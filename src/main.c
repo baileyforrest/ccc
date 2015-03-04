@@ -17,8 +17,6 @@
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "util/hashtable.h"
-
 int main() {
     return 5;
 }

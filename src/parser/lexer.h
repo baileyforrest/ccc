@@ -121,10 +121,10 @@ typedef enum token_t {
     INT,      // int
     LONG,     // long
     UNSIGNED, // unsigned
-    SIGNED,   // unsigned
+    SIGNED,   // signed
 
     DOUBLE,   // double
-    FLOAT,
+    FLOAT,    // float
 
     // Other
     ID,       // identifier
