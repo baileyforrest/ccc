@@ -52,18 +52,57 @@ void sl_destroy(slist_t *slist, bool do_free) {
 }
 
 void sl_append(slist_t *slist, sl_link_t *link) {
+    if (NULL == slist->tail) {
+        slist->head = link;
+        slist->tail = link;
+        link->next = NULL;
+        return;
+    }
+
     slist->tail->next = link;
     link->next = NULL;
     slist->tail = link;
 }
 
-void sl_remove(slist_t *slist, sl_link_t *link) {
+void sl_prepend(slist_t *slist, sl_link_t *link) {
+    if (NULL == slist->tail) {
+        slist->head = link;
+        slist->tail = link;
+        link->next = NULL;
+        return;
+    }
+
+    link->next = slist->head;
+    slist->head = link;
+}
+
+void *sl_pop_front(slist_t *slist) {
+    sl_link_t *head = slist->head;
+
+    // Removing head is O(1)
+    if (!sl_remove(slist, head)) {
+        return NULL;
+    }
+
+    return GET_ELEM(slist, head);
+}
+
+bool sl_remove(slist_t *slist, sl_link_t *link) {
+    if (NULL == link) {
+        return false;
+    }
+
     for (sl_link_t **cur = &slist->head; *cur != NULL; *cur = (*cur)->next) {
         if (*cur == link) {
             *cur = link->next;
-            return;
+            if (NULL == slist->head) {
+                slist->tail = NULL;
+            }
+            return true;
         }
     }
+
+    return false;
 }
 
 void sl_foreach(slist_t *slist, void (*func)(void *)) {

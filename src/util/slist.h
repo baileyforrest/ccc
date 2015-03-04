@@ -77,14 +77,31 @@ void sl_destroy(slist_t *slist, bool do_free);
 void sl_append(slist_t *slist, sl_link_t *link);
 
 /**
- * Removes an element from the singly linked list and returns it.
+ * Prepends an element to the list
+ *
+ * @param slist List to append to
+ * @param link Link of element to append
+ */
+void sl_prepend(slist_t *slist, sl_link_t *link);
+
+/**
+ * Pops of the front element
+ *
+ * @param slist List to pop off of
+ * @return The element to return. NULL if none
+ */
+void *sl_pop_front(slist_t *slist);
+
+/**
+ * Removes an element from the singly linked list
  *
  * Warning: This is O(n) because singly linked list.
  *
  * @param slist List to remove element from
  * @param link The link to remove.
+ * @return true if removed, false otherwise
  */
-void sl_remove(slist_t *slist, sl_link_t *link);
+bool sl_remove(slist_t *slist, sl_link_t *link);
 
 /**
  * Calls callback function on each of the elements

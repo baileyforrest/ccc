@@ -4,7 +4,7 @@
 BIN_NAME := ccc
 CC ?= cc
 DEBUG_FLAGS= -DDEBUG
-CFLAGS= -std=c11 -Wall -Wextra -g -O0
+CFLAGS= -std=c11 -Wall -Wextra -Werror -g -O0
 
 SRC= src
 DEST= bin
