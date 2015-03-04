@@ -10,6 +10,9 @@ SRC= src
 DEST= bin
 BUILD_DIR= $(DEST)/build
 
+INC= -I$(SRC)
+
+
 # Find all source files in the source directory, sorted by most
 # recently modified
 SOURCES = $(shell find $(SRC)/ -name '*.c' -printf '%T@\t%p\n' \
@@ -31,4 +34,4 @@ clean:
 	$(RM) -r $(DEST)/*
 
 $(BUILD_DIR)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(INC) -c $< -o $@
