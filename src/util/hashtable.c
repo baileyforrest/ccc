@@ -16,3 +16,13 @@
   You should have received a copy of the GNU General Public License
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include "hashtable.h"
+
+int ht_init(ht_table *ht, ht_params *params) {
+}
+
+void ht_destroy(ht_table *ht);
+int ht_insert(ht_table *ht, ht_link *elem);
+int ht_remove(ht_table *ht, ht_link *elem);
+
+void *ht_lookup(const ht_table, const void *key);

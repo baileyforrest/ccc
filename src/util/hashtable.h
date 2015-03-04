@@ -34,30 +34,79 @@ typedef uint32_t (*ht_hashfunc)(const void *key, size_t len);
 typedef bool (*ht_cmpfunc)(const void *key1, size_t len1, const void *key2,
                            size_t len2);
 
+/**
+ * Single Linked Link hash table elements.
+ *
+ * This should be a member of the values stored in the hashtable. This is
+ * preferred over the link pointing to the object stored to avoid an extra
+ * pointer indirection.
+ */
 typedef struct ht_link {
-    struct ht_link *next;
+    struct ht_link *next; /**< The next element */
 } ht_link;
 
+/**
+ * Paramaters for initializing a hashtable
+ */
 typedef struct ht_params {
-    size_t nelem_hint;
-    size_t key_len;
-    size_t key_offset;
-    size_t head_offset;
-    ht_hashfunc hashfunc;
-    ht_cmpfunc cmpfunc;
+    size_t nelem_hint;    /**< Hint for number of elements */
+    size_t key_len;       /**< Length of a key. 0 for unused */
+    size_t key_offset;    /**< Offset of the key in the struct */
+    size_t head_offset;   /**< Offset of the ht_link into the struct */
+    ht_hashfunc hashfunc; /**< Hash function to use */
+    ht_cmpfunc cmpfunc;   /**< Comparison function to use */
 } ht_params;
 
+/**
+ * The hash table structure. Basic chained buckets.
+ */
 typedef struct ht_table {
-    ht_params params;
-    ht_link *buckets;
-    size_t n_buckets;
+    ht_params params; /**< Paramaters used to initialize the hashtable */
+    ht_link *buckets; /**< The bucket array */
+    size_t n_buckets; /**< Current number of buckets */
 } ht_table;
 
-int ht_init(ht_table *ht, ht_params params);
-void ht_destroy(ht_table *ht);
-int ht_insert(ht_table *ht, ht_link *elem);
-int ht_remove(ht_table *ht, ht_link *elem);
+/**
+ * Initialize given hashtable with params
+ *
+ * @param ht The hashtable to initialize
+ * @param params paramaters
+ * @return CCC_OK on success, relevant error code on failure
+ */
+status_t ht_init(ht_table *ht, ht_params *params);
 
+/**
+ * Destroys given hashtable
+ *
+ * @param ht The hashtable to destroy
+ */
+void ht_destroy(ht_table *ht);
+
+/**
+ * Insert element with specified link into hashtable
+ *
+ * @param ht The hashtable to insert into
+ * @param elem The element to insert
+ * @return CCC_OK on success, relevant error code on failure
+ */
+status_t ht_insert(ht_table *ht, ht_link *elem);
+
+/**
+ * Remove specified element from hashtable
+ *
+ * @param ht The hashtable to remove from
+ * @param key Key of element to remove
+ * @return true if removed, false otherwise
+ */
+bool ht_remove(ht_table *ht, const void *key);
+
+/**
+ * Lookup specified element in hashtable
+ *
+ * @param ht The hashtable to retrieve from
+ * @param key Key of element to retrieve
+ * @return A pointer to the element in the hashtable. NULL otherwises
+ */
 void *ht_lookup(const ht_table, const void *key);
 
 #endif /* _HASHTABLE_H_ */
