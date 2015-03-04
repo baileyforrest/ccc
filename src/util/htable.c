@@ -19,7 +19,7 @@
 /**
  * Hashtable implementation
  */
-#include "hashtable.h"
+#include "htable.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -48,7 +48,7 @@
     (ht->params.hashfunc((key), ht->params.key_len))
 
 
-status_t ht_init(ht_table *ht, ht_params *params) {
+status_t ht_init(htable_t *ht, ht_params *params) {
     memcpy(&ht->params, params, sizeof(ht_params));
     ht->nbuckets = MAX(params->nelems, MIN_BUCKETS);
     ht->params.nelems = 0;
@@ -58,11 +58,11 @@ status_t ht_init(ht_table *ht, ht_params *params) {
     return ht->buckets == NULL ? CCC_NOMEM : CCC_OK;
 }
 
-void ht_destroy(ht_table *ht) {
+void ht_destroy(htable_t *ht) {
     // Free each chained list
     for (size_t i = 0; i < ht->nbuckets; ++i) {
-        ht_link *cur = ht->buckets[i];
-        ht_link *next = NULL;
+        ht_link_t *cur = ht->buckets[i];
+        ht_link_t *next = NULL;
 
         while(cur != NULL) {
             next = cur->next;
@@ -80,22 +80,22 @@ void ht_destroy(ht_table *ht) {
  *
  * @param ht The hashtable to grow
  */
-static status_t grow_ht(ht_table *ht) {
+static status_t grow_ht(htable_t *ht) {
     size_t new_nbuckets = NEW_SIZE(ht);
-    ht_link **new_buckets = calloc(new_nbuckets, sizeof(ht_link *));
+    ht_link_t **new_buckets = calloc(new_nbuckets, sizeof(ht_link_t *));
 
     // Iterate through current hashtable and add all elems to new bucketlist
     for (size_t i = 0; i < ht->nbuckets; ++i) {
 
-        ht_link *next = NULL;
-        for (ht_link *cur = ht->buckets[i]; cur != NULL; cur = next) {
+        ht_link_t *next = NULL;
+        for (ht_link_t *cur = ht->buckets[i]; cur != NULL; cur = next) {
             next = cur->next;
 
             // Add cur to new bucket list
             void *key = GET_KEY(ht, cur);
             uint32_t bucket = GET_HASH(ht, key) % new_nbuckets;
 
-            ht_link **new_cur = &new_buckets[bucket];
+            ht_link_t **new_cur = &new_buckets[bucket];
             for(; *new_cur != NULL; cur = (*new_cur)->next)
                 continue;
 
@@ -112,7 +112,7 @@ static status_t grow_ht(ht_table *ht) {
     return CCC_OK;
 }
 
-status_t ht_insert(ht_table *ht, ht_link *elem) {
+status_t ht_insert(htable_t *ht, ht_link_t *elem) {
     // Grow the HT if necessary
     if (ht->params.nelems >= MAX_LOAD(ht)) {
         status_t status = grow_ht(ht);
@@ -125,7 +125,7 @@ status_t ht_insert(ht_table *ht, ht_link *elem) {
     void *key = GET_KEY(ht, elem);
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
-    ht_link **cur = &ht->buckets[bucket];
+    ht_link_t **cur = &ht->buckets[bucket];
     for(; *cur != NULL; *cur = (*cur)->next) {
         void *key2 = GET_KEY(ht, *cur);
 
@@ -154,10 +154,10 @@ status_t ht_insert(ht_table *ht, ht_link *elem) {
  * @return Returns pointer to pointer of found element in hashtable chain,
  * NULL if doesn't exist
  */
-static ht_link **ht_lookup_helper(ht_table *ht, const void *key) {
+static ht_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
-    ht_link **cur = &ht->buckets[bucket];
+    ht_link_t **cur = &ht->buckets[bucket];
     for (; *cur != NULL; *cur = (*cur)->next) {
         void *key2 = GET_KEY(ht, *cur);
 
@@ -168,24 +168,24 @@ static ht_link **ht_lookup_helper(ht_table *ht, const void *key) {
     return NULL;
 }
 
-bool ht_remove(ht_table *ht, const void *key) {
-    ht_link **pp_link = ht_lookup_helper(ht, key);
+bool ht_remove(htable_t *ht, const void *key) {
+    ht_link_t **pp_link = ht_lookup_helper(ht, key);
     if (pp_link == NULL) {
         return false;
     }
 
-    ht_link *link = *pp_link;
+    ht_link_t *link = *pp_link;
     *pp_link = (*pp_link)->next;
     free(GET_ELEM(ht, link));
     return true;
 }
 
-void *ht_lookup(const ht_table *ht, const void *key) {
-    ht_link **pp_link = ht_lookup_helper((ht_table *)ht, key);
+void *ht_lookup(const htable_t *ht, const void *key) {
+    ht_link_t **pp_link = ht_lookup_helper((htable_t *)ht, key);
     if (pp_link == NULL) {
         return NULL;
     }
 
-    ht_link *link = *pp_link;
+    ht_link_t *link = *pp_link;
     return GET_ELEM(ht, link);
 }

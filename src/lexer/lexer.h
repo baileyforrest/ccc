@@ -36,7 +36,7 @@ typedef enum token_t {
     ASSIGN,        // =
     PLUSEQ,        // +=
     MINUSEQ,       // -=
-    MULEQ,         // *=
+    STAREQ,        // *=
     DIVEQ,         // /=
     MODEQ,         // %=
     NEQ,           // !=
@@ -63,7 +63,7 @@ typedef enum token_t {
 
     PLUS,          // +
     MINUS,         // -
-    MUL,           // *
+    STAR,          // *
     DIV,           // /
     MOD,           // %
 
@@ -102,7 +102,7 @@ typedef enum token_t {
     VOLATILE,      // volatile
     WHILE,         // while
 
-    // New
+    // Underscore keywords
     ALIGNAS,       // _Alignas
     ALIGNOF,       // _Alignof
     BOOL,          // _Bool
@@ -128,6 +128,7 @@ typedef enum token_t {
 
     // Other
     ID,       // identifier
+    STRING,   // string
 } token_t;
 
 #endif /* _LEXER_H_ */
