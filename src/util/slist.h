@@ -32,6 +32,10 @@
 
 #include "util/status.h"
 
+/** Pointer to element represented by head */
+#define GET_ELEM(list, head) \
+    ((void *)(head) - list->head_offset)
+
 /**
  * Single Linked Link list node.
  *
@@ -60,13 +64,35 @@ typedef struct slist_t {
  */
 status_t sl_init(slist_t *slist, size_t head_offset);
 
+
+#define SL_FREE   true
+#define SL_NOFREE false
+
 /**
  * Does not free slist. Destroys a singly linked list. Optionally frees elements
  *
  * @param slist List head to destroy
- * @param do_free if true, frees the elements
+ * @param do_free if SL_FREE, frees the elements
  */
 void sl_destroy(slist_t *slist, bool do_free);
+
+/**
+ * Return slist head
+ *
+ * @param slist List to get head of
+ */
+inline void *sl_head(slist_t *slist) {
+    return slist->head;
+}
+
+/**
+ * Return slist tail
+ *
+ * @param slist List to get tail of
+ */
+inline void *sl_tail(slist_t *slist) {
+    return slist->tail;
+}
 
 /**
  * Appends an element to the list
@@ -110,5 +136,14 @@ bool sl_remove(slist_t *slist, sl_link_t *link);
  * @param func The function to call on each element
  */
 void sl_foreach(slist_t *slist, void (*func)(void *));
+
+// TODO: DOC this and fix the forward slashes
+#define SL_FOREACH(CURRENT_ELEM, SL_HEAD, LINK_NAME)      \
+    for ( \
+        sl_link_t *node = (SL_HEAD)->head, (CURRENT_ELEM) = GET_ELEM((SL_HEAD), node); \
+    node != NULL; \
+    node = node->next, (CURRENT_ELEM) = GET_ELEM((SL_HEAD), node);
+        )
+
 
 #endif /* _SLIST_H_ */

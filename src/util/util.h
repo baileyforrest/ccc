@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "util/slist.h"
+
 /**
  * Typesafe/single evalutation max macro
  *
@@ -56,8 +58,16 @@
  */
 typedef struct len_str_t {
     const char *str; /**< String. Possibly non null terminated */
-    size_t len;      /**< Length of the string */
+    size_t len;      /**< Length of the string (not including NULL) */
 } len_str_t;
+
+/**
+ * String slist node
+ */
+typedef struct len_str_node_t {
+    sl_link_t link; /**< Singly linked list node */
+    let_str_t str;  /**< Stored string object */
+} len_str_node_t;
 
 /**
  * djb2 String hash function for len_str_t.

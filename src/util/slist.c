@@ -26,10 +26,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/** Pointer to element represented by head */
-#define GET_ELEM(list, head) \
-    ((void *)(head) - list->head_offset)
-
 status_t sl_init(slist_t *slist, size_t head_offset) {
     slist->head = NULL;
     slist->tail = NULL;
@@ -39,7 +35,7 @@ status_t sl_init(slist_t *slist, size_t head_offset) {
 }
 
 void sl_destroy(slist_t *slist, bool do_free) {
-    if (!do_free) {
+    if (do_free == SL_NOFREE) {
         memset(slist, 0, sizeof(*slist));
         return;
     }

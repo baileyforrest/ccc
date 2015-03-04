@@ -23,16 +23,27 @@
 #ifndef _PREPROCESSOR_H_
 #define _PREPROCESSOR_H_
 
+#include <stdbool.h>
+
 #include "util/htable.h"
 #include "util/slist.h"
+
 
 /**
  * Object for preprocessor
  */
 typedef struct preprocessor_t {
     slist_t file_insts;        /**< Stack of instances of open files */
-    slist_t macro_param_stack; /**< Stack of macro paramater mappings */
+    slist_t macro_insts;       /**< Stack of paramaters and strings mappings */
     htable_t macros;           /**< Macro table */
+
+    char *cur_param;
+    char *param_end;
+
+    // Paramaters for reading preprocessor commands
+    bool block_comment;        /*< true if in a block comment */
+    bool string;               /*< true if in string */
+    bool char_line;            /*< true if non whitespace on current line */
 } preprocessor_t;
 
 
@@ -66,11 +77,13 @@ status_t pp_open(preprocessor_t *pp, const char *filename);
  */
 void pp_close(preprocessor_t *pp);
 
+#define PP_EOF (-1)
+
 /**
  * Fetch next character from preprocessor
  *
  * @param  pp The preprocessor to get characters from
- * @return the next character. -1 on EOF
+ * @return the next character. PP_EOF on EOF
  */
 int pp_nextchar(preprocessor_t *pp);
 
