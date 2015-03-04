@@ -17,11 +17,15 @@
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
 /**
- * Utility macros
+ * Misc Utilities
  */
 
 #ifndef _UTIL_H_
 #define _UTIL_H_
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 /**
  * Typesafe/single evalutation max macro
@@ -46,5 +50,21 @@
     __typeof__ (b) _b = (b); \
     _a < _b ? _a : _b; })
 #endif /* MIN */
+
+/**
+ * djb2 String hash function
+ *
+ * Source: http://www.cse.yorku.ca/~oz/hash.html
+ *
+ * @param str The string to hash. Optionally null terminated
+ * @param len Optional length if string is not null terminated
+ */
+uint32_t strhash(const void *vstr, size_t len);
+
+/**
+ * String compare with void pointers to be compatible with the hash table
+ * interface
+ */
+bool vstrcmp(const void *str1, const void *str2, size_t len);
 
 #endif /* _UTIL_H_ */

@@ -17,30 +17,29 @@
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _SYM_TAB_H_
-#define _SYM_TAB_H_
+#ifndef _SYMTAB_H_
+#define _SYMTAB_H_
 
 #include "lexer/lexer.h"
 
 #include "util/status.h"
 #include "util/htable.h"
+#include "util/slist.h"
 
 /**
  * Symbol table
  */
 typedef struct symtab_t {
-    ht_table hashtab; /**< Hash table backing store */
+    htable_t hashtab; /**< Hash table backing store */
 } symtab_t;
 
 /**
- * Tagged union representing type and value of a lexeme
+ * Type and value of a string lexeme
  */
-typedef struct sym_tab_entry_t {
-    token_t type;           /**< Denotes the type of the symbol table entry */
-    union {                 /**< Anonymous union holding context */
-        /** ID: Points to an identifier's null terminated string value */
-        const char *str;
-    };
+typedef struct symtab_entry_t {
+    ht_link_t link;  /**< Hashtable link */
+    const char *str; /**< Points to null terminated string value */
+    token_t type;    /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;
 
 /**
@@ -73,4 +72,4 @@ status_t st_lookup(symtab_t *table, const char *str, size_t len,
                        symtab_entry_t **entry);
 
 
-#endif /* _SYM_TAB_H_ */
+#endif /* _SYMTAB_H_ */

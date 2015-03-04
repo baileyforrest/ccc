@@ -23,8 +23,8 @@
  * Some interface ideas from here: http://lwn.net/Articles/612100/
  */
 
-#ifndef _HASHTABLE_H_
-#define _HASHTABLE_H_
+#ifndef _HTABLE_H_
+#define _HTABLE_H_
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -111,4 +111,4 @@ bool ht_remove(htable_t *ht, const void *key);
  */
 void *ht_lookup(const htable_t *ht, const void *key);
 
-#endif /* _HASHTABLE_H_ */
+#endif /* _HTABLE_H_ */

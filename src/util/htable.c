@@ -170,7 +170,7 @@ static ht_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
 
 bool ht_remove(htable_t *ht, const void *key) {
     ht_link_t **pp_link = ht_lookup_helper(ht, key);
-    if (pp_link == NULL) {
+    if (NULL == pp_link) {
         return false;
     }
 
@@ -182,7 +182,7 @@ bool ht_remove(htable_t *ht, const void *key) {
 
 void *ht_lookup(const htable_t *ht, const void *key) {
     ht_link_t **pp_link = ht_lookup_helper((htable_t *)ht, key);
-    if (pp_link == NULL) {
+    if (NULL == pp_link) {
         return NULL;
     }
 
