@@ -25,6 +25,7 @@
 #include "util/status.h"
 #include "util/htable.h"
 #include "util/slist.h"
+#include "util/util.h"
 
 /**
  * Symbol table
@@ -37,9 +38,9 @@ typedef struct symtab_t {
  * Type and value of a string lexeme
  */
 typedef struct symtab_entry_t {
-    ht_link_t link;  /**< Hashtable link */
-    const char *str; /**< Points to null terminated string value */
-    token_t type;    /**< Denotes the type of the symbol table entry */
+    ht_link_t link;   /**< Hashtable link */
+    len_str_t key;    /**< Hashtable key value */
+    token_t type;     /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;
 
 /**

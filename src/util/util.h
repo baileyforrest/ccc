@@ -52,19 +52,30 @@
 #endif /* MIN */
 
 /**
- * djb2 String hash function
+ * String with length attached
+ */
+typedef struct len_str_t {
+    const char *str; /**< String. Possibly non null terminated */
+    size_t len;      /**< Length of the string */
+} len_str_t;
+
+/**
+ * djb2 String hash function for len_str_t.
+ * Must be void * for hashtable interface
  *
  * Source: http://www.cse.yorku.ca/~oz/hash.html
  *
- * @param str The string to hash. Optionally null terminated
- * @param len Optional length if string is not null terminated
+ * @param len_str The len_str to hash
  */
-uint32_t strhash(const void *vstr, size_t len);
+uint32_t strhash(const void *len_str);
 
 /**
  * String compare with void pointers to be compatible with the hash table
  * interface
+ *
+ * @param len_str1 First string
+ * @param len_str2 Second string
  */
-bool vstrcmp(const void *str1, const void *str2, size_t len);
+bool vstrcmp(const void *len_str1, const void *len_str2);
 
 #endif /* _UTIL_H_ */

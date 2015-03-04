@@ -33,55 +33,55 @@
  */
 static symtab_entry_t s_reserved[] = {
     // Keywords
-    { { NULL }, "auto"          , AUTO          },
-    { { NULL }, "break"         , BREAK         },
-    { { NULL }, "case"          , CASE          },
-    { { NULL }, "const"         , CONST         },
-    { { NULL }, "continue"      , CONTINUE      },
-    { { NULL }, "default"       , DEFAULT       },
-    { { NULL }, "do"            , DO            },
-    { { NULL }, "else"          , ELSE          },
-    { { NULL }, "enum"          , ENUM          },
-    { { NULL }, "extern"        , EXTERN        },
-    { { NULL }, "for"           , FOR           },
-    { { NULL }, "goto"          , GOTO          },
-    { { NULL }, "if"            , IF            },
-    { { NULL }, "inline"        , INLINE        },
-    { { NULL }, "register"      , REGISTER      },
-    { { NULL }, "restrict"      , RESTRICT      },
-    { { NULL }, "return"        , RETURN        },
-    { { NULL }, "sizeof"        , SIZEOF        },
-    { { NULL }, "static"        , STATIC        },
-    { { NULL }, "struct"        , STRUCT        },
-    { { NULL }, "switch"        , SWITCH        },
-    { { NULL }, "typedef"       , TYPEDEF       },
-    { { NULL }, "union"         , UNION         },
-    { { NULL }, "volatile"      , VOLATILE      },
-    { { NULL }, "while"         , WHILE         },
+    { { NULL }, {"auto"          , sizeof "auto"          - 1}, AUTO          },
+    { { NULL }, {"break"         , sizeof "break"         - 1}, BREAK         },
+    { { NULL }, {"case"          , sizeof "case"          - 1}, CASE          },
+    { { NULL }, {"const"         , sizeof "const"         - 1}, CONST         },
+    { { NULL }, {"continue"      , sizeof "continue"      - 1}, CONTINUE      },
+    { { NULL }, {"default"       , sizeof "default"       - 1}, DEFAULT       },
+    { { NULL }, {"do"            , sizeof "do"            - 1}, DO            },
+    { { NULL }, {"else"          , sizeof "else"          - 1}, ELSE          },
+    { { NULL }, {"enum"          , sizeof "enum"          - 1}, ENUM          },
+    { { NULL }, {"extern"        , sizeof "extern"        - 1}, EXTERN        },
+    { { NULL }, {"for"           , sizeof "for"           - 1}, FOR           },
+    { { NULL }, {"goto"          , sizeof "goto"          - 1}, GOTO          },
+    { { NULL }, {"if"            , sizeof "if"            - 1}, IF            },
+    { { NULL }, {"inline"        , sizeof "inline"        - 1}, INLINE        },
+    { { NULL }, {"register"      , sizeof "register"      - 1}, REGISTER      },
+    { { NULL }, {"restrict"      , sizeof "restrict"      - 1}, RESTRICT      },
+    { { NULL }, {"return"        , sizeof "return"        - 1}, RETURN        },
+    { { NULL }, {"sizeof"        , sizeof "sizeof"        - 1}, SIZEOF        },
+    { { NULL }, {"static"        , sizeof "static"        - 1}, STATIC        },
+    { { NULL }, {"struct"        , sizeof "struct"        - 1}, STRUCT        },
+    { { NULL }, {"switch"        , sizeof "switch"        - 1}, SWITCH        },
+    { { NULL }, {"typedef"       , sizeof "typedef"       - 1}, TYPEDEF       },
+    { { NULL }, {"union"         , sizeof "union"         - 1}, UNION         },
+    { { NULL }, {"volatile"      , sizeof "volatile"      - 1}, VOLATILE      },
+    { { NULL }, {"while"         , sizeof "while"         - 1}, WHILE         },
 
-    // Underscore keywords
-    { { NULL }, "_Alignas"      , ALIGNAS       },
-    { { NULL }, "_Alignof"      , ALIGNOF       },
-    { { NULL }, "_Bool"         , BOOL          },
-    { { NULL }, "_Complex"      , COMPLEX       },
-    { { NULL }, "_Generic"      , GENERIC       },
-    { { NULL }, "_Imaginary"    , IMAGINARY     },
-    { { NULL }, "_Noreturn"     , NORETURN      },
-    { { NULL }, "_Static_assert", STATIC_ASSERT },
-    { { NULL }, "_Thread_local" , THREAD_LOCAL  },
+    // Underscor{e keywords        sizeof e keywords
+    { { NULL }, {"_Alignas"      , sizeof "_Alignas"      - 1}, ALIGNAS       },
+    { { NULL }, {"_Alignof"      , sizeof "_Alignof"      - 1}, ALIGNOF       },
+    { { NULL }, {"_Bool"         , sizeof "_Bool"         - 1}, BOOL          },
+    { { NULL }, {"_Complex"      , sizeof "_Complex"      - 1}, COMPLEX       },
+    { { NULL }, {"_Generic"      , sizeof "_Generic"      - 1}, GENERIC       },
+    { { NULL }, {"_Imaginary"    , sizeof "_Imaginary"    - 1}, IMAGINARY     },
+    { { NULL }, {"_Noreturn"     , sizeof "_Noreturn"     - 1}, NORETURN      },
+    { { NULL }, {"_Static_assert", sizeof "_Static_assert"- 1}, STATIC_ASSERT },
+    { { NULL }, {"_Thread_local" , sizeof "_Thread_local" - 1}, THREAD_LOCAL  },
 
     // Types
-    { { NULL }, "void"          , VOID          },
+    { { NULL }, {"void"          , sizeof "void"          - 1}, VOID          },
 
-    { { NULL }, "char"          , CHAR          },
-    { { NULL }, "short"         , SHORT         },
-    { { NULL }, "int"           , INT           },
-    { { NULL }, "long"          , LONG          },
-    { { NULL }, "unsigned"      , UNSIGNED      },
-    { { NULL }, "signed"        , SIGNED        },
+    { { NULL }, {"char"          , sizeof "char"          - 1}, CHAR          },
+    { { NULL }, {"short"         , sizeof "short"         - 1}, SHORT         },
+    { { NULL }, {"int"           , sizeof "int"           - 1}, INT           },
+    { { NULL }, {"long"          , sizeof "long"          - 1}, LONG          },
+    { { NULL }, {"unsigned"      , sizeof "unsigned"      - 1}, UNSIGNED      },
+    { { NULL }, {"signed"        , sizeof "signed"        - 1}, SIGNED        },
 
-    { { NULL }, "double"        , DOUBLE        },
-    { { NULL }, "float"         , FLOAT         },
+    { { NULL }, {"double"        , sizeof "double"        - 1}, DOUBLE        },
+    { { NULL }, {"float"         , sizeof "float"         - 1}, FLOAT         },
 };
 
 /**
@@ -89,8 +89,7 @@ static symtab_entry_t s_reserved[] = {
  */
 static ht_params s_params = {
     sizeof(s_reserved) / sizeof(s_reserved[0]) * 2, // Size estimate
-    0,                                              // No specified key length
-    offsetof(symtab_entry_t, str),                  // Offset of key (string)
+    offsetof(symtab_entry_t, key),                  // Offset of key (string)
     offsetof(symtab_entry_t, link),                 // Offset of ht link
     strhash,                                        // Hash function
     vstrcmp,                                        // void string compare
@@ -124,7 +123,9 @@ status_t st_lookup(symtab_t *table, const char *str, size_t len,
                    symtab_entry_t **entry) {
     status_t status = CCC_OK;
 
-    symtab_entry_t *cur_entry = ht_lookup(&table->hashtab, str);
+    len_str_t tmp = { str, len };
+
+    symtab_entry_t *cur_entry = ht_lookup(&table->hashtab, &tmp);
     if (NULL != entry) {
         *entry = cur_entry;
         return status;
@@ -149,7 +150,8 @@ status_t st_lookup(symtab_t *table, const char *str, size_t len,
 
     // If its not in symbol table already, must be identifier type
     cur_entry->type = ID;
-    cur_entry->str = new_str;
+    cur_entry->key.str = new_str;
+    cur_entry->key.len = len;
 
     if (CCC_OK != (status = ht_insert(&table->hashtab, &cur_entry->link))) {
         goto fail;

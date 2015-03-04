@@ -32,8 +32,8 @@
 
 #include "util/status.h"
 
-typedef uint32_t (*ht_hashfunc)(const void *key, size_t len);
-typedef bool (*ht_cmpfunc)(const void *key1, const void *key2, size_t len);
+typedef uint32_t (*ht_hashfunc)(const void *key);
+typedef bool (*ht_cmpfunc)(const void *key1, const void *key2);
 
 /**
  * Single Linked Link hash table elements.
@@ -51,7 +51,6 @@ typedef struct ht_link_t {
  */
 typedef struct ht_params {
     size_t nelems;        /**< Hint for number of elements, 0 for unused */
-    size_t key_len;       /**< Length of a key. 0 for unused */
     size_t key_offset;    /**< Offset of the key in the struct */
     size_t head_offset;   /**< Offset of the ht_link_t into the struct */
     ht_hashfunc hashfunc; /**< Hash function to use */

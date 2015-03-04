@@ -45,7 +45,7 @@
 
 /** Gets hash of a key */
 #define GET_HASH(ht, key) \
-    (ht->params.hashfunc((key), ht->params.key_len))
+    (ht->params.hashfunc((key)))
 
 
 status_t ht_init(htable_t *ht, ht_params *params) {
@@ -129,7 +129,7 @@ status_t ht_insert(htable_t *ht, ht_link_t *elem) {
     for(; *cur != NULL; *cur = (*cur)->next) {
         void *key2 = GET_KEY(ht, *cur);
 
-        if (!ht->params.cmpfunc(key, key2, ht->params.key_len)) {
+        if (!ht->params.cmpfunc(key, key2)) {
             // Different keys
             continue;
         }
@@ -161,7 +161,7 @@ static ht_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
     for (; *cur != NULL; *cur = (*cur)->next) {
         void *key2 = GET_KEY(ht, *cur);
 
-        if (ht->params.cmpfunc(key, key2, ht->params.key_len)) {
+        if (ht->params.cmpfunc(key, key2)) {
             return cur;
         }
     }
