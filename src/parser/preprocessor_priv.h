@@ -27,6 +27,55 @@
 #include "util/util.h"
 
 /**
+ * Given a pointer and an end, skip whitespace characters, or stop if the end is
+ * reached
+ *
+ * @param lookahead - char * to advance
+ * @param end - max char *
+ */
+#define SKIP_WS(lookahead, end)                 \
+    do {                                        \
+        bool done = false;                      \
+        while (!done && lookahead != end) {     \
+            switch (*lookahead) {               \
+            case ' ':                           \
+            case '\t':                          \
+                lookahead++;                    \
+                break;                          \
+            default:                            \
+                done = true;                    \
+            }                                   \
+        }                                       \
+    } while(0)
+
+/**
+ * Given a pointer and an end, advance the the pointer until 1 past the end of
+ * an identifier, or stop if the end is reaced
+ *
+ * @param lookahead - char * to advance
+ * @param end - max char *
+ */
+#define ADVANCE_IDENTIFIER(lookahead, end)              \
+    do {                                                \
+        bool done = false;                              \
+        while (!done && lookahead != end) {             \
+            /* Charaters allowed to be in idenitifer */ \
+            switch (*lookahead) {                       \
+            case ASCII_LOWER:                           \
+            case ASCII_UPPER:                           \
+            case ASCII_DIGIT:                           \
+            case '_':                                   \
+            case '-':                                   \
+                lookahead++;                            \
+                break;                                  \
+            default: /* Found end */                    \
+                done = true;                            \
+            }                                           \
+        }                                               \
+    } while(0)                                          \
+
+
+/**
  * An instance of an open file on the preprocessor
  */
 typedef struct pp_file_t {
@@ -69,14 +118,6 @@ typedef struct pp_macro_inst_t {
 } pp_macro_inst_t;
 
 
-typedef void (*pp_action_t)(preprocessor_t *pp);
-
-typedef struct pp_directive_t {
-    sl_link_t link; /**< Hash table link */
-    len_str_t key; /**< Directive name */
-    pp_action_t action; /**< Preprocessor action */
-} pp_directive_t;
-
 /**
  * Maps the specified file. Gives result as a pp_file_t
  *
@@ -101,7 +142,7 @@ status_t pp_file_destroy(pp_file_t *pp_file);
  * @param macro to initalize
  * @return CCC_OK on success, error code otherwise
  */
-status_t pp_macro_create(pp_macro_t *macro);
+status_t pp_macro_init(pp_macro_t *macro);
 
 /**
  * Destroys a macro instance. Does not free macro
@@ -124,17 +165,5 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result);
  * @param macro intance to destroy
  */
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
-
-/**
- * Directive for #define
- * @param pp The preprocessor to define for
- */
-void pp_directive_define(preprocessor_t *pp);
-
-/**
- * Directive for #include
- * @param pp The preprocessor to include for
- */
-void pp_directive_include(preprocessor_t *pp);
 
 #endif /* _PREPROCESSOR_PRIV_H_ */
