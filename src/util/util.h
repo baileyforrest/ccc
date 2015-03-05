@@ -57,7 +57,7 @@
  * String with length attached
  */
 typedef struct len_str_t {
-    const char *str; /**< String. Possibly non null terminated */
+    char *str; /**< String. Possibly non null terminated */
     size_t len;      /**< Length of the string (not including NULL) */
 } len_str_t;
 

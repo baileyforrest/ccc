@@ -24,6 +24,7 @@
 #include "preprocessor_priv.h"
 
 #include <stddef.h>
+#include <string.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -33,6 +34,42 @@
 
 #include "util/slist.h"
 #include "util/htable.h"
+
+#define SKIP_WS(lookahead, end)                 \
+    do {                                        \
+        bool done = false;                      \
+        while (!done && lookahead != end) {     \
+            switch (*lookahead) {               \
+            case ' ':                           \
+            case '\t':                          \
+                lookahead++;                    \
+                break;                          \
+            default:                            \
+                done = true;                    \
+            }                                   \
+        }                                       \
+    } while(0)
+
+
+#define ADVANCE_IDENTIFIER(lookahead, end)              \
+    do {                                                \
+        bool done = false;                              \
+        while (!done && lookahead != end) {             \
+            /* Charaters allowed to be in idenitifer */ \
+            switch (*lookahead) {                       \
+            case ASCII_LOWER:                           \
+            case ASCII_UPPER:                           \
+            case ASCII_DIGIT:                           \
+            case '_':                                   \
+            case '-':                                   \
+                lookahead++;                            \
+                break;                                  \
+            default: /* Found end */                    \
+                done = true;                            \
+            }                                           \
+        }                                               \
+    } while(0)                                          \
+
 
 status_t pp_init(preprocessor_t *pp) {
     status_t status = CCC_OK;
@@ -75,6 +112,7 @@ void pp_destroy(preprocessor_t *pp) {
     }
     sl_destroy(&pp->macro_insts, SL_FREE);
 
+    // HT_FOREACH() TODO: Macro destroy
     ht_destroy(&pp->macros);
 }
 
@@ -163,15 +201,62 @@ int pp_nextchar(preprocessor_t *pp) {
     int cur_char = **cur;
     char *next_char = *cur + 1;
 
+    // Found a character on line, don't process new directives
+    if (!pp->char_line && !isspace(cur_char)) {
+        pp->char_line = true;
+    }
+
+    // Record comments
+    if (cur_char == '/' && next_char != end &&
+        !pp->line_comment && !pp->block_comment && !pp->string) {
+        if (*next_char == '/') {
+            pp->line_comment = true;
+        } else if (*next_char == '*') {
+            pp->block_comment = true;
+        }
+    }
+
+    if (!pp->string && cur_char == '"') {
+        pp->string = true;
+    }
+
+    // TODO: Handle string concatenation? Maybe let the lexer do it?
+    if (pp->string && cur_char == '"') {
+        pp->string = false;
+    }
+
+    bool check_directive = false;
+
     switch (cur_char) {
+    case '\n': // Reset line variables
+        pp->char_line = false;
+        pp->line_comment = false;
+
         // Cases which cannot be before a macro
         // TODO: verify/add more of these
     case ASCII_LOWER:
     case ASCII_UPPER:
     case ASCII_DIGIT:
+    case '_':
+    case '-':
         // Return the current character
         // Also advance the current cur pointer
         return *((*cur)++);
+
+    case '#':
+        // Skip cases which ignore preprocessor
+        if (pp->block_comment || pp->line_comment || pp->string ||
+            pp->char_line) {
+            return *((*cur)++);
+        }
+
+        // TODO: Handle concatenation in macros
+        if (NULL != macro_inst) {
+            return *((*cur)++);
+        }
+
+        // Not processing a macro
+        check_directive = true;
     default:
         break;
         // Fall through, need to look for macros
@@ -185,29 +270,35 @@ int pp_nextchar(preprocessor_t *pp) {
     // Need to look ahead current identifier and see if its a macro
     char *lookahead = next_char;
 
-    while(lookahead != end) {
-        // Charaters allowed to be in macro
-        switch (*lookahead) {
-        case ASCII_LOWER:
-        case ASCII_UPPER:
-        case ASCII_DIGIT:
-            lookahead++;
-        default: // Found end
-            break;
-        }
-    }
+    ADVANCE_IDENTIFIER(lookahead, end);
 
     len_str_t lookup = {
         next_char,
         (size_t)(lookahead - next_char)
     };
 
+    // Check for preprocessor directive matching the string
+    if (check_directive) {
+        pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
+
+        if (NULL == directive) {
+            // TODO Handle this correctly
+            assert(false && "Invalid preprocessor command");
+        }
+
+        // Skip over directive name
+        *cur = lookahead;
+        // Perform directive action and return next character
+        directive->action(pp);
+        return pp_nextchar(pp);
+    }
+
     // Macro paramaters take precidence, look them up first
     if (NULL != macro_inst) {
         pp_param_map_elem_t *param = ht_lookup(&macro_inst->param_map, &lookup);
 
         // Found a parameter
-        // Advance lookhead to end of param, and set param state in pp
+        // Advance lookahead to end of param, and set param state in pp
         if (NULL != param) {
             int retval = **cur;
             *cur = lookahead;
@@ -369,6 +460,21 @@ status_t pp_file_destroy(pp_file_t *pp_file) {
     return status;
 }
 
+status_t pp_macro_init(pp_macro_t *macro) {
+    return sl_init(&macro->params, offsetof(len_str_node_t, link));
+}
+
+void pp_macro_destroy(pp_macro_t *macro) {
+    sl_link_t *cur;
+    SL_FOREACH(cur, &macro->params) {
+        len_str_node_t *str = GET_ELEM(&macro->params, cur);
+        free(str->str.str);
+    }
+    sl_destroy(&macro->params, SL_FREE);
+
+    free(macro->start);
+}
+
 status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
     status_t status = CCC_OK;
 
@@ -406,4 +512,138 @@ fail1:
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     ht_destroy(&macro_inst->param_map);
     free(macro_inst);
+}
+
+/**
+ * Note that this function needs to allocate memory for the paramaters, macro
+ * name and body. This is because the mmaped file will be unmapped when we
+ * are done with the file.
+ *
+ * TODO: A possible optimization would be to read the whole macro twice. The
+ * first time is to allocate the whole thing in one chunk, the second time is
+ * to copy the macro into the newly allocated memory.
+ */
+void pp_directive_define(preprocessor_t *pp) {
+    assert(NULL == sl_head(&pp->macro_insts) && "Define inside macro!");
+
+    pp_file_t *file = sl_head(&pp->file_insts);
+    char *cur = file->cur;
+    char *end = file->end;
+    char *lookahead = file->cur;
+
+    // Skip whitespace before name
+    SKIP_WS(lookahead, end);
+    if (lookahead == end) {
+        // TODO: Report/handle error
+        assert(false && "Macro definition at end of file");
+    }
+    cur = lookahead;
+
+    // Read the name of the macro
+    ADVANCE_IDENTIFIER(lookahead, end);
+    if (lookahead == end) {
+        // TODO: Report/handle error
+        assert(false && "Macro definition at end of file");
+    }
+
+    // Create the macro object
+    pp_macro_t *new_macro = malloc(sizeof(pp_macro_t));
+    if (NULL == new_macro) {
+        // TODO: Report/handle error
+        assert(false && "Out of memory");
+    }
+
+    status_t status = pp_macro_init(new_macro);
+    if (CCC_OK != status) {
+        // TODO: Report/handle error
+        assert(false && "Failed to create macro");
+    }
+
+    // Allocate the name
+    new_macro->name.len = lookahead - cur;
+    new_macro->name.str = malloc(new_macro->name.len + 1);
+    if (NULL == new_macro->name.str) {
+        // TODO: Report/handle error
+        assert(false && "Out of memory");
+    }
+    strncpy(new_macro->name.str, cur, new_macro->name.len);
+    new_macro->name.str[new_macro->name.len] = '\0';
+
+    cur = lookahead;
+
+    // Process paramaters
+    new_macro->num_params = 0;
+    if ('(' == *lookahead) {
+        while (lookahead != end) {
+            new_macro->num_params++;
+
+            ADVANCE_IDENTIFIER(lookahead, end);
+            size_t param_len = lookahead - cur;
+
+            if (param_len == 0) {
+                // TODO: Handle correctly
+                assert(false && "missing paramater name");
+            }
+
+            // Allocate paramaters
+            len_str_node_t *string = malloc(sizeof(len_str_t));
+            if (NULL == string) {
+                // TODO: Report/handle error
+                assert(false && "Out of memory");
+            }
+            string->str.len = param_len;
+            string->str.str = malloc(param_len + 1);
+            strncpy(string->str.str, cur, param_len);
+            string->str.str[param_len] = '\0';
+
+            sl_append(&new_macro->params, &string->link);
+
+            cur = lookahead + 1;
+
+            if (*lookahead == ',') {
+                lookahead++;
+            }
+
+            if (*lookahead == ')') { // End of param list
+                lookahead++;
+                break;
+            }
+        }
+        if (lookahead == end) {
+            // TODO: Report/handle error
+            assert(false && "Macro definition at end of file");
+        }
+    }
+
+    // Skip whitespace after parameters
+    SKIP_WS(lookahead, end);
+    if (lookahead == end) {
+        // TODO: Report/handle error
+        assert(false && "Macro definition at end of file");
+    }
+
+    cur = lookahead;
+
+    // Keep processing macro until we find a newline
+    while (lookahead != end) {
+        if ('\n' == *lookahead && '\\' != *(lookahead - 1)) {
+            break;
+        }
+        lookahead++;
+    }
+    if (lookahead == end) {
+        // TODO: Report/handle error
+        assert(false && "Macro definition at end of file");
+    }
+
+    // Allocate the macro body
+    size_t macro_len = lookahead - cur;
+    new_macro->start = malloc(macro_len + 1);
+    strncpy(new_macro->start, cur, macro_len);
+
+    new_macro->end = new_macro->start + macro_len;
+    *new_macro->end = '\0';
+
+    // Add it to the hashtable
+    ht_insert(&pp->macros, &new_macro->link);
 }

@@ -69,7 +69,7 @@ void st_destroy(symtab_t *table);
  * @param Pointer to an entry pointer if success, otherwise unchanged
  * @return CCC_OK on success, error code on failure
  */
-status_t st_lookup(symtab_t *table, const char *str, size_t len,
+status_t st_lookup(symtab_t *table, char *str, size_t len,
                        symtab_entry_t **entry);
 
 
