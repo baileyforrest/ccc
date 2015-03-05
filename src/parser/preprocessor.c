@@ -70,6 +70,10 @@
         }                                               \
     } while(0)                                          \
 
+static pp_directive_t s_directives[] = {
+    { { NULL }, { "define" , sizeof("define") } , pp_directive_define  },
+    { { NULL }, { "include", sizeof("include") }, pp_directive_include }
+};
 
 status_t pp_init(preprocessor_t *pp) {
     status_t status = CCC_OK;
@@ -85,6 +89,12 @@ status_t pp_init(preprocessor_t *pp) {
 
     if (CCC_OK != (status = ht_init(&pp->macros, offsetof(pp_macro_t, link)))) {
         goto fail3;
+    }
+
+    // Add directive handlers
+    for (size_t i = 0; i < sizeof(s_directives) / sizeof(s_directives[0]);
+         ++i) {
+        ht_insert(&pp->directives, &s_directives[i].link);
     }
 
     return status;
@@ -646,4 +656,9 @@ void pp_directive_define(preprocessor_t *pp) {
 
     // Add it to the hashtable
     ht_insert(&pp->macros, &new_macro->link);
+}
+
+void pp_directive_include(preprocessor_t *pp) {
+    //TODO: Implement this
+    (void)pp;
 }

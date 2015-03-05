@@ -131,4 +131,10 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
  */
 void pp_directive_define(preprocessor_t *pp);
 
+/**
+ * Directive for #include
+ * @param pp The preprocessor to include for
+ */
+void pp_directive_include(preprocessor_t *pp);
+
 #endif /* _PREPROCESSOR_PRIV_H_ */
