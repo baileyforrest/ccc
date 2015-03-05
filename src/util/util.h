@@ -62,6 +62,14 @@ typedef struct len_str_t {
 } len_str_t;
 
 /**
+ * Macro for creating a len_str_t literal from a literal string
+ *
+ * @param str The string to create the literal it with
+ */
+#define LEN_STR_LITERAL(str) { str, sizeof(str) - 1 }
+
+
+/**
  * String slist node
  */
 typedef struct len_str_node_t {
