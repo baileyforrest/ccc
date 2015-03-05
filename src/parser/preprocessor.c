@@ -54,10 +54,14 @@ status_t pp_init(preprocessor_t *pp) {
     }
 
     // Register directive handlers
-    pp_directives_register(&pp->directives);
+    if (CCC_OK != (status = pp_directives_init(pp))) {
+        goto fail4;
+    }
 
     return status;
 
+fail4:
+    ht_destroy(&pp->macros);
 fail3:
     sl_destroy(&pp->macro_insts, SL_FREE);
 fail2:
@@ -112,7 +116,7 @@ done:
     return status;
 }
 
-int pp_nextchar(preprocessor_t *pp) {
+int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     // We are in a macro paramater, just copy the string
     if (NULL != pp->cur_param) {
         int result = *(pp->cur_param++);
@@ -196,11 +200,19 @@ int pp_nextchar(preprocessor_t *pp) {
 
     bool check_directive = false;
 
-    switch (cur_char) {
-    case '\n': // Reset line variables
+    // Reset line variables
+    if ('\n' == cur_char) {
         pp->char_line = false;
         pp->line_comment = false;
+    }
 
+    // If we're in a comment, return whitespace
+    if (pp->block_comment || pp->line_comment) {
+        (*cur)++; // advance the cur pointer
+        return ' ';
+    }
+
+    switch (cur_char) {
         // Cases which cannot be before a macro
         // TODO: verify/add more of these
     case ASCII_LOWER:
@@ -247,7 +259,7 @@ int pp_nextchar(preprocessor_t *pp) {
     };
 
     // Check for preprocessor directive matching the string
-    if (check_directive) {
+    if (check_directive && !ignore_directive) {
         pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
 
         if (NULL == directive) {
@@ -372,6 +384,10 @@ int pp_nextchar(preprocessor_t *pp) {
     *cur = lookahead; // Set current to the end of the macro and params
 
     return retval;
+}
+
+int pp_nextchar(preprocessor_t *pp) {
+    return pp_nextchar_helper(pp, false);
 }
 
 status_t pp_file_map(const char *filename, pp_file_t **result) {

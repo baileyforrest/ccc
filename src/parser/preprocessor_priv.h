@@ -27,25 +27,56 @@
 #include "util/util.h"
 
 /**
- * Given a pointer and an end, skip whitespace characters, or stop if the end is
- * reached
+ * Given a pointer and an end, skip whitespace characters and block
+ * comments, or stop if the end is reached
+ *
+ * TODO: Handle newline
  *
  * @param lookahead - char * to advance
  * @param end - max char *
  */
-#define SKIP_WS(lookahead, end)                 \
+#define SKIP_WS_AND_COMMENT(lookahead, end)     \
     do {                                        \
-        bool done = false;                      \
-        while (!done && lookahead != end) {     \
-            switch (*lookahead) {               \
-            case ' ':                           \
-            case '\t':                          \
+    bool done = false;                          \
+    bool comment = false;                       \
+    while (!done && lookahead != end) {         \
+        if (comment) {                          \
+            if ('*' != *lookahead) {            \
                 lookahead++;                    \
-                break;                          \
-            default:                            \
-                done = true;                    \
+                continue;                       \
             }                                   \
+                                                \
+            /* Found '*' */                     \
+            lookahead++;                        \
+                                                \
+            if (lookahead == end) {             \
+                continue;                       \
+            }                                   \
+                                                \
+            if ('/' == *lookahead) {            \
+                comment = false;                \
+            }                                   \
+                                                \
+            continue;                           \
         }                                       \
+        switch (*lookahead) {                   \
+        case ' ':                               \
+        case '\t':                              \
+            lookahead++;                        \
+            break;                              \
+        case '/':                               \
+            lookahead++;                        \
+            if (lookahead == end) {             \
+                break;                          \
+            }                                   \
+            if ('*' ==*lookahead) {             \
+                comment = true;                 \
+            }                                   \
+            break;                              \
+        default:                                \
+            done = true;                        \
+        }                                       \
+    }                                           \
     } while(0)
 
 /**
@@ -72,7 +103,26 @@
                 done = true;                            \
             }                                           \
         }                                               \
-    } while(0)                                          \
+    } while(0)
+
+/**
+ * Skip util past newline
+ *
+ * @param lookahead - char * to advance
+ * @param end - max char *
+ */
+#define SKIP_LINE(lookahead, end)                                       \
+    do {                                                                \
+    bool done = false;                                                  \
+    char last = -1;                                                     \
+    while (!done && lookahead != end) {                                 \
+        /* Skip until we reach an unescaped newline */                  \
+        if ('\n' == *lookahead && '\\' != last) {                       \
+            done = true;                                                \
+        }                                                               \
+        last = *(lookahead++);                                          \
+    }                                                                   \
+    } while(0)
 
 
 /**
@@ -117,6 +167,13 @@ typedef struct pp_macro_inst_t {
     char *end; /**< End of macro */
 } pp_macro_inst_t;
 
+/**
+ * Helper function to fetch characters with macro substitution
+ *
+ * @param pp The preprocessor te fetch characters from
+ * @param ignore_directive if true, directives are not processed
+ */
+int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
 
 /**
  * Maps the specified file. Gives result as a pp_file_t

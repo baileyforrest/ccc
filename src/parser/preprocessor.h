@@ -35,6 +35,7 @@
 typedef struct preprocessor_t {
     slist_t file_insts;        /**< Stack of instances of open files */
     slist_t macro_insts;       /**< Stack of paramaters and strings mappings */
+    slist_t search_path;       /**< #include search path */
     htable_t macros;           /**< Macro table */
     htable_t directives;       /**< Preprocessor directives */
 
@@ -42,10 +43,10 @@ typedef struct preprocessor_t {
     const char *param_end;
 
     // Paramaters for reading preprocessor commands
-    bool block_comment;        /*< true if in a block comment */
-    bool line_comment;         /*< true if in a line comment */
-    bool string;               /*< true if in string */
-    bool char_line;            /*< true if non whitespace on current line */
+    bool block_comment;        /**< true if in a block comment */
+    bool line_comment;         /**< true if in a line comment */
+    bool string;               /**< true if in string */
+    bool char_line;            /**< true if non whitespace on current line */
 } preprocessor_t;
 
 

@@ -25,23 +25,39 @@
 
 #include <assert.h>
 #include <string.h>
+#include <unistd.h>
 
+#include "util/htable.h"
 #include "util/util.h"
+
+#define MAX_PATH_LEN 4096 /**< Max include path len */
 
 static pp_directive_t s_directives[] = {
     { { NULL }, LEN_STR_LITERAL("define" ), pp_directive_define  },
     { { NULL }, LEN_STR_LITERAL("include"), pp_directive_include },
     { { NULL }, LEN_STR_LITERAL("ifndef" ), pp_directive_ifndef  },
-    { { NULL }, LEN_STR_LITERAL("endif"),   pp_directive_endif   }
+    { { NULL }, LEN_STR_LITERAL("endif"  ), pp_directive_endif   }
 };
 
-void pp_directives_register(htable_t *ht) {
+// Default search path for #include files. Ordering is important
+static len_str_node_t s_default_search_path[] = {
+    { { NULL }, LEN_STR_LITERAL(".") }, // Current directory
+    { { NULL }, LEN_STR_LITERAL("/usr/local/include") },
+    { { NULL }, LEN_STR_LITERAL("/usr/include") }
+};
+
+status_t pp_directives_init(preprocessor_t *pp) {
     // Add directive handlers
-    for (size_t i = 0; i < sizeof(s_directives) / sizeof(s_directives[0]);
-         ++i) {
-        ht_insert(ht, &s_directives[i].link);
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_directives); ++i) {
+        ht_insert(&pp->directives, &s_directives[i].link);
     }
 
+    // Add default search path
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_default_search_path); ++i) {
+        sl_append(&pp->search_path, &s_default_search_path[i].link);
+    }
+
+    return CCC_OK;
 }
 
 /**
@@ -62,7 +78,7 @@ void pp_directive_define(preprocessor_t *pp) {
     char *lookahead = file->cur;
 
     // Skip whitespace before name
-    SKIP_WS(lookahead, end);
+    SKIP_WS_AND_COMMENT(lookahead, end);
     if (lookahead == end) {
         // TODO: Report/handle error
         assert(false && "Macro definition at end of file");
@@ -154,7 +170,7 @@ void pp_directive_define(preprocessor_t *pp) {
     }
 
     // Skip whitespace after parameters
-    SKIP_WS(lookahead, end);
+    SKIP_WS_AND_COMMENT(lookahead, end);
     if (lookahead == end) {
         // TODO: Report/handle error
         assert(false && "Macro definition at end of file");
@@ -190,9 +206,187 @@ void pp_directive_define(preprocessor_t *pp) {
     ht_insert(&pp->macros, &new_macro->link);
 }
 
+/**
+ * Warning: This is not reentrant!
+ */
 void pp_directive_include(preprocessor_t *pp) {
-    //TODO: Implement this
-    (void)pp;
+    static char s_path_buf[MAX_PATH_LEN];
+    static char s_suffix_buf[MAX_PATH_LEN];
+
+    assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
+
+    pp_file_t *file = sl_head(&pp->file_insts);
+    char *cur = file->cur;
+    char *end = file->end;
+    char *lookahead = file->cur;
+
+    SKIP_WS_AND_COMMENT(lookahead, end);
+
+    len_str_t suffix;
+
+    cur = lookahead;
+    char endsym = 0;
+    switch (*cur) {
+        // quote or ange bracket
+    case '"':
+        endsym = '"';
+    case '<':
+        endsym = endsym ? endsym : '>';
+
+        cur++;
+        lookahead++;
+
+        bool done = false;
+        while (!done && lookahead != end) {
+            /* Charaters allowed to be in path name */
+            switch (*lookahead) {
+            case ASCII_LOWER:
+            case ASCII_UPPER:
+            case ASCII_DIGIT:
+            case '_':
+            case '-':
+            case '.':
+                lookahead++;
+                break;
+            default: /* Found end */
+                done = true;
+            }
+        }
+
+        // Reach end
+        if (lookahead == end) {
+            // TODO: Handle/report this
+            assert(false);
+        }
+
+        // 0 length
+        if (lookahead == cur) {
+            // TODO: Handle/report this
+            assert(false);
+        }
+
+        // Incorrect end symbol
+        if (*lookahead != endsym) {
+            // TODO: Handle/report this
+            assert(false);
+        }
+
+        suffix.str = cur;
+        suffix.len = lookahead - cur;
+
+        // skip the rest of the line
+        SKIP_LINE(lookahead, end);
+
+        break;
+
+        // Identifier, expand macros
+    case ASCII_LOWER:
+    case ASCII_UPPER:
+    case ASCII_DIGIT:
+    case '_':
+        done = false;
+        // Find the starting character
+        while (!done) {
+            int next = pp_nextchar_helper(pp, true);
+            if (PP_EOF == next) {
+                // TODO: Handle/report this
+                assert(false);
+            }
+
+            switch (next) {
+            case '"':
+                endsym = '"';
+            case '<':
+                endsym = endsym ? endsym : '>';
+                done = true;
+                break;
+            case ' ':
+            case '\t':
+                continue;
+            default:
+                // TODO: Handle/report this
+                assert(false);
+            }
+        }
+
+        int offset = 0;
+        done = false;
+
+        // Act like we're in a string
+        pp->string = true;
+
+        // Find the end of the include string
+        while (true) {
+            int next = pp_nextchar_helper(pp, true);
+            if (offset == MAX_PATH_LEN || PP_EOF == next) {
+                // TODO: Handle/report this
+                assert(false);
+            }
+
+            if (next != endsym) {
+                s_suffix_buf[offset++] = next;
+                continue;
+            }
+            s_suffix_buf[offset] = '\0';
+
+            suffix.str = s_suffix_buf;
+            suffix.len = offset;
+
+            // Skip until next line
+            done = false;
+            int last = -1;
+            while (!done) {
+                int next = pp_nextchar_helper(pp, true);
+                if (PP_EOF == next) {
+                    done = true;
+                }
+
+                if ('\n' == next && '\\' != last) {
+                    done = true;
+                }
+                last = next;
+            }
+
+            break;
+        }
+        break;
+    default:
+        // Invalid symbol
+        // TODO: Handle/report this
+        assert(false);
+    }
+
+    // Search for the string in all of the search paths
+    sl_link_t *link;
+    SL_FOREACH(link, &pp->search_path) {
+        len_str_t *cur = GET_ELEM(&pp->search_path, link);
+
+        if (cur->len + suffix.len + 1 > MAX_PATH_LEN) {
+            // TODO: report/handle this
+            assert(false && "Path too large!");
+        }
+
+        strncpy(s_path_buf, cur->str, cur->len);
+        strncpy(s_path_buf + cur->len, suffix.str, suffix.len);
+        s_path_buf[cur->len + suffix.len] = '\0';
+
+        // File isn't accessible
+        if(-1 == access(s_path_buf, R_OK)) {
+            continue;
+        }
+
+        // File accessible
+        pp_file_t *pp_file;
+        status_t status = pp_file_map(s_path_buf, &pp_file);
+        if (CCC_OK != status) {
+            // TODO: report/handle this
+            assert(false && "Path too large!");
+        }
+
+        // Add the file to the top of the stack
+        sl_prepend(&pp->file_insts, &pp_file->link);
+        break;
+    }
 }
 
 void pp_directive_ifndef(preprocessor_t *pp) {

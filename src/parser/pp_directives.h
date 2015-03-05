@@ -26,6 +26,7 @@
 #include "parser/preprocessor.h"
 #include "util/htable.h"
 #include "util/slist.h"
+#include "util/status.h"
 #include "util/util.h"
 
 
@@ -43,7 +44,7 @@ typedef struct pp_directive_t {
  *
  * @param ht Mapping from directive name to directive action
  */
-void pp_directives_register(htable_t *ht);
+status_t pp_directives_init(preprocessor_t *pp);
 
 /**
  * Directive for #define
@@ -53,6 +54,9 @@ void pp_directive_define(preprocessor_t *pp);
 
 /**
  * Directive for #include
+ *
+ * Warning: Current version uses static memory so is not reentrant
+ *
  * @param pp The preprocessor to include for
  */
 void pp_directive_include(preprocessor_t *pp);

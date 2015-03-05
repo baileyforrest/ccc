@@ -30,6 +30,13 @@
 #include "util/slist.h"
 
 /**
+ * Length of static array
+ *
+ * @param Array to get length of
+ */
+#define STATIC_ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+/**
  * Typesafe/single evalutation max macro
  *
  * Source: https://gcc.gnu.org/onlinedocs/gcc-4.9.2/gcc/Typeof.html#Typeof

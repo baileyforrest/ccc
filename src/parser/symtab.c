@@ -91,7 +91,7 @@ status_t st_init(symtab_t *table) {
     status_t status = CCC_OK;
 
     static const ht_params s_params = {
-        sizeof(s_reserved) / sizeof(s_reserved[0]) * 2, // Size estimate
+        STATIC_ARRAY_LEN(s_reserved) * 2, // Size estimate
         offsetof(symtab_entry_t, key),                  // Offset of key
         offsetof(symtab_entry_t, link),                 // Offset of ht link
         strhash,                                        // Hash function
@@ -103,7 +103,7 @@ status_t st_init(symtab_t *table) {
     }
 
     // Initalize symbol table with reserved keywords
-    for (size_t i = 0; i < sizeof(s_reserved) / sizeof(s_reserved[0]); i++) {
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
         if (CCC_OK != (status = ht_insert(&table->hashtab,
                                           &s_reserved[i].link))) {
             ht_destroy(&table->hashtab);
