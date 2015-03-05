@@ -37,8 +37,8 @@ typedef struct preprocessor_t {
     slist_t macro_insts;       /**< Stack of paramaters and strings mappings */
     htable_t macros;           /**< Macro table */
 
-    char *cur_param;
-    char *param_end;
+    const char *cur_param;
+    const char *param_end;
 
     // Paramaters for reading preprocessor commands
     bool block_comment;        /*< true if in a block comment */

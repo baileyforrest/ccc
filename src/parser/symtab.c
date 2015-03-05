@@ -87,16 +87,16 @@ static symtab_entry_t s_reserved[] = {
 /**
  * Paramaters for newly constructed symbol tables
  */
-static ht_params s_params = {
-    sizeof(s_reserved) / sizeof(s_reserved[0]) * 2, // Size estimate
-    offsetof(symtab_entry_t, key),                  // Offset of key (string)
-    offsetof(symtab_entry_t, link),                 // Offset of ht link
-    strhash,                                        // Hash function
-    vstrcmp,                                        // void string compare
-};
-
 status_t st_init(symtab_t *table) {
     status_t status = CCC_OK;
+
+    static const ht_params s_params = {
+        sizeof(s_reserved) / sizeof(s_reserved[0]) * 2, // Size estimate
+        offsetof(symtab_entry_t, key),                  // Offset of key
+        offsetof(symtab_entry_t, link),                 // Offset of ht link
+        strhash,                                        // Hash function
+        vstrcmp,                                        // void string compare
+    };
 
     if (CCC_OK != (status = ht_init(&table->hashtab, &s_params))) {
         return status;

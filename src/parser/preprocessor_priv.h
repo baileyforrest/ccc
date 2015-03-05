@@ -24,6 +24,7 @@
 #define _PREPROCESSOR_PRIV_H_
 
 #include "util/slist.h"
+#include "util/util.h"
 
 /**
  * An instance of an open file on the preprocessor
@@ -40,6 +41,7 @@ typedef struct pp_file_t {
  * Struct for macro definition
  */
 typedef struct pp_macro_t {
+    sl_link_t link; /**< List link */
     len_str_t name; /**< Macro name, hashtable key */
     char *start;    /**< Start of macro text */
     char *end;      /**< End of macro text */
@@ -76,13 +78,13 @@ typedef struct pp_macro_inst_t {
 status_t pp_file_map(const char *filename, pp_file_t **result);
 
 /**
- * Does not free pp_file. Unmaps and given pp_file_t
+ * Unmaps and given pp_file_t. Does free pp_file.
  *
  * @param filename Filename to open.
  * @param result Location to store result. NULL if failed
  * @return CCC_OK on success, error code otherwise
  */
-void pp_file_destroy(pp_file_t *pp_file);
+status_t pp_file_destroy(pp_file_t *pp_file);
 
 /**
  * Creates a macro instance
@@ -94,7 +96,7 @@ void pp_file_destroy(pp_file_t *pp_file);
 status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result);
 
 /**
- * Destroys a macro instance
+ * Destroys a macro instance. Does free macro_inst.
  *
  * @param macro intance to destroy
  */

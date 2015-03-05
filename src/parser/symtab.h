@@ -38,7 +38,7 @@ typedef struct symtab_t {
  * Type and value of a string lexeme
  */
 typedef struct symtab_entry_t {
-    ht_link_t link;   /**< Hashtable link */
+    sl_link_t link;   /**< Hashtable link */
     len_str_t key;    /**< Hashtable key value */
     token_t type;     /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;

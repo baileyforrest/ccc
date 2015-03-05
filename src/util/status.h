@@ -29,8 +29,9 @@
  * Status codes for CCC
  */
 typedef enum {
-    CCC_OK = 0, /**< Success */
-    CCC_NOMEM   /**< No Memory */
+    CCC_OK = 0,   /**< Success */
+    CCC_NOMEM,    /**< No Memory */
+    CCC_FILEERR   /**< File Error */
 } status_t;
 
 #endif /* _STATUS_H_ */

@@ -19,10 +19,6 @@
 
 /**
  * Singly linked list interface
- *
- * Some code similar to ht_link_t, but decided to not combine them because
- * that would either involve slist becoming larger or additional pointer
- * indirections for comparisons and searching.
  */
 #ifndef _SLIST_H_
 #define _SLIST_H_
@@ -34,7 +30,7 @@
 
 /** Pointer to element represented by head */
 #define GET_ELEM(list, head) \
-    ((void *)(head) - list->head_offset)
+    ((void *)(head) - (list)->head_offset)
 
 /**
  * Single Linked Link list node.
@@ -82,7 +78,7 @@ void sl_destroy(slist_t *slist, bool do_free);
  * @param slist List to get head of
  */
 inline void *sl_head(slist_t *slist) {
-    return slist->head;
+    return slist->head == NULL ? NULL : GET_ELEM(slist, slist->head);
 }
 
 /**
@@ -91,7 +87,7 @@ inline void *sl_head(slist_t *slist) {
  * @param slist List to get tail of
  */
 inline void *sl_tail(slist_t *slist) {
-    return slist->tail;
+    return slist->head == NULL ? NULL : GET_ELEM(slist, slist->tail);
 }
 
 /**
@@ -137,13 +133,18 @@ bool sl_remove(slist_t *slist, sl_link_t *link);
  */
 void sl_foreach(slist_t *slist, void (*func)(void *));
 
-// TODO: DOC this and fix the forward slashes
-#define SL_FOREACH(CURRENT_ELEM, SL_HEAD, LINK_NAME)      \
-    for ( \
-        sl_link_t *node = (SL_HEAD)->head, (CURRENT_ELEM) = GET_ELEM((SL_HEAD), node); \
-    node != NULL; \
-    node = node->next, (CURRENT_ELEM) = GET_ELEM((SL_HEAD), node);
-        )
+/**
+ * Run code on each element
+ *
+ * The elements themselves must be accessed with GET_ELEM
+ *
+ * @param CURRENT_ELEMENT pp_link_t pointer to store current element
+ * @param SL_HEAD Head of the list
+ */
+#define SL_FOREACH(CURRENT_ELEM, SL_HEAD) \
+    for (CURRENT_ELEM = (SL_HEAD)->head;                                       \
+         CURRENT_ELEM != NULL;                                                 \
+         CURRENT_ELEM = CURRENT_ELEM->next)
 
 
 #endif /* _SLIST_H_ */

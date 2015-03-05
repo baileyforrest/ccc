@@ -23,54 +23,57 @@
 #include "preprocessor.h"
 #include "preprocessor_priv.h"
 
-#include <fnctl.h>
+#include <stddef.h>
+#include <assert.h>
+#include <fcntl.h>
+#include <ctype.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "util/slist.h"
 #include "util/htable.h"
 
 status_t pp_init(preprocessor_t *pp) {
     status_t status = CCC_OK;
-    if (CCC_OK != (status = sl_init(&pp->file_insts))) {
+    if (CCC_OK !=
+        (status = sl_init(&pp->file_insts, offsetof(pp_file_t, link)))) {
         goto fail1;
     }
 
-    if (CCC_OK != (status = sl_init(&pp->macro_param_stack))) {
+    if (CCC_OK !=
+        (status = sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link)))) {
         goto fail2;
     }
 
-    if (CCC_OK != (status = ht_init(&pp->macros))) {
+    if (CCC_OK != (status = ht_init(&pp->macros, offsetof(pp_macro_t, link)))) {
         goto fail3;
     }
-
-    pp->comment = false;
-    pp->char_line = false;
 
     return status;
 
 fail3:
-    sl_destroy(&pp->macro_param_stack, SL_FREE);
+    sl_destroy(&pp->macro_insts, SL_FREE);
 fail2:
     sl_destroy(&pp->file_insts, SL_FREE);
 fail1:
     return status;
 }
 
-static void clean_pp(void *pp_file) {
-    pp_destroy((pp_file_t *)pp_file);
-}
-
-static void clean_ht(void *ht) {
-    ht_destroy((htable_t *)ht);
-}
-
+/**
+ * Release all resources in pp
+ */
 void pp_destroy(preprocessor_t *pp) {
-    // Unmap all of the files on the file stack, then free the handles
-    sl_foreach(&pp->file_insts, clean_pp);
-    sl_destroy(&pp->file_insts, SL_FREE);
+    sl_link_t *cur;
+    SL_FOREACH(cur, &pp->file_insts) {
+        pp_file_destroy(GET_ELEM(&pp->file_insts, &cur));
+    }
+    sl_destroy(&pp->file_insts, SL_NOFREE);
 
-    // Clear hashtables on macro param stack then free the them
-    sl_foreach(&pp->macro_param_stack, clean_ht);
-    sl_destroy(&pp->macro_param_stack, SL_FREE);
+    SL_FOREACH(cur, &pp->macro_insts) {
+        pp_macro_inst_destroy(GET_ELEM(&pp->macro_insts, cur));
+    }
+    sl_destroy(&pp->macro_insts, SL_FREE);
 
     ht_destroy(&pp->macros);
 }
@@ -85,11 +88,18 @@ void pp_close(preprocessor_t *pp) {
 status_t pp_open(preprocessor_t *pp, const char *filename) {
     status_t status = CCC_OK;
     pp_file_t *pp_file;
-    if (CCC_OK != (status = pp_map_file(filename, &pp_file))) {
+    if (CCC_OK != (status = pp_file_map(filename, &pp_file))) {
         goto done;
     }
 
     sl_prepend(&pp->file_insts, &pp_file->link);
+
+    pp->cur_param = NULL;
+    pp->param_end = NULL;
+
+    pp->block_comment = false;
+    pp->string = false;
+    pp->char_line = false;
 
 done:
     return status;
@@ -98,7 +108,7 @@ done:
 int pp_nextchar(preprocessor_t *pp) {
     // We are in a macro paramater, just copy the string
     if (NULL != pp->cur_param) {
-        int result = pp->cur_param++;
+        int result = *(pp->cur_param++);
 
         // Record if we reached end of the paramater
         if (pp->cur_param == pp->param_end) {
@@ -109,7 +119,7 @@ int pp_nextchar(preprocessor_t *pp) {
         return result;
     }
 
-    pp_macro_inst *macro_inst = sl_head(&&pp->macro_insts);
+    pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
     pp_file_t *file = sl_head(&pp->file_insts);
 
     char **cur;
@@ -124,7 +134,7 @@ int pp_nextchar(preprocessor_t *pp) {
             break;
         }
 
-        pp_macro_inst *last = sl_pop_front(&pp->macro_insts);
+        pp_macro_inst_t *last = sl_pop_front(&pp->macro_insts);
         pp_macro_inst_destroy(last);
         macro_inst = sl_head(&pp->macro_insts);
     }
@@ -132,7 +142,7 @@ int pp_nextchar(preprocessor_t *pp) {
     // if we're done with macros, try to find an incomplete file
     if (NULL == macro_inst) {
         while (NULL != file) {
-            &cur = file->cur;
+            *cur = file->cur;
             end = file->end;
 
             if (*cur != end) { // Found an unfinished file
@@ -151,24 +161,25 @@ int pp_nextchar(preprocessor_t *pp) {
     }
 
     int cur_char = **cur;
-    int next_char = *cur + 1 != end ? *(*cur + 1) : -1;
+    char *next_char = *cur + 1;
 
     switch (cur_char) {
         // Cases which cannot be before a macro
         // TODO: verify/add more of these
-    case #include "util/lower.inc":
-    case #include "util/upper.inc":
-    case #include "util/number.inc":
+    case ASCII_LOWER:
+    case ASCII_UPPER:
+    case ASCII_DIGIT:
         // Return the current character
         // Also advance the current cur pointer
-        return *((*cur_char)++);
+        return *((*cur)++);
     default:
+        break;
         // Fall through, need to look for macros
     }
 
     // if next character is not alphanumeric, we know this shouldn't be a macro
-    if (!isalnum(next_char)) {
-        return *((*cur_char)++);
+    if (next_char == end || !isalnum(*next_char)) {
+        return *((*cur)++);
     }
 
     // Need to look ahead current identifier and see if its a macro
@@ -176,22 +187,24 @@ int pp_nextchar(preprocessor_t *pp) {
 
     while(lookahead != end) {
         // Charaters allowed to be in macro
-    case #include "util/lower.inc":
-    case #include "util/upper.inc":
-    case #include "util/number.inc":
-        lookahead++
-    default: // Found end
-        break;
+        switch (*lookahead) {
+        case ASCII_LOWER:
+        case ASCII_UPPER:
+        case ASCII_DIGIT:
+            lookahead++;
+        default: // Found end
+            break;
+        }
     }
 
     len_str_t lookup = {
         next_char,
-        (size_t)(lookahead - next_char);
+        (size_t)(lookahead - next_char)
     };
 
     // Macro paramaters take precidence, look them up first
     if (NULL != macro_inst) {
-        pp_param_map_elemnt_t *param = ht_lookup(&macro->param_map, lookup);
+        pp_param_map_elem_t *param = ht_lookup(&macro_inst->param_map, &lookup);
 
         // Found a parameter
         // Advance lookhead to end of param, and set param state in pp
@@ -205,14 +218,14 @@ int pp_nextchar(preprocessor_t *pp) {
     }
 
     // Look up in the macro table
-    pp_macro_t *macro = ht_lookup(&pp->macros, lookup);
+    pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
 
     if (NULL == macro) { // No macro found
-        return *((*cur_char)++);
+        return *((*cur)++);
     }
 
-    pp_macro_inst_t *macro_inst;
-    status_t status = pp_macro_inst_create(macro, &macro_inst);
+    pp_macro_inst_t *new_macro_inst;
+    status_t status = pp_macro_inst_create(macro, &new_macro_inst);
 
     if (CCC_OK != status) {
         // TODO Handle this correctly, propgate the error
@@ -220,12 +233,12 @@ int pp_nextchar(preprocessor_t *pp) {
     }
 
     // No paramaters on macro
-    if (lookahead != '(') {
+    if (lookahead == end || *lookahead != '(') {
 
         // If macro requires params, but none are provided, this is just
         // treated as identifier
         if (macro->num_params != 0) {
-            return *((*cur_char)++);
+            return *((*cur)++);
         }
     } else {
         // Need to create param map
@@ -234,7 +247,9 @@ int pp_nextchar(preprocessor_t *pp) {
 
         bool done = false;
         char *cur_param = ++lookahead;
-        SL_FOREACH(cur, &macro->params, link) {
+
+        sl_link_t *cur_link;
+        SL_FOREACH(cur_link, &macro->params) {
             num_params++;
 
             while (lookahead != end) {
@@ -244,11 +259,11 @@ int pp_nextchar(preprocessor_t *pp) {
                     continue;
                 }
 
-                if (*lookahead == ',') {
+                if (*lookahead == ',') { // end of current param
                     break;
                 }
 
-                if (*lookahead == ')') {
+                if (*lookahead == ')') { // end of all params
                     done = true;
                     break;
                 }
@@ -259,15 +274,26 @@ int pp_nextchar(preprocessor_t *pp) {
                 assert(false && "Unfilled macro");
             }
 
-            size_t cur_len = lookhead - cur_param;
+            size_t cur_len = lookahead - cur_param;
 
             pp_param_map_elem_t *param_elem =
                 malloc(sizeof(pp_param_map_elem_t));
 
-            param_elem->key.str = cur_param;
-            param_elem->key.len = cur_len;
+            // TODO: Handle/propgate the error
+            if (NULL == param_elem) {
+                assert(false);
+            }
 
-            ht_insert(&macro_inst->param_map, &param_elem->link);
+            // Get current paramater in macro
+            len_str_t *param_str = GET_ELEM(&macro->params, cur_link);
+
+            // Insert the paramater mapping into the instance's hash table
+            param_elem->key.str = param_str->str;
+            param_elem->key.len = param_str->len;
+            param_elem->val.str = cur_param;
+            param_elem->val.len = cur_len;
+
+            ht_insert(&new_macro_inst->param_map, &param_elem->link);
         }
 
         // TOOD: handle/report error
@@ -276,11 +302,11 @@ int pp_nextchar(preprocessor_t *pp) {
         }
     }
 
-    macro_inst->cur = macro->start;
-    macro_inst->end = macro->end;
+    new_macro_inst->cur = macro->start;
+    new_macro_inst->end = macro->end;
 
     // Add new macro instance to the stack
-    sl_push_front(&pp->macro_insts, &macro_inst->link);
+    sl_prepend(&pp->macro_insts, &new_macro_inst->link);
 
     int retval = **cur;   // Return current character
     *cur = lookahead; // Set current to the end of the macro and params
@@ -288,7 +314,7 @@ int pp_nextchar(preprocessor_t *pp) {
     return retval;
 }
 
-status_t pp_map_file(const char *filename, pp_file_t **result) {
+status_t pp_file_map(const char *filename, pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = malloc(sizeof(pp_file_t));
     if (NULL == pp_file) {
@@ -296,7 +322,7 @@ status_t pp_map_file(const char *filename, pp_file_t **result) {
         goto fail1;
     }
 
-    if (-1 == (pp_file->fd = open(filename, O_RD, 0))) {
+    if (-1 == (pp_file->fd = open(filename, O_RDONLY, 0))) {
         status = CCC_FILEERR;
         goto fail2;
     }
@@ -314,7 +340,7 @@ status_t pp_map_file(const char *filename, pp_file_t **result) {
         goto fail2;
     }
     pp_file->cur = pp_file->buf;
-    pp_file->max = pp_file->buf + size;
+    pp_file->end = pp_file->buf + size;
 
     *result = pp_file;
 
@@ -324,4 +350,60 @@ fail2:
 fail1:
     *result = NULL;
     return status;
+}
+
+status_t pp_file_destroy(pp_file_t *pp_file) {
+    status_t status = CCC_OK;
+
+    // If we failed to close the file, just continue
+    if (-1 == munmap(pp_file->buf, (size_t)(pp_file->end - pp_file->buf))) {
+        status = CCC_FILEERR;
+    }
+
+    if (-1 == close(pp_file->fd)) {
+        status = CCC_FILEERR;
+    }
+
+    free(pp_file);
+
+    return status;
+}
+
+status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
+    status_t status = CCC_OK;
+
+    pp_macro_inst_t *macro_inst = malloc(sizeof(pp_macro_inst_t));
+    if (NULL == macro_inst) {
+        status = CCC_NOMEM;
+        goto fail1;
+    }
+
+    static const ht_params pp_param_map_params = {
+        0,                                   // No size hint
+        offsetof(pp_param_map_elem_t, key),  // Key offset
+        offsetof(pp_param_map_elem_t, link), // HT link offset
+        strhash,                             // String Hash function
+        vstrcmp                              // void string compare
+    };
+
+    if (CCC_OK !=
+        (status = ht_init(&macro_inst->param_map, &pp_param_map_params))) {
+        goto fail2;
+    }
+
+    macro_inst->cur = macro->start;
+    macro_inst->end = macro->end;
+    *result = macro_inst;
+
+    return status;
+
+fail2:
+    free(macro_inst);
+fail1:
+    return status;
+}
+
+void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
+    ht_destroy(&macro_inst->param_map);
+    free(macro_inst);
 }

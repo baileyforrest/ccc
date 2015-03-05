@@ -26,6 +26,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Extern declarations for the inline functions
+extern inline void *sl_head(slist_t *slist);
+extern inline void *sl_tail(slist_t *slist);
+
 status_t sl_init(slist_t *slist, size_t head_offset) {
     slist->head = NULL;
     slist->tail = NULL;

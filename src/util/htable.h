@@ -31,20 +31,10 @@
 #include <stdlib.h>
 
 #include "util/status.h"
+#include "util/slist.h"
 
 typedef uint32_t (*ht_hashfunc)(const void *key);
 typedef bool (*ht_cmpfunc)(const void *key1, const void *key2);
-
-/**
- * Single Linked Link hash table elements.
- *
- * This should be a member of the values stored in the hashtable. This is
- * preferred over the link pointing to the object stored to avoid an extra
- * pointer indirection.
- */
-typedef struct ht_link_t {
-    struct ht_link_t *next; /**< The next element */
-} ht_link_t;
 
 /**
  * Paramaters for initializing a hashtable
@@ -52,7 +42,7 @@ typedef struct ht_link_t {
 typedef struct ht_params {
     size_t nelems;        /**< Hint for number of elements, 0 for unused */
     size_t key_offset;    /**< Offset of the key in the struct */
-    size_t head_offset;   /**< Offset of the ht_link_t into the struct */
+    size_t head_offset;   /**< Offset of the sl_link_t into the struct */
     ht_hashfunc hashfunc; /**< Hash function to use */
     ht_cmpfunc cmpfunc;   /**< Comparison function to use */
 } ht_params;
@@ -61,9 +51,9 @@ typedef struct ht_params {
  * The hash table structure. Basic chained buckets.
  */
 typedef struct htable_t {
-    ht_link_t **buckets; /**< The bucket array */
-    size_t nbuckets;
-    ht_params params; /**< Paramaters used to initialize the hashtable */
+    sl_link_t **buckets; /**< The bucket array */
+    size_t nbuckets;     /**< Number of buckets */
+    ht_params params;    /**< Paramaters used to initialize the hashtable */
 } htable_t;
 
 /**
@@ -73,7 +63,7 @@ typedef struct htable_t {
  * @param params paramaters
  * @return CCC_OK on success, relevant error code on failure
  */
-status_t ht_init(htable_t *ht, ht_params *params);
+status_t ht_init(htable_t *ht, const ht_params *params);
 
 /**
  * Does not free ht itself. Frees all of the contained elements and bucketlist.
@@ -90,7 +80,7 @@ void ht_destroy(htable_t *ht);
  * @param elem The element to insert
  * @return CCC_OK on success, error code on failure
  */
-status_t ht_insert(htable_t *ht, ht_link_t *elem);
+status_t ht_insert(htable_t *ht, sl_link_t *elem);
 
 /**
  * Remove specified element from hashtable. Frees the element

@@ -18,6 +18,13 @@
 */
 /**
  * Hashtable implementation
+ *
+ * Some code similar to slist_t, but decided to not combine them because
+ * slist contains a tail pointer so the hashtable would take up twice as much
+ * space.
+ *
+ * However, sl_link_t is reused so elements can be placed in either a hashtable
+ * or a slist
  */
 #include "htable.h"
 
@@ -36,19 +43,19 @@
 #define MIN_BUCKETS ((size_t)16)
 
 /** Pointer to element represented by head */
-#define GET_ELEM(ht, head) \
+#define GET_HT_ELEM(ht, head) \
     ((void *)(head) - ht->params.head_offset)
 
 /** Pointer to key of element represented by head */
 #define GET_KEY(ht, head) \
-    (GET_ELEM(ht, head) + ht->params.key_offset)
+    (GET_HT_ELEM(ht, head) + ht->params.key_offset)
 
 /** Gets hash of a key */
 #define GET_HASH(ht, key) \
     (ht->params.hashfunc((key)))
 
 
-status_t ht_init(htable_t *ht, ht_params *params) {
+status_t ht_init(htable_t *ht, const ht_params *params) {
     memcpy(&ht->params, params, sizeof(ht_params));
     ht->nbuckets = MAX(params->nelems, MIN_BUCKETS);
     ht->params.nelems = 0;
@@ -61,12 +68,12 @@ status_t ht_init(htable_t *ht, ht_params *params) {
 void ht_destroy(htable_t *ht) {
     // Free each chained list
     for (size_t i = 0; i < ht->nbuckets; ++i) {
-        ht_link_t *cur = ht->buckets[i];
-        ht_link_t *next = NULL;
+        sl_link_t *cur = ht->buckets[i];
+        sl_link_t *next = NULL;
 
         while(cur != NULL) {
             next = cur->next;
-            free(GET_ELEM(ht, cur));
+            free(GET_HT_ELEM(ht, cur));
             cur = next;
         }
     }
@@ -82,20 +89,20 @@ void ht_destroy(htable_t *ht) {
  */
 static status_t grow_ht(htable_t *ht) {
     size_t new_nbuckets = NEW_SIZE(ht);
-    ht_link_t **new_buckets = calloc(new_nbuckets, sizeof(ht_link_t *));
+    sl_link_t **new_buckets = calloc(new_nbuckets, sizeof(sl_link_t *));
 
     // Iterate through current hashtable and add all elems to new bucketlist
     for (size_t i = 0; i < ht->nbuckets; ++i) {
 
-        ht_link_t *next = NULL;
-        for (ht_link_t *cur = ht->buckets[i]; cur != NULL; cur = next) {
+        sl_link_t *next = NULL;
+        for (sl_link_t *cur = ht->buckets[i]; cur != NULL; cur = next) {
             next = cur->next;
 
             // Add cur to new bucket list
             void *key = GET_KEY(ht, cur);
             uint32_t bucket = GET_HASH(ht, key) % new_nbuckets;
 
-            ht_link_t **new_cur = &new_buckets[bucket];
+            sl_link_t **new_cur = &new_buckets[bucket];
             for(; *new_cur != NULL; cur = (*new_cur)->next)
                 continue;
 
@@ -112,7 +119,7 @@ static status_t grow_ht(htable_t *ht) {
     return CCC_OK;
 }
 
-status_t ht_insert(htable_t *ht, ht_link_t *elem) {
+status_t ht_insert(htable_t *ht, sl_link_t *elem) {
     // Grow the HT if necessary
     if (ht->params.nelems >= MAX_LOAD(ht)) {
         status_t status = grow_ht(ht);
@@ -125,7 +132,7 @@ status_t ht_insert(htable_t *ht, ht_link_t *elem) {
     void *key = GET_KEY(ht, elem);
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
-    ht_link_t **cur = &ht->buckets[bucket];
+    sl_link_t **cur = &ht->buckets[bucket];
     for(; *cur != NULL; *cur = (*cur)->next) {
         void *key2 = GET_KEY(ht, *cur);
 
@@ -136,7 +143,7 @@ status_t ht_insert(htable_t *ht, ht_link_t *elem) {
 
         // Found a match
         elem->next = (*cur)->next;
-        free(GET_ELEM(ht, *cur));
+        free(GET_HT_ELEM(ht, *cur));
         *cur = elem;
         return CCC_OK;
     }
@@ -154,10 +161,10 @@ status_t ht_insert(htable_t *ht, ht_link_t *elem) {
  * @return Returns pointer to pointer of found element in hashtable chain,
  * NULL if doesn't exist
  */
-static ht_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
+static sl_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
-    ht_link_t **cur = &ht->buckets[bucket];
+    sl_link_t **cur = &ht->buckets[bucket];
     for (; *cur != NULL; *cur = (*cur)->next) {
         void *key2 = GET_KEY(ht, *cur);
 
@@ -169,23 +176,23 @@ static ht_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
 }
 
 bool ht_remove(htable_t *ht, const void *key) {
-    ht_link_t **pp_link = ht_lookup_helper(ht, key);
+    sl_link_t **pp_link = ht_lookup_helper(ht, key);
     if (NULL == pp_link) {
         return false;
     }
 
-    ht_link_t *link = *pp_link;
+    sl_link_t *link = *pp_link;
     *pp_link = (*pp_link)->next;
-    free(GET_ELEM(ht, link));
+    free(GET_HT_ELEM(ht, link));
     return true;
 }
 
 void *ht_lookup(const htable_t *ht, const void *key) {
-    ht_link_t **pp_link = ht_lookup_helper((htable_t *)ht, key);
+    sl_link_t **pp_link = ht_lookup_helper((htable_t *)ht, key);
     if (NULL == pp_link) {
         return NULL;
     }
 
-    ht_link_t *link = *pp_link;
-    return GET_ELEM(ht, link);
+    sl_link_t *link = *pp_link;
+    return GET_HT_ELEM(ht, link);
 }
