@@ -556,6 +556,14 @@ void pp_directive_define(preprocessor_t *pp) {
         assert(false && "Macro definition at end of file");
     }
 
+    size_t name_len = lookahead - cur;
+
+    len_str_node_t lookup = { { NULL }, { cur, name_len } };
+
+    if (NULL != ht_lookup(&pp->macros, &lookup)) {
+        // TODO: warn about redefined macro
+    }
+
     // Create the macro object
     pp_macro_t *new_macro = malloc(sizeof(pp_macro_t));
     if (NULL == new_macro) {
@@ -570,8 +578,8 @@ void pp_directive_define(preprocessor_t *pp) {
     }
 
     // Allocate the name
-    new_macro->name.len = lookahead - cur;
-    new_macro->name.str = malloc(new_macro->name.len + 1);
+    new_macro->name.len = name_len;
+    new_macro->name.str = malloc(name_len + 1);
     if (NULL == new_macro->name.str) {
         // TODO: Report/handle error
         assert(false && "Out of memory");
@@ -648,7 +656,11 @@ void pp_directive_define(preprocessor_t *pp) {
 
     // Allocate the macro body
     size_t macro_len = lookahead - cur;
-    new_macro->start = malloc(macro_len + 1);
+    new_macro->start = macro_len == 0 ? NULL : malloc(macro_len + 1);
+    if (macro_len != 0 && NULL == new_macro->start) {
+        // TODO: Report/handle error
+        assert(false && "Out of memory");
+    }
     strncpy(new_macro->start, cur, macro_len);
 
     new_macro->end = new_macro->start + macro_len;
