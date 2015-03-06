@@ -128,6 +128,59 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         if (pp->cur_param == pp->param_end) {
             pp->cur_param = NULL;
             pp->param_end = NULL;
+
+            pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
+
+            // Check for concatenate operator
+            assert(NULL != macro_inst);
+            char *cur = macro_inst->cur;
+            char *end = macro_inst->end;
+
+            SKIP_WS_AND_COMMENT(cur, end);
+            if (cur == end || '#' != *cur) {
+                return result;
+            }
+
+            if (++cur == end) {
+                // TODO: Handle this correctly
+                assert(false && "Unexpected #");
+            }
+
+            // Not ##
+            if ('#' != *(cur++)) {
+                return result;
+            }
+
+            SKIP_WS_AND_COMMENT(cur, end);
+            char *lookahead = cur;
+
+            ADVANCE_IDENTIFIER(lookahead, end);
+            if (cur == end) {
+                // TODO: Handle this correctly
+                assert(false && "Expected macro paramater after ##");
+            }
+
+            len_str_t lookup = {
+                cur,
+                (size_t)(lookahead - cur)
+            };
+
+            pp_param_map_elem_t *param =
+                ht_lookup(&macro_inst->param_map, &lookup);
+
+            // Found a parameter
+            // Advance lookahead to end of param, and set param state in pp
+            if (NULL == param) {
+                assert(false &&
+                       "Expected macro paramater after ##");
+            }
+
+            macro_inst->cur = lookahead;
+            // Substitute next parameter
+            pp->cur_param = param->val.str;
+            pp->param_end = param->val.str + param->val.len;
+
+            return result;
         }
 
         return result;
@@ -146,6 +199,12 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         if (*cur != end) { // Found an unfinished macro
             break;
+        }
+
+        // Handle closing quote of stringification
+        if (pp->param_stringify) {
+            pp->param_stringify = false;
+            return '"';
         }
 
         pp_macro_inst_t *last = sl_pop_front(&pp->macro_insts);
@@ -242,10 +301,46 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         // TODO: Handle concatenation in macros
         if (NULL != macro_inst) {
+            if (next_char == end) {
+                // TODO: error here
+                assert(false && "Unexpected EOF in macro");
+            }
+
+            if ('#' != *next_char) {
+                // Stringification, should be a macro paramater
+                char *lookahead = next_char;
+                ADVANCE_IDENTIFIER(lookahead, end);
+
+                len_str_t lookup = {
+                    next_char,
+                    (size_t)(lookahead - next_char)
+                };
+
+                pp_param_map_elem_t *param =
+                    ht_lookup(&macro_inst->param_map, &lookup);
+
+                // Found a parameter
+                // Advance lookahead to end of param, and set param state in pp
+                if (NULL == param) {
+                    assert(false &&
+                           "Expected macro paramater for stringification");
+                }
+
+                *cur = lookahead;
+
+                // Substitute current paramater
+                pp->cur_param = param->val.str;
+                pp->param_end = param->val.str + param->val.len;
+                pp->param_stringify = true;
+
+                // We are stringifying, so return a double quote
+                return '"';
+            }
+
             return *((*cur)++);
         }
 
-        // Not processing a macro
+        // Not currently processing a macro
         check_directive = true;
     default:
         break;

@@ -41,6 +41,7 @@ typedef struct preprocessor_t {
 
     const char *cur_param;
     const char *param_end;
+    bool param_stringify;      /**< Whether or not we are stringifying */
 
     // Paramaters for reading preprocessor commands
     bool block_comment;        /**< true if in a block comment */

@@ -429,8 +429,6 @@ void pp_directive_ifndef(preprocessor_t *pp) {
         return;
     }
 
-    // TODO: skip to else/elif
-
     cur = lookahead;
     // Skip ahead until we find a directive telling us to stop
     while (cur != end) {
@@ -482,7 +480,7 @@ void pp_directive_ifndef(preprocessor_t *pp) {
 
         ADVANCE_IDENTIFIER(lookahead, end);
         size_t len = lookahead - cur;
-        if (strncmp(cur, "endif", len) != 0) {
+        if (0 != strncmp(cur, "endif", len)) {
             continue;
         }
         pp_directive_endif(pp);
