@@ -33,6 +33,14 @@
 #include "util/status.h"
 #include "util/slist.h"
 
+/** Pointer to element represented by head */
+#define GET_HT_ELEM(ht, head) \
+    ((void *)(head) - (ht)->params.head_offset)
+
+/** Pointer to key of element represented by head */
+#define GET_HT_KEY(ht, head) \
+    (GET_HT_ELEM((ht), (head)) + (ht)->params.key_offset)
+
 typedef uint32_t (*ht_hashfunc)(const void *key);
 typedef bool (*ht_cmpfunc)(const void *key1, const void *key2);
 
@@ -69,8 +77,9 @@ status_t ht_init(htable_t *ht, const ht_params *params);
  * Does not free ht itself. Frees all of the contained elements and bucketlist.
  *
  * @param ht The hashtable to destroy
+ * @param do_free DOFREE (true) if elements should be freed. NOFREE otherwise
  */
-void ht_destroy(htable_t *ht);
+void ht_destroy(htable_t *ht, bool do_free);
 
 /**
  * Insert element with specified link into hashtable. Frees the old element if
@@ -99,5 +108,9 @@ bool ht_remove(htable_t *ht, const void *key);
  * @return A pointer to the element in the hashtable. NULL otherwises
  */
 void *ht_lookup(const htable_t *ht, const void *key);
+
+#define HT_FOREACH(link, ht)                                            \
+    for (size_t i = 0; i < (ht)->params.nelems; ++i)                    \
+        for (link = (ht)->buckets[i]; link != NULL; link = link->next)  \
 
 #endif /* _HTABLE_H_ */

@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "util.h"
+
 // Extern declarations for the inline functions
 extern inline void *sl_head(slist_t *slist);
 extern inline void *sl_tail(slist_t *slist);
@@ -39,7 +41,7 @@ status_t sl_init(slist_t *slist, size_t head_offset) {
 }
 
 void sl_destroy(slist_t *slist, bool do_free) {
-    if (do_free == SL_NOFREE) {
+    if (do_free == NOFREE) {
         memset(slist, 0, sizeof(*slist));
         return;
     }

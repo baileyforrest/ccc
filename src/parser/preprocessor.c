@@ -18,7 +18,6 @@
 */
 /**
  * Implementation for preprocessor/file reader
- * TODO: Make sure we don't point to mmap'd file
  */
 
 #include "preprocessor.h"
@@ -61,11 +60,11 @@ status_t pp_init(preprocessor_t *pp) {
     return status;
 
 fail4:
-    ht_destroy(&pp->macros);
+    ht_destroy(&pp->macros, DOFREE);
 fail3:
-    sl_destroy(&pp->macro_insts, SL_FREE);
+    sl_destroy(&pp->macro_insts, DOFREE);
 fail2:
-    sl_destroy(&pp->file_insts, SL_FREE);
+    sl_destroy(&pp->file_insts, DOFREE);
 fail1:
     return status;
 }
@@ -78,15 +77,19 @@ void pp_destroy(preprocessor_t *pp) {
     SL_FOREACH(cur, &pp->file_insts) {
         pp_file_destroy(GET_ELEM(&pp->file_insts, &cur));
     }
-    sl_destroy(&pp->file_insts, SL_NOFREE);
+    sl_destroy(&pp->file_insts, NOFREE);
 
     SL_FOREACH(cur, &pp->macro_insts) {
         pp_macro_inst_destroy(GET_ELEM(&pp->macro_insts, cur));
     }
-    sl_destroy(&pp->macro_insts, SL_FREE);
+    sl_destroy(&pp->macro_insts, DOFREE);
 
     // HT_FOREACH() TODO: Macro destroy
-    ht_destroy(&pp->macros);
+    HT_FOREACH(cur, &pp->macros) {
+        pp_macro_t *macro = GET_HT_ELEM(&pp->macros, cur);
+        pp_macro_destroy(macro);
+    }
+    ht_destroy(&pp->macros, NOFREE);
 }
 
 void pp_close(preprocessor_t *pp) {
@@ -456,7 +459,7 @@ void pp_macro_destroy(pp_macro_t *macro) {
         len_str_node_t *str = GET_ELEM(&macro->params, cur);
         free(str->str.str);
     }
-    sl_destroy(&macro->params, SL_FREE);
+    sl_destroy(&macro->params, DOFREE);
 
     free(macro->start);
 }
@@ -496,6 +499,6 @@ fail1:
 }
 
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
-    ht_destroy(&macro_inst->param_map);
+    ht_destroy(&macro_inst->param_map, DOFREE);
     free(macro_inst);
 }

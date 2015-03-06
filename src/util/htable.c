@@ -42,14 +42,6 @@
 /** Minimum number of hash buckets */
 #define MIN_BUCKETS ((size_t)16)
 
-/** Pointer to element represented by head */
-#define GET_HT_ELEM(ht, head) \
-    ((void *)(head) - ht->params.head_offset)
-
-/** Pointer to key of element represented by head */
-#define GET_KEY(ht, head) \
-    (GET_HT_ELEM(ht, head) + ht->params.key_offset)
-
 /** Gets hash of a key */
 #define GET_HASH(ht, key) \
     (ht->params.hashfunc((key)))
@@ -65,7 +57,12 @@ status_t ht_init(htable_t *ht, const ht_params *params) {
     return ht->buckets == NULL ? CCC_NOMEM : CCC_OK;
 }
 
-void ht_destroy(htable_t *ht) {
+void ht_destroy(htable_t *ht, bool do_free) {
+    if (NOFREE == do_free) {
+        free(ht->buckets);
+        return;
+    }
+
     // Free each chained list
     for (size_t i = 0; i < ht->nbuckets; ++i) {
         sl_link_t *cur = ht->buckets[i];
@@ -99,7 +96,7 @@ static status_t grow_ht(htable_t *ht) {
             next = cur->next;
 
             // Add cur to new bucket list
-            void *key = GET_KEY(ht, cur);
+            void *key = GET_HT_KEY(ht, cur);
             uint32_t bucket = GET_HASH(ht, key) % new_nbuckets;
 
             sl_link_t **new_cur = &new_buckets[bucket];
@@ -129,12 +126,12 @@ status_t ht_insert(htable_t *ht, sl_link_t *elem) {
     }
 
     ++ht->params.nelems;
-    void *key = GET_KEY(ht, elem);
+    void *key = GET_HT_KEY(ht, elem);
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
     sl_link_t **cur = &ht->buckets[bucket];
     for(; *cur != NULL; *cur = (*cur)->next) {
-        void *key2 = GET_KEY(ht, *cur);
+        void *key2 = GET_HT_KEY(ht, *cur);
 
         if (!ht->params.cmpfunc(key, key2)) {
             // Different keys
@@ -166,7 +163,7 @@ static sl_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
 
     sl_link_t **cur = &ht->buckets[bucket];
     for (; *cur != NULL; *cur = (*cur)->next) {
-        void *key2 = GET_KEY(ht, *cur);
+        void *key2 = GET_HT_KEY(ht, *cur);
 
         if (ht->params.cmpfunc(key, key2)) {
             return cur;

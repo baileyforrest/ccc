@@ -61,9 +61,6 @@ typedef struct slist_t {
 status_t sl_init(slist_t *slist, size_t head_offset);
 
 
-#define SL_FREE   true
-#define SL_NOFREE false
-
 /**
  * Does not free slist. Destroys a singly linked list. Optionally frees elements
  *
