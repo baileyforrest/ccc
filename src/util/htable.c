@@ -172,7 +172,7 @@ static sl_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
     return NULL;
 }
 
-bool ht_remove(htable_t *ht, const void *key) {
+bool ht_remove(htable_t *ht, const void *key, bool do_free) {
     sl_link_t **pp_link = ht_lookup_helper(ht, key);
     if (NULL == pp_link) {
         return false;
@@ -180,7 +180,9 @@ bool ht_remove(htable_t *ht, const void *key) {
 
     sl_link_t *link = *pp_link;
     *pp_link = (*pp_link)->next;
-    free(GET_HT_ELEM(ht, link));
+    if (DOFREE == do_free) {
+        free(GET_HT_ELEM(ht, link));
+    }
     return true;
 }
 

@@ -65,10 +65,6 @@ status_t pp_directives_init(preprocessor_t *pp) {
  * Note that this function needs to allocate memory for the paramaters, macro
  * name and body. This is because the mmaped file will be unmapped when we
  * are done with the file.
- *
- * TODO: A possible optimization would be to read the whole macro twice. The
- * first time is to allocate the whole thing in one chunk, the second time is
- * to copy the macro into the newly allocated memory.
  */
 void pp_directive_define(preprocessor_t *pp) {
     assert(NULL == sl_head(&pp->macro_insts) && "Define inside macro!");
@@ -97,8 +93,11 @@ void pp_directive_define(preprocessor_t *pp) {
 
     len_str_node_t lookup = { { NULL }, { cur, name_len } };
 
-    if (NULL != ht_lookup(&pp->macros, &lookup)) {
+    pp_macro_t cur_macro = ht_lookup(&pp->macros, &lookup);
+    if (NULL != cur_macro) {
         // TODO: warn about redefined macro
+
+        ht_remove(&pp->macros, cur_macro, DOFREE);
     }
 
     // Create the macro object
@@ -457,7 +456,6 @@ void pp_directive_ifndef(preprocessor_t *pp) {
             pp->string = true;
         }
 
-        // TODO: Handle string concatenation? Maybe let the lexer do it?
         if (pp->string && cur_char == '"') {
             pp->string = false;
         }

@@ -84,7 +84,6 @@ void pp_destroy(preprocessor_t *pp) {
     }
     sl_destroy(&pp->macro_insts, DOFREE);
 
-    // HT_FOREACH() TODO: Macro destroy
     HT_FOREACH(cur, &pp->macros) {
         pp_macro_t *macro = GET_HT_ELEM(&pp->macros, cur);
         pp_macro_destroy(macro);
@@ -196,8 +195,16 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         pp->string = true;
     }
 
-    // TODO: Handle string concatenation? Maybe let the lexer do it?
     if (pp->string && cur_char == '"') {
+        char *lookahead = next_char;
+        SKIP_WS_AND_COMMENT(lookahead, end);
+
+        // Concatenate strings
+        if (lookahead != end && '"' == *lookahead) {
+            *cur = lookahead;
+            return pp_next_char(pp);
+        }
+
         pp->string = false;
     }
 

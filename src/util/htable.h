@@ -96,9 +96,10 @@ status_t ht_insert(htable_t *ht, sl_link_t *elem);
  *
  * @param ht The hashtable to remove from
  * @param key Key of element to remove
+ * @param do_free DOFREE (true) if element is to be free, else NOFREE
  * @return true if removed, false otherwise
  */
-bool ht_remove(htable_t *ht, const void *key);
+bool ht_remove(htable_t *ht, const void *key, bool do_free);
 
 /**
  * Lookup specified element in hashtable
