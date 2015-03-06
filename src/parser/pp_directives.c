@@ -24,6 +24,7 @@
 #include "preprocessor_priv.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -221,6 +222,10 @@ void pp_directive_include(preprocessor_t *pp) {
     char *lookahead = file->cur;
 
     SKIP_WS_AND_COMMENT(lookahead, end);
+    if (lookahead == end) {
+        // TODO: Handle/report this
+        assert(false);
+    }
 
     len_str_t suffix;
 
@@ -276,6 +281,7 @@ void pp_directive_include(preprocessor_t *pp) {
 
         // skip the rest of the line
         SKIP_LINE(lookahead, end);
+        file->cur = lookahead;
 
         break;
 
@@ -390,11 +396,107 @@ void pp_directive_include(preprocessor_t *pp) {
 }
 
 void pp_directive_ifndef(preprocessor_t *pp) {
-    //TODO: Implement this
-    (void)pp;
+    assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
+
+    pp_file_t *file = sl_head(&pp->file_insts);
+    file->if_count++;
+
+    char *cur = file->cur;
+    char *end = file->end;
+    char *lookahead = file->cur;
+
+    SKIP_WS_AND_COMMENT(lookahead, end);
+    if (lookahead == end) {
+        // TODO: Handle/report this
+        assert(false);
+    }
+
+    cur = lookahead;
+    ADVANCE_IDENTIFIER(lookahead, end);
+    if (lookahead == end) {
+        // TODO: Handle/report this
+        assert(false);
+    }
+
+    len_str_t lookup = { cur, (size_t)(lookahead - cur) };
+
+    pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
+    SKIP_LINE(lookahead, end);
+
+    // No macro found, proceed after skipping line
+    if (NULL == macro) {
+        file->cur = lookahead;
+        return;
+    }
+
+    // TODO: skip to else/elif
+
+    cur = lookahead;
+    // Skip ahead until we find a directive telling us to stop
+    while (cur != end) {
+        int cur_char = *lookahead;
+        char *next_char = lookahead + 1;
+
+        // TODO: this logic is duplicated in preprocessor.c
+        // Found a character on line, don't process new directives
+        if (!pp->char_line && !isspace(cur_char)) {
+            pp->char_line = true;
+        }
+
+        // Record comments
+        if (cur_char == '/' && next_char != end &&
+            !pp->line_comment && !pp->block_comment && !pp->string) {
+            if (*next_char == '/') {
+                pp->line_comment = true;
+            } else if (*next_char == '*') {
+                pp->block_comment = true;
+            }
+        }
+
+        if (!pp->string && cur_char == '"') {
+            pp->string = true;
+        }
+
+        // TODO: Handle string concatenation? Maybe let the lexer do it?
+        if (pp->string && cur_char == '"') {
+            pp->string = false;
+        }
+
+        // Reset line variables
+        if ('\n' == cur_char) {
+            pp->char_line = false;
+            pp->line_comment = false;
+        }
+
+        // Cases to ignore directives
+        if (pp->block_comment || pp->line_comment || pp->string ||
+            pp->char_line) {
+            continue;
+        }
+
+        if ('#' != cur_char) {
+            continue;
+        }
+
+        // cur_char == '#' look for a preprocessor command
+        lookahead = cur + 1;
+
+        ADVANCE_IDENTIFIER(lookahead, end);
+        size_t len = lookahead - cur;
+        if (strncmp(cur, "endif", len) != 0) {
+            continue;
+        }
+        pp_directive_endif(pp);
+    }
 }
 
 void pp_directive_endif(preprocessor_t *pp) {
-    //TODO: Implement this
-    (void)pp;
+    assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
+
+    pp_file_t *file = sl_head(&pp->file_insts);
+    if (0 == file->if_count) {
+        // TODO: handle this
+        assert(false && "Invalid endif");
+    }
+    file->if_count--;
 }

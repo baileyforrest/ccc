@@ -134,6 +134,7 @@ typedef struct pp_file_t {
     char *cur;      /**< Current buffer location */
     char *end;      /**< Max location */
     int fd;         /**< File descriptor of open file */
+    int if_count;   /**< Number of instances of active if directive */
 } pp_file_t;
 
 /**

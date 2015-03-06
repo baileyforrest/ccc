@@ -417,6 +417,7 @@ status_t pp_file_map(const char *filename, pp_file_t **result) {
     }
     pp_file->cur = pp_file->buf;
     pp_file->end = pp_file->buf + size;
+    pp_file->if_count = 0;
 
     *result = pp_file;
 
