@@ -30,11 +30,17 @@
 #include "util/util.h"
 
 
-typedef void (*pp_action_t)(preprocessor_t *pp);
+/**
+ * Preprocessor directive callback type
+ */
+typedef status_t (*pp_action_t)(preprocessor_t *pp);
 
+/**
+ * Prepcoressor directive object
+ */
 typedef struct pp_directive_t {
-    sl_link_t link; /**< Hash table link */
-    len_str_t key; /**< Directive name */
+    sl_link_t link;     /**< Hash table link */
+    len_str_t key;      /**< Directive name */
     pp_action_t action; /**< Preprocessor action */
 } pp_directive_t;
 
@@ -50,7 +56,7 @@ status_t pp_directives_init(preprocessor_t *pp);
  * Directive for #define
  * @param pp The preprocessor to define for
  */
-void pp_directive_define(preprocessor_t *pp);
+status_t pp_directive_define(preprocessor_t *pp);
 
 /**
  * Directive for #include
@@ -59,18 +65,18 @@ void pp_directive_define(preprocessor_t *pp);
  *
  * @param pp The preprocessor to include for
  */
-void pp_directive_include(preprocessor_t *pp);
+status_t pp_directive_include(preprocessor_t *pp);
 
 /**
  * Directive for #ifndef
  * @param pp The preprocessor act on
  */
-void pp_directive_ifndef(preprocessor_t *pp);
+status_t pp_directive_ifndef(preprocessor_t *pp);
 
 /**
  * Directive for #endif
  * @param pp The preprocessor act on
  */
-void pp_directive_endif(preprocessor_t *pp);
+status_t pp_directive_endif(preprocessor_t *pp);
 
 #endif /* _PP_DIRECTIVE_H_ */

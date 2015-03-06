@@ -374,8 +374,17 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         // Skip over directive name
         *cur = lookahead;
+
         // Perform directive action and return next character
-        directive->action(pp);
+        status_t status = directive->action(pp);
+        if (CCC_OK != status) {
+            // If there was an error, just skip directive
+            lookahead = *cur;
+            SKIP_LINE(lookahead, end);
+            *cur = lookahead;
+
+            return status;
+        }
         return pp_nextchar(pp);
     }
 

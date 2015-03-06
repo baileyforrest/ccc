@@ -18,6 +18,8 @@
 */
 /**
  * Preprocessor directive implementation
+ *
+ * TODO: Make sure resources are released in error cases
  */
 
 #include "pp_directives.h"
@@ -66,7 +68,7 @@ status_t pp_directives_init(preprocessor_t *pp) {
  * name and body. This is because the mmaped file will be unmapped when we
  * are done with the file.
  */
-void pp_directive_define(preprocessor_t *pp) {
+status_t pp_directive_define(preprocessor_t *pp) {
     assert(NULL == sl_head(&pp->macro_insts) && "Define inside macro!");
 
     pp_file_t *file = sl_head(&pp->file_insts);
@@ -77,16 +79,16 @@ void pp_directive_define(preprocessor_t *pp) {
     // Skip whitespace before name
     SKIP_WS_AND_COMMENT(lookahead, end);
     if (lookahead == end) {
-        // TODO: Report/handle error
-        assert(false && "Macro definition at end of file");
+        LOG_ERROR(pp, "Macro definition at end of file", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
     cur = lookahead;
 
     // Read the name of the macro
     ADVANCE_IDENTIFIER(lookahead, end);
     if (lookahead == end) {
-        // TODO: Report/handle error
-        assert(false && "Macro definition at end of file");
+        LOG_ERROR(pp, "Macro definition at end of file", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     size_t name_len = lookahead - cur;
@@ -95,30 +97,29 @@ void pp_directive_define(preprocessor_t *pp) {
 
     pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
     if (NULL != cur_macro) {
-        // TODO: warn about redefined macro
-
+        LOG_ERROR(pp, "Macro redefinition", LOG_WARN);
         ht_remove(&pp->macros, cur_macro, DOFREE);
     }
 
     // Create the macro object
     pp_macro_t *new_macro = malloc(sizeof(pp_macro_t));
     if (NULL == new_macro) {
-        // TODO: Report/handle error
-        assert(false && "Out of memory");
+        LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
+        return -(int)CCC_NOMEM;
     }
 
     status_t status = pp_macro_init(new_macro);
     if (CCC_OK != status) {
-        // TODO: Report/handle error
-        assert(false && "Failed to create macro");
+        LOG_ERROR(pp, "Failed to create macro", LOG_ERR);
+        return -(int)status;
     }
 
     // Allocate the name
     new_macro->name.len = name_len;
     new_macro->name.str = malloc(name_len + 1);
     if (NULL == new_macro->name.str) {
-        // TODO: Report/handle error
-        assert(false && "Out of memory");
+        LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
+        return -(int)CCC_NOMEM;
     }
     strncpy(new_macro->name.str, cur, new_macro->name.len);
     new_macro->name.str[new_macro->name.len] = '\0';
@@ -135,15 +136,15 @@ void pp_directive_define(preprocessor_t *pp) {
             size_t param_len = lookahead - cur;
 
             if (param_len == 0) {
-                // TODO: Handle correctly
-                assert(false && "missing paramater name");
+                LOG_ERROR(pp, "Macro missing paramater name", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             // Allocate paramaters
             len_str_node_t *string = malloc(sizeof(len_str_t));
             if (NULL == string) {
-                // TODO: Report/handle error
-                assert(false && "Out of memory");
+                LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
+                return -(int)CCC_NOMEM;
             }
             string->str.len = param_len;
             string->str.str = malloc(param_len + 1);
@@ -164,16 +165,16 @@ void pp_directive_define(preprocessor_t *pp) {
             }
         }
         if (lookahead == end) {
-            // TODO: Report/handle error
-            assert(false && "Macro definition at end of file");
+            LOG_ERROR(pp, "Unexpected EOF in macro definition", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
     }
 
     // Skip whitespace after parameters
     SKIP_WS_AND_COMMENT(lookahead, end);
     if (lookahead == end) {
-        // TODO: Report/handle error
-        assert(false && "Macro definition at end of file");
+        LOG_ERROR(pp, "Unexpected EOF in macro definition", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     cur = lookahead;
@@ -186,16 +187,16 @@ void pp_directive_define(preprocessor_t *pp) {
         lookahead++;
     }
     if (lookahead == end) {
-        // TODO: Report/handle error
-        assert(false && "Macro definition at end of file");
+        LOG_ERROR(pp, "Unexpected EOF in macro definition", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     // Allocate the macro body
     size_t macro_len = lookahead - cur;
     new_macro->start = macro_len == 0 ? NULL : malloc(macro_len + 1);
     if (macro_len != 0 && NULL == new_macro->start) {
-        // TODO: Report/handle error
-        assert(false && "Out of memory");
+        LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
+        return -(int)CCC_NOMEM;
     }
     strncpy(new_macro->start, cur, macro_len);
 
@@ -204,12 +205,13 @@ void pp_directive_define(preprocessor_t *pp) {
 
     // Add it to the hashtable
     ht_insert(&pp->macros, &new_macro->link);
+    return CCC_OK;
 }
 
 /**
  * Warning: This is not reentrant!
  */
-void pp_directive_include(preprocessor_t *pp) {
+status_t pp_directive_include(preprocessor_t *pp) {
     static char s_path_buf[MAX_PATH_LEN];
     static char s_suffix_buf[MAX_PATH_LEN];
 
@@ -222,8 +224,8 @@ void pp_directive_include(preprocessor_t *pp) {
 
     SKIP_WS_AND_COMMENT(lookahead, end);
     if (lookahead == end) {
-        // TODO: Handle/report this
-        assert(false);
+        LOG_ERROR(pp, "Unexpected EOF in #include", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     len_str_t suffix;
@@ -259,20 +261,20 @@ void pp_directive_include(preprocessor_t *pp) {
 
         // Reach end
         if (lookahead == end) {
-            // TODO: Handle/report this
-            assert(false);
+            LOG_ERROR(pp, "Unexpected EOF in #include", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
 
         // 0 length
         if (lookahead == cur) {
-            // TODO: Handle/report this
-            assert(false);
+            LOG_ERROR(pp, "0 length include path", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
 
         // Incorrect end symbol
         if (*lookahead != endsym) {
-            // TODO: Handle/report this
-            assert(false);
+            LOG_ERROR(pp, "Unexpected symbol in #include", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
 
         suffix.str = cur;
@@ -294,8 +296,8 @@ void pp_directive_include(preprocessor_t *pp) {
         while (!done) {
             int next = pp_nextchar_helper(pp, true);
             if (PP_EOF == next) {
-                // TODO: Handle/report this
-                assert(false);
+                LOG_ERROR(pp, "Unexpected EOF in #include", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             switch (next) {
@@ -309,8 +311,9 @@ void pp_directive_include(preprocessor_t *pp) {
             case '\t':
                 continue;
             default:
-                // TODO: Handle/report this
-                assert(false);
+                // TODO: report expected/found character
+                LOG_ERROR(pp, "Unexpected character in #include", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
         }
 
@@ -323,9 +326,13 @@ void pp_directive_include(preprocessor_t *pp) {
         // Find the end of the include string
         while (true) {
             int next = pp_nextchar_helper(pp, true);
-            if (offset == MAX_PATH_LEN || PP_EOF == next) {
-                // TODO: Handle/report this
-                assert(false);
+            if (offset == MAX_PATH_LEN) {
+                LOG_ERROR(pp, "Include path name too long", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
+            }
+            if (PP_EOF == next) {
+                LOG_ERROR(pp, "Unexpected EOF in #include", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             if (next != endsym) {
@@ -356,9 +363,9 @@ void pp_directive_include(preprocessor_t *pp) {
         }
         break;
     default:
-        // Invalid symbol
-        // TODO: Handle/report this
-        assert(false);
+        // TODO: report expected/found character
+        LOG_ERROR(pp, "Unexpected character in #include", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     // Search for the string in all of the search paths
@@ -367,8 +374,8 @@ void pp_directive_include(preprocessor_t *pp) {
         len_str_t *cur = GET_ELEM(&pp->search_path, link);
 
         if (cur->len + suffix.len + 1 > MAX_PATH_LEN) {
-            // TODO: report/handle this
-            assert(false && "Path too large!");
+            LOG_ERROR(pp, "Include path name too long", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
 
         strncpy(s_path_buf, cur->str, cur->len);
@@ -385,17 +392,19 @@ void pp_directive_include(preprocessor_t *pp) {
         pp_file_t *pp_file;
         status_t status = pp_file_map(s_path_buf, len, &pp_file);
         if (CCC_OK != status) {
-            // TODO: report/handle this
-            assert(false && "Path too large!");
+            LOG_ERROR(pp, "Include path name too long", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
 
         // Add the file to the top of the stack
         sl_prepend(&pp->file_insts, &pp_file->link);
         break;
     }
+
+    return CCC_OK;
 }
 
-void pp_directive_ifndef(preprocessor_t *pp) {
+status_t pp_directive_ifndef(preprocessor_t *pp) {
     assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
 
     pp_file_t *file = sl_head(&pp->file_insts);
@@ -407,15 +416,15 @@ void pp_directive_ifndef(preprocessor_t *pp) {
 
     SKIP_WS_AND_COMMENT(lookahead, end);
     if (lookahead == end) {
-        // TODO: Handle/report this
-        assert(false);
+        LOG_ERROR(pp, "Unexpected EOF in #ifndef", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     cur = lookahead;
     ADVANCE_IDENTIFIER(lookahead, end);
     if (lookahead == end) {
-        // TODO: Handle/report this
-        assert(false);
+        LOG_ERROR(pp, "Unexpected EOF in #ifndef", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
 
     len_str_t lookup = { cur, (size_t)(lookahead - cur) };
@@ -426,7 +435,7 @@ void pp_directive_ifndef(preprocessor_t *pp) {
     // No macro found, proceed after skipping line
     if (NULL == macro) {
         file->cur = lookahead;
-        return;
+        return CCC_OK;
     }
 
     cur = lookahead;
@@ -485,15 +494,19 @@ void pp_directive_ifndef(preprocessor_t *pp) {
         }
         pp_directive_endif(pp);
     }
+
+    return CCC_OK;
 }
 
-void pp_directive_endif(preprocessor_t *pp) {
+status_t pp_directive_endif(preprocessor_t *pp) {
     assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
 
     pp_file_t *file = sl_head(&pp->file_insts);
     if (0 == file->if_count) {
-        // TODO: handle this
-        assert(false && "Invalid endif");
+        LOG_ERROR(pp, "Unexpected #endif", LOG_ERR);
+        return -(int)CCC_ESYNTAX;
     }
     file->if_count--;
+
+    return CCC_OK;
 }
