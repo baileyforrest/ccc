@@ -92,10 +92,10 @@ status_t st_init(symtab_t *table) {
 
     static const ht_params s_params = {
         STATIC_ARRAY_LEN(s_reserved) * 2, // Size estimate
-        offsetof(symtab_entry_t, key),                  // Offset of key
-        offsetof(symtab_entry_t, link),                 // Offset of ht link
-        strhash,                                        // Hash function
-        vstrcmp,                                        // void string compare
+        offsetof(symtab_entry_t, key),    // Offset of key
+        offsetof(symtab_entry_t, link),   // Offset of ht link
+        strhash,                          // Hash function
+        vstrcmp,                          // void string compare
     };
 
     if (CCC_OK != (status = ht_init(&table->hashtab, &s_params))) {
@@ -119,7 +119,7 @@ void st_destroy(symtab_t *table) {
     // Remove all of the static entries first, because they aren't heap
     // allocated
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
-        ht_remove(&table->hashtab, &s_reserved[i].link);
+        ht_remove(&table->hashtab, &s_reserved[i].link, NOFREE);
     }
 
     ht_destroy(&table->hashtab, DOFREE);

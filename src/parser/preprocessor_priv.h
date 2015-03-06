@@ -25,12 +25,11 @@
 
 #include "util/slist.h"
 #include "util/util.h"
+#include "util/logger.h"
 
 /**
  * Given a pointer and an end, skip whitespace characters and block
  * comments, or stop if the end is reached
- *
- * TODO: Handle newline
  *
  * @param lookahead - char * to advance
  * @param end - max char *
@@ -41,22 +40,19 @@
     bool comment = false;                       \
     while (!done && lookahead != end) {         \
         if (comment) {                          \
-            if ('*' != *lookahead) {            \
-                lookahead++;                    \
+            if ('*' != *(lookahead++)) {        \
                 continue;                       \
             }                                   \
                                                 \
             /* Found '*' */                     \
-            lookahead++;                        \
                                                 \
             if (lookahead == end) {             \
                 continue;                       \
             }                                   \
                                                 \
-            if ('/' == *lookahead) {            \
+            if ('/' == *(lookahead++)) {        \
                 comment = false;                \
             }                                   \
-                                                \
             continue;                           \
         }                                       \
         switch (*lookahead) {                   \
@@ -69,8 +65,18 @@
             if (lookahead == end) {             \
                 break;                          \
             }                                   \
-            if ('*' ==*lookahead) {             \
+            if ('*' == *lookahead) {            \
                 comment = true;                 \
+            }                                   \
+            break;                              \
+        case '\\':                              \
+            lookahead++;                        \
+            if (lookahead == end) {             \
+                break;                          \
+            }                                   \
+            /* Skip escaped newlines */         \
+            if ('\n' == *lookahead) {           \
+                lookahead++;                    \
             }                                   \
             break;                              \
         default:                                \
@@ -124,17 +130,36 @@
     }                                                                   \
     } while(0)
 
+/**
+ * Log an error
+ *
+ * @param pp_file_t pp_file The file the error is in
+ * @param char * message The message
+ * @param log_type_t type Type of log message
+ */
+#define LOG_ERROR(pp_file, message, type)       \
+    do {                                        \
+        fmark_t mark = {                        \
+            (pp_file)->filename,                \
+            (pp_file)->line_num,                \
+            (pp_file)->col_num                  \
+        };                                      \
+        logger_log(&mark, (message), (type));   \
+    } while(0)
 
 /**
  * An instance of an open file on the preprocessor
  */
 typedef struct pp_file_t {
-    sl_link_t link; /**< List link */
-    char *buf;      /**< mmap'd buffer */
-    char *cur;      /**< Current buffer location */
-    char *end;      /**< Max location */
-    int fd;         /**< File descriptor of open file */
-    int if_count;   /**< Number of instances of active if directive */
+    sl_link_t link;      /**< List link */
+    len_str_t *filename; /**< Filename. Not freed/alloced with pp_file_t */
+    char *buf;           /**< mmap'd buffer */
+    char *cur;           /**< Current buffer location */
+    char *end;           /**< Max location */
+    int fd;              /**< File descriptor of open file */
+    int if_count;        /**< Number of instances of active if directive */
+    int line_num;        /**< Current line number in file */
+    int col_num;         /**< Current column number in file */
 } pp_file_t;
 
 /**
@@ -180,10 +205,11 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
  * Maps the specified file. Gives result as a pp_file_t
  *
  * @param filename Filename to open.
+ * @param len Length of filename
  * @param result Location to store result. NULL if failed
  * @return CCC_OK on success, error code otherwise
  */
-status_t pp_file_map(const char *filename, pp_file_t **result);
+status_t pp_file_map(const char *filename, size_t len, pp_file_t **result);
 
 /**
  * Unmaps and given pp_file_t. Does free pp_file.

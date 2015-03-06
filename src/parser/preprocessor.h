@@ -80,13 +80,14 @@ status_t pp_open(preprocessor_t *pp, const char *filename);
  */
 void pp_close(preprocessor_t *pp);
 
-#define PP_EOF (-1)
+#define PP_EOF (0)
 
 /**
  * Fetch next character from preprocessor
  *
  * @param  pp The preprocessor to get characters from
- * @return the next character. PP_EOF on EOF
+ * @return the next character. PP_EOF on EOF. Negative value on error. It is a
+ * negated status_t
  */
 int pp_nextchar(preprocessor_t *pp);
 

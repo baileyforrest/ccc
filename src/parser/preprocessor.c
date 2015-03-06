@@ -101,7 +101,8 @@ void pp_close(preprocessor_t *pp) {
 status_t pp_open(preprocessor_t *pp, const char *filename) {
     status_t status = CCC_OK;
     pp_file_t *pp_file;
-    if (CCC_OK != (status = pp_file_map(filename, &pp_file))) {
+    if (CCC_OK !=
+        (status = pp_file_map(filename, strlen(filename), &pp_file))) {
         goto done;
     }
 
@@ -202,7 +203,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         // Concatenate strings
         if (lookahead != end && '"' == *lookahead) {
             *cur = lookahead;
-            return pp_next_char(pp);
+            return pp_nextchar(pp);
         }
 
         pp->string = false;
@@ -223,13 +224,11 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     switch (cur_char) {
-        // Cases which cannot be before a macro
-        // TODO: verify/add more of these
+        // Cases which cannot be before a macro. Macros are identifiers
     case ASCII_LOWER:
     case ASCII_UPPER:
     case ASCII_DIGIT:
     case '_':
-    case '-':
         // Return the current character
         // Also advance the current cur pointer
         return *((*cur)++);
@@ -400,7 +399,7 @@ int pp_nextchar(preprocessor_t *pp) {
     return pp_nextchar_helper(pp, false);
 }
 
-status_t pp_file_map(const char *filename, pp_file_t **result) {
+status_t pp_file_map(const char *filename, size_t len, pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = malloc(sizeof(pp_file_t));
     if (NULL == pp_file) {
@@ -429,9 +428,18 @@ status_t pp_file_map(const char *filename, pp_file_t **result) {
     pp_file->end = pp_file->buf + size;
     pp_file->if_count = 0;
 
-    *result = pp_file;
+    if (CCC_OK != (status = fdir_insert(filename, len, &pp_file->filename))) {
+        goto fail3;
+    }
 
+    pp_file->line_num = 0;
+    pp_file->col_num = 0;
+
+    *result = pp_file;
     return status;
+
+fail3:
+    munmap(pp_file->buf, (size_t)(pp_file->end - pp_file->buf));
 fail2:
     free(pp_file);
 fail1:

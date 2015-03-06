@@ -93,7 +93,7 @@ void pp_directive_define(preprocessor_t *pp) {
 
     len_str_node_t lookup = { { NULL }, { cur, name_len } };
 
-    pp_macro_t cur_macro = ht_lookup(&pp->macros, &lookup);
+    pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
     if (NULL != cur_macro) {
         // TODO: warn about redefined macro
 
@@ -373,7 +373,8 @@ void pp_directive_include(preprocessor_t *pp) {
 
         strncpy(s_path_buf, cur->str, cur->len);
         strncpy(s_path_buf + cur->len, suffix.str, suffix.len);
-        s_path_buf[cur->len + suffix.len] = '\0';
+        size_t len = cur->len + suffix.len;
+        s_path_buf[len] = '\0';
 
         // File isn't accessible
         if(-1 == access(s_path_buf, R_OK)) {
@@ -382,7 +383,7 @@ void pp_directive_include(preprocessor_t *pp) {
 
         // File accessible
         pp_file_t *pp_file;
-        status_t status = pp_file_map(s_path_buf, &pp_file);
+        status_t status = pp_file_map(s_path_buf, len, &pp_file);
         if (CCC_OK != status) {
             // TODO: report/handle this
             assert(false && "Path too large!");
