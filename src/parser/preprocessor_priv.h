@@ -133,18 +133,20 @@
 /**
  * Log an error
  *
- * @param pp_file_t pp_file The file the error is in
+ * @param preprocessor_t The preprocessor the error is in
  * @param char * message The message
  * @param log_type_t type Type of log message
  */
-#define LOG_ERROR(pp_file, message, type)       \
-    do {                                        \
-        fmark_t mark = {                        \
-            (pp_file)->filename,                \
-            (pp_file)->line_num,                \
-            (pp_file)->col_num                  \
-        };                                      \
-        logger_log(&mark, (message), (type));   \
+#define LOG_ERROR(pp, message, type)                        \
+    do {                                                    \
+        pp_file_t *pp_file = sl_head(&(pp)->file_insts);    \
+        assert(NULL != pp_file);                            \
+        fmark_t mark = {                                    \
+            (pp_file)->filename,                            \
+            (pp_file)->line_num,                            \
+            (pp_file)->col_num                              \
+        };                                                  \
+        logger_log(&mark, (message), (type));               \
     } while(0)
 
 /**

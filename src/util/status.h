@@ -31,7 +31,8 @@
 typedef enum {
     CCC_OK = 0,   /**< Success */
     CCC_NOMEM,    /**< No Memory */
-    CCC_FILEERR   /**< File Error */
+    CCC_FILEERR,  /**< File Error */
+    CCC_ESYNTAX   /**< Syntax Error */
 } status_t;
 
 #endif /* _STATUS_H_ */

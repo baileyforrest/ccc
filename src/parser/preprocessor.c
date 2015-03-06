@@ -18,6 +18,8 @@
 */
 /**
  * Implementation for preprocessor/file reader
+ *
+ * TODO: Make sure no memory leaked on error paths
  */
 
 #include "preprocessor.h"
@@ -142,8 +144,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             }
 
             if (++cur == end) {
-                // TODO: Handle this correctly
-                assert(false && "Unexpected #");
+                LOG_ERROR(pp, "Unexpected #", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             // Not ##
@@ -156,8 +158,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             ADVANCE_IDENTIFIER(lookahead, end);
             if (cur == end) {
-                // TODO: Handle this correctly
-                assert(false && "Expected macro paramater after ##");
+                LOG_ERROR(pp, "Expected macro paramater after ##", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             len_str_t lookup = {
@@ -299,11 +301,10 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             return *((*cur)++);
         }
 
-        // TODO: Handle concatenation in macros
         if (NULL != macro_inst) {
             if (next_char == end) {
-                // TODO: error here
-                assert(false && "Unexpected EOF in macro");
+                LOG_ERROR(pp, "Unexpected EOF in macro", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             if ('#' != *next_char) {
@@ -367,8 +368,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
 
         if (NULL == directive) {
-            // TODO Handle this correctly
-            assert(false && "Invalid preprocessor command");
+            LOG_ERROR(pp, "Invalid preprocessor command", LOG_ERR);
+            return -(int)CCC_ESYNTAX;
         }
 
         // Skip over directive name
@@ -404,8 +405,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     status_t status = pp_macro_inst_create(macro, &new_macro_inst);
 
     if (CCC_OK != status) {
-        // TODO Handle this correctly, propgate the error
-        assert(false);
+        LOG_ERROR(pp, "Failed to create new macro.", LOG_ERR);
+        return -(int)status;
     }
 
     // No paramaters on macro
@@ -445,9 +446,10 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
                 }
             }
 
-            // TODO handle/report error
             if (lookahead == end && *lookahead != ')') {
-                assert(false && "Unfilled macro");
+                LOG_ERROR(pp, "Unexpected EOF while scanning macro paramaters",
+                          LOG_ERR);
+                return -(int)CCC_ESYNTAX;
             }
 
             size_t cur_len = lookahead - cur_param;
@@ -455,9 +457,9 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             pp_param_map_elem_t *param_elem =
                 malloc(sizeof(pp_param_map_elem_t));
 
-            // TODO: Handle/propgate the error
             if (NULL == param_elem) {
-                assert(false);
+                LOG_ERROR(pp, "Out of memory while scanning macro", LOG_ERR);
+                return -(int)CCC_NOMEM;
             }
 
             // Get current paramater in macro
