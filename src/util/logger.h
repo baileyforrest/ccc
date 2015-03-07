@@ -34,6 +34,12 @@ typedef enum log_type_t {
     LOG_INFO  /**< Information */
 } log_type_t;
 
+// String formatting buffer for logging
+// Usage is obviously nonreentrant
+// Should be formatted then used right away
+#define LOG_FMT_BUF_SIZE 4096
+extern char logger_fmt_buf[LOG_FMT_BUF_SIZE];
+
 /**
  * Initializes logger
  */

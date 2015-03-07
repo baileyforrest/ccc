@@ -25,6 +25,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -339,8 +340,9 @@ status_t pp_directive_include(preprocessor_t *pp) {
             case '\t':
                 continue;
             default:
-                // TODO: report expected/found character
-                LOG_ERROR(pp, "Unexpected character in #include", LOG_ERR);
+                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+                        "Unexpected character %c in #include", next);
+                LOG_ERROR(pp, logger_fmt_buf, LOG_ERR);
                 status = CCC_ESYNTAX;
                 goto fail1;
             }
@@ -357,11 +359,13 @@ status_t pp_directive_include(preprocessor_t *pp) {
             int next = pp_nextchar_helper(pp, true);
             if (offset == MAX_PATH_LEN) {
                 LOG_ERROR(pp, "Include path name too long", LOG_ERR);
-                return -(int)CCC_ESYNTAX;
+                status = CCC_ESYNTAX;
+                goto fail1;
             }
             if (PP_EOF == next) {
                 LOG_ERROR(pp, "Unexpected EOF in #include", LOG_ERR);
-                return -(int)CCC_ESYNTAX;
+                status = CCC_ESYNTAX;
+                goto fail1;
             }
 
             if (next != endsym) {
@@ -392,8 +396,9 @@ status_t pp_directive_include(preprocessor_t *pp) {
         }
         break;
     default:
-        // TODO: report expected/found character
-        LOG_ERROR(pp, "Unexpected character in #include", LOG_ERR);
+        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+                 "Unexpected character %c in #include", *cur);
+        LOG_ERROR(pp, logger_fmt_buf, LOG_ERR);
         status = CCC_ESYNTAX;
         goto fail1;
     }

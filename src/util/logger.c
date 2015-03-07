@@ -26,6 +26,8 @@
 
 #include <stdio.h>
 
+char logger_fmt_buf[LOG_FMT_BUF_SIZE];
+
 status_t logger_init() {
     // No op
     return CCC_OK;
