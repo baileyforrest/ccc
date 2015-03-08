@@ -27,6 +27,7 @@
 
 #include "util/htable.h"
 #include "util/slist.h"
+#include "util/file_directory.h"
 
 
 /**
@@ -38,6 +39,9 @@ typedef struct preprocessor_t {
     slist_t search_path;       /**< #include search path */
     htable_t macros;           /**< Macro table */
     htable_t directives;       /**< Preprocessor directives */
+
+    // TODO: Update this correctly
+    fmark_t last_mark;         /**< Mark of the last found token */
 
     const char *cur_param;
     const char *param_end;
@@ -81,12 +85,21 @@ status_t pp_open(preprocessor_t *pp, const char *filename);
  */
 void pp_close(preprocessor_t *pp);
 
+/**
+ * Get the mark of the last successfully fetched character
+ *
+ * @param pp The preprocessor to get the mark from from
+ * @param mark Pointer to mark to populate
+ */
+void pp_lastmark(preprocessor_t *pp, fmark_t *mark);
+
+
 #define PP_EOF (0)
 
 /**
  * Fetch next character from preprocessor
  *
- * @param  pp The preprocessor to get characters from
+ * @param pp The preprocessor to get characters from
  * @return the next character. PP_EOF on EOF. Negative value on error. It is a
  * negated status_t
  */

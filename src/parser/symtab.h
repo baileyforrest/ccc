@@ -20,7 +20,7 @@
 #ifndef _SYMTAB_H_
 #define _SYMTAB_H_
 
-#include "parser/lexer.h"
+#include "parser/token.h"
 
 #include "util/status.h"
 #include "util/htable.h"

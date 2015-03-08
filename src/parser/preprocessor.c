@@ -119,6 +119,10 @@ done:
     return status;
 }
 
+void pp_lastmark(preprocessor_t *pp, fmark_t *mark) {
+    memcpy(mark, &pp->last_mark, sizeof(fmark_t));
+}
+
 int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     // We are in a macro paramater, just copy the string
     if (NULL != pp->cur_param) {

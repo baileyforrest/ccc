@@ -55,5 +55,14 @@ void logger_destroy();
  */
 void logger_log(fmark_t *mark, const char *message, log_type_t type);
 
+/**
+ * @return Returns true if an error message has been logged
+ */
+bool logger_has_error();
+
+/**
+ * @return Returns true if warning message has been logged
+ */
+bool logger_has_error();
 
 #endif /* _LOGGER_H_ */

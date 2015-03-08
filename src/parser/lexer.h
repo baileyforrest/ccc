@@ -16,119 +16,87 @@
   You should have received a copy of the GNU General Public License
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
+/**
+ * Lexer interface
+ */
 
 #ifndef _LEXER_H_
 #define _LEXER_H_
 
-typedef enum token_t {
-    // Delimiters
-    LBRACE,        // {
-    RBRACE,        // }
-    LPAREN,        // (
-    RPAREN,        // )
-    SEMI,          // ;
-    COMMA,         // ,
+#include "parser/preprocessor.h"
+#include "parser/symtab.h"
+#include "parser/token.h"
 
-    COND,          // ?
-    COLON,         // :
+#define CHAR_BITS (sizeof(char) * 8);
+#define SHORT_BITS (sizeof(short) * 8);
+#define INT_BITS (sizeof(int) * 8);
+#define LONG_BITS (sizeof(long) * 8);
+#define LONG_LONG_BITS (sizeof(long long) * 8);
 
-    // Assignment operators
-    ASSIGN,        // =
-    PLUSEQ,        // +=
-    MINUSEQ,       // -=
-    STAREQ,        // *=
-    DIVEQ,         // /=
-    MODEQ,         // %=
-    NEQ,           // !=
-    ANDEQ,         // &=
-    XOREQ,         // ^=
-    OREQ,          // |=
-    RSHIFTEQ,      // >>=
-    LSHIFTEQ,      // <<=
+/** Size of lexer internal buffer */
+#define MAX_LEXEME_SIZE 4096
 
-    // Comparison operators
-    EQ,            // ==
-    LT,            // <
-    GT,            // >
-    LTEQ,          // <=
-    GTEQ,          // >=
+/**
+ * Structure represerting a lexer
+ */
+typedef struct lexer_t {
+    preprocessor_t *pp;           /**< Preprocessor to get characters from */
+    symtab_t *symtab;             /**< Symbol table */
+    symtab_t *string_tab;         /**< String table */
+    char lexbuf[MAX_LEXEME_SIZE]; /**< Temporary work buffer */
+    int next_char;                /**< Next buffered character */
+} lexer_t;
 
-    // Arithmetic
-    RSHIFT,        // >>
-    LSHIFT,        // <<
+/**
+ * Structure representing a single lexeme
+ *
+ * Acts as a tagged union
+ */
+typedef struct lexeme_t {
+    token_t type;                  /**< Type of lememe */
+    fmark_t mark;                  /**< Location of lexeme */
 
-    LOGICAND,      // &&
-    LOGICOR,       // ||
-    LOGICNOT,      // !
+    union {
+        symtab_entry_t *tab_entry; /**< For string/id types */
+        struct {
+            long long int_val;     /**< For integral types */
+            bool hasU;             /**< Has U suffix */
+            bool hasL;             /**< Has U suffix */
+            bool hasLL;            /**< Has LL suffix */
+        } int_params;
+        struct {
+            double float_val;      /**< For floating point types */
+            bool hasF;             /**< Has F suffix */
+        } float_params;
+    };
+} lexeme_t;
 
-    PLUS,          // +
-    MINUS,         // -
-    STAR,          // *
-    DIV,           // /
-    MOD,           // %
 
-    BITAND,        // &
-    BITOR,         // |
-    BITXOR,        // ^
-    BITNOT,        // ~
+/**
+ * Initializes a lexer object
+ *
+ * @param lexer The lexer to initialize
+ * @param pp Preprocessor to fetch chars from
+ * @param symtab Symbol table to use
+ * @param string_tab string table to use
+ * @return CCC_OK on success, error code or error
+ */
+status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
+                    symtab_t *string_tab);
 
-    INC,           // ++
-    DEC,           // --
+/**
+ * Destroys a lexer object
+ *
+ * @param lexer The lexer to destroy
+ */
+void lexer_destroy(lexer_t *lexer);
 
-    // Keywords
-    AUTO,          // auto
-    BREAK,         // break
-    CASE,          // case
-    CONST,         // const
-    CONTINUE,      // continue
-    DEFAULT,       // default
-    DO,            // do
-    ELSE,          // else
-    ENUM,          // enum
-    EXTERN,        // extern
-    FOR,           // for
-    GOTO,          // goto
-    IF,            // if
-    INLINE,        // inline
-    REGISTER,      // register
-    RESTRICT,      // restrict
-    RETURN,        // return
-    SIZEOF,        // sizeof
-    STATIC,        // static
-    STRUCT,        // struct
-    SWITCH,        // switch
-    TYPEDEF,       // typedef
-    UNION,         // union
-    VOLATILE,      // volatile
-    WHILE,         // while
-
-    // Underscore keywords
-    ALIGNAS,       // _Alignas
-    ALIGNOF,       // _Alignof
-    BOOL,          // _Bool
-    COMPLEX,       // _Complex
-    GENERIC,       // _Generic
-    IMAGINARY,     // _Imaginary
-    NORETURN,      // _Noreturn
-    STATIC_ASSERT, // _Static_assert
-    THREAD_LOCAL,  // _Thread_local
-
-    // Types
-    VOID,     // void
-
-    CHAR,     // char
-    SHORT,    // short
-    INT,      // int
-    LONG,     // long
-    UNSIGNED, // unsigned
-    SIGNED,   // signed
-
-    DOUBLE,   // double
-    FLOAT,    // float
-
-    // Other
-    ID,       // identifier
-    STRING,   // string
-} token_t;
+/**
+ * Fetches the next lexeme
+ *
+ * @param lexer The lexer to fetch from
+ * @return CCC_OK on success, error code on error
+ */
+status_t lexer_next_token(lexer_t *lexer, lexeme_t *result);
 
 #endif /* _LEXER_H_ */

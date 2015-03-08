@@ -28,8 +28,16 @@
 
 char logger_fmt_buf[LOG_FMT_BUF_SIZE];
 
+typedef struct logger_t {
+    bool has_error;
+    bool has_warning;
+} logger_t;
+
+static logger_t logger;
+
 status_t logger_init() {
-    // No op
+    logger.has_error = false;
+    logger.has_warning = false;
     return CCC_OK;
 }
 
@@ -43,10 +51,13 @@ void logger_log(fmark_t *mark, const char *message, log_type_t type) {
     switch (type) {
     case LOG_ERR:
         header = "error: ";
+        logger.has_error = true;
         break;
 
     case LOG_WARN:
         header = "warning: ";
+        logger.has_warning = true;
+        break;
 
     default:
         header = "info: ";
