@@ -5,6 +5,7 @@ BIN_NAME := ccc
 CC ?= cc
 DEBUG_FLAGS= -DDEBUG
 CFLAGS= -std=c11 -Wall -Wextra -Werror -g -O0
+LDFLAGS= -lm
 
 SRC= src
 DEST= bin
@@ -27,7 +28,7 @@ dirs:
 	@mkdir -p $(dir $(OBJS))
 
 $(DEST)/$(BIN_NAME): dirs $(OBJS)
-	$(CC) $(OBJS) -o $@
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
 .PHONY: clean
 clean:
