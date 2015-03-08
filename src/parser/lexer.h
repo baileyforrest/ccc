@@ -24,8 +24,8 @@
 #define _LEXER_H_
 
 #include "parser/preprocessor.h"
-#include "parser/symtab.h"
 #include "parser/token.h"
+#include "parser/symtab.h"
 
 #define CHAR_BITS (sizeof(char) * 8);
 #define SHORT_BITS (sizeof(short) * 8);
@@ -46,31 +46,6 @@ typedef struct lexer_t {
     char lexbuf[MAX_LEXEME_SIZE]; /**< Temporary work buffer */
     int next_char;                /**< Next buffered character */
 } lexer_t;
-
-/**
- * Structure representing a single lexeme
- *
- * Acts as a tagged union
- */
-typedef struct lexeme_t {
-    token_t type;                  /**< Type of lememe */
-    fmark_t mark;                  /**< Location of lexeme */
-
-    union {
-        symtab_entry_t *tab_entry; /**< For string/id types */
-        struct {
-            long long int_val;     /**< For integral types */
-            bool hasU;             /**< Has U suffix */
-            bool hasL;             /**< Has U suffix */
-            bool hasLL;            /**< Has LL suffix */
-        } int_params;
-        struct {
-            double float_val;      /**< For floating point types */
-            bool hasF;             /**< Has F suffix */
-        } float_params;
-    };
-} lexeme_t;
-
 
 /**
  * Initializes a lexer object

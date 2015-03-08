@@ -17,6 +17,56 @@
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-int main() {
-    return 5;
+#include "parser/lexer.h"
+#include "parser/preprocessor.h"
+#include "parser/symtab.h"
+#include "parser/token.h"
+
+static preprocessor_t pp;
+static symtab_t symtab;
+static symtab_t string_tab;
+static lexer_t lexer;
+
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        return -1;
+    }
+
+    status_t status;
+
+    if (CCC_OK != (status = pp_init(&pp))) {
+        goto fail1;
+    }
+    if (CCC_OK != (status = st_init(&symtab))) {
+        goto fail2;
+    }
+    if (CCC_OK != (status = st_init(&string_tab))) {
+        goto fail3;
+    }
+    if (CCC_OK != (status = lexer_init(&lexer, &pp, &symtab, &string_tab))) {
+        goto fail4;
+    }
+
+    if (CCC_OK != (status = pp_open(&pp, argv[1]))) {
+        goto fail5;
+
+    }
+
+    lexeme_t cur_token;
+
+    do {
+        lexer_next_token(&lexer, &cur_token);
+        token_print(&cur_token);
+    } while(cur_token.type != TOKEN_EOF);
+
+fail5:
+    lexer_destroy(&lexer);
+fail4:
+    st_destroy(&string_tab);
+fail3:
+    st_destroy(&symtab);
+fail2:
+    pp_destroy(&pp);
+fail1:
+    return status;
 }

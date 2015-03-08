@@ -35,8 +35,17 @@
 #include "parser/pp_directives.h"
 #include "util/slist.h"
 #include "util/htable.h"
+#include "util/util.h"
 
 status_t pp_init(preprocessor_t *pp) {
+    static ht_params params = {
+        0,                                // No Size estimate
+        offsetof(pp_macro_t, name),    // Offset of key
+        offsetof(pp_macro_t, link),   // Offset of ht link
+        strhash,                          // Hash function
+        vstrcmp,                          // void string compare
+    };
+
     status_t status = CCC_OK;
     if (CCC_OK !=
         (status = sl_init(&pp->file_insts, offsetof(pp_file_t, link)))) {
@@ -48,7 +57,7 @@ status_t pp_init(preprocessor_t *pp) {
         goto fail2;
     }
 
-    if (CCC_OK != (status = ht_init(&pp->macros, offsetof(pp_macro_t, link)))) {
+    if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
         goto fail3;
     }
 

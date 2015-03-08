@@ -23,6 +23,8 @@
 #ifndef _TOKEN_H_
 #define _TOKEN_H_
 
+#include "util/file_directory.h"
+
 typedef enum token_t {
     TOKEN_EOF,           // end of file
     // Delimiters
@@ -136,5 +138,39 @@ typedef enum token_t {
     INTLIT,   // Integral literal
     FLOATLIT, // Float literal
 } token_t;
+
+typedef struct symtab_entry_t symtab_entry_t; // Forward definition
+
+/**
+ * Structure representing a single lexeme
+ *
+ * Acts as a tagged union
+ */
+typedef struct lexeme_t {
+    token_t type;                  /**< Type of lememe */
+    fmark_t mark;                  /**< Location of lexeme */
+
+    union {
+        symtab_entry_t *tab_entry; /**< For string/id types */
+        struct {
+            long long int_val;     /**< For integral types */
+            bool hasU;             /**< Has U suffix */
+            bool hasL;             /**< Has U suffix */
+            bool hasLL;            /**< Has LL suffix */
+        } int_params;
+        struct {
+            double float_val;      /**< For floating point types */
+            bool hasF;             /**< Has F suffix */
+        } float_params;
+    };
+} lexeme_t;
+
+/**
+ * Prints a token
+ *
+ * @param token The token to print
+ */
+void token_print(lexeme_t *token);
+
 
 #endif /* _TOKEN_H_ */

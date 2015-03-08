@@ -46,6 +46,7 @@ typedef bool (*ht_cmpfunc)(const void *key1, const void *key2);
 
 /**
  * Paramaters for initializing a hashtable
+ * TODO: change to ht_params_t
  */
 typedef struct ht_params {
     size_t nelems;        /**< Hint for number of elements, 0 for unused */
