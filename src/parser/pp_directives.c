@@ -77,6 +77,11 @@ done:
     return status;
 }
 
+void pp_directives_destroy(preprocessor_t *pp) {
+    ht_destroy(&pp->directives, NOFREE);
+    sl_destroy(&pp->macro_insts, NOFREE);
+}
+
 /**
  * Note that this function needs to allocate memory for the paramaters, macro
  * name and body. This is because the mmaped file will be unmapped when we

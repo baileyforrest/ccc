@@ -105,6 +105,7 @@ void pp_destroy(preprocessor_t *pp) {
         pp_macro_destroy(macro);
     }
     ht_destroy(&pp->macros, NOFREE);
+    pp_directives_destroy(pp);
 }
 
 void pp_close(preprocessor_t *pp) {

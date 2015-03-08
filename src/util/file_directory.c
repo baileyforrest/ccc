@@ -60,15 +60,16 @@ status_t fdir_insert(const char *filename, size_t len, len_str_t **result) {
     }
 
     // Allocate the string and len_str structure in one region
-    len_str_node_t *new_len_str = malloc(sizeof(len_str_t) + len + 1);
+    len_str_node_t *new_len_str = malloc(sizeof(len_str_node_t) + len + 1);
     if (NULL == new_len_str) {
         return CCC_NOMEM;
     }
 
-    new_len_str->str.str = (char *)new_len_str + sizeof(len_str_t);
+    new_len_str->str.str = (char *)new_len_str + sizeof(len_str_node_t);
     new_len_str->str.len = len;
 
     strncpy(new_len_str->str.str, filename, len);
+    new_len_str->str.str[len] = '\0';
 
     ht_insert(&s_fdir.table, &new_len_str->link);
 

@@ -229,7 +229,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             lexer->next_char = cur;
 
             if (CCC_OK !=
-                (status = st_lookup(lexer->symtab, lexer->lexbuf, len,
+                (status = st_lookup(lexer->symtab, lexer->lexbuf, len, ID,
                                     &result->tab_entry))) {
                 logger_log(&result->mark, "Failed to add identifier!", LOG_ERR);
                 status = CCC_ESYNTAX;
@@ -272,7 +272,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             }
 
             if (CCC_OK !=
-                (status = st_lookup(lexer->symtab, lexer->lexbuf, len,
+                (status = st_lookup(lexer->symtab, lexer->lexbuf, len, STRING,
                                     &result->tab_entry))) {
                 logger_log(&result->mark, "Failed to add String!", LOG_ERR);
                 status = CCC_ESYNTAX;

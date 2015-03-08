@@ -22,8 +22,9 @@
 
 #include "symtab.h"
 
-#include <string.h>
+#include <assert.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "util/htable.h"
 #include "util/util.h"
@@ -87,18 +88,26 @@ static symtab_entry_t s_reserved[] = {
 /**
  * Paramaters for newly constructed symbol tables
  */
-status_t st_init(symtab_t *table) {
+status_t st_init(symtab_t *table, bool is_sym) {
+    assert(table != NULL);
     status_t status = CCC_OK;
 
-    static const ht_params s_params = {
-        STATIC_ARRAY_LEN(s_reserved) * 2, // Size estimate
-        offsetof(symtab_entry_t, key),    // Offset of key
-        offsetof(symtab_entry_t, link),   // Offset of ht link
-        strhash,                          // Hash function
-        vstrcmp,                          // void string compare
+    size_t size = is_sym ? STATIC_ARRAY_LEN(s_reserved) * 2: 0;
+
+    ht_params params = {
+        size,                           // Size estimate
+        offsetof(symtab_entry_t, key),  // Offset of key
+        offsetof(symtab_entry_t, link), // Offset of ht link
+        strhash,                        // Hash function
+        vstrcmp,                        // void string compare
     };
 
-    if (CCC_OK != (status = ht_init(&table->hashtab, &s_params))) {
+    if (CCC_OK != (status = ht_init(&table->hashtab, &params))) {
+        return status;
+    }
+    table->is_sym = is_sym;
+
+    if (!is_sym) {
         return status;
     }
 
@@ -116,16 +125,18 @@ status_t st_init(symtab_t *table) {
 }
 
 void st_destroy(symtab_t *table) {
-    // Remove all of the static entries first, because they aren't heap
-    // allocated
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
-        ht_remove(&table->hashtab, &s_reserved[i].key, NOFREE);
+    if (table->is_sym) {
+        // Remove all of the static entries first, because they aren't heap
+        // allocated
+        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
+            ht_remove(&table->hashtab, &s_reserved[i].key, NOFREE);
+        }
     }
 
     ht_destroy(&table->hashtab, DOFREE);
 }
 
-status_t st_lookup(symtab_t *table, char *str, size_t len,
+status_t st_lookup(symtab_t *table, char *str, size_t len, token_t type,
                    symtab_entry_t **entry) {
     status_t status = CCC_OK;
 
@@ -138,25 +149,18 @@ status_t st_lookup(symtab_t *table, char *str, size_t len,
     }
 
     // Doesn't exist. Need to allocate memory for the string and entry
-    char *new_str = malloc(len + 1);
-    if (NULL == new_str) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
-
-    strncpy(new_str, str, len);
-    new_str[len] = '\0';
-
-
-    cur_entry = malloc(sizeof(*cur_entry));
+    // We allocate them together so they are freed together
+    cur_entry = malloc(sizeof(*cur_entry) + len + 1);
     if (NULL == cur_entry) {
         status = CCC_NOMEM;
         goto fail;
     }
+    cur_entry->key.str = (char *)cur_entry + sizeof(*cur_entry);
 
-    // If its not in symbol table already, must be identifier type
-    cur_entry->type = ID;
-    cur_entry->key.str = new_str;
+    strncpy(cur_entry->key.str, str, len);
+    cur_entry->key.str[len] = '\0';
+
+    cur_entry->type = type;
     cur_entry->key.len = len;
 
     if (CCC_OK != (status = ht_insert(&table->hashtab, &cur_entry->link))) {
@@ -166,7 +170,6 @@ status_t st_lookup(symtab_t *table, char *str, size_t len,
     *entry = cur_entry;
     return status;
 fail:
-    free(new_str);
     free(cur_entry);
     return status;
 }

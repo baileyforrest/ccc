@@ -43,10 +43,10 @@ int main(int argc, char **argv) {
     if (CCC_OK != (status = pp_init(&pp))) {
         goto fail1;
     }
-    if (CCC_OK != (status = st_init(&symtab))) {
+    if (CCC_OK != (status = st_init(&symtab, IS_SYM))) {
         goto fail2;
     }
-    if (CCC_OK != (status = st_init(&string_tab))) {
+    if (CCC_OK != (status = st_init(&string_tab, NOT_SYM))) {
         goto fail3;
     }
     if (CCC_OK != (status = lexer_init(&lexer, &pp, &symtab, &string_tab))) {

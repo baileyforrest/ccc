@@ -130,7 +130,7 @@ status_t ht_insert(htable_t *ht, sl_link_t *elem) {
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
     sl_link_t **cur = &ht->buckets[bucket];
-    for(; *cur != NULL; *cur = (*cur)->next) {
+    for(; *cur != NULL; cur = &(*cur)->next) {
         void *key2 = GET_HT_KEY(ht, *cur);
 
         if (!ht->params.cmpfunc(key, key2)) {
@@ -162,7 +162,7 @@ static sl_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
     uint32_t bucket = GET_HASH(ht, key) % ht->nbuckets;
 
     sl_link_t **cur = &ht->buckets[bucket];
-    for (; *cur != NULL; *cur = (*cur)->next) {
+    for (; *cur != NULL; cur = &(*cur)->next) {
         void *key2 = GET_HT_KEY(ht, *cur);
 
         if (ht->params.cmpfunc(key, key2)) {
@@ -180,6 +180,7 @@ bool ht_remove(htable_t *ht, const void *key, bool do_free) {
 
     sl_link_t *link = *pp_link;
     *pp_link = (*pp_link)->next;
+    ht->params.nelems--;
     if (DOFREE == do_free) {
         free(GET_HT_ELEM(ht, link));
     }

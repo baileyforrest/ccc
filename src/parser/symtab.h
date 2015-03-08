@@ -32,6 +32,10 @@
  */
 typedef struct symtab_t {
     htable_t hashtab; /**< Hash table backing store */
+    /** If true, used for symbols, otherwise used for something else
+      * (e.g. strings)
+      */
+    bool is_sym;
 } symtab_t;
 
 /**
@@ -43,12 +47,17 @@ typedef struct symtab_entry_t {
     token_t type;     /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;
 
+#define IS_SYM true
+#define NOT_SYM false
+
 /**
  * Initalizes a symbol table
  * @param sym_tab Symbol to initialize
+ * @param is_sym IS_SYM if symbol table. else NOT_SYM. if IS_SYM, then table
+ *     will be populated with reserved words
  * @return CCC_OK on succes, error code on error
  */
-status_t st_init(symtab_t *table);
+status_t st_init(symtab_t *table, bool is_sym);
 
 /**
  * Does not destroy sym_tab. Destroys a symbol table.
@@ -66,10 +75,11 @@ void st_destroy(symtab_t *table);
  * @param table The table to lookup
  * @param str The string to lookup and or add
  * @param len The length of the string to looku and or add
+ * @param type The type of entry to add if it doesn't already exist
  * @param Pointer to an entry pointer if success, otherwise unchanged
  * @return CCC_OK on success, error code on failure
  */
-status_t st_lookup(symtab_t *table, char *str, size_t len,
+status_t st_lookup(symtab_t *table, char *str, size_t len, token_t type,
                        symtab_entry_t **entry);
 
 

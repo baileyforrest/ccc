@@ -46,11 +46,18 @@ typedef struct pp_directive_t {
 
 
 /**
- * Registers preprocessor directives in a hashtable
+ * Registers preprocessor directives in a preprocessor
  *
- * @param ht Mapping from directive name to directive action
+ * @param pp preprocessor to operate on
  */
 status_t pp_directives_init(preprocessor_t *pp);
+
+/**
+ * Destroys preprocessor directive structures in a preprocessor
+ *
+ * @param pp preprocessor to operate on
+ */
+void pp_directives_destroy(preprocessor_t *pp);
 
 /**
  * Directive for #define
