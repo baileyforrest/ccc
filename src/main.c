@@ -22,6 +22,8 @@
 #include "parser/symtab.h"
 #include "parser/token.h"
 
+#include "util/file_directory.h"
+
 static preprocessor_t pp;
 static symtab_t symtab;
 static symtab_t string_tab;
@@ -33,6 +35,10 @@ int main(int argc, char **argv) {
     }
 
     status_t status;
+
+    if (CCC_OK != (status = fdir_init())) {
+        goto fail0;
+    }
 
     if (CCC_OK != (status = pp_init(&pp))) {
         goto fail1;
@@ -68,5 +74,7 @@ fail3:
 fail2:
     pp_destroy(&pp);
 fail1:
+    fdir_destroy();
+fail0:
     return status;
 }

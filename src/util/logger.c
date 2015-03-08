@@ -64,6 +64,6 @@ void logger_log(fmark_t *mark, const char *message, log_type_t type) {
         break;
     }
 
-    printf("%s:%d:%d %s %s", mark->filename->str, mark->line_num, mark->col_num,
-            header, message);
+    printf("%s:%d:%d %s %s\n", mark->filename->str, mark->line_num,
+           mark->col_num, header, message);
 }

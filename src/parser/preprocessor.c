@@ -40,8 +40,8 @@
 status_t pp_init(preprocessor_t *pp) {
     static ht_params params = {
         0,                                // No Size estimate
-        offsetof(pp_macro_t, name),    // Offset of key
-        offsetof(pp_macro_t, link),   // Offset of ht link
+        offsetof(pp_macro_t, name),       // Offset of key
+        offsetof(pp_macro_t, link),       // Offset of ht link
         strhash,                          // Hash function
         vstrcmp,                          // void string compare
     };
@@ -57,19 +57,26 @@ status_t pp_init(preprocessor_t *pp) {
         goto fail2;
     }
 
-    if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
+    if (CCC_OK !=
+        (status = sl_init(&pp->search_path, offsetof(len_str_node_t, link)))) {
         goto fail3;
+    }
+
+    if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
+        goto fail4;
     }
 
     // Register directive handlers
     if (CCC_OK != (status = pp_directives_init(pp))) {
-        goto fail4;
+        goto fail5;
     }
 
     return status;
 
-fail4:
+fail5:
     ht_destroy(&pp->macros, DOFREE);
+fail4:
+    sl_destroy(&pp->search_path, DOFREE);
 fail3:
     sl_destroy(&pp->macro_insts, DOFREE);
 fail2:
@@ -117,10 +124,22 @@ status_t pp_open(preprocessor_t *pp, const char *filename) {
 
     sl_prepend(&pp->file_insts, &pp_file->link);
 
+    size_t len = strlen(filename);
+    len_str_t *file = fdir_lookup(filename, len);
+    if (file == NULL &&
+        CCC_OK != (status = fdir_insert(filename, len, &file))) {
+        goto done;
+    }
+    pp->last_mark.filename = file;
+    pp->last_mark.line_num = 0;
+    pp->last_mark.col_num = 0;
+
     pp->cur_param = NULL;
     pp->param_end = NULL;
+    pp->param_stringify = false;
 
     pp->block_comment = false;
+    pp->line_comment = false;
     pp->string = false;
     pp->char_line = false;
 
@@ -228,7 +247,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     // if we're done with macros, try to find an incomplete file
     if (NULL == macro_inst) {
         while (NULL != file) {
-            *cur = file->cur;
+            cur = &file->cur;
             end = file->end;
 
             if (*cur != end) { // Found an unfinished file

@@ -119,7 +119,7 @@ void st_destroy(symtab_t *table) {
     // Remove all of the static entries first, because they aren't heap
     // allocated
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
-        ht_remove(&table->hashtab, &s_reserved[i].link, NOFREE);
+        ht_remove(&table->hashtab, &s_reserved[i].key, NOFREE);
     }
 
     ht_destroy(&table->hashtab, DOFREE);
@@ -132,7 +132,7 @@ status_t st_lookup(symtab_t *table, char *str, size_t len,
     len_str_t tmp = { str, len };
 
     symtab_entry_t *cur_entry = ht_lookup(&table->hashtab, &tmp);
-    if (NULL != entry) {
+    if (NULL != cur_entry) {
         *entry = cur_entry;
         return status;
     }
@@ -163,6 +163,7 @@ status_t st_lookup(symtab_t *table, char *str, size_t len,
         goto fail;
     }
 
+    *entry = cur_entry;
     return status;
 fail:
     free(new_str);

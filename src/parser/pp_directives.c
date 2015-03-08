@@ -49,6 +49,20 @@ static len_str_node_t s_default_search_path[] = {
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {
+    status_t status = CCC_OK;
+
+    static ht_params params = {
+        STATIC_ARRAY_LEN(s_directives),   // Size estimate
+        offsetof(pp_directive_t, key),    // Offset of key
+        offsetof(pp_directive_t, link),   // Offset of ht link
+        strhash,                          // Hash function
+        vstrcmp,                          // void string compare
+    };
+
+    if (CCC_OK != (status = ht_init(&pp->directives, &params))) {
+        goto done;
+    }
+
     // Add directive handlers
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_directives); ++i) {
         ht_insert(&pp->directives, &s_directives[i].link);
@@ -59,7 +73,8 @@ status_t pp_directives_init(preprocessor_t *pp) {
         sl_append(&pp->search_path, &s_default_search_path[i].link);
     }
 
-    return CCC_OK;
+done:
+    return status;
 }
 
 /**
