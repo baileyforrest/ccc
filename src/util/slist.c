@@ -94,7 +94,7 @@ bool sl_remove(slist_t *slist, sl_link_t *link) {
         return false;
     }
 
-    for (sl_link_t **cur = &slist->head; *cur != NULL; *cur = (*cur)->next) {
+    for (sl_link_t **cur = &slist->head; *cur != NULL; cur = &(*cur)->next) {
         if (*cur == link) {
             *cur = link->next;
             if (NULL == slist->head) {

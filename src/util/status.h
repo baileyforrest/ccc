@@ -18,7 +18,7 @@
  */
 
 /**
- * Unified Status codes
+ * CCC status codes
  */
 
 

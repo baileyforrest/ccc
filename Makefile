@@ -11,7 +11,7 @@ SRC= src
 DEST= bin
 BUILD_DIR= $(DEST)/build
 
-INC= -I$(SRC)
+INC= -I$(SRC)/
 
 
 # Find all source files in the source directory, sorted by most
@@ -19,6 +19,8 @@ INC= -I$(SRC)
 SOURCES = $(shell find $(SRC)/ -name '*.c' -printf '%T@\t%p\n' \
 					| sort -k 1nr | cut -f2-)
 OBJS= $(SOURCES:$(SRC)/%.c=$(BUILD_DIR)/%.o)
+# Set the dependency files that will be used to add header dependencies
+DEPS = $(OBJS:.o=.d)
 
 all: $(DEST)/$(BIN_NAME)
 
@@ -34,5 +36,8 @@ $(DEST)/$(BIN_NAME): dirs $(OBJS)
 clean:
 	$(RM) -r $(DEST)/*
 
+# Add dependency files, if they exist
+-include $(DEPS)
+
 $(BUILD_DIR)/%.o: $(SRC)/%.c
-	$(CC) $(CFLAGS) $(INC) -c $< -o $@
+	$(CC) $(CFLAGS) $(INC) -MP -MMD -c $< -o $@
