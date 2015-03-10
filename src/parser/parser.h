@@ -17,12 +17,22 @@
  * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
  */
 /**
- * AST function implementation
+ * Parser Interface
  */
 
-#include "ast.h"
+#ifndef _PARSER_H_
+#define _PARSER_H_
 
-void ast_print(trans_unit_t *tu) {
-    // TODO: Implement this
-    (void)tu;
-}
+#include "parser/ast.h"
+#include "parser/lexer.h"
+
+/**
+ * Parses input from a lexer into an AST
+ *
+ * @param lexer Lexer to parse tokens from
+ * @param result The parsed AST
+ * @return CCC_OK on success, error code on error
+ */
+status_t parser_parse(lexer_t *lexer, trans_unit_t **result);
+
+#endif /* _PARSER_H_ */

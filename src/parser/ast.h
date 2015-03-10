@@ -158,9 +158,11 @@ typedef struct param_t {
 } param_t;
 
 typedef enum gdecl_type_t {
-    GDECL_FDEFN, /**< Function definition */
-    GDECL_FDECL, /**< Function declaration */
-    GDECL_VDECL  /**< Varable declaration */
+    GDECL_FDEFN,   /**< Function definition */
+    GDECL_FDECL,   /**< Function declaration */
+    GDECL_VDECL,   /**< Varable declaration */
+    GDECL_TYPE,    /**< Type definition */
+    GDECL_TYPEDEF, /**< Typedef */
 } gdecl_type_t;
 
 /**
@@ -177,13 +179,22 @@ typedef struct gdecl_t {
             struct stmt_t *stmt; /**< Function body */
         } fdefn;
 
-        struct {
+        struct {                 /**< Function declaration parameters */
             type_t *ret;         /**< Return type */
             len_str_t id;        /**< Decl name */
             slist_t params;      /**< List of paramaters */
         } fdecl;
 
-        struct stmt_t *vdecl;           /**< Statements */
+        struct stmt_t *vdecl;    /**< Declaration statements */
+
+        struct {                 /**< Type declaration params */
+            type_t *type;        /**< The type defined */
+        } type_params;
+
+        struct {                 /**< typedef parameters */
+            len_str_t name;      /**< Name of new type alias */
+            type_t *type;        /**< Type of alias */
+        } typedef_params;
     };
 } gdecl_t;
 
@@ -357,19 +368,19 @@ typedef struct stmt_t {
 } stmt_t;
 
 /**
- * Compilation unit
+ * Translation unit - Top level AST structure
  */
-typedef struct comp_unit_t {
+typedef struct trans_unit_t {
     sl_link_t link; /**< Storage link */
     len_str_t path; /**< Path of compilation unit */
-    slist_t gdecl;  /**< List of gdecl in compilation unit */
-} comp_unit_t;
+    slist_t gdecls;  /**< List of gdecl in compilation unit */
+} trans_unit_t;
 
 /**
  * Print an AST
  *
  * @param cu The AST to print
  */
-void ast_print(comp_unit_t *cu);
+void ast_print(trans_unit_t *tu);
 
 #endif /* _AST_H_ */
