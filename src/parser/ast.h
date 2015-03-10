@@ -371,8 +371,8 @@ typedef struct stmt_t {
  * Translation unit - Top level AST structure
  */
 typedef struct trans_unit_t {
-    sl_link_t link; /**< Storage link */
-    len_str_t path; /**< Path of compilation unit */
+    sl_link_t link;  /**< Storage link */
+    len_str_t *path; /**< Path of compilation unit */
     slist_t gdecls;  /**< List of gdecl in compilation unit */
 } trans_unit_t;
 

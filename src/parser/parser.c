@@ -50,9 +50,9 @@ status_t par_trans_unit(lex_wrap_t *lex, trans_unit_t **result) {
 
     // Setup new translation unit
     ALLOC_NODE(tunit, trans_unit_t);
-    tunit->path.str = lex->cur.mark->filename.str;
-    tunit->path.str = lex->cur.mark->filename.len;
-    if (!CCC_OK == (status = sl_init(&tunit->gdecls, offsetof(gdecl, link)))) {
+    tunit->path = lex->cur.mark.filename;
+    if (!CCC_OK ==
+        (status = sl_init(&tunit->gdecls, offsetof(gdecl_t, link)))) {
         goto fail0;
     }
 
@@ -71,20 +71,41 @@ status_t par_trans_unit(lex_wrap_t *lex, trans_unit_t **result) {
     }
 
 fail: // General failure
-    sl_destroy(&tunit->gdecls);
+    // TODO: call destructors on gdecls
+    sl_destroy(&tunit->gdecls, NOFREE);
 fail0: // Failed allocation
     free(tunit);
     return status;
 }
 
-status_t par_gdecl(lex_wrap_t *lex, gdecl_t **result);
-//status_t par_gdecl_param(lex_wrap_t *lex, param_t **result);
-//status_t par_gdecl_param_list(lex_wrap_t *lex, slist__t **result);
+status_t par_gdecl(lex_wrap_t *lex, gdecl_t **result) {
+    status_t status = CCC_OK;
+    // TODO: Implement
+    (void)lex;
+    (void)result;
+    return status;
+}
 
-status_t par_type(lex_wrap_t *lex, type_t **result);
-//status_t par_type_struct_decls(lex_wrap_t *lex, type_t **result);
-//status_t par_type_arr_decl(lex_wrap_t *lex, slist_t **result);
+status_t par_type(lex_wrap_t *lex, type_t **result) {
+    status_t status = CCC_OK;
+    // TODO: Implement
+    (void)lex;
+    (void)result;
+    return status;
+}
 
-status_t par_expr(lex_wrap_t *lex, type_t **result);
+status_t par_expr(lex_wrap_t *lex, type_t **result) {
+    status_t status = CCC_OK;
+    // TODO: Implement
+    (void)lex;
+    (void)result;
+    return status;
+}
 
-status_t par_stmt(lex_wrap_t *lex, type_t **result);
+status_t par_stmt(lex_wrap_t *lex, type_t **result) {
+    status_t status = CCC_OK;
+    // TODO: Implement
+    (void)lex;
+    (void)result;
+    return status;
+}
