@@ -93,18 +93,18 @@ void pp_destroy(preprocessor_t *pp) {
     SL_FOREACH(cur, &pp->file_insts) {
         pp_file_destroy(GET_ELEM(&pp->file_insts, &cur));
     }
-    sl_destroy(&pp->file_insts, NOFREE);
+    sl_destroy(&pp->file_insts, NOFREE); // pp_file_destroy frees
 
     SL_FOREACH(cur, &pp->macro_insts) {
         pp_macro_inst_destroy(GET_ELEM(&pp->macro_insts, cur));
     }
-    sl_destroy(&pp->macro_insts, DOFREE);
+    sl_destroy(&pp->macro_insts, NOFREE); // pp_macro_inst_destroy frees
 
     HT_FOREACH(cur, &pp->macros) {
         pp_macro_t *macro = GET_HT_ELEM(&pp->macros, cur);
         pp_macro_destroy(macro);
     }
-    ht_destroy(&pp->macros, NOFREE);
+    ht_destroy(&pp->macros, DOFREE); // pp_macro_destroy does not free
     pp_directives_destroy(pp);
 }
 
@@ -270,7 +270,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     char *next_char = *cur + 1;
 
     // Found a character on line, don't process new directives
-    if (!pp->char_line && !isspace(cur_char)) {
+    if (!pp->char_line && cur_char != '#' && !isspace(cur_char)) {
         pp->char_line = true;
     }
 
@@ -411,12 +411,11 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         // Perform directive action and return next character
         status_t status = directive->action(pp);
+        // Skip the rest of the line
+        lookahead = *cur;
+        SKIP_LINE(lookahead, end);
+        *cur = lookahead;
         if (CCC_OK != status) {
-            // If there was an error, just skip directive
-            lookahead = *cur;
-            SKIP_LINE(lookahead, end);
-            *cur = lookahead;
-
             return status;
         }
         return pp_nextchar(pp);
@@ -463,32 +462,26 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             return *((*cur)++);
         }
     } else {
+        lookahead++; // Skip the paren
         // Need to create param map
 
         int num_params = 0;
 
         bool done = false;
-        char *cur_param = ++lookahead;
 
         sl_link_t *cur_link;
         SL_FOREACH(cur_link, &macro->params) {
             num_params++;
-
+            char *cur_param = lookahead;
             while (lookahead != end) {
-                // Skip single line whitespace
-                if (*lookahead == ' ' || *lookahead == '\t') {
-                    lookahead++;
-                    continue;
-                }
-
                 if (*lookahead == ',') { // end of current param
                     break;
                 }
-
                 if (*lookahead == ')') { // end of all params
                     done = true;
                     break;
                 }
+                lookahead++; // Blindly copy param data
             }
 
             if (lookahead == end && *lookahead != ')') {
@@ -502,7 +495,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             pp_param_map_elem_t *param_elem =
                 malloc(sizeof(pp_param_map_elem_t));
-
             if (NULL == param_elem) {
                 LOG_ERROR(pp, "Out of memory while scanning macro", LOG_ERR);
                 error = -(int)CCC_NOMEM;
@@ -510,15 +502,17 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             }
 
             // Get current paramater in macro
-            len_str_t *param_str = GET_ELEM(&macro->params, cur_link);
+            len_str_node_t *param_str = GET_ELEM(&macro->params, cur_link);
 
             // Insert the paramater mapping into the instance's hash table
-            param_elem->key.str = param_str->str;
-            param_elem->key.len = param_str->len;
+            param_elem->key.str = param_str->str.str;
+            param_elem->key.len = param_str->str.len;
             param_elem->val.str = cur_param;
             param_elem->val.len = cur_len;
 
             ht_insert(&new_macro_inst->param_map, &param_elem->link);
+
+            lookahead++;
         }
 
         if (done && num_params != macro->num_params) {
@@ -619,15 +613,8 @@ status_t pp_macro_init(pp_macro_t *macro) {
 }
 
 void pp_macro_destroy(pp_macro_t *macro) {
-    sl_link_t *cur;
-    SL_FOREACH(cur, &macro->params) {
-        len_str_node_t *str = GET_ELEM(&macro->params, cur);
-        free(str->str.str);
-    }
     sl_destroy(&macro->params, DOFREE);
-
     free(macro->start);
-    free(macro->name.str);
 }
 
 status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {

@@ -115,18 +115,19 @@ status_t pp_directive_define(preprocessor_t *pp) {
 
     size_t name_len = lookahead - cur;
 
-    len_str_node_t lookup = { { NULL }, { cur, name_len } };
+    len_str_t lookup = { cur, name_len };
 
     pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
     if (NULL != cur_macro) {
         LOG_ERROR(pp, "Macro redefinition", LOG_WARN);
 
-        // Remove and free existing macro
+        // Remove and cleanup existing macro
+        pp_macro_destroy(cur_macro);
         ht_remove(&pp->macros, cur_macro, DOFREE);
     }
 
-    // Create the macro object
-    pp_macro_t *new_macro = malloc(sizeof(pp_macro_t));
+    // Allocate new macro object and its name
+    pp_macro_t *new_macro = malloc(sizeof(pp_macro_t) + name_len + 1);
     if (NULL == new_macro) {
         LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
         status = CCC_NOMEM;
@@ -140,14 +141,9 @@ status_t pp_directive_define(preprocessor_t *pp) {
         goto fail2;
     }
 
-    // Allocate the name
+    // Setup name
     new_macro->name.len = name_len;
-    new_macro->name.str = malloc(name_len + 1);
-    if (NULL == new_macro->name.str) {
-        LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
-        status = CCC_NOMEM;
-        goto fail3;
-    }
+    new_macro->name.str = (char *)new_macro + sizeof(*new_macro);
     strncpy(new_macro->name.str, cur, new_macro->name.len);
     new_macro->name.str[new_macro->name.len] = '\0';
 
@@ -156,9 +152,11 @@ status_t pp_directive_define(preprocessor_t *pp) {
     // Process paramaters
     new_macro->num_params = 0;
     if ('(' == *lookahead) {
+        lookahead++;
         while (lookahead != end) {
             new_macro->num_params++;
-
+            SKIP_WS_AND_COMMENT(lookahead, end);
+            cur = lookahead;
             ADVANCE_IDENTIFIER(lookahead, end);
             size_t param_len = lookahead - cur;
 
@@ -168,27 +166,27 @@ status_t pp_directive_define(preprocessor_t *pp) {
                 goto fail3;
             }
 
-            // Allocate paramaters
-            len_str_node_t *string = malloc(sizeof(len_str_t));
+            // Allocate paramater with string in one chunk
+            len_str_node_t *string =
+                malloc(sizeof(len_str_node_t) + param_len + 1);
             if (NULL == string) {
                 LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
                 status = CCC_NOMEM;
                 goto fail3;
             }
             string->str.len = param_len;
-            string->str.str = malloc(param_len + 1);
+            string->str.str = (char *)string + sizeof(*string);
             strncpy(string->str.str, cur, param_len);
             string->str.str[param_len] = '\0';
 
             sl_append(&new_macro->params, &string->link);
 
+            SKIP_WS_AND_COMMENT(lookahead, end);
             cur = lookahead + 1;
 
             if (*lookahead == ',') {
                 lookahead++;
-            }
-
-            if (*lookahead == ')') { // End of param list
+            } else if (*lookahead == ')') { // End of param list
                 lookahead++;
                 break;
             }

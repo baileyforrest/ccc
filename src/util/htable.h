@@ -112,7 +112,7 @@ bool ht_remove(htable_t *ht, const void *key, bool do_free);
 void *ht_lookup(const htable_t *ht, const void *key);
 
 #define HT_FOREACH(link, ht)                                            \
-    for (size_t i = 0; i < (ht)->params.nelems; ++i)                    \
+    for (size_t i = 0; i < (ht)->nbuckets; ++i)                         \
         for (link = (ht)->buckets[i]; link != NULL; link = link->next)  \
 
 #endif /* _HTABLE_H_ */

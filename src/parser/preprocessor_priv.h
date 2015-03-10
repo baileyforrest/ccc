@@ -231,9 +231,9 @@ status_t pp_file_destroy(pp_file_t *pp_file);
 status_t pp_macro_init(pp_macro_t *macro);
 
 /**
- * Destroys a macro instance. Does not free macro
+ * Destroys a macro definition. Does not free macro
  *
- * @param macro intance to destroy
+ * @param macro definition to destroy
  */
 void pp_macro_destroy(pp_macro_t *macro);
 /**
