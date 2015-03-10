@@ -21,3 +21,8 @@
  */
 
 #include "ast.h"
+
+void ast_print(comp_unit_t *cu) {
+    // TODO: Implement this
+    (void)cu;
+}

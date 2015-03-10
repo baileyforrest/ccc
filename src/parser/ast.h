@@ -28,6 +28,9 @@
 #include "util/slist.h"
 #include "util/util.h"
 
+/**
+ * Basic varieties of types
+ */
 typedef enum basic_type_t {
     TYPE_VOID,
     TYPE_CHAR,
@@ -39,11 +42,14 @@ typedef enum basic_type_t {
     TYPE_STRUCT,
     TYPE_UNION,
     TYPE_ENUM,
-    TYPE_FUNC,
-    TYPE_PTR,
-    TYPE_ARR
+    TYPE_FUNC,   /**< Function pointer */
+    TYPE_PTR,    /**< Pointer */
+    TYPE_ARR     /**< Array */
 } basic_type_t;
 
+/**
+ * Modifiers for types. Should be stored in a bitmap
+ */
 typedef enum type_mod_t {
     TMOD_SIGNED   = 1 << 0,
     TMOD_UNSIGNED = 1 << 1,
@@ -55,6 +61,9 @@ typedef enum type_mod_t {
     TMOD_VOLATILE = 1 << 7,
 } type_mod_t;
 
+/**
+ * Types of operations
+ */
 typedef enum oper_t {
     OP_NOP,        // Nop
     OP_PLUS,       // Plus
@@ -81,195 +90,286 @@ typedef enum oper_t {
     OP_TERN,       // Ternary Operator
 } oper_t;
 
+// Forward declarations
+struct stmt_t;
 struct type_t;
-
-typedef struct struct_decl_t {
-    sl_link_t link;
-    struct type_t *type;
-    len_str_t id;
-    int bf_bits;
-} struct_decl_t;
-
-typedef struct enum_id_t {
-    sl_link_t link;
-    len_str_t id;
-    intptr_t val;
-} enum_id_t;
-
-typedef struct arr_dim_t {
-    sl_link_t link;
-    int dim_len;
-} arr_dim_t;
-
 struct gdecl_t;
 
+/**
+ * Struct and union declaration entry
+ */
+typedef struct struct_decl_t {
+    sl_link_t link;      /**< List link */
+    struct type_t *type; /**< Type of entry */
+    len_str_t id;        /**< Name */
+    int bf_bits;         /**< Bitfield bits 0 for unused */
+} struct_decl_t;
+
+/**
+ * Union declaration entry
+ */
+typedef struct enum_id_t {
+    sl_link_t link; /**< List link */
+    len_str_t id;   /**< Name */
+    intptr_t val;   /**< Value */
+} enum_id_t;
+
+/**
+ * Array dimention type
+ */
+typedef struct arr_dim_t {
+    sl_link_t link; /**< List link */
+    int dim_len;    /**< Length of dimension */
+} arr_dim_t;
+
+/**
+ * Tagged union representing a type
+ */
 typedef struct type_t {
-    basic_type_t type;
-    type_mod_t type_mod;
-    int size;
-    char align;
+    sl_link_t link;                     /**< Storage Link */
+    basic_type_t type;                  /**< Basic type */
+    type_mod_t type_mod;                /**< Bitset of type modifiers */
+    int size;                           /**< Size of this type */
+    int align;                          /**< Alignment */
     union {
-        slist_t struct_decls;
-        slist_t union_decls;
-        slist_t enum_ids;
-        struct gdecl_t *func;
-        struct {
-            struct type_t *pointed_to;
-            int indirections;
+        slist_t struct_decls;           /**< List of struct definitions */
+        slist_t union_decls;            /**< List of union definitions */
+        slist_t enum_ids;               /**< List of enum ids/values */
+        struct gdecl_t *func;           /**< Function pointer */
+
+        struct {                        /**< Structure for pointer info */
+            struct type_t *pointed_to;  /**< Base type pointed to */
+            int indirections;           /**< Number of indirections */
         } ptr;
-        struct {
-            struct type_t *base;
-            slist_t dims;
+        struct {                        /**< Structure for array info */
+            struct type_t *base;        /**< Base type */
+            slist_t dims;               /**< List of dimensions */
         } arr;
     };
 } type_t;
 
-
+/**
+ * Function parameter
+ */
 typedef struct param_t {
-    sl_link_t link;
-    type_t type;
-    len_str_t id;
+    sl_link_t link; /**< Storage Link */
+    type_t *type;   /**< Type of the paramater */
+    len_str_t id;   /**< ID of the paramater */
 } param_t;
 
-struct stmt_t;
+typedef enum gdecl_type_t {
+    GDECL_FDEFN, /**< Function definition */
+    GDECL_FDECL, /**< Function declaration */
+    GDECL_VDECL  /**< Varable declaration */
+} gdecl_type_t;
+
+/**
+ * Global declaration
+ */
 typedef struct gdecl_t {
-    sl_link_t link;
-    type_t ret;
-    len_str_t id;
-    slist_t params;
-    struct stmt_t *stmt;
+    sl_link_t link;              /**< Storage Link */
+    gdecl_type_t type;           /**< Type of gdecl */
+    union {
+        struct {                 /**< Function definition parameters */
+            type_t *ret;         /**< Return type */
+            len_str_t id;        /**< Decl name */
+            slist_t params;      /**< List of paramaters */
+            struct stmt_t *stmt; /**< Function body */
+        } fdefn;
+
+        struct {
+            type_t *ret;         /**< Return type */
+            len_str_t id;        /**< Decl name */
+            slist_t params;      /**< List of paramaters */
+        } fdecl;
+
+        struct stmt_t *vdecl;           /**< Statements */
+    };
 } gdecl_t;
 
+/**
+ * Types of expressions
+ */
 typedef enum expr_type_t {
-    EXPR_VOID,
-    EXPR_VAR,
-    EXPR_CONST,
-    EXPR_OP,
-    EXPR_CALL,
-    EXPR_DEREF,
-    EXPR_ARR_ACC,
-    EXPR_CMPD,
+    EXPR_VOID,    /**< Void */
+    EXPR_VAR,     /**< Variable */
+    EXPR_CONST,   /**< Constant */
+    EXPR_OP,      /**< Operation */
+    EXPR_CALL,    /**< Function call */
+    EXPR_DEREF,   /**< Pointer dereference */
+    EXPR_ARR_ACC, /**< Array access */
+    EXPR_CMPD,    /**< Compound expression */
 } expr_type_t;
 
+/**
+ * Tagged union for expressions
+ */
 typedef struct expr_t {
-    sl_link_t link;
-    expr_type_t type;
+    sl_link_t link;               /**< Storage link */
+    expr_type_t type;             /**< Expression type */
 
-    union {
-        len_str_t var_id;
-        intptr_t const_val;
-        struct {
-            oper_t op;
-            slist_t exprs;
+    union {                       /**< Type specific info */
+        len_str_t var_id;         /**< Variable identifier */
+        intptr_t const_val;       /**< Constant value */
+
+        struct {                  /**< Operation paramaters */
+            oper_t op;            /**< Type of operation */
+            slist_t exprs;        /**< Paramaters for operation */
         } op;
-        struct {
-            gdecl_t *func;
-            slist_t params;
+
+        struct {                  /**< Function call paramaters */
+            gdecl_t *func;        /**< The function to call */
+            slist_t params;       /**< The function paramaters (expressions) */
         } call;
-        struct {
-            struct expr_t *expr;
+
+        struct {                  /**< Pointer dereference paramaters */
+            struct expr_t *expr;  /**< The expression to dereference */
         } defref;
-        struct {
-            struct expr_t *expr;
-            struct expr_t *index;
+
+        struct {                  /**< Array access parameters */
+            struct expr_t *expr;  /**< Expression for array */
+            struct expr_t *index; /**< Expression for array index */
         } arr_acc;
-        struct {
-            slist_t exprs;
+
+        struct {                  /**< Compound expression */
+            slist_t exprs;        /**< List of expressions */
         } cmpd;
     };
 } expr_t;
 
+/**
+ * Types of statements
+ */
 typedef enum stmt_type_t {
-    STMT_NOP,
-    STMT_DECL,
-    STMT_ASSIGN,
-    STMT_RETURN,
-    STMT_IF,
-    STMT_WHILE,
-    STMT_FOR,
-    STMT_DO,
-    STMT_SEQ,
-    STMT_BLOCK,
-    STMT_EXP,
-    STMT_ASSN_INIT_LIST,
-    STMT_LABEL,
-    STMT_GOTO,
-    STMT_CONTINUE,
-    STMT_SWITCH,
+    STMT_NOP,            /**< No op statement */
+    STMT_DECL,           /**< Declaration */
+    STMT_ASSIGN,         /**< Assignment */
+    STMT_RETURN,         /**< Return */
+    STMT_IF,             /**< if */
+    STMT_WHILE,          /**< while */
+    STMT_FOR,            /**< for */
+    STMT_DO,             /**< do while */
+    STMT_SEQ,            /**< sequence of statements */
+    STMT_BLOCK,          /**< block of statements */
+    STMT_EXP,            /**< expression */
+    STMT_ASSN_INIT_LIST, /**< Assign to an initializer list */
+    STMT_LABEL,          /**< Label */
+    STMT_GOTO,           /**< goto */
+    STMT_CONTINUE,       /**< continue */
+    STMT_SWITCH,         /**< switch */
+    STMT_BREAK,          /**< break */
 } stmt_type_t;
 
-struct stmt_t;
-
+/**
+ * Object representing a single switch case
+ */
 typedef struct switch_case_t {
-    sl_link_t link;
-    intptr_t val;
-    struct stmt_t *stmt;
+    sl_link_t link;      /**< Storage Link */
+    intptr_t val;        /**< case value */
+    struct stmt_t *stmt; /**< Statement to execute */
 } switch_case_t;
 
+/**
+ * Tagged union representing a statement
+ */
 typedef struct stmt_t {
-    sl_link_t link;
-    stmt_type_t type;
+    sl_link_t link;                      /**< Storage link */
+    stmt_type_t type;                    /**< Type of statement */
 
     union {
-        struct {
-            len_str_t id;
-            type_t *type;
-            expr_t *expr;
+        struct {                         /**< Declaration parameters */
+            len_str_t id;                /**< Name of variable */
+            type_t *type;                /**< Type of variable */
+            expr_t *expr;                /**< Expression to assign */
         } decl;
-        struct {
-            len_str_t id;
-            expr_t *expr;
-            oper_t op;
+
+        struct {                         /**< Assignment paramaters */
+            expr_t *dest;                /**< Expression to assign to */
+            expr_t *expr;                /**< Expression to assign */
+            oper_t op;                   /**< Operation for expression (+=) */
         } assign;
-        struct {
-            expr_t *expr;
+
+        struct {                         /**< Return paramaters */
+            expr_t *expr;                /**< Expression to return */
         } ret;
-        struct {
-            expr_t *expr;
-            struct stmt_t *true_stmt;
-            struct stmt_t *false_stmt;
+
+        struct {                         /**< if paramaters */
+            expr_t *expr;                /**< Conditional expression */
+            struct stmt_t *true_stmt;    /**< Statement to execute if true */
+            struct stmt_t *false_stmt;   /**< Statement to execute if false */
         } if_params;
-        struct {
-            expr_t *expr;
-            struct stmt_t *stmt;
+
+        struct {                         /**< While parameters */
+            expr_t *expr;                /**< Conditional expression */
+            struct stmt_t *stmt;         /**< Statement in loop */
         } while_params;
-        struct {
-            expr_t *expr1;
-            expr_t *expr2;
-            expr_t *expr3;
-            struct stmt_t *stmt;
+
+        struct {                         /**< For paramaters */
+            expr_t *expr1;               /**< Expression 1 */
+            expr_t *expr2;               /**< Expression 2 */
+            expr_t *expr3;               /**< Expression 3 */
+            struct stmt_t *stmt;         /**< Statement in loop */
         } for_params;
-        struct {
-            expr_t *expr;
-            struct stmt_t *stmt;
+
+        struct {                         /**< Do while paramaters */
+            struct stmt_t *stmt;         /**< Statement in loop */
+            expr_t *expr;                /**< Conditional expression */
         } do_params;
-        struct {
-            slist_t stmts;
+
+        struct {                         /**< Sequence paramaters */
+            slist_t stmts;               /**< List of statements */
         } seq;
-        struct {
-            slist_t stmts;
+
+        struct {                         /**< Block paramaters */
+            slist_t stmts;               /**< List of statements */
         } block;
-        struct {
-            expr_t *expr;
+
+        struct {                         /**< Expression parameters */
+            expr_t *expr;                /**< Expression to execute */
         } expr;
-        struct {
-            slist_t exprs;
+
+        struct {                         /**< Initializer list parameters */
+            slist_t exprs;               /**< Expressions in initializer list */
         } assn_init_list;
-        struct {
-            len_str_t label;
+
+        struct {                         /**< Label parameters */
+            len_str_t label;             /**< Label value */
         } label;
-        struct {
-            len_str_t label;
+
+        struct {                         /**< Goto parameters */
+            struct stmt_t *label;               /**< Label to goto */
         } goto_params;
-        struct {
-            struct stmt_t *parent;
+
+        struct {                         /**< Continue parameters */
+            struct stmt_t *parent;       /**< Parent statement to continue */
         } continue_params;
-        struct {
-            expr_t *expr;
-            slist_t cases;
-            struct stmt_t *default_case;
+
+        struct {                         /**< Switch paramaters */
+            expr_t *expr;                /**< Expression to switch on */
+            slist_t cases;               /**< List of cases */
+            struct stmt_t *default_case; /**< Default case statement */
         } switch_params;
+
+        struct {                         /**< Break parameters */
+            struct stmt_t *parent;       /**< Parent statement */
+        } break_params;
     };
 } stmt_t;
+
+/**
+ * Compilation unit
+ */
+typedef struct comp_unit_t {
+    sl_link_t link; /**< Storage link */
+    len_str_t path; /**< Path of compilation unit */
+    slist_t gdecl;  /**< List of gdecl in compilation unit */
+} comp_unit_t;
+
+/**
+ * Print an AST
+ *
+ * @param cu The AST to print
+ */
+void ast_print(comp_unit_t *cu);
 
 #endif /* _AST_H_ */
