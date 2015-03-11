@@ -594,3 +594,881 @@ status_t par_direct_declaration(lex_wrap_t *lex) {
 
     return CCC_OK;
 }
+
+/*
+status_t par_constant_expression(lex_wrap_t *lex) {
+    return par_conditional_expression(lex_wrap_t *lex);
+}
+
+status_t par_conditional_expression(lex_wrap_t *lex) {
+    par_logical_expression(lex);
+
+    if (lex->cur.type != COND) {
+        return CCC_OK;
+    }
+    LEX_ADVANCE(lex);
+
+    par_expression(lex);
+
+    if (lex->cur.type != COLON) {
+        return CCC_ESYNTAX;
+    }
+    LEX_ADVANCE(lex);
+    return par_conditional_expression(lex);
+}
+*/
+
+status_t par_expression(lex_wrap_t *lex) {
+    bool primary1 = false;
+
+    switch (lex->cur.type) {
+        // Unary expressions
+    case INC:
+    case DEC:
+    case SIZEOF:
+    case BITAND:
+    case STAR:
+    case PLUS:
+    case MINUS:
+    case BITNOT:
+    case LOGICNOT:
+        unary = true;
+        par_unary_expression(lex);
+        break;
+
+        // Primary expressions
+    case ID:
+    case STRING:
+    case INTCONST:
+    case FLOATCONST:
+        primary = true;
+        break;
+
+        // Casts and parens around expressions
+    case LPAREN:
+        LEX_ADVANCE(lex);
+        switch (lex->cur.type) {
+            // Cases for casts
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: TODO: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_cast_expression(lex);
+            break;
+
+            // Parens
+        default:
+            primary = true;
+            par_expression(lex);
+            break;
+        }
+    }
+
+    if (primary) {
+        switch (lex->cur.next) {
+        case DEREF:
+        case INC:
+        case DEC:
+        case DOT:
+        case LBRACK:
+        case LPAREN:
+            par_postfix_expression(lex);
+        }
+
+        switch (lex->cur.next) {
+        case EQ:
+        case STAREQ:
+        case DIVEQ:
+        case MODEQ:
+        case PLUSEQ:
+        case MINUSEQ:
+        case LSHIFTEQ:
+        case RSHIFTEQ:
+        case BITANDEQ:
+        case BITXOREQ:
+        case BINOREQ:
+            par_assignment_expression(lex);
+        }
+    }
+    token_t op1;
+
+    switch (lex->cur.next) {
+        // Binary operators
+    case STAR:
+    case DIV:
+    case MOD:
+    case PLUS:
+    case MINUS:
+    case LSHIFT:
+    case RSHIFT:
+    case LT:
+    case GT:
+    case LE:
+    case GE:
+    case EQ:
+    case NE:
+    case BITAND:
+    case BITXOR:
+    case BITOR:
+    case LOGICAND:
+    case LOGICOR:
+        op1 = lex->cur.next;
+        LEX_ADVANCE(lex);
+        break;
+
+    case COND:
+        LEX_ADVANCE(lex);
+        par_expression(lex);
+        LEX_MATCH(COLON);
+        return par_expression(lex);
+    }
+
+    // Parse next nonbinary expression
+    switch (lex->cur.type) {
+        // Unary expressions
+    case INC:
+    case DEC:
+    case SIZEOF:
+    case BITAND:
+    case STAR:
+    case PLUS:
+    case MINUS:
+    case BITNOT:
+    case LOGICNOT:
+        par_unary_expression(lex);
+        break;
+
+        // Primary expressions
+    case ID:
+    case STRING:
+    case INTCONST:
+    case FLOATCONST:
+        break;
+
+        // Casts and parens around expressions
+    case LPAREN:
+        LEX_ADVANCE(lex);
+        switch (lex->cur.type) {
+            // Cases for casts
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: TODO: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_cast_expression(lex);
+            break;
+
+            // Parens
+        default:
+            par_expression(lex);
+            break;
+        }
+    }
+
+    bool binary2 = false;
+    token_t op2;
+    switch (lex->cur.next) {
+        // Binary operators
+    case STAR:
+    case DIV:
+    case MOD:
+    case PLUS:
+    case MINUS:
+    case LSHIFT:
+    case RSHIFT:
+    case LT:
+    case GT:
+    case LE:
+    case GE:
+    case EQ:
+    case NE:
+    case BITAND:
+    case BITXOR:
+    case BITOR:
+    case LOGICAND:
+    case LOGICOR:
+        op2 = lex->cur.next;
+        break;
+
+    case COND:
+        LEX_ADVANCE(lex);
+        par_expression(lex);
+        LEX_MATCH(COLON);
+        par_expression(lex);
+        // Handle binary operators
+        return;
+    default:
+        // Return expression combinaned with last op
+        return;
+    }
+
+    if (greater_or_equal_prec(op1, op2)) {
+        // Combine op1
+        // TODO: loop back to above with combined first two as the left
+    } else {
+        par_expresson(lex);
+        // recursive call with 2nd expression as current op
+    }
+
+    return CCC_OK;
+}
+
+status_t par_unary_expression(lex_wrap_t *lex) {
+    case (lex->cur.type) {
+        // Primary expressions
+    case ID:
+    case STRING:
+    case INTCONST:
+    case FLOATCONST:
+        return par_postfix_expression(lex);
+    case INC:
+    case DEC:
+        LEX_ADVANCE(lex);
+        par_unary_expression(lex);
+        break;
+    case SIZEOF:
+        LEX_ADVANCE(lex);
+        switch (lex->cur.type) {
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: TODO: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_type_name(lex);
+            break;
+        default:
+            par_unary_expression(lex);
+            break;
+        }
+        break;
+    case BITAND:
+    case STAR:
+    case PLUS:
+    case MINUS:
+    case BITNOT:
+    case LOGICNOT:
+        par_cast_expression(lex);
+        break;
+    }
+}
+status_t par_cast_expression(lex_wrap_t *lex) {
+    if (lex->cur.next != LPAREN) {
+        return par_unary_expression(lex);
+
+    }
+    LEX_ADVANCE(lex);
+    par_type_name(lex);
+    LEX_MATCH(lex, RPAREN);
+    return par_cast_expression(lex);
+}
+status_t par_postfix_expression(lex_wrap_t *lex) {
+    switch (lex->cur.next) {
+    case LBRACK:
+        LEX_ADVANCE(lex);
+        par_expression(lex);
+        LEX_MATCH(lex, RBRACK);
+        return CCC_OK;
+
+    case LPAREN:
+        LEX_ADVANCE(lex);
+        while (lex->cur.next != RPAREN) {
+            bool primary = false;
+            bool parsed = false;
+            switch (lex->cur.next) {
+            case ID:
+            case STRING:
+            case INTCONST:
+            case FLOATCONST:
+                primary = true;
+            default:
+                primary = false;
+            }
+            if (primary) {
+                switch (lex->cur.next) {
+                case DEREF:
+                case INC:
+                case DEC:
+                case DOT:
+                case LBRACK:
+                case LPAREN:
+                    par_postfix_expression(lex);
+                }
+
+                switch (lex->cur.next) {
+                case EQ:
+                case STAREQ:
+                case DIVEQ:
+                case MODEQ:
+                case PLUSEQ:
+                case MINUSEQ:
+                case LSHIFTEQ:
+                case RSHIFTEQ:
+                case BITANDEQ:
+                case BITXOREQ:
+                case BINOREQ:
+                    par_assignment_expression(lex);
+                    bool parsed = true;
+                }
+            }
+            if (!parsed) {
+                // TODO: Need to continue with primary if found
+                par_expression(lex);
+            }
+        }
+        LEX_ADVANCE(lex);
+        break;
+
+    case DOT:
+        LEX_MATCH(lex, ID);
+        break;
+
+    case DEREF:
+        LEX_MATCH(lex, ID);
+        break;
+
+    case INC:
+    case DEC:
+        LEX_ADVANCE(lex);
+        break;
+    }
+
+    return CCC_OK;
+}
+status_t par_assignment_expression(lex_wrap_t *lex) {
+    switch (lex->cur.next) {
+    case EQ:
+    case STAREQ:
+    case DIVEQ:
+    case MODEQ:
+    case PLUSEQ:
+    case MINUSEQ:
+    case LSHIFTEQ:
+    case RSHIFTEQ:
+    case BITANDEQ:
+    case BITXOREQ:
+    case BINOREQ:
+    default:
+        return CCC_ESYNTAX;
+    }
+    ADVANCE_LEX(lex);
+
+    bool primary = false;
+    bool parsed = false;
+    switch (lex->cur.next) {
+    case ID:
+    case STRING:
+    case INTCONST:
+    case FLOATCONST:
+        primary = true;
+    default:
+        primary = false;
+    }
+    if (primary) {
+        switch (lex->cur.next) {
+        case DEREF:
+        case INC:
+        case DEC:
+        case DOT:
+        case LBRACK:
+        case LPAREN:
+            par_postfix_expression(lex);
+        }
+
+        switch (lex->cur.next) {
+        case EQ:
+        case STAREQ:
+        case DIVEQ:
+        case MODEQ:
+        case PLUSEQ:
+        case MINUSEQ:
+        case LSHIFTEQ:
+        case RSHIFTEQ:
+        case BITANDEQ:
+        case BITXOREQ:
+        case BINOREQ:
+            par_assignment_expression(lex);
+            bool parsed = true;
+        }
+    }
+    if (!parsed) {
+        // TODO: Need to continue with primary if found
+        par_expression(lex);
+    }
+}
+
+status_t par_type_name(lex_wrap_t *lex) {
+    par_specifier_qualifier(lex);
+    bool done = false;
+    while (!done) {
+        switch (lex->cur.type) {
+            // Type specifiers:
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: TODO: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_specifier_qualifier(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+    switch (lex->cur.next) {
+    case STAR:
+    case LPAREN:
+    case LBRACE:
+        par_abstract_declarator(lex);
+    }
+
+    return CCC_OK;
+}
+
+status_t par_parameter_type_list(lex_wrap_t *lex) {
+    par_parameter_list(lex);
+    if (lex->cur.next != ELIPSE) {
+        return CCC_OK;
+    }
+    LEX_ADVANCE(lex);
+
+    return CCC_OK;
+}
+
+status_t par_parameter_list(lex_wrap_t *lex) {
+    par_parameter_declaration(lex);
+    bool done = false;
+    while (!done && lex->cur.next == COMMA) {
+        LEX_ADVANCE(lex);
+        switch (lex->cur.type) {
+            // Cases for declaration specifier
+            // Storage class specifiers
+        case AUTO:
+        case REGISTER:
+        case STATIC:
+        case EXTERN:
+        case TYPEDEF:
+
+            // Type specifiers:
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_parameter_declaration(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+}
+
+status_t par_parameter_declaration(lex_wrap_t *lex) {
+    par_declaration_specifier(lex);
+    bool done = false;
+    while (!done && lex->cur.next == COMMA) {
+        LEX_ADVANCE(lex);
+        switch (lex->cur.type) {
+            // Cases for declaration specifier
+            // Storage class specifiers
+        case AUTO:
+        case REGISTER:
+        case STATIC:
+        case EXTERN:
+        case TYPEDEF:
+
+            // Type specifiers:
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_parameter_declaration(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+
+    switch (lex->cur.type) {
+    case ID:
+    case STAR:
+    case LPAREN:
+        return par_declarator(lex);
+    }
+}
+
+status_t par_enum_specifier(lex_wrap_t *lex) {
+    LEX_MATCH(lex, ENUM);
+    if (lex->cur.type == ID) {
+        LEX_ADVANCE(lex);
+    }
+
+    if (lex->cur.type == LBRACE) {
+        LEX_ADVANCE(lex);
+        par_enumerator_list(lex);
+        LEX_MATCH(lex, RBRACE);
+    }
+
+    return CCC_OK;
+}
+
+status_t par_enumerator_list(lex_wrap_t *lex) {
+    par_enumerator(lex);
+    while (lex->cur.next == COMMA) {
+        par_enumerator(lex);
+    }
+
+    return CCC_OK;
+}
+
+status_t par_enumerator(lex_wrap_t *lex) {
+    LEX_MATCH(lex, ID);
+    if (lex->cur.type == EQ) {
+        LEX_ADVANCE(lex, ID);
+        LEX_MATCH(lex, INTLIT);
+    }
+    return CCC_OK;
+}
+
+status_t par_declaration(lex_wrap_t *lex) {
+    par_declaration_specifier(lex);
+    bool done = false;
+    while (!done && lex->cur.next == COMMA) {
+        LEX_ADVANCE(lex);
+        switch (lex->cur.type) {
+            // Cases for declaration specifier
+            // Storage class specifiers
+        case AUTO:
+        case REGISTER:
+        case STATIC:
+        case EXTERN:
+        case TYPEDEF:
+
+            // Type specifiers:
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            par_parameter_declaration(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+
+    done = false;
+    while (!done) {
+        switch (lex->cur.type) {
+        case ID:
+        case LPAREN:
+        case STAR:
+            par_init_declarator(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+}
+
+status_t par_init_declarator(lex_wrap_t *lex) {
+    par_declarator(lex);
+
+    if (lex->cur.type == ASSIGN) {
+        LEX_ADVANCE(lex);
+        par_initializer(lex);
+    }
+
+    return CCC_OK;
+}
+
+status_t par_initializer(lex_wrap_t *lex) {
+    if (lex->cur.type != LBRACK) {
+        return par_assignment_expression(lex);
+    }
+    LEX_ADVANCE(lex);
+    par_initializer_list(lex);
+    LEX_MATCH(lex, RBRACK);
+    return CCC_OK;
+}
+
+status_t par_initializer_list(lex_wrap_t *lex) {
+    par_initializer(lex);
+    while (lex->cur.type == COMMA) {
+        LEX_ADVANCE(lex);
+        if (lex->cur.type == RBRACK) {
+            break;
+        }
+        par_initializer_list(lex);
+    }
+}
+
+
+status_t par_compound_statement(lex_wrap_t *lex) {
+    LEX_MATCH(lex, LBRACK);
+    while (lex->cur.next != RBRACK) {
+        par_statement(lex);
+    }
+    LEX_ADVANCE(lex);
+}
+
+status_t par_statement(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+        // Cases for declaration specifier
+        // Storage class specifiers
+    case AUTO:
+    case REGISTER:
+    case STATIC:
+    case EXTERN:
+    case TYPEDEF:
+
+        // Type specifiers:
+    case VOID:
+    case CHAR:
+    case SHORT:
+    case INT:
+    case LONG:
+    case FLOAT:
+    case DOUBLE:
+    case SIGNED:
+    case UNSIGNED:
+    case STRUCT:
+    case UNION:
+    case ENUM:
+        // case ID: ID needs to be handled separately
+
+        // Type qualitifiers
+    case CONST:
+    case VOLATILE:
+        return par_declaration(lex);
+        break;
+
+    case ID: // TODO: Id can be in expression. need to have backtracking
+    case CASE:
+    case DEFAULT:
+        return par_labeled_statement(lex);
+
+    case IF:
+    case SWITCH:
+        return par_selection_statement(lex);
+
+    case DO:
+    case WHILE:
+    case FOR:
+        return par_iteration_statement(lex);
+
+    case GOTO:
+    case CONTINUE:
+    case BREAK:
+    case RETURN:
+        return par_iteration_statement(lex);
+
+    case SEMI: // noop
+        return;
+    default:
+        return par_expression_statement(lex);
+    }
+}
+
+status_t par_labeled_statement(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+    case ID:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, COLON);
+        par_statement(lex);
+        break;
+    case CASE:
+        LEX_ADVANCE(lex);
+        par_constant_expression(lex);
+        LEX_MATCH(lex, COLON);
+        par_statement(lex);
+        break;
+    case DEFAULT:
+        LEX_ADVANCE(lex);
+        par_statement(lex);
+        break;
+    default:
+        return CCC_ESYNTAX;
+    }
+
+    return CCC_OK;
+}
+
+status_t par_expression_statement(lex_wrap_t *lex) {
+    if (lex->cur.type != SEMI) {
+        par_expression(lex);
+    }
+
+    LEX_MATCH(lex, SEMI);
+}
+
+status_t par_selection_statement(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+    case IF:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+        par_expression(lex);
+        LEX_MATCH(lex, RPAREN);
+        par_statement(lex);
+        if (lex->cur.type == ELSE) {
+            LEX_ADVANCE(lex);
+        }
+        par_statement(lex);
+        break;
+    case SWITCH:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+        par_expression(lex);
+        LEX_MATCH(lex, RPAREN);
+        par_statement(lex);
+        break;
+    default:
+        return CCC_ESYNTAX;
+    }
+}
+
+status_t par_iteration_statement(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+    case DO:
+        LEX_ADVANCE(lex);
+        par_statement(lex);
+        LEX_MATCH(lex, WHILE);
+        LEX_MATCH(lex, LPAREN);
+        par_expression(lex);
+        LEX_MATCH(lex, RPAREN);
+        LEX_MATCH(lex, SEMI);
+        break;
+    case WHILE:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+        par_expression(lex);
+        LEX_MATCH(lex, RPAREN);
+        par_statement(lex);
+        break;
+    case FOR:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+        if (lex->cur.type != SEMI) {
+            par_expression(lex);
+        }
+        LEX_MATCH(lex, SEMI);
+        if (lex->cur.type != SEMI) {
+            par_expression(lex);
+        }
+        LEX_MATCH(lex, SEMI);
+        if (lex->cur.type != SEMI) {
+            par_expression(lex);
+        }
+        LEX_MATCH(lex, SEMI);
+        LEX_MATCH(lex, RPAREN);
+        par_statement(lex);
+        break;
+    default:
+        return CCC_ESYNTAX;
+    }
+}
+status_t par_jump_statement(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+    case GOTO:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, ID);
+        LEX_MATCH(lex, SEMI);
+        break;
+    case CONTINUE:
+    case BREAK:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, SEMI);
+        break;
+    case RETURN:
+        LEX_ADVANCE(lex);
+        par_expression(lex);
+        LEX_MATCH(lex, SEMI);
+        break;
+    default:
+        return CCC_ESYNTAX;
+    }
+}
