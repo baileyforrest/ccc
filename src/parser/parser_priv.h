@@ -32,7 +32,7 @@
             logger_log(&lex->cur.mark, "Out of memory in parser",   \
                        LOG_ERR);                                    \
             status = CCC_NOMEM;                                     \
-            goto fail0;                                             \
+            goto fail;                                              \
         }                                                           \
     } while (0)
 

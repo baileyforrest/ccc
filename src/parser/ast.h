@@ -101,7 +101,7 @@ struct gdecl_t;
 typedef struct struct_decl_t {
     sl_link_t link;      /**< List link */
     struct type_t *type; /**< Type of entry */
-    len_str_t id;        /**< Name */
+    len_str_t *id;       /**< Name */
     int bf_bits;         /**< Bitfield bits 0 for unused */
 } struct_decl_t;
 
@@ -110,7 +110,7 @@ typedef struct struct_decl_t {
  */
 typedef struct enum_id_t {
     sl_link_t link; /**< List link */
-    len_str_t id;   /**< Name */
+    len_str_t *id;  /**< Name */
     intptr_t val;   /**< Value */
 } enum_id_t;
 
@@ -139,7 +139,7 @@ typedef struct type_t {
 
         struct {                        /**< Structure for pointer info */
             struct type_t *pointed_to;  /**< Base type pointed to */
-            int indirections;           /**< Number of indirections */
+            //int indirections;           /**< Number of indirections */
         } ptr;
         struct {                        /**< Structure for array info */
             struct type_t *base;        /**< Base type */
@@ -154,15 +154,16 @@ typedef struct type_t {
 typedef struct param_t {
     sl_link_t link; /**< Storage Link */
     type_t *type;   /**< Type of the paramater */
-    len_str_t id;   /**< ID of the paramater */
+    len_str_t *id;  /**< ID of the paramater */
 } param_t;
 
 typedef enum gdecl_type_t {
-    GDECL_FDEFN,   /**< Function definition */
-    GDECL_FDECL,   /**< Function declaration */
-    GDECL_VDECL,   /**< Varable declaration */
-    GDECL_TYPE,    /**< Type definition */
-    GDECL_TYPEDEF, /**< Typedef */
+    GDECL_NULL = 0, /**< Unititialized */
+    GDECL_FDEFN,    /**< Function definition */
+    GDECL_FDECL,    /**< Function declaration */
+    GDECL_VDECL,    /**< Varable declaration */
+    GDECL_TYPE,     /**< Type definition */
+    GDECL_TYPEDEF,  /**< Typedef */
 } gdecl_type_t;
 
 /**
@@ -174,14 +175,14 @@ typedef struct gdecl_t {
     union {
         struct {                 /**< Function definition parameters */
             type_t *ret;         /**< Return type */
-            len_str_t id;        /**< Decl name */
+            len_str_t *id;       /**< Decl name */
             slist_t params;      /**< List of paramaters */
             struct stmt_t *stmt; /**< Function body */
         } fdefn;
 
         struct {                 /**< Function declaration parameters */
             type_t *ret;         /**< Return type */
-            len_str_t id;        /**< Decl name */
+            len_str_t *id;       /**< Decl name */
             slist_t params;      /**< List of paramaters */
         } fdecl;
 
@@ -189,10 +190,10 @@ typedef struct gdecl_t {
 
         struct {                 /**< Type declaration params */
             type_t *type;        /**< The type defined */
-        } type_params;
+        } type;
 
         struct {                 /**< typedef parameters */
-            len_str_t name;      /**< Name of new type alias */
+            len_str_t *name;     /**< Name of new type alias */
             type_t *type;        /**< Type of alias */
         } typedef_params;
     };
@@ -220,7 +221,7 @@ typedef struct expr_t {
     expr_type_t type;             /**< Expression type */
 
     union {                       /**< Type specific info */
-        len_str_t var_id;         /**< Variable identifier */
+        len_str_t *var_id;        /**< Variable identifier */
         intptr_t const_val;       /**< Constant value */
 
         struct {                  /**< Operation paramaters */
@@ -289,7 +290,7 @@ typedef struct stmt_t {
 
     union {
         struct {                         /**< Declaration parameters */
-            len_str_t id;                /**< Name of variable */
+            len_str_t *id;               /**< Name of variable */
             type_t *type;                /**< Type of variable */
             expr_t *expr;                /**< Expression to assign */
         } decl;
@@ -344,7 +345,7 @@ typedef struct stmt_t {
         } assn_init_list;
 
         struct {                         /**< Label parameters */
-            len_str_t label;             /**< Label value */
+            len_str_t *label;            /**< Label value */
         } label;
 
         struct {                         /**< Goto parameters */
