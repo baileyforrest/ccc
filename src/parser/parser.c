@@ -30,6 +30,7 @@
 
 #include "util/logger.h"
 
+/*
 status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
     assert(lexer != NULL);
     assert(result != NULL);
@@ -258,4 +259,338 @@ status_t par_stmt(lex_wrap_t *lex, type_t **result) {
     (void)lex;
     (void)result;
     return status;
+}
+*/
+
+status_t par_translation_unit(lex_wrap_t *lex) {
+    status_t status = CCC_OK;
+    while (true) {
+
+        // We're done when we reach EOF
+        if (lex->cur.type == TOKEN_EOF) {
+            return status;
+        }
+
+        if (CCC_OK != (status = par_external_declaration(lex))) {
+            goto fail;
+        }
+    }
+fail:
+    return status;
+}
+
+status_t par_external_declaration(lex_wrap_t *lex) {
+    status_t status = CCC_OK;
+    if (CCC_OK != (status = par_declaration_specifier(lex))) {
+        goto fail;
+    }
+
+    bool done = false;
+    while (!done) {
+        switch (lex->cur.type) {
+            // Cases for declaration specifier
+            // Storage class specifiers
+        case AUTO:
+        case REGISTER:
+        case STATIC:
+        case EXTERN:
+        case TYPEDEF:
+
+            // Type specifiers:
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            if (CCC_OK != (status = par_declaration_specifier(lex))) {
+                goto fail;
+            }
+            break;
+        default:
+            done = true;
+        }
+
+        // Must be declaration
+        if (lex->cur.type == SEMI) {
+            return par_declaration(lex);
+        }
+
+        // Must match declarator now
+        par_declarator(lex);
+
+        switch (lex->cur.type) {
+        case EQ:
+        case SEMI:
+            return par_declaration(lex);
+        case LPAREN:
+            return par_function_definition(lex);
+        }
+    }
+fail:
+    return status;
+}
+
+status_t par_function_definition(lex_wrap_t *lex) {
+    LEX_MATCH(lex, LPAREN);
+
+    while (lex->cur.type != RPAREN) {
+        par_declaration(lex);
+    }
+
+    return par_compound_statement;
+}
+
+status_t par_declaration_specifier(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+        // Storage class specifiers
+    case AUTO:
+    case REGISTER:
+    case STATIC:
+    case EXTERN:
+    case TYPEDEF:
+        return par_storage_class_specifier(lex);
+
+        // Type specifiers:
+    case VOID:
+    case CHAR:
+    case SHORT:
+    case INT:
+    case LONG:
+    case FLOAT:
+    case DOUBLE:
+    case SIGNED:
+    case UNSIGNED:
+    case STRUCT:
+    case UNION:
+    case ENUM:
+    case ID:
+        return par_type_specifier(lex);
+
+        // Type qualitifiers
+    case CONST:
+    case VOLATILE:
+        return par_type_qualifier(lex);
+    default:
+        return CCC_ESYNTAX;
+    }
+}
+
+status_t parse_storage_class_specifier(lex_wrap_t *lex) {
+}
+
+status_t parse_type_specifier(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+    case VOID:
+    case CHAR:
+    case SHORT:
+    case INT:
+    case LONG:
+    case FLOAT:
+    case DOUBLE:
+    case SIGNED:
+    case UNSIGNED:
+        return CCC_OK;
+    case STRUCT:
+    case UNION:
+        return par_struct_or_union_specifier(lex);
+    case ENUM:
+        return par_enum_specifier(lex);
+    case ID:
+        return par_type_specifier(lex);
+    default:
+        return CCC_ESYNTAX;
+    }
+}
+
+status_t par_struct_or_union_specifier(lex_wrap_t *lex) {
+    switch (lex->cur.type) {
+    case STRUCT:
+    case UNION:
+        break;
+    default:
+        return CCC_ESYNTAX;
+    }
+    LEX_ADVANCE(lex);
+
+    if (lex->cur.type == LBRACE) {
+        par_struct_declaration(lex);
+        LEX_MATCH(lex, RBRACE);
+        return CCC_OK;
+    }
+
+    if (lex->cur.type != ID) {
+        return CCC_ESYNTAX;
+    }
+    LEX_ADVANCE(lex);
+
+    if (lex->cur.type == LBRACE) {
+        par_struct_declaration(lex);
+        LEX_MATCH(lex, RBRACE);
+        return CCC_OK;
+    }
+
+    return CCC_OK;
+}
+
+status_t par_struct_declaration(lex_wrap_t *lex) {
+    bool done = false;
+    while (!done) {
+        switch (lex->cur.type) {
+            // Type specifiers:
+        case VOID:
+        case CHAR:
+        case SHORT:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case SIGNED:
+        case UNSIGNED:
+        case STRUCT:
+        case UNION:
+        case ENUM:
+            // case ID: TODO: ID needs to be handled separately
+
+            // Type qualitifiers
+        case CONST:
+        case VOLATILE:
+            return par_specifier_qualifier(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+
+    return par_struct_declarator_list(lex);
+}
+
+status_t par_struct_declaration(lex_wrap_t *lex) {
+    switch (lex.cur->type) {
+        // Type specifiers:
+    case VOID:
+    case CHAR:
+    case SHORT:
+    case INT:
+    case LONG:
+    case FLOAT:
+    case DOUBLE:
+    case SIGNED:
+    case UNSIGNED:
+    case STRUCT:
+    case UNION:
+    case ENUM:
+    case ID:
+        return par_type_specifier(lex);
+
+        // Type qualitifiers
+    case CONST:
+    case VOLATILE:
+        return par_type_qualifier(lex);
+        break;
+    default:
+        return CCC_ESYNTAX;
+    }
+
+    return CCC_OK;
+}
+
+status_t par_struct_declarator_list(lex_wrap_t *lex) {
+    par_struct_declarator();
+    while (lex->cur.type == COMMA) {
+        par_struct_declarator();
+    }
+    return CCC_OK;
+}
+
+status_t par_struct_declarator(lex_wrap_t *lex) {
+    if (lex->cur.type == COLON) {
+        LEX_ADVANCE(lex);
+        return par_constant_expression(lex);
+    }
+
+    par_declarator(lex);
+
+    if (lex->cur.type == COLON) {
+        LEX_ADVANCE(lex);
+        return par_constant_expression(lex);
+    }
+
+    return CCC_OK;
+}
+
+status_t par_declarator(lex_wrap_t *lex) {
+    if (lex->cur.type == STAR) {
+        par_pointer(lex);
+    }
+    return par_direct_declarator(lex);
+}
+
+status_t par_pointer(lex_wrap_t *lex) {
+    LEX_MATCH(lex, STAR);
+
+    bool done = false;
+    while (!done) {
+        switch (lex->cur.type) {
+        case CONST:
+        case VOLATILE:
+            par_type_qualifier(lex);
+            break;
+        default:
+            done = true;
+        }
+    }
+
+    if (lex->cur.type == STAR) {
+        par_pointer(lex);
+    }
+
+    return CCC_OK;
+}
+
+status_t par_type_qualifier(lex_wrap_t *lex) {
+}
+
+status_t par_direct_declaration(lex_wrap_t *lex) {
+    if (cur->lex.type == LPAREN) {
+        LEX_ADVANCE(lex);
+        par_direct_declaration(lex);
+        LEX_MATCH(lex, RPAREN);
+    } else if (cur->lex.type == ID) {
+        LEX_ADVANCE(lex);
+    }
+
+    if (cur->lex.type == LBRACK) {
+        LEX_ADVANCE(lex);
+        if (cur->lex.type == RBRACK) {
+            LEX_ADVANCE(lex);
+        } else {
+            par_const_expression(lex);
+            LEX_MATCH(lex, RBRACK);
+        }
+    } else if (cur->lex.type == LPAREN) {
+        LEX_ADVANCE(lex);
+
+        if (cur->lex.type == ID) {
+            while (cur->lex.type == ID) {
+                LEX_ADVANCE(lex);
+            }
+            LEX_MATCH(lex, RPAREN);
+        } else {
+            par_parameter_type_list(lex);
+        }
+    }
+
+    return CCC_OK;
 }
