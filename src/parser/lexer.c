@@ -108,8 +108,8 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         case ')': result->type = RPAREN; break;
         case ';': result->type = SEMI; break;
         case ',': result->type = COMMA; break;
-        case '[' result->type = LBRACK; break;
-        case ']' result->type = RBRACK; break;
+        case '[': result->type = LBRACK; break;
+        case ']': result->type = RBRACK; break;
         case '?': result->type = COND; break;
         case ':': result->type = COLON; break;
         case '~': result->type = BITNOT; break;

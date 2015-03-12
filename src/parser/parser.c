@@ -30,11 +30,39 @@
 
 #include "util/logger.h"
 
+static inline int par_get_prec(token_t token) {
+    switch (token) {
+    case STAR:
+    case DIV:
+    case MOD:      return 10;
+
+    case PLUS:
+    case MINUS:    return 9;
+
+    case LSHIFT:
+    case RSHIFT:   return 8;
+
+    case LT:
+    case GT:
+    case LE:
+    case GE:       return 7;
+
+    case EQ:
+    case NE:       return 6;
+
+    case BITAND:   return 5;
+    case BITXOR:   return 4;
+    case BITOR:    return 3;
+    case LOGICAND: return 2;
+    case LOGICOR:  return 1;
+    default:
+        assert(false);
+    }
+
+}
+
 bool par_greater_or_equal_prec(token_t t1, token_t t2) {
-    (void)t1;
-    (void)t2;
-    // TODO: Implement this
-    return false;
+    return par_get_prec(t1) >= par_get_prec(t2);
 }
 
 status_t par_translation_unit(lex_wrap_t *lex) {
