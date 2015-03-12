@@ -30,6 +30,19 @@
 
 #include "util/logger.h"
 
+status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
+    assert(lexer != NULL);
+    assert(result != NULL);
+    status_t status = CCC_OK;
+    lex_wrap_t lex;
+    lex.lexer = lexer;
+    LEX_ADVANCE(&lex);
+    status = par_translation_unit(&lex);
+    *result = NULL; // TODO: Actually get result
+fail:
+    return status;
+}
+
 static inline int par_get_prec(token_t token) {
     switch (token) {
     case STAR:
@@ -636,7 +649,6 @@ status_t par_expression(lex_wrap_t *lex, bool has_left) {
 
         case COND: // Cond has lowest precedence
             cond2 = true;
-            // TODO: Handle this,
             break;
         default:
             // TODO Return expression combinaned with last op

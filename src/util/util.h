@@ -27,6 +27,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+
 
 #include "util/slist.h"
 
@@ -106,7 +108,19 @@ typedef struct len_str_node_t {
  *
  * @param len_str The len_str to hash
  */
-uint32_t strhash(const void *len_str);
+inline uint32_t strhash(const void *vstr) {
+    const len_str_t *len_str = (const len_str_t *)vstr;
+    const char *str = len_str->str;
+    size_t len = len_str->len;
+    uint32_t hash = 5381;
+    int c;
+
+    while (len-- > 0 && (c = *str++)) {
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    }
+
+    return hash;
+}
 
 /**
  * String compare with void pointers to be compatible with the hash table
@@ -115,7 +129,16 @@ uint32_t strhash(const void *len_str);
  * @param len_str1 First string
  * @param len_str2 Second string
  */
-bool vstrcmp(const void *len_str1, const void *len_str2);
+inline bool vstrcmp(const void *vstr1, const void *vstr2) {
+    const len_str_t *str1 = (const len_str_t *)vstr1;
+    const len_str_t *str2 = (const len_str_t *)vstr2;
+
+    if (str1->len != str2->len) {
+        return false;
+    }
+
+    return strncmp(str1->str, str2->str, str1->len) == 0;
+}
 
 #define ASCII_LOWER \
 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': \

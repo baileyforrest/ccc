@@ -33,7 +33,8 @@ typedef enum {
     CCC_NOMEM,     /**< No Memory */
     CCC_FILEERR,   /**< File Error */
     CCC_ESYNTAX,   /**< Syntax Error */
-    CCC_BACKTRACK  /**< Backtrack required */
+    CCC_BACKTRACK, /**< Backtrack required */
+    CCC_DUPLICATE  /**< Already Exists */
 } status_t;
 
 #endif /* _STATUS_H_ */

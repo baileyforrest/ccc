@@ -112,7 +112,7 @@ status_t st_init(symtab_t *table, bool is_sym) {
     }
 
     // Initalize symbol table with reserved keywords
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); ++i) {
         if (CCC_OK != (status = ht_insert(&table->hashtab,
                                           &s_reserved[i].link))) {
             ht_destroy(&table->hashtab, NOFREE);

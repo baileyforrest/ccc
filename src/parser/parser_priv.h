@@ -39,14 +39,6 @@
     } while (0)
 
 /**
- * Wrapper for lexer
- */
-typedef struct lex_wrap_t {
-    lexer_t *lexer;
-    lexeme_t cur;
-} lex_wrap_t;
-
-/**
  * Advance lexer wrapper to next token
  *
  * @param wrap Wrapper to advance
@@ -77,6 +69,14 @@ typedef struct lex_wrap_t {
         }                                                               \
         LEX_ADVANCE(wrap);                                              \
     } while (0)
+
+/**
+ * Wrapper for lexer
+ */
+typedef struct lex_wrap_t {
+    lexer_t *lexer;
+    lexeme_t cur;
+} lex_wrap_t;
 
 bool par_greater_or_equal_prec(token_t t1, token_t t2);
 

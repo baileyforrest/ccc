@@ -44,7 +44,9 @@ typedef enum basic_type_t {
     TYPE_ENUM,
     TYPE_FUNC,   /**< Function pointer */
     TYPE_PTR,    /**< Pointer */
-    TYPE_ARR     /**< Array */
+    TYPE_ARR,    /**< Array */
+    TYPE_MOD,    /**< Modified Type */
+    TYPE_TYPEDEF /**< Typedef type */
 } basic_type_t;
 
 /**
@@ -128,9 +130,12 @@ typedef struct arr_dim_t {
 typedef struct type_t {
     sl_link_t link;                     /**< Storage Link */
     basic_type_t type;                  /**< Basic type */
-    type_mod_t type_mod;                /**< Bitset of type modifiers */
     int size;                           /**< Size of this type */
-    int align;                          /**< Alignment */
+    char align;                         /**< Alignment */
+
+    /** Whether or not this should be freed with containing structure */
+    bool dealloc;
+
     union {
         slist_t struct_decls;           /**< List of struct definitions */
         slist_t union_decls;            /**< List of union definitions */
@@ -139,12 +144,23 @@ typedef struct type_t {
 
         struct {                        /**< Structure for pointer info */
             struct type_t *pointed_to;  /**< Base type pointed to */
-            //int indirections;           /**< Number of indirections */
+            type_mod_t type_mod;        /**< Modifiers */
         } ptr;
+
         struct {                        /**< Structure for array info */
             struct type_t *base;        /**< Base type */
             slist_t dims;               /**< List of dimensions */
         } arr;
+
+        struct {
+            struct type_t *base;
+            type_mod_t type_mod;        /**< Bitset of type modifiers */
+        } mod;
+
+        struct {
+            struct type_t *base;        /**< Base type */
+            len_str_t name;             /**< New type's name */
+        } typedef_params;
     };
 } type_t;
 

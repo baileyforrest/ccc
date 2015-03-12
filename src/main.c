@@ -17,7 +17,9 @@
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "parser/ast.h"
 #include "parser/lexer.h"
+#include "parser/parser.h"
 #include "parser/preprocessor.h"
 #include "parser/symtab.h"
 #include "parser/token.h"
@@ -58,12 +60,19 @@ int main(int argc, char **argv) {
 
     }
 
+    /*
+    // Print tokens
     lexeme_t cur_token;
 
     do {
         lexer_next_token(&lexer, &cur_token);
         token_print(&cur_token);
     } while(cur_token.type != TOKEN_EOF);
+    */
+    trans_unit_t *ast;
+    if (CCC_OK != (status = parser_parse(&lexer, &ast))) {
+        goto fail5;
+    }
 
 fail5:
     lexer_destroy(&lexer);
