@@ -53,12 +53,11 @@ status_t par_external_declaration(lex_wrap_t *lex) {
             goto fail;
         }
     }
-    status = CCC_OK;
-
     if (CCC_BACKTRACK == (status = par_declarator(lex))) {
         // If the next character isn't a declarator, then its a type declaration
         return CCC_OK;
     }
+    status = CCC_OK;
 
     switch (lex->cur.type) {
     case LPAREN:
@@ -282,6 +281,7 @@ fail:
     return status;
 }
 
+// TODO: Handle abstract-declarator
 status_t par_declarator(lex_wrap_t *lex) {
     status_t status = CCC_OK;
     switch (lex->cur.type) {
@@ -831,8 +831,10 @@ status_t par_parameter_declaration(lex_wrap_t *lex) {
     }
     status = CCC_OK;
 
-    if (CCC_OK != (status = par_declarator(lex)) && status != CCC_BACKTRACK) {
+    if (CCC_BACKTRACK != (status = par_declarator(lex))) {
+        if (status != CCC_OK) {
             goto fail;
+        }
     }
 fail:
     return status;
