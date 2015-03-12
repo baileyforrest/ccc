@@ -108,6 +108,8 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         case ')': result->type = RPAREN; break;
         case ';': result->type = SEMI; break;
         case ',': result->type = COMMA; break;
+        case '[' result->type = LBRACK; break;
+        case ']' result->type = RBRACK; break;
         case '?': result->type = COND; break;
         case ':': result->type = COLON; break;
         case '~': result->type = BITNOT; break;
@@ -117,6 +119,23 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         case '%': CHECK_NEXT_EQ(MOD, MODEQ); break;
         case '!': CHECK_NEXT_EQ(LOGICNOT, NE); break;
         case '^': CHECK_NEXT_EQ(BITXOR, BITXOREQ); break;
+        case '.': {
+            NEXT_CHAR_NOERR(lexer->pp, next);
+            if (next != '.') {
+                result->type = DOT;
+                lexer->next_char = next;
+                break;
+            }
+            NEXT_CHAR_NOERR(lexer->pp, next);
+            if (next == '.') {
+                result->type = ELIPSE;
+                break;
+            }
+            logger_log(&result->mark,
+                       "Unexpected token: ..", LOG_ERR);
+            status = CCC_ESYNTAX;
+            break;
+        }
         case '+': {
             NEXT_CHAR_NOERR(lexer->pp, next);
             switch(next) {
@@ -133,6 +152,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             switch(next) {
             case '-': result->type = DEC; break;
             case '=': result->type = MINUSEQ; break;
+            case '>': result->type = DEREF; break;
             default:
                 result->type = MINUS;
                 lexer->next_char = next;
