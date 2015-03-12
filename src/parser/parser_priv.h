@@ -25,6 +25,8 @@
 
 #include "util/status.h"
 
+#include <stdio.h>
+
 #define ALLOC_NODE(loc, type)                                       \
     do {                                                            \
         loc = malloc(sizeof(type));                                 \
@@ -73,21 +75,50 @@ typedef struct lex_wrap_t {
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \
-        LEX_WRAP_ADVANCE(wrap);                                         \
+        LEX_ADVANCE(wrap);                                              \
     } while (0)
 
-status_t par_trans_unit(lex_wrap_t *lex, trans_unit_t **result);
+bool par_greater_or_equal_prec(token_t t1, token_t t2);
 
-status_t par_gdecl(lex_wrap_t *lex, gdecl_t **result);
-//status_t par_gdecl_param(lex_wrap_t *lex, param_t **result);
-//status_t par_gdecl_param_list(lex_wrap_t *lex, slist__t **result);
-
-status_t par_type(lex_wrap_t *lex, type_t **result);
-//status_t par_type_struct_decls(lex_wrap_t *lex, type_t **result);
-//status_t par_type_arr_decl(lex_wrap_t *lex, slist_t **result);
-
-status_t par_expr(lex_wrap_t *lex, type_t **result);
-
-status_t par_stmt(lex_wrap_t *lex, type_t **result);
+status_t par_translation_unit(lex_wrap_t *lex);
+status_t par_external_declaration(lex_wrap_t *lex);
+status_t par_function_definition(lex_wrap_t *lex);
+status_t par_declaration_specifier(lex_wrap_t *lex);
+status_t par_storage_class_specifier(lex_wrap_t *lex);
+status_t par_type_specifier(lex_wrap_t *lex);
+status_t par_struct_or_union_specifier(lex_wrap_t *lex);
+status_t par_struct_declaration(lex_wrap_t *lex);
+status_t par_specifier_qualifier(lex_wrap_t *lex);
+status_t par_struct_declarator_list(lex_wrap_t *lex);
+status_t par_struct_declarator(lex_wrap_t *lex);
+status_t par_declarator(lex_wrap_t *lex);
+status_t par_pointer(lex_wrap_t *lex);
+status_t par_type_qualifier(lex_wrap_t *lex);
+status_t par_direct_declarator(lex_wrap_t *lex);
+status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary);
+status_t par_expression(lex_wrap_t *lex, bool has_left);
+status_t par_unary_expression(lex_wrap_t *lex);
+status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren);
+status_t par_postfix_expression(lex_wrap_t *lex);
+status_t par_assignment_expression(lex_wrap_t *lex);
+status_t par_primary_expression(lex_wrap_t *lex);
+status_t par_type_name(lex_wrap_t *lex);
+status_t par_parameter_type_list(lex_wrap_t *lex);
+status_t par_parameter_list(lex_wrap_t *lex);
+status_t par_parameter_declaration(lex_wrap_t *lex);
+status_t par_enum_specifier(lex_wrap_t *lex);
+status_t par_enumerator_list(lex_wrap_t *lex);
+status_t par_enumerator(lex_wrap_t *lex);
+status_t par_declaration(lex_wrap_t *lex);
+status_t par_init_declarator(lex_wrap_t *lex);
+status_t par_initializer(lex_wrap_t *lex);
+status_t par_initializer_list(lex_wrap_t *lex);
+status_t par_compound_statement(lex_wrap_t *lex);
+status_t par_statement(lex_wrap_t *lex);
+status_t par_labeled_statement(lex_wrap_t *lex);
+status_t par_expression_statement(lex_wrap_t *lex);
+status_t par_selection_statement(lex_wrap_t *lex);
+status_t par_iteration_statement(lex_wrap_t *lex);
+status_t par_jump_statement(lex_wrap_t *lex);
 
 #endif /* _PARSER_PRIV_H_ */

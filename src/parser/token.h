@@ -34,6 +34,11 @@ typedef enum token_t {
     RPAREN,        // )
     SEMI,          // ;
     COMMA,         // ,
+    LBRACK,        // [
+    RBRACK,        // ]
+    DEREF,         // ->
+    DOT,           // .
+    ELIPSE,        // ...
 
     COND,          // ?
     COLON,         // :

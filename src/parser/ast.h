@@ -190,7 +190,7 @@ typedef struct gdecl_t {
 
         struct {                 /**< Type declaration params */
             type_t *type;        /**< The type defined */
-        } type;
+        } type_params;
 
         struct {                 /**< typedef parameters */
             len_str_t *name;     /**< Name of new type alias */

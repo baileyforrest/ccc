@@ -41,7 +41,12 @@ void token_print(lexeme_t *token) {
         CASE_BASIC_PRINT(LPAREN);        // (
         CASE_BASIC_PRINT(RPAREN);        // )
         CASE_BASIC_PRINT(SEMI);          // ;
-        CASE_BASIC_PRINT(COMMA);         // );
+        CASE_BASIC_PRINT(COMMA);         // ,
+        CASE_BASIC_PRINT(LBRACK);        // [
+        CASE_BASIC_PRINT(RBRACK);        // ]
+        CASE_BASIC_PRINT(DEREF);         // ->
+        CASE_BASIC_PRINT(DOT);           // .
+        CASE_BASIC_PRINT(ELIPSE);        // ...
 
         CASE_BASIC_PRINT(COND);          // ?
         CASE_BASIC_PRINT(COLON);         // :
