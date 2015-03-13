@@ -24,6 +24,7 @@
 #define _PARSER_PRIV_H_
 
 #include "util/status.h"
+#include "parser/type_table.h"
 
 #include <stdio.h>
 
@@ -71,11 +72,12 @@
     } while (0)
 
 /**
- * Wrapper for lexer
+ * Container for lexer containing lex context
  */
 typedef struct lex_wrap_t {
-    lexer_t *lexer;
-    lexeme_t cur;
+    lexer_t *lexer;     /* Lexer */
+    typetab_t *typetab; /* Type table */
+    lexeme_t cur;       /* Current token */
 } lex_wrap_t;
 
 bool par_greater_or_equal_prec(token_t t1, token_t t2);

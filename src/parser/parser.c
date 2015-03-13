@@ -147,6 +147,13 @@ status_t par_declaration_specifier(lex_wrap_t *lex) {
         return par_storage_class_specifier(lex);
 
         // Type specifiers:
+    case ID: {
+        // Type specifier only if its a typedef name
+        tt_key_t key = {{ lex->cur.tab_entry->key.str,
+                           lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        if (tt_lookup(lex->typetab, &key) == NULL) {
+            return CCC_BACKTRACK;
+        }
     case VOID:
     case CHAR:
     case SHORT:
@@ -159,8 +166,8 @@ status_t par_declaration_specifier(lex_wrap_t *lex) {
     case STRUCT:
     case UNION:
     case ENUM:
-    case ID: // TODO: Need to check if this is a type
         return par_type_specifier(lex);
+    }
 
         // Type qualitifiers
     case CONST:
@@ -178,6 +185,14 @@ status_t par_storage_class_specifier(lex_wrap_t *lex) {
 
 status_t par_type_specifier(lex_wrap_t *lex) {
     switch (lex->cur.type) {
+    case ID: {
+        // Type specifier only if its a typedef name
+        tt_key_t key = {{ lex->cur.tab_entry->key.str,
+                          lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        if (tt_lookup(lex->typetab, &key) == NULL) {
+            return CCC_ESYNTAX;
+        }
+    }
     case VOID:
     case CHAR:
     case SHORT:
@@ -193,9 +208,6 @@ status_t par_type_specifier(lex_wrap_t *lex) {
         return par_struct_or_union_specifier(lex);
     case ENUM:
         return par_enum_specifier(lex);
-    case ID:
-        // TODO: Make sure this is a typedef name
-        return CCC_OK;
     default:
         return CCC_ESYNTAX;
     }
@@ -262,6 +274,14 @@ fail:
 status_t par_specifier_qualifier(lex_wrap_t *lex) {
     switch (lex->cur.type) {
         // Type specifiers:
+    case ID: {
+        // Type specifier only if its a typedef name
+        tt_key_t key = {{ lex->cur.tab_entry->key.str,
+                           lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        if (tt_lookup(lex->typetab, &key) == NULL) {
+            return CCC_BACKTRACK;
+        }
+    }
     case VOID:
     case CHAR:
     case SHORT:
@@ -274,7 +294,6 @@ status_t par_specifier_qualifier(lex_wrap_t *lex) {
     case STRUCT:
     case UNION:
     case ENUM:
-    case ID: // TODO: Make sure this is a type
         return par_type_specifier(lex);
 
         // Type qualitifiers
@@ -472,6 +491,15 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
         LEX_ADVANCE(lex);
         switch (lex->cur.type) {
             // Cases for casts
+
+        case ID: {
+            // Type specifier only if its a typedef name
+            tt_key_t key = {{ lex->cur.tab_entry->key.str,
+                              lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+            if (tt_lookup(lex->typetab, &key) == NULL) {
+                break;
+            }
+        }
         case VOID:
         case CHAR:
         case SHORT:
@@ -484,7 +512,6 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
         case STRUCT:
         case UNION:
         case ENUM:
-            // case ID: TODO: ID needs to be handled separately
 
             // Type qualitifiers
         case CONST:
@@ -1065,14 +1092,20 @@ status_t par_statement(lex_wrap_t *lex) {
     case STRUCT:
     case UNION:
     case ENUM:
-        // case ID: ID needs to be handled separately
 
         // Type qualitifiers
     case CONST:
     case VOLATILE:
         return par_declaration(lex);
 
-    case ID: // TODO: Id can be in expression. need to have backtracking
+    case ID: {
+        // Type specifier only if its a typedef name
+        tt_key_t key = {{ lex->cur.tab_entry->key.str,
+                           lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        if (tt_lookup(lex->typetab, &key) != NULL) {
+            return par_declaration(lex);
+        }
+    }
     case CASE:
     case DEFAULT:
         return par_labeled_statement(lex);

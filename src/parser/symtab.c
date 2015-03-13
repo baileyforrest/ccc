@@ -78,6 +78,7 @@ static symtab_entry_t s_reserved[] = {
     { { NULL }, LEN_STR_LITERAL("short"         ), SHORT         },
     { { NULL }, LEN_STR_LITERAL("int"           ), INT           },
     { { NULL }, LEN_STR_LITERAL("long"          ), LONG          },
+
     { { NULL }, LEN_STR_LITERAL("unsigned"      ), UNSIGNED      },
     { { NULL }, LEN_STR_LITERAL("signed"        ), SIGNED        },
 

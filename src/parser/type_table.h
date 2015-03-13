@@ -50,13 +50,13 @@ typedef struct typetab_entry_t {
     type_t *type;
 } typetab_entry_t;
 
-extern type_t *tt_void;
-extern type_t *tt_char;
-extern type_t *tt_short;
-extern type_t *tt_int;
-extern type_t *tt_long;
-extern type_t *tt_float;
-extern type_t *tt_double;
+extern type_t * const tt_void;
+extern type_t * const tt_char;
+extern type_t * const tt_short;
+extern type_t * const tt_int;
+extern type_t * const tt_long;
+extern type_t * const tt_float;
+extern type_t * const tt_double;
 
 uint32_t typetab_key_hash(const void *key);
 bool typetab_key_cmp(const void *key1, const void *key2);
@@ -97,7 +97,7 @@ inline typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key) {
  * @param entry The added entry
  * @return CCC_OK on success, error code on error
  */
-inline status_t tt_insert(typetab_t *tt, type_t *type, len_str_t *name,
+status_t tt_insert(typetab_t *tt, type_t *type, len_str_t *name,
                           typetab_entry_t **entry);
 
 #endif /* _TYPE_TABLE_H_ */

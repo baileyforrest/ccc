@@ -31,8 +31,6 @@
     { { NULL }, typename, sizeof(type), alignof(type), false, \
       { .ptr = { NULL, 0 } } }
 
-
-
 static type_t stt_void   = TYPE_LITERAL(TYPE_VOID  , void  );
 static type_t stt_char   = TYPE_LITERAL(TYPE_CHAR  , char  );
 static type_t stt_short  = TYPE_LITERAL(TYPE_SHORT , short );
@@ -41,13 +39,13 @@ static type_t stt_long   = TYPE_LITERAL(TYPE_LONG  , long  );
 static type_t stt_float  = TYPE_LITERAL(TYPE_FLOAT , float );
 static type_t stt_double = TYPE_LITERAL(TYPE_DOUBLE, double);
 
-type_t *tt_void = &stt_void;
-type_t *tt_char = &stt_char;
-type_t *tt_short = &stt_short;
-type_t *tt_int = &stt_int;
-type_t *tt_long = &stt_long;
-type_t *tt_float = &stt_float;
-type_t *tt_double = &stt_double;
+type_t * const tt_void = &stt_void;
+type_t * const tt_char = &stt_char;
+type_t * const tt_short = &stt_short;
+type_t * const tt_int = &stt_int;
+type_t * const tt_long = &stt_long;
+type_t * const tt_float = &stt_float;
+type_t * const tt_double = &stt_double;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
     { { NULL }, { LEN_STR_LITERAL(#type), TT_PRIM }, &stt_ ## type }
