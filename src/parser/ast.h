@@ -43,7 +43,7 @@ typedef enum basic_type_t {
     TYPE_UNION,
     TYPE_ENUM,
 
-    TYPE_FUNC,   /**< Function pointer */
+    TYPE_FUNC,   /**< Function */
 
     TYPE_ARR,    /**< Array */
     TYPE_PTR,    /**< Pointer */
@@ -106,9 +106,8 @@ struct gdecl_t;
  */
 typedef struct struct_decl_t {
     sl_link_t link;      /**< List link */
-    struct type_t *type; /**< Type of entry */
-    len_str_t *id;       /**< Name */
-    int bf_bits;         /**< Bitfield bits 0 for unused */
+    stmt_t *decl;
+    expr_t *bf_bits;     /**< Bitfield bits 0 for unused */
 } struct_decl_t;
 
 /**
@@ -119,14 +118,6 @@ typedef struct enum_id_t {
     len_str_t *id;  /**< Name */
     intptr_t val;   /**< Value */
 } enum_id_t;
-
-/**
- * Array dimention type
- */
-typedef struct arr_dim_t {
-    sl_link_t link; /**< List link */
-    int dim_len;    /**< Length of dimension */
-} arr_dim_t;
 
 /**
  * Tagged union representing a type
@@ -141,10 +132,13 @@ typedef struct type_t {
     bool dealloc;
 
     union {
-        slist_t struct_decls;           /**< List of struct definitions */
-        slist_t union_decls;            /**< List of union definitions */
+        slist_t struct_decls;           /**< List of struct/union definitions */
         slist_t enum_ids;               /**< List of enum ids/values */
-        struct gdecl_t *func;           /**< Function pointer */
+
+        struct {                        /**< Function signature */
+            type_t *type;               /**< Type (May be function pointer */
+            stmt_t *params;             /**< Paramater signature */
+        } func;
 
         struct {                        /**< Structure for pointer info */
             struct type_t *base;        /**< Base type pointed to */
@@ -153,7 +147,7 @@ typedef struct type_t {
 
         struct {                        /**< Structure for array info */
             struct type_t *base;        /**< Base type */
-            slist_t dims;               /**< List of dimensions */
+            expr_t *len;                /**< Dimension length */
         } arr;
 
         struct {
@@ -179,7 +173,6 @@ typedef struct gdecl_t {
     struct stmt_t *decl;         /**< Declaration */
     union {
         struct {                 /**< Function definition parameters */
-            slist_t params;      /**< List of paramaters */
             struct stmt_t *stmt; /**< Function body */
         } fdefn;
     };

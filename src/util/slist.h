@@ -55,6 +55,8 @@ typedef struct slist_t {
 /**
  * Initalizes a singly linked list head
  *
+ * TODO: Remove error code
+ *
  * @param slist List head to initalize
  * @param head_offset offset of head into list element structs
  */

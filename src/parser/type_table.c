@@ -142,12 +142,13 @@ status_t tt_insert(typetab_t *tt, type_t *type, len_str_t *name,
     case TYPE_INT:
     case TYPE_LONG:
     case TYPE_FLOAT:
-    case TYPE_DOUBLE:  new_entry->key.type = TT_PRIM   ; break;
+    case TYPE_DOUBLE:  new_entry->key.type = TT_PRIM    ; break;
 
-    case TYPE_TYPEDEF: new_entry->key.type = TT_TYPEDEF; break;
-    case TYPE_STRUCT:  new_entry->key.type = TT_STRUCT ; break;
-    case TYPE_UNION:   new_entry->key.type = TT_UNION  ; break;
-    case TYPE_ENUM:    new_entry->key.type = TT_ENUM   ; break;
+    case TYPE_TYPEDEF: new_entry->key.type = TT_TYPEDEF ; break;
+
+    case TYPE_STRUCT:  new_entry->key.type
+    case TYPE_UNION:   new_entry->key.type
+    case TYPE_ENUM:    new_entry->key.type = TT_COMPOUND; break;
     default:
         assert(false);
     }

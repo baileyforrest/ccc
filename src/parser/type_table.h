@@ -34,14 +34,12 @@ typedef struct typetab_t {
 typedef enum tt_type_t {
     TT_PRIM,
     TT_TYPEDEF,
-    TT_STRUCT,
-    TT_UNION,
-    TT_ENUM
+    TT_COMPOUND /* struct, union, enum */
 } tt_type_t;
 
 typedef struct tt_key_t {
     len_str_t name;
-    basic_type_t type;
+    tt_type_t type;
 } tt_key_t;
 
 typedef struct typetab_entry_t {
