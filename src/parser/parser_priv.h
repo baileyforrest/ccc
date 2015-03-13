@@ -82,18 +82,31 @@ typedef struct lex_wrap_t {
 
 bool par_greater_or_equal_prec(token_t t1, token_t t2);
 
-status_t par_translation_unit(lex_wrap_t *lex);
-status_t par_external_declaration(lex_wrap_t *lex);
-status_t par_function_definition(lex_wrap_t *lex);
-status_t par_declaration_specifier(lex_wrap_t *lex);
-status_t par_storage_class_specifier(lex_wrap_t *lex);
-status_t par_type_specifier(lex_wrap_t *lex);
-status_t par_struct_or_union_specifier(lex_wrap_t *lex);
+status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
+                              trans_unit_t **result);
+
+status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result);
+
+status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl);
+
+/**
+ * If *type == NULL, allocates statement, otherwise continues parsing existing
+ * declaration
+ */
+status_t par_declaration_specifier(lex_wrap_t *lex, type_t **type);
+
+status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type);
+
+status_t par_type_specifier(lex_wrap_t *lex, type_t **type);
+
+status_t par_struct_or_union_specifier(lex_wrap_t *lex, type_t **type);
+
 status_t par_struct_declaration(lex_wrap_t *lex);
-status_t par_specifier_qualifier(lex_wrap_t *lex);
+status_t par_specifier_qualifier(lex_wrap_t *lex, type_t **type);
 status_t par_struct_declarator_list(lex_wrap_t *lex);
 status_t par_struct_declarator(lex_wrap_t *lex);
-status_t par_declarator(lex_wrap_t *lex);
+
+status_t par_declarator(lex_wrap_t *lex, stmt_t **stmt, type_t *type);
 status_t par_pointer(lex_wrap_t *lex);
 status_t par_type_qualifier(lex_wrap_t *lex);
 status_t par_direct_declarator(lex_wrap_t *lex);
@@ -108,14 +121,20 @@ status_t par_type_name(lex_wrap_t *lex);
 status_t par_parameter_type_list(lex_wrap_t *lex);
 status_t par_parameter_list(lex_wrap_t *lex);
 status_t par_parameter_declaration(lex_wrap_t *lex);
-status_t par_enum_specifier(lex_wrap_t *lex);
+status_t par_enum_specifier(lex_wrap_t *lex, type_t **type);
 status_t par_enumerator_list(lex_wrap_t *lex);
 status_t par_enumerator(lex_wrap_t *lex);
-status_t par_declaration(lex_wrap_t *lex);
+
+/**
+ * If *stmt == NULL, allocates statement, otherwise continues parsing existing
+ * declaration
+ */
+status_t par_declaration(lex_wrap_t *lex, stmt_t **stmt);
+
 status_t par_init_declarator(lex_wrap_t *lex);
 status_t par_initializer(lex_wrap_t *lex);
 status_t par_initializer_list(lex_wrap_t *lex);
-status_t par_compound_statement(lex_wrap_t *lex);
+status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result);
 status_t par_statement(lex_wrap_t *lex);
 status_t par_labeled_statement(lex_wrap_t *lex);
 status_t par_expression_statement(lex_wrap_t *lex);

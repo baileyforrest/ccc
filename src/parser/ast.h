@@ -42,10 +42,13 @@ typedef enum basic_type_t {
     TYPE_STRUCT,
     TYPE_UNION,
     TYPE_ENUM,
+
     TYPE_FUNC,   /**< Function pointer */
-    TYPE_PTR,    /**< Pointer */
+
     TYPE_ARR,    /**< Array */
+    TYPE_PTR,    /**< Pointer */
     TYPE_MOD,    /**< Modified Type */
+
     TYPE_TYPEDEF /**< Typedef type */
 } basic_type_t;
 
@@ -59,8 +62,9 @@ typedef enum type_mod_t {
     TMOD_REGISTER = 1 << 3,
     TMOD_STATIC   = 1 << 4,
     TMOD_EXTERN   = 1 << 5,
-    TMOD_CONST    = 1 << 6,
-    TMOD_VOLATILE = 1 << 7,
+    TMOD_TYPEDEF  = 1 << 6,
+    TMOD_CONST    = 1 << 7,
+    TMOD_VOLATILE = 1 << 8,
 } type_mod_t;
 
 /**
@@ -143,7 +147,7 @@ typedef struct type_t {
         struct gdecl_t *func;           /**< Function pointer */
 
         struct {                        /**< Structure for pointer info */
-            struct type_t *pointed_to;  /**< Base type pointed to */
+            struct type_t *base;        /**< Base type pointed to */
             type_mod_t type_mod;        /**< Modifiers */
         } ptr;
 
@@ -157,29 +161,13 @@ typedef struct type_t {
             type_mod_t type_mod;        /**< Bitset of type modifiers */
         } mod;
 
-        struct {
-            struct type_t *base;        /**< Base type */
-            len_str_t name;             /**< New type's name */
-        } typedef_params;
+        len_str_t *typedef_name;        /**< New type's name */
     };
 } type_t;
 
-/**
- * Function parameter
- */
-typedef struct param_t {
-    sl_link_t link; /**< Storage Link */
-    type_t *type;   /**< Type of the paramater */
-    len_str_t *id;  /**< ID of the paramater */
-} param_t;
-
 typedef enum gdecl_type_t {
-    GDECL_NULL = 0, /**< Unititialized */
     GDECL_FDEFN,    /**< Function definition */
-    GDECL_FDECL,    /**< Function declaration */
-    GDECL_VDECL,    /**< Varable declaration */
-    GDECL_TYPE,     /**< Type definition */
-    GDECL_TYPEDEF,  /**< Typedef */
+    GDECL_DECL      /**< Declaration */
 } gdecl_type_t;
 
 /**
@@ -188,30 +176,12 @@ typedef enum gdecl_type_t {
 typedef struct gdecl_t {
     sl_link_t link;              /**< Storage Link */
     gdecl_type_t type;           /**< Type of gdecl */
+    struct stmt_t *decl;         /**< Declaration */
     union {
         struct {                 /**< Function definition parameters */
-            type_t *ret;         /**< Return type */
-            len_str_t *id;       /**< Decl name */
             slist_t params;      /**< List of paramaters */
             struct stmt_t *stmt; /**< Function body */
         } fdefn;
-
-        struct {                 /**< Function declaration parameters */
-            type_t *ret;         /**< Return type */
-            len_str_t *id;       /**< Decl name */
-            slist_t params;      /**< List of paramaters */
-        } fdecl;
-
-        struct stmt_t *vdecl;    /**< Declaration statements */
-
-        struct {                 /**< Type declaration params */
-            type_t *type;        /**< The type defined */
-        } type_params;
-
-        struct {                 /**< typedef parameters */
-            len_str_t *name;     /**< Name of new type alias */
-            type_t *type;        /**< Type of alias */
-        } typedef_params;
     };
 } gdecl_t;
 
@@ -297,6 +267,13 @@ typedef struct switch_case_t {
     struct stmt_t *stmt; /**< Statement to execute */
 } switch_case_t;
 
+typedef struct decl_node_t {
+    sl_link_t link; /**< Storage link */
+    type_t *type;   /**< Type of variable */
+    len_str_t *id;  /**< Name of variable */
+    expr_t *expr;   /**< Expression to assign */
+} decl_node_t;
+
 /**
  * Tagged union representing a statement
  */
@@ -306,9 +283,8 @@ typedef struct stmt_t {
 
     union {
         struct {                         /**< Declaration parameters */
-            len_str_t *id;               /**< Name of variable */
             type_t *type;                /**< Type of variable */
-            expr_t *expr;                /**< Expression to assign */
+            slist_t decls;               /**< List of declarations */
         } decl;
 
         struct {                         /**< Assignment paramaters */

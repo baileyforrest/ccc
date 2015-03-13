@@ -30,15 +30,18 @@
 
 #include "util/logger.h"
 
-status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
+status_t parser_parse(lexer_t *lexer, typetab_t *typetab,
+                      len_str_t *file, trans_unit_t **result) {
     assert(lexer != NULL);
+    assert(typetab != NULL);
+    assert(file != NULL);
     assert(result != NULL);
     status_t status = CCC_OK;
     lex_wrap_t lex;
     lex.lexer = lexer;
+    lex.typetab = typetab;
     LEX_ADVANCE(&lex);
-    status = par_translation_unit(&lex);
-    *result = NULL; // TODO: Actually get result
+    status = par_translation_unit(&lex, file, result);
 fail:
     return status;
 }
@@ -78,65 +81,108 @@ bool par_greater_or_equal_prec(token_t t1, token_t t2) {
     return par_get_prec(t1) >= par_get_prec(t2);
 }
 
-status_t par_translation_unit(lex_wrap_t *lex) {
+status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
+                              trans_unit_t **result) {
     status_t status = CCC_OK;
+    trans_unit_t *tunit;
+    ALLLC_NODE(tunit, trans_unit_t);
+    sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
+    tunit->path = file;
+
     while (lex->cur.type != TOKEN_EOF) {
-        if (CCC_OK != (status = par_external_declaration(lex))) {
+        gdecl_t *gdecl;
+        if (CCC_OK != (status = par_external_declaration(lex, &gdecl))) {
             goto fail;
         }
+        sl_append(&tunit->gdecls, &gdecl->link);
     }
+    *result = tunit;
 fail:
     return status;
 }
 
-status_t par_external_declaration(lex_wrap_t *lex) {
+status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     status_t status = CCC_OK;
+    gdecl_t *gdecl = NULL;
+    ALLOC_NODE(gdecl, gdecl_t);
+
+    type_t *type = NULL;
+
     // Must match at least one declaration specifier
-    if (CCC_OK != (status = par_declaration_specifier(lex))) {
+    if (CCC_OK != (status = par_declaration_specifier(lex, &type))) {
         goto fail;
     }
     // Match declaration specifers until they don't match anymore
-    while (CCC_BACKTRACK != (status = par_declaration_specifier(lex))) {
+    while (CCC_BACKTRACK != (status = par_declaration_specifier(lex, &type))) {
         if (status != CCC_OK) {
             goto fail;
         }
     }
-    if (CCC_BACKTRACK == (status = par_declarator(lex))) {
+    if (CCC_BACKTRACK == (status = par_declarator(lex, &gdecl->decl, type))) {
         // If the next character isn't a declarator, then its a type declaration
-        return CCC_OK;
+        gdecl->type = GDECL_DECL;
+        ALLOC_NODE(gdecl->decl, stmt_t);
+        gdecl->decl = STMT_DECL;
+        gdecl->decl.type = type;
+        if (CCC_OK != sl_init(&gdecl->decls, offsetof(decl_node_t, link))) {
+            free(gdecl->decl);
+            goto fail;
+        }
+        goto done;
     }
     status = CCC_OK;
 
     switch (lex->cur.type) {
     case LPAREN:
-        return par_function_definition(lex);
+        if (CCC_OK != (status = par_function_definition(lex, gdecl))) {
+            goto fail;
+        }
+        break;
     case EQ:
     default:
-        return par_declaration(lex);
+        if (CCC_OK != (status = par_declaration(lex, &gdecl->decl))) {
+            goto fail;
+        }
+        break;
     }
+done:
+    *result = gdecl;
 fail:
+    // free(type); TODO: Call type destructor
+    free(gdecl);
     return status;
 }
 
 /**
  * Continues parsing after type and declarator
+ *
+ * gdecl_t.decl holds type and declarator as a declaration stmt
  */
-status_t par_function_definition(lex_wrap_t *lex) {
+status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
     status_t status = CCC_OK;
     LEX_MATCH(lex, LPAREN);
-
-    while (lex->cur.type != RPAREN) {
-        if (CCC_OK != (status = par_declaration(lex))) {
-            goto fail;
-        }
+    gdecl->type = GDECL_FDEFN;
+    if (CCC_OK != sl_init(&gdecl->fdefn.params, offsetof(stmt_t, link))) {
+        goto fail;
     }
 
-    return par_compound_statement(lex);
+    while (lex->cur.type != RPAREN) {
+        stmt_t *param = NULL;
+        if (CCC_OK != (status = par_declaration(lex, &param))) {
+            goto fail;
+        }
+        sl_append(&gdecl->fdefn.params, param->link);
+    }
+
+    if (CCC_OK != (status = par_compound_statement(lex, &gdecl->fdefn.stmt))) {
+        goto fail;
+        // TODO: Destroy function definition
+    }
 fail:
     return status;
 }
 
-status_t par_declaration_specifier(lex_wrap_t *lex) {
+status_t par_declaration_specifier(lex_wrap_t *lex, type_t **type) {
     switch (lex->cur.type) {
         // Storage class specifiers
     case AUTO:
@@ -144,7 +190,7 @@ status_t par_declaration_specifier(lex_wrap_t *lex) {
     case STATIC:
     case EXTERN:
     case TYPEDEF:
-        return par_storage_class_specifier(lex);
+        return par_storage_class_specifier(lex, type);
 
         // Type specifiers:
     case ID: {
@@ -166,54 +212,135 @@ status_t par_declaration_specifier(lex_wrap_t *lex) {
     case STRUCT:
     case UNION:
     case ENUM:
-        return par_type_specifier(lex);
+        return par_type_specifier(lex, type);
     }
 
         // Type qualitifiers
     case CONST:
     case VOLATILE:
-        return par_type_qualifier(lex);
+        return par_type_qualifier(lex, type);
     default:
         return CCC_BACKTRACK;
     }
 }
 
-status_t par_storage_class_specifier(lex_wrap_t *lex) {
-    (void)lex;
-    return CCC_OK;
+status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
+    // Allocate new type if one isn't assigned
+    if (*type == NULL) {
+        ALLOC_NODE(*type, type_t);
+        *type->type = TYPE_MOD;
+        *type->mod.base = NULL;
+    }
+    status_t status = CCC_OK;
+    type_mod_t tmod;
+    switch (lex->cur.type) {
+        // Storage class specifiers
+    case AUTO:     tmod = TMOD_AUTO;     break;
+    case REGISTER: tmod = TMOD_REGISTER; break;
+    case STATIC:   tmod = TMOD_STATIC;   break;
+    case EXTERN:   tmod = TMOD_EXTERN;   break;
+    case TYPEDEF:  tmod = TMOD_TYPEDEF;  break;
+    default:
+        return CCC_EYNTAX;
+    }
+    // Create a new type modifier on the front if there isn't one
+    if (*type->type != TYPE_MOD) {
+        type_t *new_type;
+        ALLOC_NODE(new_type, type_t);
+        new_type->type = TYPE_MOD;
+        new_type->mod.base = *type;
+        *type = new_type;
+        new_type->size = new_type->mod.base.size;
+        new_type->align = new_type->mod.base.align;
+    }
+    if (*type->mod.type_mod & tmod) {
+        // TODO: Report duplicate storage class specifier
+    }
+    *type->mod.type |= tmod;
+fail:
+    // TODO: free mem on failure
+    return status;
 }
 
-status_t par_type_specifier(lex_wrap_t *lex) {
+status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
+    // Check first node for mod node
+    type_t *mod_node;
+    if (*type != NULL && *type->type == TYPE_MOD) {
+        mod_node = *type;
+    }
+    bool final_node = false;
+    // Find last node in chain
+    type_t **end_node = NULL;
+    if (*type != NULL) {
+        bool done = false;
+        for (end_node = type; !done && *end_node != NULL; ) {
+            switch (*end_node->type) {
+            case TYPE_ARR: end_node = &tmp->arr.base; break;
+            case TYPE_PTR: end_node = &tmp->ptr.base; break;
+            case TYPE_MOD: end_node = &tmp->mod.base; break;
+            default:
+                done = true;
+                final_node = true;
+            }
+        }
+    }
+
+    if (final_node && lex->cur.type != UNSIGNED && lex->cur.type != SIGNED) {
+        // TODO: report duplicate type specifier
+    }
+
     switch (lex->cur.type) {
     case ID: {
         // Type specifier only if its a typedef name
         tt_key_t key = {{ lex->cur.tab_entry->key.str,
                           lex->cur.tab_entry->key.len }, TT_TYPEDEF };
-        if (tt_lookup(lex->typetab, &key) == NULL) {
+        typetab_entry_t *entry = tt_lookup(lex->typetab, &key);
+        if (entry == NULL) {
             return CCC_ESYNTAX;
         }
+        *end_node = entry->type;
+        break;
     }
-    case VOID:
-    case CHAR:
-    case SHORT:
-    case INT:
-    case LONG:
-    case FLOAT:
-    case DOUBLE:
+    case VOID:   *end_node = tt_void;   break;
+    case CHAR:   *end_node = tt_char;   break;
+    case SHORT:  *end_node = tt_short;  break;
+    case INT:    *end_node = tt_int;    break;
+    case LONG:   *end_node = tt_long;   break;
+    case FLOAT:  *end_node = tt_float;  break;
+    case DOUBLE: *end_node = tt_double; break;
+
+        // Don't give a base type for signed/unsigned. No base type defaults to
+        // int
     case SIGNED:
     case UNSIGNED:
-        return CCC_OK;
+        type_mod_t mod = lex->cur.type == SIGNED ? TMOD_SIGNED : TMOD_UNSIGNED;
+        if (mod_node == NULL) {
+            ALLOC_NODE(mod_node, type_t);
+            mod_node->type = TYPE_MOD;
+            mod_node->dealloc = true;
+            mod_node->mod.base = *type;
+            *type = mod_node;
+            mod_node->size = mode_node->mod.base.size;
+            mod_node->align = mode_node->mod.base.align;
+        }
+
+        if (mod_node->mod.type_mod & mod) {
+            // TODO: Report duplicate type specifier
+        }
+        mod_node->mod.type_mod |= mod;
+
+        break;
     case STRUCT:
     case UNION:
-        return par_struct_or_union_specifier(lex);
+        return par_struct_or_union_specifier(lex, end_node);
     case ENUM:
-        return par_enum_specifier(lex);
+        return par_enum_specifier(lex, end_node);
     default:
         return CCC_ESYNTAX;
     }
 }
 
-status_t par_struct_or_union_specifier(lex_wrap_t *lex) {
+status_t par_struct_or_union_specifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
     switch (lex->cur.type) {
     case STRUCT:
