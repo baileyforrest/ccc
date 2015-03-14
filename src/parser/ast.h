@@ -127,7 +127,7 @@ typedef struct struct_decl_t {
 typedef struct enum_id_t {
     sl_link_t link; /**< List link */
     len_str_t *id;  /**< Name */
-    intptr_t val;   /**< Value */
+    expr_t *val;   /**< Value */
 } enum_id_t;
 
 /**
@@ -148,7 +148,8 @@ typedef struct type_t {
 
         struct {                        /**< Function signature */
             type_t *type;               /**< Type (May be function pointer */
-            stmt_t *params;             /**< Paramater signature */
+            slist_t params;             /**< Paramater signature (decl list) */
+            bool varargs;               /**< Whether or not function has VA */
         } func;
 
         struct {                        /**< Structure for pointer info */
@@ -207,7 +208,8 @@ typedef enum expr_type_t {
     EXPR_ARR_ACC,     /**< Array access */
     EXPR_CMPD,        /**< Compound expression */
     EXPR_SIZEOF,      /**< Sizeof expression */
-    EXPR_MEM_ACC      /**< Member access */
+    EXPR_MEM_ACC,     /**< Member access */
+    EXPR_INIT_LIST    /**< Initializer list */
 } expr_type_t;
 
 /**
@@ -276,6 +278,10 @@ typedef struct expr_t {
             oper_t op;
             len_str_t *name;
         } mem_acc;
+
+        struct {
+            slist_t exprs;        /**< List of expressions */
+        } init_list;
     };
 } expr_t;
 
@@ -284,21 +290,32 @@ typedef struct expr_t {
  */
 typedef enum stmt_type_t {
     STMT_NOP,            /**< No op statement */
+
     STMT_DECL,           /**< Declaration */
-    STMT_RETURN,         /**< Return */
+
+    // Labeled Statements
+    STMT_LABEL,          /**< Label */
+    STMT_CASE,           /**< case */
+    STMT_DEFAULT,        /**< default */
+
+    // Selection statements
     STMT_IF,             /**< if */
+    STMT_SWITCH,         /**< switch */
+
+    // Iteration statements
+    STMT_DO,             /**< do while */
     STMT_WHILE,          /**< while */
     STMT_FOR,            /**< for */
-    STMT_DO,             /**< do while */
-    STMT_SEQ,            /**< sequence of statements */
-    STMT_BLOCK,          /**< block of statements */
-    STMT_EXP,            /**< expression */
-    STMT_ASSN_INIT_LIST, /**< Assign to an initializer list */
-    STMT_LABEL,          /**< Label */
+
+    // Jump statements
     STMT_GOTO,           /**< goto */
     STMT_CONTINUE,       /**< continue */
-    STMT_SWITCH,         /**< switch */
     STMT_BREAK,          /**< break */
+    STMT_RETURN,         /**< Return */
+
+    STMT_COMPOUND,       /**< block of statements */
+
+    STMT_EXP             /**< expression */
 } stmt_type_t;
 
 /**
@@ -330,15 +347,35 @@ typedef struct stmt_t {
             slist_t decls;               /**< List of declarations */
         } decl;
 
-        struct {                         /**< Return paramaters */
-            expr_t *expr;                /**< Expression to return */
-        } ret;
+        struct {                         /**< Label parameters */
+            len_str_t *label;            /**< Label value */
+            stmt_t *stmt;                /**< Statement labeled */
+        } label;
+
+        struct {                         /**< case parameters */
+            expr_t *val;                 /**< Expression value */
+            stmt_t *stmt;                /**< Statement labeled */
+        } case_params;
+
+        struct {                         /**< default parameters */
+            stmt_t *stmt;                /**< Statement labeled */
+        } default_params;
 
         struct {                         /**< if paramaters */
             expr_t *expr;                /**< Conditional expression */
             struct stmt_t *true_stmt;    /**< Statement to execute if true */
             struct stmt_t *false_stmt;   /**< Statement to execute if false */
         } if_params;
+
+        struct {                         /**< Switch paramaters */
+            expr_t *expr;                /**< Expression to switch on */
+            stmt_t *stmt;                /**< Statement */
+        } switch_params;
+
+        struct {                         /**< Do while paramaters */
+            struct stmt_t *stmt;         /**< Statement in loop */
+            expr_t *expr;                /**< Conditional expression */
+        } do_params;
 
         struct {                         /**< While parameters */
             expr_t *expr;                /**< Conditional expression */
@@ -352,48 +389,29 @@ typedef struct stmt_t {
             struct stmt_t *stmt;         /**< Statement in loop */
         } for_params;
 
-        struct {                         /**< Do while paramaters */
-            struct stmt_t *stmt;         /**< Statement in loop */
-            expr_t *expr;                /**< Conditional expression */
-        } do_params;
-
-        struct {                         /**< Sequence paramaters */
-            slist_t stmts;               /**< List of statements */
-        } seq;
-
-        struct {                         /**< Block paramaters */
-            slist_t stmts;               /**< List of statements */
-        } block;
-
-        struct {                         /**< Expression parameters */
-            expr_t *expr;                /**< Expression to execute */
-        } expr;
-
-        struct {                         /**< Initializer list parameters */
-            slist_t exprs;               /**< Expressions in initializer list */
-        } assn_init_list;
-
-        struct {                         /**< Label parameters */
-            len_str_t *label;            /**< Label value */
-        } label;
-
         struct {                         /**< Goto parameters */
-            struct stmt_t *label;               /**< Label to goto */
+            struct len_str_t *label;        /**< Label to goto */
         } goto_params;
 
         struct {                         /**< Continue parameters */
             struct stmt_t *parent;       /**< Parent statement to continue */
         } continue_params;
 
-        struct {                         /**< Switch paramaters */
-            expr_t *expr;                /**< Expression to switch on */
-            slist_t cases;               /**< List of cases */
-            struct stmt_t *default_case; /**< Default case statement */
-        } switch_params;
-
         struct {                         /**< Break parameters */
             struct stmt_t *parent;       /**< Parent statement */
         } break_params;
+
+        struct {                         /**< Return paramaters */
+            expr_t *expr;                /**< Expression to return */
+        } return_params;;
+
+        struct {                         /**< Block paramaters */
+            slist_t stmts;               /**< List of statements */
+        } compound;
+
+        struct {                         /**< Expression parameters */
+            expr_t *expr;                /**< Expression to execute */
+        } expr;
     };
 } stmt_t;
 

@@ -99,7 +99,7 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type);
 
 status_t par_type_specifier(lex_wrap_t *lex, type_t **type);
 
-status_t par_struct_or_union_specifier(lex_wrap_t *lex, type_t **type);
+status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type);
 
 status_t par_struct_declaration(lex_wrap_t *lex, type_t *type);
 
@@ -139,12 +139,14 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
 
 status_t par_type_name(lex_wrap_t *lex, decl_t **result);
 
-status_t par_parameter_type_list(lex_wrap_t *lex);
+status_t par_parameter_type_list(lex_wrap_t *lex, type_t *func);
 
-status_t par_parameter_list(lex_wrap_t *lex);
-status_t par_parameter_declaration(lex_wrap_t *lex);
-status_t par_enum_specifier(lex_wrap_t *lex, type_t **type);
-status_t par_enumerator_list(lex_wrap_t *lex);
+status_t par_parameter_list(lex_wrap_t *lex, type_t *func);
+
+status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func);
+
+status_t par_enumerator_list(lex_wrap_t *lex, type_t *type);
+
 status_t par_enumerator(lex_wrap_t *lex);
 
 /**
@@ -153,15 +155,24 @@ status_t par_enumerator(lex_wrap_t *lex);
  */
 status_t par_declaration(lex_wrap_t *lex, stmt_t **stmt);
 
-status_t par_init_declarator(lex_wrap_t *lex);
-status_t par_initializer(lex_wrap_t *lex);
-status_t par_initializer_list(lex_wrap_t *lex);
+status_t par_init_declarator(lex_wrap_t *lex, stmt_t *stmt);
+
+status_t par_initializer(lex_wrap_t *lex, expr_t **result);
+
+status_t par_initializer_list(lex_wrap_t *lex, expr_t **result);
+
 status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result);
-status_t par_statement(lex_wrap_t *lex);
-status_t par_labeled_statement(lex_wrap_t *lex);
-status_t par_expression_statement(lex_wrap_t *lex);
-status_t par_selection_statement(lex_wrap_t *lex);
-status_t par_iteration_statement(lex_wrap_t *lex);
-status_t par_jump_statement(lex_wrap_t *lex);
+
+status_t par_statement(lex_wrap_t *lex, stmt_t **result);
+
+status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result);
+
+status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result);
+
+status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result);
+
+status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result);
+
+status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result);
 
 #endif /* _PARSER_PRIV_H_ */
