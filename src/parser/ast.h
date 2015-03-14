@@ -102,7 +102,7 @@ typedef enum oper_t {
     OP_ADDR,       // Address of
     OP_DEREF,      // Dereference of
     OP_UPLUS,      // Unary plus
-    OP_UMINUS      // Unary minus
+    OP_UMINUS,     // Unary minus
     OP_ARROW,      // ->
     OP_DOT         // .
 } oper_t;
@@ -116,9 +116,9 @@ struct gdecl_t;
  * Struct and union declaration entry
  */
 typedef struct struct_decl_t {
-    sl_link_t link;      /**< List link */
-    stmt_t *decl;
-    expr_t *bf_bits;     /**< Bitfield bits 0 for unused */
+    sl_link_t link;         /**< List link */
+    struct stmt_t *decl;    /**< The declaration */
+    struct expr_t *bf_bits; /**< Bitfield bits 0 for unused */
 } struct_decl_t;
 
 /**
@@ -127,7 +127,7 @@ typedef struct struct_decl_t {
 typedef struct enum_id_t {
     sl_link_t link; /**< List link */
     len_str_t *id;  /**< Name */
-    expr_t *val;   /**< Value */
+    struct expr_t *val;   /**< Value */
 } enum_id_t;
 
 /**
@@ -147,7 +147,7 @@ typedef struct type_t {
         slist_t enum_ids;               /**< List of enum ids/values */
 
         struct {                        /**< Function signature */
-            type_t *type;               /**< Type (May be function pointer */
+            struct type_t *type;        /**< Type (May be function pointer */
             slist_t params;             /**< Paramater signature (decl list) */
             bool varargs;               /**< Whether or not function has VA */
         } func;
@@ -159,7 +159,7 @@ typedef struct type_t {
 
         struct {                        /**< Structure for array info */
             struct type_t *base;        /**< Base type */
-            expr_t *len;                /**< Dimension length */
+            struct expr_t *len;         /**< Dimension length */
         } arr;
 
         struct {
@@ -197,9 +197,9 @@ typedef enum expr_type_t {
     EXPR_VOID,        /**< Void */
     EXPR_VAR,         /**< Variable */
     EXPR_ASSIGN,      /**< Assignment */
-    EXPR_CONST_PTR,   /**< Constant */
-    EXPR_CONST_INT,   /**< Constant */
-    EXPR_CONST_FLOAT, /**< Constant */
+    EXPR_CONST_INT,   /**< Constant integral type */
+    EXPR_CONST_FLOAT, /**< Constant floating point type */
+    EXPR_CONST_STR,   /**< Constant string tye */
     EXPR_BIN,         /**< Binary Operation */
     EXPR_UNARY,       /**< Unary Operation */
     EXPR_COND,        /**< Conditional Operator */
@@ -223,45 +223,45 @@ typedef struct expr_t {
         len_str_t *var_id;        /**< Variable identifier */
 
         struct {                  /**< Assignment paramaters */
-            expr_t *dest;         /**< Expression to assign to */
-            expr_t *expr;         /**< Expression to assign */
+            struct expr_t *dest;  /**< Expression to assign to */
+            struct expr_t *expr;  /**< Expression to assign */
             oper_t op;            /**< Operation for expression (+=) */
         } assign;
 
         struct {
             type_t *type;
             union {               /**< Constant value */
-                void *ptr_val;    /**< Pointer constant */
                 long long int_val;/**< Int constant */
                 double float_val; /**< Float constant */
+                len_str_t *str_val;/**< String constant */
             };
         } const_val;
 
         struct {                  /**< Binary operation */
             oper_t op;            /**< Type of operation */
-            expr_t expr1;         /**< Expr 1 */
-            expr_t expr2;         /**< Expr 2 */
+            struct expr_t *expr1; /**< Expr 1 */
+            struct expr_t *expr2; /**< Expr 2 */
         } bin;
 
         struct {                  /**< Binary operation */
             oper_t op;            /**< Type of operation */
-            expr_t expr;          /**< Expression  */
+            struct expr_t *expr;  /**< Expression  */
         } unary;
 
         struct {                  /**< Operation paramaters */
             oper_t op;            /**< Type of operation */
-            expr_t expr1;         /**< Expr 1 */
-            expr_t expr2;         /**< Expr 2 */
-            expr_t expr3;         /**< Expr 3 */
+            struct expr_t *expr1; /**< Expr 1 */
+            struct expr_t *expr2; /**< Expr 2 */
+            struct expr_t *expr3; /**< Expr 3 */
         } cond;
 
         struct {                  /**< Cast parameters */
-            expr_t *base;         /**< Base expression */
-            decl_t *cast;         /**< Casted type */
+            struct expr_t *base;  /**< Base expression */
+            struct stmt_t *cast;  /**< Casted type */
         } cast;
 
         struct {                  /**< Function call paramaters */
-            expr_t *func;         /**< The function to call */
+            struct expr_t *func;  /**< The function to call */
             slist_t params;       /**< The function paramaters (expressions) */
         } call;
 
@@ -270,8 +270,8 @@ typedef struct expr_t {
         } cmpd;
 
         struct {
-            type_t *type;
-            expr_t *expr;
+            struct stmt_t *type;
+            struct expr_t *expr;
         } sizeof_params;
 
         struct {
@@ -315,7 +315,7 @@ typedef enum stmt_type_t {
 
     STMT_COMPOUND,       /**< block of statements */
 
-    STMT_EXP             /**< expression */
+    STMT_EXPR            /**< expression */
 } stmt_type_t;
 
 /**
@@ -349,16 +349,16 @@ typedef struct stmt_t {
 
         struct {                         /**< Label parameters */
             len_str_t *label;            /**< Label value */
-            stmt_t *stmt;                /**< Statement labeled */
+            struct stmt_t *stmt;         /**< Statement labeled */
         } label;
 
         struct {                         /**< case parameters */
             expr_t *val;                 /**< Expression value */
-            stmt_t *stmt;                /**< Statement labeled */
+            struct stmt_t *stmt;         /**< Statement labeled */
         } case_params;
 
         struct {                         /**< default parameters */
-            stmt_t *stmt;                /**< Statement labeled */
+            struct stmt_t *stmt;         /**< Statement labeled */
         } default_params;
 
         struct {                         /**< if paramaters */
@@ -369,7 +369,7 @@ typedef struct stmt_t {
 
         struct {                         /**< Switch paramaters */
             expr_t *expr;                /**< Expression to switch on */
-            stmt_t *stmt;                /**< Statement */
+            struct stmt_t *stmt;         /**< Statement */
         } switch_params;
 
         struct {                         /**< Do while paramaters */

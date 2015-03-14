@@ -146,8 +146,8 @@ status_t tt_insert(typetab_t *tt, type_t *type, len_str_t *name,
 
     case TYPE_TYPEDEF: new_entry->key.type = TT_TYPEDEF ; break;
 
-    case TYPE_STRUCT:  new_entry->key.type
-    case TYPE_UNION:   new_entry->key.type
+    case TYPE_STRUCT:
+    case TYPE_UNION:
     case TYPE_ENUM:    new_entry->key.type = TT_COMPOUND; break;
     default:
         assert(false);

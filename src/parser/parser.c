@@ -29,9 +29,10 @@
 #include <stdlib.h>
 
 #include "util/logger.h"
+#include "util/util.h"
 
-status_t parser_parse(lexer_t *lexer, typetab_t *typetab,
-                      len_str_t *file, trans_unit_t **result) {
+status_t parser_parse(lexer_t *lexer, typetab_t *typetab, len_str_t *file,
+                      trans_unit_t **result) {
     assert(lexer != NULL);
     assert(typetab != NULL);
     assert(file != NULL);
@@ -85,7 +86,7 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
                               trans_unit_t **result) {
     status_t status = CCC_OK;
     trans_unit_t *tunit;
-    ALLLC_NODE(tunit, trans_unit_t);
+    ALLOC_NODE(tunit, trans_unit_t);
     sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
     tunit->path = file;
 
@@ -121,32 +122,33 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     }
 
     ALLOC_NODE(gdecl->decl, stmt_t);
-    gdecl->decl.type = STMT_DECL;
-    gdecl->decl.decl.type = type;
-    sl_init(&gdecl->decl.decl.decls, offsetof(decl_node, link));
+    gdecl->decl->type = STMT_DECL;
+    gdecl->decl->decl.type = type;
+    sl_init(&gdecl->decl->decl.decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_BACKTRACK == (status = par_declarator(lex, type, &decl_node))) {
         // If the next character isn't a declarator, then its a type declaration
         gdecl->type = GDECL_DECL;
         ALLOC_NODE(gdecl->decl, stmt_t);
-        gdecl->decl = STMT_DECL;
-        gdecl->decl.type = type;
-        if (CCC_OK != sl_init(&gdecl->decls, offsetof(decl_node_t, link))) {
+        gdecl->decl->type = STMT_DECL;
+        gdecl->decl->decl.type = type;
+        if (CCC_OK !=
+            sl_init(&gdecl->decl->decl.decls, offsetof(decl_node_t, link))) {
             free(gdecl->decl);
             goto fail;
         }
         goto done;
     }
     status = CCC_OK;
-    sl_append(&gdecl->decl.decl.decls, &decl_node->link);
+    sl_append(&gdecl->decl->decl.decls, &decl_node->link);
 
-    if (decl_node.type.type == TYPE_FUNC) {
+    if (decl_node->type->type == TYPE_FUNC) {
         if (CCC_OK != (status = par_function_definition(lex, gdecl))) {
             goto fail;
         }
     } else {
-        if (CCC_OK != (status = par_declaration(lex, gdecl->decl))) {
+        if (CCC_OK != (status = par_declaration(lex, &gdecl->decl))) {
             goto fail;
         }
     }
@@ -231,13 +233,13 @@ status_t par_declaration_specifier(lex_wrap_t *lex, type_t **type) {
 }
 
 status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
+    status_t status = CCC_OK;
     // Allocate new type if one isn't assigned
     if (*type == NULL) {
         ALLOC_NODE(*type, type_t);
-        *type->type = TYPE_MOD;
-        *type->mod.base = NULL;
+        (*type)->type = TYPE_MOD;
+        (*type)->mod.base = NULL;
     }
-    status_t status = CCC_OK;
     type_mod_t tmod;
     switch (lex->cur.type) {
         // Storage class specifiers
@@ -247,31 +249,32 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
     case EXTERN:   tmod = TMOD_EXTERN;   break;
     case TYPEDEF:  tmod = TMOD_TYPEDEF;  break;
     default:
-        return CCC_EYNTAX;
+        return CCC_ESYNTAX;
     }
     // Create a new type modifier on the front if there isn't one
-    if (*type->type != TYPE_MOD) {
+    if ((*type)->type != TYPE_MOD) {
         type_t *new_type;
         ALLOC_NODE(new_type, type_t);
         new_type->type = TYPE_MOD;
         new_type->mod.base = *type;
         *type = new_type;
-        new_type->size = new_type->mod.base.size;
-        new_type->align = new_type->mod.base.align;
+        new_type->size = new_type->mod.base->size;
+        new_type->align = new_type->mod.base->align;
     }
-    if (*type->mod.type_mod & tmod) {
+    if ((*type)->mod.type_mod & tmod) {
         // TODO: Report duplicate storage class specifier
     }
-    *type->mod.type |= tmod;
+    (*type)->mod.type_mod |= tmod;
 fail:
     // TODO: free mem on failure
     return status;
 }
 
 status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
+    status_t status = CCC_OK;
     // Check first node for mod node
     type_t *mod_node;
-    if (*type != NULL && *type->type == TYPE_MOD) {
+    if (*type != NULL && (*type)->type == TYPE_MOD) {
         mod_node = *type;
     }
 
@@ -280,10 +283,10 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     if (*type != NULL) {
         bool done = false;
         for (end_node = type; !done && *end_node != NULL; ) {
-            switch (*end_node->type) {
-            case TYPE_ARR: end_node = &tmp->arr.base; break;
-            case TYPE_PTR: end_node = &tmp->ptr.base; break;
-            case TYPE_MOD: end_node = &tmp->mod.base; break;
+            switch ((*end_node)->type) {
+            case TYPE_ARR: end_node = &(*end_node)->arr.base; break;
+            case TYPE_PTR: end_node = &(*end_node)->ptr.base; break;
+            case TYPE_MOD: end_node = &(*end_node)->mod.base; break;
             default:
                 done = true;
             }
@@ -318,16 +321,16 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         // Don't give a base type for signed/unsigned. No base type defaults to
         // int
     case SIGNED:
-    case UNSIGNED:
+    case UNSIGNED: {
         type_mod_t mod = lex->cur.type == SIGNED ? TMOD_SIGNED : TMOD_UNSIGNED;
         if (mod_node == NULL) {
             ALLOC_NODE(mod_node, type_t);
             mod_node->type = TYPE_MOD;
             mod_node->dealloc = true;
             mod_node->mod.base = *type;
+            mod_node->size = (*type)->size;
+            mod_node->align = (*type)->align;
             *type = mod_node;
-            mod_node->size = mode_node->mod.base.size;
-            mod_node->align = mode_node->mod.base.align;
         }
 
         if (mod_node->mod.type_mod & mod) {
@@ -336,6 +339,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         mod_node->mod.type_mod |= mod;
 
         break;
+    }
     case STRUCT:
     case UNION:
     case ENUM:
@@ -343,6 +347,9 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     default:
         return CCC_ESYNTAX;
     }
+
+fail:
+    return status;
 }
 
 status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
@@ -350,31 +357,31 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     assert(*type == NULL);
     status_t status = CCC_OK;
 
-    basic_type_t type;
-    type_t new_type = NULL;
+    basic_type_t btype;
+    type_t *new_type;
 
     switch (lex->cur.type) {
-    case STRUCT: type = TYPE_STRUCT; break;
-    case UNION:  type = TYPE_UNION;  break;
-    case ENUM:   type = TYPE_ENUM;   break;
+    case STRUCT: btype = TYPE_STRUCT; break;
+    case UNION:  btype = TYPE_UNION;  break;
+    case ENUM:   btype = TYPE_ENUM;   break;
     default:
         assert(false);
     }
     LEX_ADVANCE(lex);
 
     len_str_t *name = NULL;
-    typetab_entry_t *entry = NULL
+    typetab_entry_t *entry = NULL;
     if (lex->cur.type == ID) {
-        name = lex->cur.tab_entry->key;
-        tt_key_t key = {{ key->str, key->len }, TT_COMPOUND };
+        name = &lex->cur.tab_entry->key;
+        tt_key_t key = {{ name->str, name->len }, TT_COMPOUND };
         entry = tt_lookup(lex->typetab, &key);
 
         LEX_ADVANCE(lex);
 
         // Not a definition
         if (lex->cur.type != LBRACE && entry != NULL) {
-            if (entry->type != type) {
-                status = ESYNTAX;
+            if (entry->type->type != btype) {
+                status = CCC_ESYNTAX;
                 goto fail;
             }
             *type = entry->type;
@@ -384,11 +391,11 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
 
     if (entry == NULL) { // Allocate a new type if it doesn't exist
         ALLOC_NODE(new_type, type_t);
-        new_type->type = type;
+        new_type->type = btype;
         new_type->size = 0; // Mark as unitialized
         new_type->align = 0;
         new_type->dealloc = false;
-        if (type == ENUM) {
+        if (btype == TYPE_ENUM) {
             sl_init(&new_type->enum_ids, offsetof(enum_id_t, link));
         } else {
             sl_init(&new_type->struct_decls, offsetof(struct_decl_t, link));
@@ -398,7 +405,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     // Add a new named compound type into the type table
     if (name != NULL && entry == NULL) {
         if (CCC_OK !=
-            (status = tt_insert(&lex->typetab, new_type, name, &entry))) {
+            (status = tt_insert(lex->typetab, new_type, name, &entry))) {
             goto fail;
         }
     }
@@ -413,7 +420,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         }
     }
 
-    if (type == TYPE_ENUM) {
+    if (btype == TYPE_ENUM) {
         if (CCC_OK != (status = par_enumerator_list(lex, new_type))) {
             goto fail;
         }
@@ -503,7 +510,7 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
         goto fail;
     }
     while (lex->cur.type == COMMA) {
-        if (CCC_OK != (status = par_struct_declarator(lex, base_decl_type))) {
+        if (CCC_OK != (status = par_struct_declarator(lex, base, decl_type))) {
             goto fail;
         }
     }
@@ -519,16 +526,16 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
     ALLOC_NODE(node, struct_decl_t);
     node->bf_bits = NULL;
     ALLOC_NODE(node->decl, stmt_t);
-    node->decl.type = STMT_DECL;
-    node->decl.decl.type = decl_type;
-    sl_init(&node->decl.decl.decls, offsetof(decl_node, link);
+    node->decl->type = STMT_DECL;
+    node->decl->decl.type = decl_type;
+    sl_init(&node->decl->decl.decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
 
     if (CCC_OK != (status = par_declarator(lex, decl_type, &decl_node))) {
         goto fail;
     }
-    sl_append(&node->decl.decl.decls, &decl_node->link);
+    sl_append(&node->decl->decl.decls, &decl_node->link);
 
     if (lex->cur.type == COLON) {
         LEX_ADVANCE(lex);
@@ -538,15 +545,15 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
     }
 
     // Update base type
-    sl_append(&base->struct_decls, node->link);
-    base->align = MAX(base->align, node->decl.type.align);
+    sl_append(&base->struct_decls, &node->link);
+    base->align = MAX(base->align, node->decl->decl.type->align);
 
     // Update size and alignment.
     // TODO: Handle bitfields
     if (base->type == TYPE_STRUCT) {
-        base->size += node->decl.type.size;
+        base->size += node->decl->decl.type->size;
     } else { // base->type == TYPE_UNION
-        base->size = MAX(base->size, node->decl.type.size);
+        base->size = MAX(base->size, node->decl->decl.type->size);
     }
 
 fail:
@@ -554,20 +561,20 @@ fail:
 }
 
 // TODO: Handle abstract-declarator
-status_t par_declarator(lex_wrap_t *lex, decl_node_t **decl_node,
-                        type_t *base) {
+status_t par_declarator(lex_wrap_t *lex, type_t *base,
+                        decl_node_t **decl_node) {
     status_t status = CCC_OK;
     switch (lex->cur.type) {
     case STAR: {
         if (*decl_node == NULL) {
             ALLOC_NODE(*decl_node, decl_node_t);
-            decl_node->type = base;
-            decl_node->id = NULL;
-            decl_node->expr = NULL;
+            (*decl_node)->type = base;
+            (*decl_node)->id = NULL;
+            (*decl_node)->expr = NULL;
         }
 
         while (lex->cur.type == STAR) {
-            if (CCC_OK != (status = par_pointer(lex, &decl_node->type))) {
+            if (CCC_OK != (status = par_pointer(lex, &(*decl_node)->type))) {
                 goto fail;
             }
         }
@@ -577,9 +584,9 @@ status_t par_declarator(lex_wrap_t *lex, decl_node_t **decl_node,
 
         if (*decl_node == NULL) {
             ALLOC_NODE(*decl_node, decl_node_t);
-            decl_node->type = base;
-            decl_node->id = NULL;
-            decl_node->expr = NULL;
+            (*decl_node)->type = base;
+            (*decl_node)->id = NULL;
+            (*decl_node)->expr = NULL;
         }
 
         if (CCC_OK != (status = par_direct_declarator(lex, *decl_node, base))) {
@@ -605,19 +612,20 @@ status_t par_pointer(lex_wrap_t *lex, type_t **mod) {
         }
     }
     status = CCC_OK;
-    type_mod_t mods = new_type->mod.typemod;
+    type_mod_t mods = new_type->mod.type_mod;
     new_type->type = TYPE_PTR;
     new_type->size = PTR_SIZE;
     new_type->align = PTR_ALIGN;
     new_type->dealloc = true;
     new_type->ptr.base = *mod;
-    new_type->ptr.mod = mods;
+    new_type->ptr.type_mod = mods;
 
 fail:
     return status;
 }
 
 status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
+    status_t status = CCC_OK;
     type_mod_t mod;
     switch (lex->cur.type) {
     case CONST:    mod = TMOD_CONST;    break;
@@ -628,7 +636,7 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
 
     // Check first node for mod node
     type_t *mod_node;
-    if (*type != NULL && *type->type == TYPE_MOD) {
+    if (*type != NULL && (*type)->type == TYPE_MOD) {
         mod_node = *type;
     } else {
         ALLOC_NODE(mod_node, type_t);
@@ -637,16 +645,17 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
         mod_node->mod.base = *type;
         *type = mod_node;
         if (mod_node->mod.base != NULL) {
-            mod_node->size = mode_node->mod.base.size;
-            mod_node->align = mode_node->mod.base.align;
+            mod_node->size = mod_node->mod.base->size;
+            mod_node->align = mod_node->mod.base->align;
         } else {
             mod_node->size = 0;
             mod_node->align = 0;
         }
     }
     mod_node->mod.type_mod |= mod;
+
 fail:
-    return CCC_OK;
+    return status;
 }
 
 status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
@@ -658,7 +667,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         par_declarator(lex, base, &node);
         LEX_MATCH(lex, RPAREN);
     } else if (lex->cur.type == ID) {
-        node->id = lex->cur.tab_entry.key;
+        node->id = &lex->cur.tab_entry->key;
         LEX_ADVANCE(lex);
     }
 
@@ -670,7 +679,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             type_t *arr_type;
             ALLOC_NODE(arr_type, type_t);
             arr_type->type = TYPE_ARR;
-            arr_type->align = node->type.align;
+            arr_type->align = node->type->align;
             arr_type->size = 0;
             arr_type->dealloc = true;
             arr_type->arr.base = node->type;
@@ -690,12 +699,12 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             LEX_ADVANCE(lex);
             type_t *func_type;
             ALLOC_NODE(func_type, type_t);
-            func_type->func.type = TYPE_FUNC;
-            func_type->func.align = PTR_ALIGN;
-            func_type->func.size = PTR_SIZE;
-            func_type->func.dealloc = true;
+            func_type->type = TYPE_FUNC;
+            func_type->align = PTR_ALIGN;
+            func_type->size = PTR_SIZE;
+            func_type->dealloc = true;
             func_type->func.type = node->type;
-            func_type->func.varargs = false
+            func_type->func.varargs = false;
             sl_init(&func_type->func.params, offsetof(stmt_t, link));
 
             /* TODO: Support old decl syntax
@@ -816,13 +825,14 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
         case DEC:
         case DOT:
         case LBRACK:
-        case LPAREN:
+        case LPAREN: {
             expr_t *base = *result;
-            if (CCC_OK != (status = par_postfix_expression(lex, base,
-                                                           &result))) {
+            if (CCC_OK !=
+                (status = par_postfix_expression(lex, base, result))) {
                 goto fail;
             }
             break;
+        }
         default:
             break;
         }
@@ -899,20 +909,22 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             break;
 
         case COND: { // Conditional operator
-            expr_t *new_left;
-            ALLOC_NODE(new_left, expr_t);
-            new_left->type = EXPR_COND;
-            new_left->cond.expr1 = left;
+            expr_t *new_expr_left;
+            ALLOC_NODE(new_expr_left, expr_t);
+            new_expr_left->type = EXPR_COND;
+            new_expr_left->cond.expr1 = left;
 
             LEX_ADVANCE(lex);
-            if (CCC_OK != par_expression(lex, NULL, &new_left->cond.expr2)) {
+            if (CCC_OK !=
+                par_expression(lex, NULL, &new_expr_left->cond.expr2)) {
                 goto fail;
             }
             LEX_MATCH(lex, COLON);
-            if (CCC_OK != par_expression(lex, NULL, &new_left->cond.expr3)) {
+            if (CCC_OK !=
+                par_expression(lex, NULL, &new_expr_left->cond.expr3)) {
                 goto fail;
             }
-            left = new_left;
+            left = new_expr_left;
             new_left = true;
             break;
         }
@@ -1003,7 +1015,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             new_node->bin.expr1 = left;
 
             if (CCC_OK !=
-                (status = par_expression(lex, right, &new_node->bin.right))) {
+                (status = par_expression(lex, right, &new_node->bin.expr2))) {
                 goto fail;
             }
 
@@ -1041,7 +1053,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
         base->type = EXPR_UNARY;
         base->unary.op = op;
-        if (CCC_OK != (status = par_unary_expression(lex, &base->expr))) {
+        if (CCC_OK != (status = par_unary_expression(lex, &base->unary.expr))) {
             goto fail;
         }
         *result = base;
@@ -1064,7 +1076,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
 
         base->sizeof_params.expr = NULL;
         if (CCC_OK !=
-            (status = par_type_name(lex, result, &base->sizeof_params.type))) {
+            (status = par_type_name(lex, &base->sizeof_params.type))) {
             goto fail;
         }
 
@@ -1117,7 +1129,7 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
     if (!skip_paren) {
         LEX_ADVANCE(lex);
     }
-    decl_t *type = NULL;
+    stmt_t *type = NULL;
     if (CCC_OK != (status = par_type_name(lex, &type))) {
         goto fail;
     }
@@ -1125,8 +1137,8 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
 
     expr_t *expr;
     ALLOC_NODE(expr, expr_t);
-    expr->type = TYPE_CAST;
-    expr->cast.type = type;
+    expr->type = EXPR_CAST;
+    expr->cast.cast = type;
     expr->cast.base = NULL;
     if (CCC_OK !=
         (status = par_cast_expression(lex, false, &expr->cast.base))) {
@@ -1150,12 +1162,12 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
         case LBRACK:
             LEX_ADVANCE(lex);
             ALLOC_NODE(expr, expr_t);
-            expr->type = EXPR_BINOP;
-            expr->binop.op = ARR_ACC;
-            expr->binop.expr1 = base;
+            expr->type = EXPR_BIN;
+            expr->bin.op = OP_ARR_ACC;
+            expr->bin.expr1 = base;
 
             if (CCC_OK !=
-                (status = par_expression(lex, NULL, expr->binop.expr2))) {
+                (status = par_expression(lex, NULL, &expr->bin.expr2))) {
                 goto fail;
             }
             LEX_MATCH(lex, RBRACK);
@@ -1174,7 +1186,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
                 if (CCC_OK != (status = par_expression(lex, NULL, &param))) {
                     goto fail;
                 }
-                sl_append(&expr->call.params, param);
+                sl_append(&expr->call.params, &param->link);
                 LEX_MATCH(lex, COMMA);
             }
             LEX_ADVANCE(lex);
@@ -1191,14 +1203,14 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
             ALLOC_NODE(expr, expr_t);
             expr->type = EXPR_MEM_ACC;
             expr->mem_acc.op = op;
-            expr->mem_acc.name = &lex->cur.tab_entry.key;
+            expr->mem_acc.name = &lex->cur.tab_entry->key;
             LEX_ADVANCE(lex);
             base = expr;
             break;
         }
 
         case INC:
-        case DEC:
+        case DEC: {
             oper_t op = lex->cur.type == INC ? OP_POSTINC : OP_POSTDEC;
             LEX_ADVANCE(lex);
             ALLOC_NODE(expr, expr_t);
@@ -1208,6 +1220,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
 
             base = expr;
             break;
+        }
         default: // Found a terminating character
             base = NULL;
         }
@@ -1261,21 +1274,30 @@ fail:
 
 // Excludes parens because they need to be diferrentiated from casts
 status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
+    status_t status = CCC_OK;
     expr_t *base;
     ALLOC_NODE(base, expr_t);
 
     switch (lex->cur.type) {
     case ID: {
         base->type = EXPR_VAR;
-        base->var_id = &lex->cur.tab_entry.key;
+        base->var_id = &lex->cur.tab_entry->key;
         LEX_ADVANCE(lex);
         break;
     }
     case STRING: {
-        // TODO: Think about how pointers should be represented.
-        // Probably a pointer to the appropriate declaration
-        // So strings need a fake declaration
+        base->type = EXPR_CONST_STR;
+        base->const_val.str_val = &lex->cur.tab_entry->key;
+        type_t *type;
+        ALLOC_NODE(type, type_t);
+        type->type = TYPE_ARR;
+        type->size = base->const_val.str_val->len + 1;
+        type->align = 1;
+        type->dealloc = true;
+        type->arr.base = tt_char;
+        type->arr.len = NULL;
         LEX_ADVANCE(lex);
+        base->const_val.type = type;
         break;
     }
     case INTLIT: {
@@ -1292,7 +1314,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
 
         if (lex->cur.int_params.hasU) {
             type_t *type_mod;
-            alloc_node(type_mod, type_t);
+            ALLOC_NODE(type_mod, type_t);
             type_mod->type = TYPE_MOD;
             type_mod->size = type->size;
             type_mod->align = type->align;
@@ -1324,7 +1346,7 @@ fail:
 
 status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
-    type_t base = NULL;
+    type_t *base = NULL;
     if (CCC_OK != (status = par_specifier_qualifier(lex, &base))) {
         goto fail;
     }
@@ -1334,10 +1356,10 @@ status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
         }
     }
     stmt_t *decl;
-    ALLOC_NODE(gdecl->decl, stmt_t);
-    gdecl->decl.type = STMT_DECL;
-    gdecl->decl.decl.type = base;
-    sl_init(&gdecl->decl.decl.decls, offsetof(decl_node, link));
+    ALLOC_NODE(decl, stmt_t);
+    decl->type = STMT_DECL;
+    decl->decl.type = base;
+    sl_init(&decl->decl.decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_BACKTRACK != (status = par_declarator(lex, base, &decl_node))) {
@@ -1346,7 +1368,7 @@ status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
         }
     }
     status = CCC_OK;
-    sl_append(&gdecl->decl.decl.decls, &decl_node->link);
+    sl_append(&decl->decl.decls, &decl_node->link);
 
     *result = decl;
 fail:
@@ -1399,7 +1421,7 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
     ALLOC_NODE(decl, stmt_t);
     decl->type = STMT_DECL;
     decl->decl.type = type;
-    sl_init(&gdecl->decl.decl.decls, offsetof(decl_node, link));
+    sl_init(&decl->decl.decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_BACKTRACK != (status = par_declarator(lex, type, &decl_node))) {
@@ -1408,8 +1430,8 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
         }
     }
     status = CCC_OK;
-    sl_append(&gdecl->decl.decl.decls, &decl_node->link);
-    sl_append(&func->func.params, &decl);
+    sl_append(&decl->decl.decls, &decl_node->link);
+    sl_append(&func->func.params, &decl->link);
 
 fail:
     return status;
@@ -1433,13 +1455,13 @@ fail:
 
 status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     status_t status = CCC_OK;
-    enum_id_t node;
     if (lex->cur.type != ID) {
         status = CCC_ESYNTAX;
         goto fail;
     }
+    enum_id_t *node;
     ALLOC_NODE(node, enum_id_t);
-    node->id = &lex->cur.tab_entry.key;
+    node->id = &lex->cur.tab_entry->key;
     LEX_ADVANCE(lex);
 
     if (lex->cur.type == EQ) {
@@ -1448,7 +1470,7 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
             goto fail;
         }
     }
-    sl_append(&type->enum_ids, node->link);
+    sl_append(&type->enum_ids, &node->link);
     return status;
 fail:
     free(node);
@@ -1459,18 +1481,18 @@ status_t par_declaration(lex_wrap_t *lex, stmt_t **stmt) {
     status_t status = CCC_OK;
     if (*stmt == NULL) {
         ALLOC_NODE(*stmt, stmt_t);
-        stmt->type = STMT_DECL;
-        stmt->decl.type = NULL;
-        sl_init(&decl->decl.decls, offsetof(decl_node, link));
+        (*stmt)->type = STMT_DECL;
+        (*stmt)->decl.type = NULL;
+        sl_init(&(*stmt)->decl.decls, offsetof(decl_node_t, link));
 
         // Must match at least one declaration specifier
         if (CCC_OK !=
-            (status = par_declaration_specifier(lex, &stmt->decl.type))) {
+            (status = par_declaration_specifier(lex, &(*stmt)->decl.type))) {
             goto fail;
         }
         // Match declaration specifers until they don't match anymore
         while (CCC_BACKTRACK !=
-               (status = par_declaration_specifier(lex, &stmt->decl.type))) {
+               (status = par_declaration_specifier(lex, &(*stmt)->decl.type))) {
             if (status != CCC_OK) {
                 goto fail;
             }
@@ -1524,14 +1546,14 @@ fail:
 status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *expr;
-    ALLOC_NODE(*expr, expr_t);
-    *expr->type = EXPR_INIT_LIST;
-    sl_init(&(*expr->init_list), offsetof(expr_t, link));
+    ALLOC_NODE(expr, expr_t);
+    expr->type = EXPR_INIT_LIST;
+    sl_init(&expr->init_list.exprs, offsetof(expr_t, link));
     expr_t *cur = NULL;
     if (CCC_OK != (status = par_initializer(lex, &cur))) {
         goto fail;
     }
-    sl_append(&(*expr->init_list), cur);
+    sl_append(&expr->init_list.exprs, &cur->link);
 
     while (lex->cur.type == COMMA) {
         LEX_ADVANCE(lex);
@@ -1541,7 +1563,7 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
         if (CCC_OK != (status = par_initializer(lex, &cur))) {
             goto fail;
         }
-        sl_append(&(*expr->init_list), cur);
+        sl_append(&expr->init_list.exprs, &cur->link);
     }
     *result = expr;
 fail:
@@ -1603,12 +1625,12 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     case CONTINUE:
     case BREAK:
     case RETURN:
-        return par_jump_statement(lex, resut);
+        return par_jump_statement(lex, result);
 
     case SEMI: // noop
         return CCC_OK;
     case RBRACK:
-        return par_compound_statement(lex, resut);
+        return par_compound_statement(lex, result);
     default:
         return par_expression_statement(lex, result);
     }
@@ -1621,7 +1643,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
     switch (lex->cur.type) {
     case ID:
         stmt->type = STMT_LABEL;
-        stmt->label.label = &lex->cur.tab_entry.key;
+        stmt->label.label = &lex->cur.tab_entry->key;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, COLON);
         if (CCC_OK != (status = par_statement(lex, &stmt->label.stmt))) {
@@ -1633,12 +1655,12 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
         stmt->type = STMT_CASE;
 
         if (CCC_OK !=
-            (status = par_expression(lex, NULL, stmt->case_params.val))) {
+            (status = par_expression(lex, NULL, &stmt->case_params.val))) {
             goto fail;
         }
         LEX_MATCH(lex, COLON);
         if (CCC_OK !=
-            (status = par_statement(lex, stmt->case_params.stmt))) {
+            (status = par_statement(lex, &stmt->case_params.stmt))) {
             goto fail;
         }
         break;
@@ -1646,7 +1668,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_ADVANCE(lex);
         stmt->type = STMT_DEFAULT;
         if (CCC_OK !=
-            (status = par_statement(lex, stmt->default_params.stmt))) {
+            (status = par_statement(lex, &stmt->default_params.stmt))) {
             goto fail;
         }
         break;
@@ -1800,7 +1822,7 @@ status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
             status = CCC_ESYNTAX;
             goto fail;
         }
-        stmt->goto_params.label = &lex->cur.tab_entry.key;
+        stmt->goto_params.label = &lex->cur.tab_entry->key;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, SEMI);
         break;
@@ -1809,9 +1831,9 @@ status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_ADVANCE(lex);
         stmt->type = STMT_BREAK;
         if (lex->cur.type == CONTINUE) {
-            stmt->continue_params = NULL;
+            stmt->continue_params.parent = NULL;
         } else {
-            stmt->break_params = NULL;
+            stmt->break_params.parent = NULL;
         }
         LEX_MATCH(lex, SEMI);
         break;
@@ -1839,16 +1861,16 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     ALLOC_NODE(stmt, stmt_t);
 
     ALLOC_NODE(*result, stmt_t);
-    *result->type = STMT_CMPD;
-    sl_init(&(*result->compound.stmts, offsetof(stmt_t, link)));
+    (*result)->type = STMT_COMPOUND;
+    sl_init(&(*result)->compound.stmts, offsetof(stmt_t, link));
 
     LEX_MATCH(lex, LBRACK);
     while (lex->cur.type != RBRACK) {
-        stmt_t cur = NULL;
+        stmt_t *cur = NULL;
         if (CCC_OK != (status = par_statement(lex, &cur))) {
             goto fail;
         }
-        sl_append(&(*result->compound.stmts), cur);
+        sl_append(&(*result)->compound.stmts, &cur->link);
     }
     LEX_ADVANCE(lex);
 

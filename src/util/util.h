@@ -23,6 +23,7 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -31,6 +32,9 @@
 
 
 #include "util/slist.h"
+
+#define PTR_SIZE (sizeof(void *));
+#define PTR_ALIGN (alignof(void *));
 
 /**
  * Paramater for data structure deletion. Indicates stored elements should be
