@@ -160,7 +160,7 @@ typedef struct lexeme_t {
         struct {
             long long int_val;     /**< For integral types */
             bool hasU;             /**< Has U suffix */
-            bool hasL;             /**< Has U suffix */
+            bool hasL;             /**< Has L suffix */
             bool hasLL;            /**< Has LL suffix */
         } int_params;
         struct {

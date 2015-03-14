@@ -126,7 +126,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     sl_init(&gdecl->decl.decl.decls, offsetof(decl_node, link));
 
     decl_node_t *decl_node = NULL;
-    if (CCC_BACKTRACK == (status = par_declarator(lex, &decl_node, type))) {
+    if (CCC_BACKTRACK == (status = par_declarator(lex, type, &decl_node))) {
         // If the next character isn't a declarator, then its a type declaration
         gdecl->type = GDECL_DECL;
         ALLOC_NODE(gdecl->decl, stmt_t);
@@ -519,7 +519,7 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
 
     decl_node_t *decl_node = NULL;
 
-    if (CCC_OK != (status = par_declarator(lex, &decl_node, decl_type))) {
+    if (CCC_OK != (status = par_declarator(lex, decl_type, &decl_node))) {
         goto fail;
     }
     sl_append(&node->decl.decl.decls, &decl_node->link);
@@ -649,7 +649,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
 
     if (lex->cur.type == LPAREN) {
         LEX_ADVANCE(lex);
-        par_declarator(lex, &node, base);
+        par_declarator(lex, base, &node);
         LEX_MATCH(lex, RPAREN);
     } else if (lex->cur.type == ID) {
         node->id = lex->cur.tab_entry.key;
@@ -715,8 +715,10 @@ fail:
     return status;
 }
 
-status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
-    status_t status;
+status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
+                                   expr_t **result) {
+    status_t status = CCC_OK;
+
     bool primary = false;
     bool unary = false;
 
@@ -733,7 +735,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
     case MINUS:
     case BITNOT:
     case LOGICNOT:
-        if (CCC_OK != (status = par_unary_expression(lex))) {
+        if (CCC_OK != (status = par_unary_expression(lex, result))) {
             goto fail;
         }
         unary = true;
@@ -744,7 +746,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
     case STRING:
     case INTLIT:
     case FLOATLIT:
-        if (CCC_OK != (status = par_primary_expression(lex))) {
+        if (CCC_OK != (status = par_primary_expression(lex, result))) {
             goto fail;
         }
         unary = true;
@@ -781,14 +783,14 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
             // Type qualitifiers
         case CONST:
         case VOLATILE:
-            if (CCC_OK != (status = par_cast_expression(lex, true))) {
+            if (CCC_OK != (status = par_cast_expression(lex, true, result))) {
                 goto fail;
             }
             break;
 
             // Parens
         default:
-            if (CCC_OK != (status = par_expression(lex, false))) {
+            if (CCC_OK != (status = par_expression(lex, NULL, result))) {
                 goto fail;
             }
             primary = true;
@@ -809,7 +811,9 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary) {
         case DOT:
         case LBRACK:
         case LPAREN:
-            if (CCC_OK != (status = par_postfix_expression(lex))) {
+            expr_t *base = *result;
+            if (CCC_OK != (status = par_postfix_expression(lex, base,
+                                                           &result))) {
                 goto fail;
             }
             break;
@@ -823,12 +827,13 @@ fail:
     return status;
 }
 
-status_t par_expression(lex_wrap_t *lex, bool has_left) {
+status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
     status_t status = CCC_OK;
     bool unary1;
 
-    if (!has_left) { // Only search for first operand if not provided
-        if (CCC_OK != (status = par_non_binary_expression(lex, &unary1))) {
+    if (left == NULL) { // Only search for first operand if not provided
+        if (CCC_OK !=
+            (status = par_non_binary_expression(lex, &unary1, &left))) {
             goto fail;
         }
 
@@ -846,20 +851,21 @@ status_t par_expression(lex_wrap_t *lex, bool has_left) {
             case BITANDEQ:
             case BITXOREQ:
             case BITOREQ:
-                if (CCC_OK != (status = par_assignment_expression(lex))) {
+                if (CCC_OK !=
+                    (status = par_assignment_expression(lex, left, result))) {
                     goto fail;
                 }
 
-                return par_expression(lex, false);
+                return CCC_OK;
             default:
                 break;
             }
         }
     }
 
-    bool done = false;
-    while (!done) {
-        bool new_left = false;
+    bool new_left = true;
+    while (new_left) {
+        new_left = false;
         token_t op1;
 
         switch (lex->cur.type) {
@@ -886,20 +892,26 @@ status_t par_expression(lex_wrap_t *lex, bool has_left) {
             LEX_ADVANCE(lex);
             break;
 
-        case COND:
-            // Conditional operator
+        case COND: { // Conditional operator
+            expr_t *new_left;
+            ALLOC_NODE(new_left, expr_t);
+            new_left->type = EXPR_COND;
+            new_left->cond.expr1 = left;
+
             LEX_ADVANCE(lex);
-            if (CCC_OK != par_expression(lex, false)) {
+            if (CCC_OK != par_expression(lex, NULL, &new_left->cond.expr2)) {
                 goto fail;
             }
             LEX_MATCH(lex, COLON);
-            if (CCC_OK != par_expression(lex, false)) {
+            if (CCC_OK != par_expression(lex, NULL, &new_left->cond.expr3)) {
                 goto fail;
             }
-            // Restart the loop with a new expresson on the left
+            left = new_left;
+            new_left = true;
             break;
+        }
         default:
-            // We're done with the expression
+            *result = left;
             return CCC_OK;
         }
 
@@ -907,13 +919,13 @@ status_t par_expression(lex_wrap_t *lex, bool has_left) {
             continue;
         }
 
+        expr_t *right;
         bool unary2;
-        if (CCC_OK != (status = par_non_binary_expression(lex, &unary2))) {
+        if (CCC_OK !=
+            (status = par_non_binary_expression(lex, &unary2, &right))) {
             goto fail;
         }
 
-        bool binary2 = false;
-        bool cond2 = false;
         token_t op2;
         switch (lex->cur.type) {
             // Binary operators
@@ -935,49 +947,62 @@ status_t par_expression(lex_wrap_t *lex, bool has_left) {
         case BITOR:
         case LOGICAND:
         case LOGICOR:
-            binary2 = true;
             op2 = lex->cur.type;
             break;
 
-        case COND: // Cond has lowest precedence
-            cond2 = true;
-            break;
-        default:
-            // TODO Return expression combinaned with last op
-            return CCC_OK;
-        }
-
-        if (cond2) {
-            // Conditional operator
+        case COND: { // Cond has lowest precedence
             LEX_ADVANCE(lex);
-            if (CCC_OK != par_expression(lex, false)) {
+            expr_t *new_node;
+            ALLOC_NODE(new_node, expr_t);
+            new_node->type = EXPR_BIN;
+            new_node->bin.expr1 = left;
+            new_node->bin.expr2 = right;
+            expr_t *cond_node;
+            ALLOC_NODE(cond_node, expr_t);
+            cond_node->type = EXPR_COND;
+            cond_node->cond.expr1 = new_node;
+            if (CCC_OK != par_expression(lex, NULL, &cond_node->cond.expr2)) {
                 goto fail;
             }
             LEX_MATCH(lex, COLON);
-            if (CCC_OK != par_expression(lex, false)) {
+            if (CCC_OK != par_expression(lex, NULL, &cond_node->cond.expr3)) {
                 goto fail;
             }
-            // Restart loop with new second expression
-        } else if (!binary2) {
-            // Combine op1
-            done = true;
-        } else if (par_greater_or_equal_prec(op1, op2)) {
-            // Combine op1
-            new_left = true;
-            if (CCC_OK != (status = par_expression(lex, true))) {
-                goto fail;
-            }
-            done = true;
-        } else {
-            // Evaluate op2 and next operand, then combine with op1
-            if (CCC_OK != (status = par_expression(lex, true))) {
-                goto fail;
-            }
-            done = true;
+            *result = new_node;
+            return CCC_OK;
+        }
+        default: { // Not binary 2
+            expr_t *new_node;
+            ALLOC_NODE(new_node, expr_t);
+            new_node->type = EXPR_BIN;
+            new_node->bin.expr1 = left;
+            new_node->bin.expr2 = right;
+            *result = new_node;
+            return CCC_OK;
+        }
         }
 
-        if (new_left) {
-            continue;
+        if (par_greater_or_equal_prec(op1, op2)) {
+            expr_t *new_node;
+            ALLOC_NODE(new_node, expr_t);
+            new_node->type = EXPR_BIN;
+            new_node->bin.expr1 = left;
+            new_node->bin.expr2 = right;
+            new_left = true;
+            left = new_node;
+        } else {
+            expr_t *new_node;
+            ALLOC_NODE(new_node, expr_t);
+            new_node->type = EXPR_BIN;
+            new_node->bin.expr1 = left;
+
+            if (CCC_OK !=
+                (status = par_expression(lex, right, &new_node->bin.right))) {
+                goto fail;
+            }
+
+            *result = new_node;
+            return CCC_OK;
         }
     }
 
@@ -985,58 +1010,123 @@ fail:
     return status;
 }
 
-status_t par_unary_expression(lex_wrap_t *lex) {
+status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
+    expr_t *base;
+
     switch (lex->cur.type) {
         // Primary expressions
     case ID:
     case STRING:
     case INTLIT:
     case FLOATLIT:
-        return par_postfix_expression(lex);
+        if (CCC_OK != (status = par_primary_expression(lex, &base))) {
+            goto fail;
+        }
+        if (CCC_OK != (status = par_postfix_expression(lex, base, result))) {
+            goto fail;
+        }
+        break;
+
     case INC:
-    case DEC:
+    case DEC: {
+        ALLOC_NODE(base, expr_t);
+        oper_t op = lex->cur.type == INC ? OP_PREINC : OP_PREDEC;
         LEX_ADVANCE(lex);
-        return par_unary_expression(lex);
+        base->type = EXPR_UNARY;
+        base->unary.op = op;
+        if (CCC_OK != (status = par_unary_expression(lex, &base->expr))) {
+            goto fail;
+        }
+        *result = base;
+        return CCC_OK;
+    }
+
     case SIZEOF:
+        ALLOC_NODE(base, expr_t);
         LEX_ADVANCE(lex);
-        if (CCC_BACKTRACK != (status = par_unary_expression(lex))) {
+        base->type = EXPR_SIZEOF;
+        if (CCC_BACKTRACK != (status = par_unary_expression(lex, result))) {
             if (status != CCC_OK) {
                 goto fail;
             }
+            base->sizeof_params.type = NULL;
+            base->sizeof_params.expr = *result;
+            *result = base;
             return CCC_OK;
         }
-        return par_type_name(lex);
+
+        base->sizeof_params.expr = NULL;
+        if (CCC_OK !=
+            (status = par_type_name(lex, result, &base->sizeof_params.type))) {
+            goto fail;
+        }
+
+        *result = base;
+        return CCC_OK;
+
     case BITAND:
     case STAR:
     case PLUS:
     case MINUS:
     case BITNOT:
-    case LOGICNOT:
-        return par_cast_expression(lex, false);
+    case LOGICNOT: {
+        ALLOC_NODE(base, expr_t);
+        oper_t op;
+        switch (lex->cur.type) {
+        case BITAND:   op = OP_ADDR;     break;
+        case STAR:     op = OP_DEREF;    break;
+        case PLUS:     op = OP_UPLUS;    break;
+        case MINUS:    op = OP_UMINUS;   break;
+        case BITNOT:   op = OP_BITNOT;   break;
+        case LOGICNOT: op = OP_LOGICNOT; break;
+        default:
+            assert(false);
+        }
+        base->type = EXPR_UNARY;
+        base->unary.op = op;
+        if (CCC_OK !=
+            (status = par_cast_expression(lex, false, &base->unary.expr))) {
+            goto fail;
+        }
+
+        *result = base;
+        return CCC_OK;
+    }
     default:
         return CCC_BACKTRACK;
     }
 
 fail:
+    free(base);
     return status;
 }
 
-status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren) {
-    status_t status;
+status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
+                             expr_t **result) {
+    status_t status = CCC_OK;
     if (!skip_paren && lex->cur.type != LPAREN) {
-        return par_unary_expression(lex);
+        return par_unary_expression(lex, result);
     }
     if (!skip_paren) {
         LEX_ADVANCE(lex);
     }
-    if (CCC_OK != (status =par_type_name(lex))) {
+    decl_t *type = NULL;
+    if (CCC_OK != (status = par_type_name(lex, &type))) {
         goto fail;
     }
     LEX_MATCH(lex, RPAREN);
-    if (CCC_OK != (status = par_cast_expression(lex, false))) {
+
+    expr_t *expr;
+    ALLOC_NODE(expr, expr_t);
+    expr->type = TYPE_CAST;
+    expr->cast.type = type;
+    expr->cast.base = NULL;
+    if (CCC_OK !=
+        (status = par_cast_expression(lex, false, &expr->cast.base))) {
         goto fail;
     }
+    *result = expr;
 fail:
     return status;
 }
@@ -1044,47 +1134,80 @@ fail:
 /**
  * Parses postfix expression after the primary expression part
  */
-status_t par_postfix_expression(lex_wrap_t *lex) {
+status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
+                                expr_t **result) {
     status_t status = CCC_OK;
-    bool done = false;
-    while (!done) {
+    expr_t *expr = NULL;
+
+    while (base != NULL) {
         switch (lex->cur.type) {
         case LBRACK:
             LEX_ADVANCE(lex);
-            if (CCC_OK != (status = par_expression(lex, false))) {
+            ALLOC_NODE(expr, expr_t);
+            expr->type = EXPR_BINOP;
+            expr->binop.op = ARR_ACC;
+            expr->binop.expr1 = base;
+
+            if (CCC_OK !=
+                (status = par_expression(lex, NULL, expr->binop.expr2))) {
                 goto fail;
             }
             LEX_MATCH(lex, RBRACK);
+            base = expr;
             break;
 
         case LPAREN:
             LEX_ADVANCE(lex);
+            ALLOC_NODE(expr, expr_t);
+            expr->type = EXPR_CALL;
+            expr->call.func = base;
+            sl_init(&expr->call.params, offsetof(expr_t, link));
+
             while (lex->cur.type != RPAREN) {
-                if (CCC_OK != (status =par_expression(lex, false))) {
+                expr_t *param;
+                if (CCC_OK != (status = par_expression(lex, NULL, &param))) {
                     goto fail;
                 }
+                sl_append(&expr->call.params, param);
                 LEX_MATCH(lex, COMMA);
             }
             LEX_ADVANCE(lex);
+            base = expr;
             break;
 
         case DOT:
-            LEX_MATCH(lex, ID);
+        case DEREF: {
+            oper_t op = lex->cur.type == DOT ? OP_DOT : OP_ARROW;
+            LEX_ADVANCE(lex);
+            if (lex->cur.type != ID) {
+                goto fail;
+            }
+            ALLOC_NODE(expr, expr_t);
+            expr->type = EXPR_MEM_ACC;
+            expr->mem_acc.op = op;
+            expr->mem_acc.name = &lex->cur.tab_entry.key;
+            LEX_ADVANCE(lex);
+            base = expr;
             break;
-
-        case DEREF:
-            LEX_MATCH(lex, ID);
-            break;
+        }
 
         case INC:
         case DEC:
+            oper_t op = lex->cur.type == INC ? OP_POSTINC : OP_POSTDEC;
             LEX_ADVANCE(lex);
+            ALLOC_NODE(expr, expr_t);
+            expr->type = EXPR_UNARY;
+            expr->unary.op = op;
+            expr->unary.expr = base;
+
+            base = expr;
             break;
         default: // Found a terminating character
-            done = true;
+            base = NULL;
         }
     }
 
+    *result = expr;
 fail:
     return status;
 }
@@ -1092,64 +1215,134 @@ fail:
 /**
  * Parses assignment after the assignment operator
  */
-status_t par_assignment_expression(lex_wrap_t *lex) {
+status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
+                                   expr_t **result) {
     status_t status = CCC_OK;
+    oper_t op;
     switch (lex->cur.type) {
-    case EQ:
-    case STAREQ:
-    case DIVEQ:
-    case MODEQ:
-    case PLUSEQ:
-    case MINUSEQ:
-    case LSHIFTEQ:
-    case RSHIFTEQ:
-    case BITANDEQ:
-    case BITXOREQ:
-    case BITOREQ:
-        break;
+    case EQ:       op = OP_NOP;    break;
+    case STAREQ:   op = OP_TIMES;  break;
+    case DIVEQ:    op = OP_DIV;    break;
+    case MODEQ:    op = OP_MOD;    break;
+    case PLUSEQ:   op = OP_PLUS;   break;
+    case MINUSEQ:  op = OP_MINUS;  break;
+    case LSHIFTEQ: op = OP_LSHIFT; break;
+    case RSHIFTEQ: op = OP_RSHIFT; break;
+    case BITANDEQ: op = OP_BITAND; break;
+    case BITXOREQ: op = OP_BITXOR; break;
+    case BITOREQ:  op = OP_BITOR;  break;
     default:
         return CCC_ESYNTAX;
     }
     LEX_ADVANCE(lex);
+    expr_t *expr;
+    ALLOC_NODE(expr, expr_t);
+    expr->type = EXPR_ASSIGN;
+    expr->assign.dest = left;
+    expr->assign.op = op;
 
-    if (CCC_OK != (status = par_expression(lex, false))) {
+    if (CCC_OK != (status = par_expression(lex, NULL, &expr->assign.expr))) {
         goto fail;
     }
 
+    *result = expr;
+    return status;
+
 fail:
+    free(expr);
     return status;
 }
 
 // Excludes parens because they need to be diferrentiated from casts
-status_t par_primary_expression(lex_wrap_t *lex) {
+status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
+    expr_t *base;
+    ALLOC_NODE(base, expr_t);
+
     switch (lex->cur.type) {
-    case ID:
-    case STRING:
-    case INTLIT:
-    case FLOATLIT:
-        return CCC_OK;
+    case ID: {
+        base->type = EXPR_VAR;
+        base->var_id = &lex->cur.tab_entry.key;
+        LEX_ADVANCE(lex);
+        break;
+    }
+    case STRING: {
+        // TODO: Think about how pointers should be represented.
+        // Probably a pointer to the appropriate declaration
+        // So strings need a fake declaration
+        LEX_ADVANCE(lex);
+        break;
+    }
+    case INTLIT: {
+        base->type = EXPR_CONST_INT;
+        base->const_val.int_val = lex->cur.int_params.int_val;
+        type_t *type;
+        if (lex->cur.int_params.hasLL) {
+            type = tt_long; // TODO: Add long long support
+        } else if (lex->cur.int_params.hasL) {
+            type = tt_long;
+        } else {
+            type = tt_int;
+        }
+
+        if (lex->cur.int_params.hasU) {
+            type_t *type_mod;
+            alloc_node(type_mod, type_t);
+            type_mod->type = TYPE_MOD;
+            type_mod->size = type->size;
+            type_mod->align = type->align;
+            type_mod->dealloc = true;
+            type_mod->mod.type_mod = TMOD_UNSIGNED;
+            type_mod->mod.base = type;
+            type = type_mod;
+        }
+        base->const_val.type = type;
+        LEX_ADVANCE(lex);
+        break;
+    }
+    case FLOATLIT: {
+        base->type = EXPR_CONST_FLOAT;
+        base->const_val.float_val = lex->cur.float_params.float_val;
+        base->const_val.type =
+            lex->cur.float_params.hasF ? tt_float : tt_double;
+        LEX_ADVANCE(lex);
+        break;
+    }
     default:
         return CCC_ESYNTAX;
     }
+
+    *result = base;
+fail:
+    return status;
 }
 
-status_t par_type_name(lex_wrap_t *lex) {
+status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
-    if (CCC_OK != (status = par_specifier_qualifier(lex))) {
+    type_t base = NULL;
+    if (CCC_OK != (status = par_specifier_qualifier(lex, &base))) {
         goto fail;
     }
-    while (CCC_BACKTRACK != (status = par_specifier_qualifier(lex))) {
+    while (CCC_BACKTRACK != (status = par_specifier_qualifier(lex, &base))) {
         if (status != CCC_OK) {
             goto fail;
         }
     }
-    if (CCC_BACKTRACK != (status = par_declarator(lex))) {
+    stmt_t *decl;
+    ALLOC_NODE(gdecl->decl, stmt_t);
+    gdecl->decl.type = STMT_DECL;
+    gdecl->decl.decl.type = base;
+    sl_init(&gdecl->decl.decl.decls, offsetof(decl_node, link));
+
+    decl_node_t *decl_node = NULL;
+    if (CCC_BACKTRACK != (status = par_declarator(lex, base, &decl_node))) {
         if (status != CCC_OK) {
             goto fail;
         }
     }
     status = CCC_OK;
+    sl_append(&gdecl->decl.decl.decls, &decl_node->link);
 
+    *result = decl;
 fail:
     return status;
 }

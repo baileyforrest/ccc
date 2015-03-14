@@ -88,12 +88,23 @@ typedef enum oper_t {
     OP_BITOR,      // Bitwise OR
     OP_LSHIFT,     // Left Shift
     OP_RSHIFT,     // Right Shift
-    OP_LNOT,       // Logical NOT
-    OP_BNOT,       // Bitwise NOT
+    OP_LOGICNOT,   // Logical NOT
+    OP_BITNOT,     // Bitwise NOT
     OP_NEGATIVE,   // unary minus
     OP_PINC,       // Post increment
     OP_PDEC,       // Post Decrement
     OP_TERN,       // Ternary Operator
+    OP_ARR_ACC,    // Array access
+    OP_PREINC,     // Pre increment
+    OP_PREDEC,     // Pre decrement
+    OP_POSTINC,    // Post increment
+    OP_POSTDEC,    // Post decrement
+    OP_ADDR,       // Address of
+    OP_DEREF,      // Dereference of
+    OP_UPLUS,      // Unary plus
+    OP_UMINUS      // Unary minus
+    OP_ARROW,      // ->
+    OP_DOT         // .
 } oper_t;
 
 // Forward declarations
@@ -182,14 +193,21 @@ typedef struct gdecl_t {
  * Types of expressions
  */
 typedef enum expr_type_t {
-    EXPR_VOID,    /**< Void */
-    EXPR_VAR,     /**< Variable */
-    EXPR_CONST,   /**< Constant */
-    EXPR_OP,      /**< Operation */
-    EXPR_CALL,    /**< Function call */
-    EXPR_DEREF,   /**< Pointer dereference */
-    EXPR_ARR_ACC, /**< Array access */
-    EXPR_CMPD,    /**< Compound expression */
+    EXPR_VOID,        /**< Void */
+    EXPR_VAR,         /**< Variable */
+    EXPR_ASSIGN,      /**< Assignment */
+    EXPR_CONST_PTR,   /**< Constant */
+    EXPR_CONST_INT,   /**< Constant */
+    EXPR_CONST_FLOAT, /**< Constant */
+    EXPR_BIN,         /**< Binary Operation */
+    EXPR_UNARY,       /**< Unary Operation */
+    EXPR_COND,        /**< Conditional Operator */
+    EXPR_CAST,        /**< Cast expression */
+    EXPR_CALL,        /**< Function call */
+    EXPR_ARR_ACC,     /**< Array access */
+    EXPR_CMPD,        /**< Compound expression */
+    EXPR_SIZEOF,      /**< Sizeof expression */
+    EXPR_MEM_ACC      /**< Member access */
 } expr_type_t;
 
 /**
@@ -201,30 +219,63 @@ typedef struct expr_t {
 
     union {                       /**< Type specific info */
         len_str_t *var_id;        /**< Variable identifier */
-        intptr_t const_val;       /**< Constant value */
+
+        struct {                  /**< Assignment paramaters */
+            expr_t *dest;         /**< Expression to assign to */
+            expr_t *expr;         /**< Expression to assign */
+            oper_t op;            /**< Operation for expression (+=) */
+        } assign;
+
+        struct {
+            type_t *type;
+            union {               /**< Constant value */
+                void *ptr_val;    /**< Pointer constant */
+                long long int_val;/**< Int constant */
+                double float_val; /**< Float constant */
+            };
+        } const_val;
+
+        struct {                  /**< Binary operation */
+            oper_t op;            /**< Type of operation */
+            expr_t expr1;         /**< Expr 1 */
+            expr_t expr2;         /**< Expr 2 */
+        } bin;
+
+        struct {                  /**< Binary operation */
+            oper_t op;            /**< Type of operation */
+            expr_t expr;          /**< Expression  */
+        } unary;
 
         struct {                  /**< Operation paramaters */
             oper_t op;            /**< Type of operation */
-            slist_t exprs;        /**< Paramaters for operation */
-        } op;
+            expr_t expr1;         /**< Expr 1 */
+            expr_t expr2;         /**< Expr 2 */
+            expr_t expr3;         /**< Expr 3 */
+        } cond;
+
+        struct {                  /**< Cast parameters */
+            expr_t *base;         /**< Base expression */
+            decl_t *cast;         /**< Casted type */
+        } cast;
 
         struct {                  /**< Function call paramaters */
-            gdecl_t *func;        /**< The function to call */
+            expr_t *func;         /**< The function to call */
             slist_t params;       /**< The function paramaters (expressions) */
         } call;
-
-        struct {                  /**< Pointer dereference paramaters */
-            struct expr_t *expr;  /**< The expression to dereference */
-        } defref;
-
-        struct {                  /**< Array access parameters */
-            struct expr_t *expr;  /**< Expression for array */
-            struct expr_t *index; /**< Expression for array index */
-        } arr_acc;
 
         struct {                  /**< Compound expression */
             slist_t exprs;        /**< List of expressions */
         } cmpd;
+
+        struct {
+            type_t *type;
+            expr_t *expr;
+        } sizeof_params;
+
+        struct {
+            oper_t op;
+            len_str_t *name;
+        } mem_acc;
     };
 } expr_t;
 
@@ -234,7 +285,6 @@ typedef struct expr_t {
 typedef enum stmt_type_t {
     STMT_NOP,            /**< No op statement */
     STMT_DECL,           /**< Declaration */
-    STMT_ASSIGN,         /**< Assignment */
     STMT_RETURN,         /**< Return */
     STMT_IF,             /**< if */
     STMT_WHILE,          /**< while */
@@ -279,12 +329,6 @@ typedef struct stmt_t {
             type_t *type;                /**< Type of variable */
             slist_t decls;               /**< List of declarations */
         } decl;
-
-        struct {                         /**< Assignment paramaters */
-            expr_t *dest;                /**< Expression to assign to */
-            expr_t *expr;                /**< Expression to assign */
-            oper_t op;                   /**< Operation for expression (+=) */
-        } assign;
 
         struct {                         /**< Return paramaters */
             expr_t *expr;                /**< Expression to return */

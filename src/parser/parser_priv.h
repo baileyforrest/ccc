@@ -111,7 +111,7 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
 status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
                                type_t *decl_type);
 
-status_t par_declarator(lex_wrap_t *lex, decl_node_t **decl, type_t *base);
+status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t **decl);
 
 status_t par_pointer(lex_wrap_t *lex, type_t **mod);
 
@@ -120,17 +120,27 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type);
 status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
                                type_t *base);
 
-status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary);
+status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
+                                   expr_t **result);
 
 status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result);
 
-status_t par_unary_expression(lex_wrap_t *lex);
-status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren);
-status_t par_postfix_expression(lex_wrap_t *lex);
-status_t par_assignment_expression(lex_wrap_t *lex);
-status_t par_primary_expression(lex_wrap_t *lex);
-status_t par_type_name(lex_wrap_t *lex);
+status_t par_unary_expression(lex_wrap_t *lex, expr_t **result);
+
+status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren, expr_t **result);
+
+status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
+                                expr_t **result);
+
+status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
+                                   expr_t **result);
+
+status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
+
+status_t par_type_name(lex_wrap_t *lex, decl_t **result);
+
 status_t par_parameter_type_list(lex_wrap_t *lex);
+
 status_t par_parameter_list(lex_wrap_t *lex);
 status_t par_parameter_declaration(lex_wrap_t *lex);
 status_t par_enum_specifier(lex_wrap_t *lex, type_t **type);
