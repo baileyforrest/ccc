@@ -33,6 +33,14 @@
     { { NULL }, typename, sizeof(type), alignof(type), false, \
       { .ptr = { NULL, 0 } } }
 
+static len_str_t void_str   = LEN_STR_LITERAL("void");
+static len_str_t char_str   = LEN_STR_LITERAL("char");
+static len_str_t short_str  = LEN_STR_LITERAL("short");
+static len_str_t int_str    = LEN_STR_LITERAL("int");
+static len_str_t long_str   = LEN_STR_LITERAL("long");
+static len_str_t float_str  = LEN_STR_LITERAL("float");
+static len_str_t double_str = LEN_STR_LITERAL("double");
+
 static type_t stt_void   = TYPE_LITERAL(TYPE_VOID  , void  );
 static type_t stt_char   = TYPE_LITERAL(TYPE_CHAR  , char  );
 static type_t stt_short  = TYPE_LITERAL(TYPE_SHORT , short );
@@ -50,7 +58,7 @@ type_t * const tt_float = &stt_float;
 type_t * const tt_double = &stt_double;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
-    { { NULL }, { LEN_STR_LITERAL(#type), TT_PRIM }, &stt_ ## type }
+    { { NULL }, { &type##_str, TT_PRIM }, &stt_ ## type }
 
 /**
  * Table of primative types
@@ -67,7 +75,7 @@ static typetab_entry_t s_prim_types[] = {
 
 uint32_t typetab_key_hash(const void *void_key) {
     const tt_key_t *key = (tt_key_t *)void_key;
-    uint32_t hash = strhash(&key->name);
+    uint32_t hash = strhash(key->name);
 
     return hash * 33 + (int)key->type;
 }
@@ -80,7 +88,7 @@ bool typetab_key_cmp(const void *void_key1, const void *void_key2) {
         return false;
     }
 
-    return vstrcmp(&key1->name, &key2->name);
+    return vstrcmp(key1->name, key2->name);
 }
 
 status_t tt_init(typetab_t *tt, typetab_t *last) {
@@ -112,23 +120,27 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
     return status;
 
 fail1:
-    ht_destroy(&tt->hashtab, NOFREE);
+    ht_destroy(&tt->hashtab);
 fail:
     return status;
 }
 
-void tt_destroy(typetab_t *tt) {
-    assert(tt != NULL);
-
-    // Need to remove primitive types from top level table
-    if (tt->last == NULL) {
-        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
-            ht_remove(&tt->hashtab, &s_prim_types[i].key, NOFREE);
-        }
+static void typetab_entry_destroy(typetab_entry_t *entry) {
+    // Ignore primitive types, they are in static memory
+    if (entry->key.type == TT_PRIM) {
+        return;
     }
 
-    // TODO: Free all the types
-    ht_destroy(&tt->hashtab, NOFREE);
+    // Only free the type if its a compound type
+    if (entry->key.type == TT_COMPOUND) {
+        ast_type_destroy(entry->type, OVERRIDE);
+    }
+    free(entry);
+}
+
+void tt_destroy(typetab_t *tt) {
+    assert(tt != NULL);
+    HT_DESTROY_FUNC(&tt->hashtab, typetab_entry_destroy);
 }
 
 status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
@@ -146,8 +158,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
 
     new_entry->type = type;
     new_entry->key.type = tt_type;
-    new_entry->key.name.str = name->str;
-    new_entry->key.name.len = name->len;
+    new_entry->key.name = name;
 
     if (NULL != tt_lookup(tt, &new_entry->key)) {
         status = CCC_DUPLICATE;

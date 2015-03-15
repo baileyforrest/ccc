@@ -37,19 +37,6 @@
 #define PTR_ALIGN (alignof(void *));
 
 /**
- * Paramater for data structure deletion. Indicates stored elements should be
- * freed
- */
-#define DOFREE true
-
-/**
- * Paramater for data structure deletion. Indicates stored elements should not
- * be freed
- */
-#define NOFREE false
-
-
-/**
  * Length of static array
  *
  * @param Array to get length of

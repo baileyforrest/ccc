@@ -40,7 +40,7 @@ typedef enum tt_type_t {
 } tt_type_t;
 
 typedef struct tt_key_t {
-    len_str_t name;
+    len_str_t *name;
     tt_type_t type;
 } tt_key_t;
 
@@ -95,7 +95,8 @@ typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key);
  * @param tt Type table to insert into
  * @param type The type to insert
  * @param tt_type Type table type to insert
- * @param name The name of the item to insert
+ * @param name The name of the item to insert. It is not copied so must point to
+ *     a stable location
  * @param entry The added entry, NULL if it isn't needed
  * @return CCC_OK on success, error code on error
  */

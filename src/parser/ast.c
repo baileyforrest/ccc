@@ -256,8 +256,8 @@ void ast_stmt_destroy(stmt_t *stmt) {
         break;
 
     case STMT_COMPOUND:
-        tt_destroy(&stmt->compound.typetab);
         SL_DESTROY_FUNC(&stmt->compound.stmts, ast_stmt_destroy);
+        tt_destroy(&stmt->compound.typetab); // Must free last
         break;
 
     case STMT_EXPR:
@@ -273,7 +273,7 @@ void ast_trans_unit_destroy(trans_unit_t *trans_unit) {
     if (trans_unit == NULL) {
         return;
     }
-    tt_destroy(&trans_unit->typetab);
     SL_DESTROY_FUNC(&trans_unit->gdecls, ast_gdecl_destroy);
+    tt_destroy(&trans_unit->typetab); // Must free after trans units
     free(trans_unit);
 }

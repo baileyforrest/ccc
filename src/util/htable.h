@@ -75,12 +75,36 @@ typedef struct htable_t {
 status_t ht_init(htable_t *ht, const ht_params *params);
 
 /**
- * Does not free ht itself. Frees all of the contained elements and bucketlist.
+ * Destroys an hash table
+ * Does not free ht itself. Does not free elements, only backing store
  *
  * @param ht The hashtable to destroy
  * @param do_free DOFREE (true) if elements should be freed. NOFREE otherwise
  */
-void ht_destroy(htable_t *ht, bool do_free);
+void ht_destroy(htable_t *ht);
+
+/**
+ * Destroys an hash table. Does not free ht itself.
+ *
+ * Calls a destructor on each of the elements, which may free the the elements
+ *
+ * @param ht The hashtable to destroy
+ * @param do_free DOFREE (true) if elements should be freed. NOFREE otherwise
+ */
+#define HT_DESTROY_FUNC(ht, func)                       \
+    do {                                                \
+        for (size_t i = 0; i < (ht)->nbuckets; ++i) {   \
+            sl_link_t *cur = (ht)->buckets[i];          \
+            sl_link_t *next = NULL;                     \
+                                                        \
+            while (cur != NULL) {                       \
+                next = cur->next;                       \
+                (func)(GET_HT_ELEM((ht), cur));         \
+                cur = next;                             \
+            }                                           \
+        }                                               \
+        ht_destroy(ht);                                 \
+    } while (0)
 
 /**
  * Insert element with specified link into hashtable. Frees the old element if
@@ -88,7 +112,8 @@ void ht_destroy(htable_t *ht, bool do_free);
  *
  * @param ht The hashtable to insert into
  * @param elem The element to insert
- * @return CCC_OK on success, error code on failure
+ * @return CCC_OK on success, error code on failure. Returns CCC_DUPLICATE if
+ * key with same value already exists
  */
 status_t ht_insert(htable_t *ht, sl_link_t *elem);
 
@@ -97,10 +122,9 @@ status_t ht_insert(htable_t *ht, sl_link_t *elem);
  *
  * @param ht The hashtable to remove from
  * @param key Key of element to remove
- * @param do_free DOFREE (true) if element is to be free, else NOFREE
- * @return true if removed, false otherwise
+ * @return A pointer to the element removed, or NULL if it doesn't exist
  */
-bool ht_remove(htable_t *ht, const void *key, bool do_free);
+void *ht_remove(htable_t *ht, const void *key);
 
 /**
  * Lookup specified element in hashtable

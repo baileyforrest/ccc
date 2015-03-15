@@ -172,8 +172,8 @@ typedef struct pp_macro_t {
     len_str_t name; /**< Macro name, hashtable key */
     char *start;    /**< Start of macro text */
     char *end;      /**< End of macro text */
-    slist_t params;  /**< Macro paramaters, list of len_str */
-    int num_params;  /**< Number of paramaters */
+    slist_t params; /**< Macro paramaters, list of len_str */
+    int num_params; /**< Number of paramaters */
 } pp_macro_t;
 
 /**
@@ -181,18 +181,18 @@ typedef struct pp_macro_t {
  */
 typedef struct pp_param_map_elem_t {
     sl_link_t link; /**< List link */
-    len_str_t key; /**< Macro paramater being mappend */
-    len_str_t val; /**< Macro paramater value */
+    len_str_t key;  /**< Macro paramater being mappend */
+    len_str_t val;  /**< Macro paramater value */
 } pp_param_map_elem_t;
 
 /**
  * Represents the macro invocation
  */
 typedef struct pp_macro_inst_t {
-    sl_link_t link; /**< List link */
+    sl_link_t link;     /**< List link */
     htable_t param_map; /**< Mapping of strings to paramater values */
-    char *cur; /**< Current location in macro */
-    char *end; /**< End of macro */
+    char *cur;          /**< Current location in macro */
+    char *end;          /**< End of macro */
 } pp_macro_inst_t;
 
 /**
@@ -223,15 +223,15 @@ status_t pp_file_map(const char *filename, size_t len, pp_file_t **result);
 status_t pp_file_destroy(pp_file_t *pp_file);
 
 /**
- * Initializes a macro
+ * Creates a macro
  *
- * @param macro to initalize
+ * @param macro Points to new macro on success
  * @return CCC_OK on success, error code otherwise
  */
-status_t pp_macro_init(pp_macro_t *macro);
+status_t pp_macro_create(pp_macro_t **macro);
 
 /**
- * Destroys a macro definition. Does not free macro
+ * Destroys a macro definition. Does free macro
  *
  * @param macro definition to destroy
  */

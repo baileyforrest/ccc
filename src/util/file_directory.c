@@ -49,7 +49,7 @@ status_t fdir_init() {
 }
 
 void fdir_destroy() {
-    ht_destroy(&s_fdir.table, DOFREE);
+    HT_DESTROY_FUNC(&s_fdir.table, free);
 }
 
 status_t fdir_insert(const char *filename, size_t len, len_str_t **result) {

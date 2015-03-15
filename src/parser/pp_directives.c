@@ -78,7 +78,7 @@ done:
 }
 
 void pp_directives_destroy(preprocessor_t *pp) {
-    ht_destroy(&pp->directives, NOFREE);
+    ht_destroy(&pp->directives);
     sl_destroy(&pp->macro_insts);
 }
 
@@ -110,7 +110,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
     if (lookahead == end) {
         LOG_ERROR(pp, "Macro definition at end of file", LOG_ERR);
         status = CCC_ESYNTAX;
-        goto fail2;
+        goto fail1;
     }
 
     size_t name_len = lookahead - cur;
@@ -122,28 +122,23 @@ status_t pp_directive_define(preprocessor_t *pp) {
         LOG_ERROR(pp, "Macro redefinition", LOG_WARN);
 
         // Remove and cleanup existing macro
+        ht_remove(&pp->macros, cur_macro);
         pp_macro_destroy(cur_macro);
-        ht_remove(&pp->macros, cur_macro, DOFREE);
     }
 
     // Allocate new macro object and its name
-    pp_macro_t *new_macro = malloc(sizeof(pp_macro_t) + name_len + 1);
-    if (NULL == new_macro) {
-        LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
-        status = CCC_NOMEM;
-        goto fail1;
-    }
-
-    status = pp_macro_init(new_macro);
-    if (CCC_OK != status) {
+    pp_macro_t *new_macro;
+    if (CCC_OK != (status = pp_macro_create(&new_macro))) {
         LOG_ERROR(pp, "Failed to create macro", LOG_ERR);
-        status = status;
-        goto fail2;
+        goto fail1;
     }
 
     // Setup name
     new_macro->name.len = name_len;
-    new_macro->name.str = (char *)new_macro + sizeof(*new_macro);
+    new_macro->name.str = malloc(name_len + 1);
+    if (new_macro->name.str == NULL) {
+        goto fail2;
+    }
     strncpy(new_macro->name.str, cur, new_macro->name.len);
     new_macro->name.str[new_macro->name.len] = '\0';
 
@@ -163,7 +158,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
             if (param_len == 0) {
                 LOG_ERROR(pp, "Macro missing paramater name", LOG_ERR);
                 status = CCC_ESYNTAX;
-                goto fail3;
+                goto fail2;
             }
 
             // Allocate paramater with string in one chunk
@@ -172,7 +167,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
             if (NULL == string) {
                 LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
                 status = CCC_NOMEM;
-                goto fail3;
+                goto fail2;
             }
             string->str.len = param_len;
             string->str.str = (char *)string + sizeof(*string);
@@ -194,7 +189,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
         if (lookahead == end) {
             LOG_ERROR(pp, "Unexpected EOF in macro definition", LOG_ERR);
             status = CCC_ESYNTAX;
-            goto fail3;
+            goto fail2;
         }
     }
 
@@ -203,7 +198,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
     if (lookahead == end) {
         LOG_ERROR(pp, "Unexpected EOF in macro definition", LOG_ERR);
         status = CCC_ESYNTAX;
-        goto fail3;
+        goto fail2;
     }
 
     cur = lookahead;
@@ -218,7 +213,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
     if (lookahead == end) {
         LOG_ERROR(pp, "Unexpected EOF in macro definition", LOG_ERR);
         status = CCC_ESYNTAX;
-        goto fail3;
+        goto fail2;
     }
 
     // Allocate the macro body
@@ -227,7 +222,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
     if (macro_len != 0 && NULL == new_macro->start) {
         LOG_ERROR(pp, "Out of memory while defining macro", LOG_ERR);
         status = CCC_NOMEM;
-        goto fail3;
+        goto fail2;
     }
     strncpy(new_macro->start, cur, macro_len);
 
@@ -236,14 +231,12 @@ status_t pp_directive_define(preprocessor_t *pp) {
 
     // Add it to the hashtable
     if (CCC_OK != (status = ht_insert(&pp->macros, &new_macro->link))) {
-        goto fail3;
+        goto fail2;
     }
     return status;
 
-fail3:
-    pp_macro_destroy(new_macro);
 fail2:
-    free(new_macro);
+    pp_macro_destroy(new_macro);
 fail1:
     return status;
 }

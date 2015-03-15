@@ -197,8 +197,7 @@ status_t par_declaration_specifier(lex_wrap_t *lex, type_t **type) {
         // Type specifiers:
     case ID: {
         // Type specifier only if its a typedef name
-        tt_key_t key = {{ lex->cur.tab_entry->key.str,
-                           lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        tt_key_t key = { &lex->cur.tab_entry->key, TT_TYPEDEF };
         if (tt_lookup(lex->typetab, &key) == NULL) {
             return CCC_BACKTRACK;
         }
@@ -297,8 +296,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     switch (lex->cur.type) {
     case ID: {
         // Type specifier only if its a typedef name
-        tt_key_t key = {{ lex->cur.tab_entry->key.str,
-                          lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        tt_key_t key = { &lex->cur.tab_entry->key , TT_TYPEDEF };
         typetab_entry_t *entry = tt_lookup(lex->typetab, &key);
         if (entry == NULL) {
             return CCC_ESYNTAX;
@@ -370,7 +368,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     typetab_entry_t *entry = NULL;
     if (lex->cur.type == ID) {
         name = &lex->cur.tab_entry->key;
-        tt_key_t key = {{ name->str, name->len }, TT_COMPOUND };
+        tt_key_t key = { name, TT_COMPOUND };
         entry = tt_lookup(lex->typetab, &key);
 
         LEX_ADVANCE(lex);
@@ -470,8 +468,7 @@ status_t par_specifier_qualifier(lex_wrap_t *lex, type_t **type) {
         // Type specifiers:
     case ID: {
         // Type specifier only if its a typedef name
-        tt_key_t key = {{ lex->cur.tab_entry->key.str,
-                          lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        tt_key_t key = { &lex->cur.tab_entry->key , TT_TYPEDEF };
         if (tt_lookup(lex->typetab, &key) == NULL) {
             return CCC_BACKTRACK;
         }
@@ -796,8 +793,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             // Parens
         case ID: {
             // Type specifier only if its a typedef name
-            tt_key_t key = {{ lex->cur.tab_entry->key.str,
-                              lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+            tt_key_t key = { &lex->cur.tab_entry->key, TT_TYPEDEF };
             if (tt_lookup(lex->typetab, &key) != NULL) {
                 if (CCC_OK !=
                     (status = par_cast_expression(lex, true, result))) {
@@ -1625,8 +1621,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
 
     case ID: {
         // Type specifier only if its a typedef name
-        tt_key_t key = {{ lex->cur.tab_entry->key.str,
-                           lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+        tt_key_t key = { &lex->cur.tab_entry->key, TT_TYPEDEF };
         if (tt_lookup(lex->typetab, &key) != NULL) {
             return par_declaration(lex, result);
         }

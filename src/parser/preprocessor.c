@@ -63,7 +63,7 @@ status_t pp_init(preprocessor_t *pp) {
     return status;
 
 fail2:
-    ht_destroy(&pp->macros, DOFREE);
+    ht_destroy(&pp->macros);
 fail1:
     sl_destroy(&pp->search_path);
     sl_destroy(&pp->macro_insts);
@@ -77,15 +77,7 @@ fail1:
 void pp_destroy(preprocessor_t *pp) {
     SL_DESTROY_FUNC(&pp->file_insts, pp_file_destroy);
     SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
-
-
-    sl_link_t *cur;
-    // TODO: Fix this
-    HT_FOREACH(cur, &pp->macros) {
-        pp_macro_t *macro = GET_HT_ELEM(&pp->macros, cur);
-        pp_macro_destroy(macro);
-    }
-    ht_destroy(&pp->macros, DOFREE);
+    HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
     pp_directives_destroy(pp);
 }
 
@@ -586,14 +578,21 @@ status_t pp_file_destroy(pp_file_t *pp_file) {
     return status;
 }
 
-status_t pp_macro_init(pp_macro_t *macro) {
-    sl_init(&macro->params, offsetof(len_str_node_t, link));
+status_t pp_macro_create(pp_macro_t **macro) {
+    pp_macro_t *result = malloc(sizeof(pp_macro_t));
+    if (result == NULL) {
+        return CCC_NOMEM;
+    }
+    sl_init(&result->params, offsetof(len_str_node_t, link));
+    *macro = result;
     return CCC_OK;
 }
 
 void pp_macro_destroy(pp_macro_t *macro) {
     SL_DESTROY_FUNC(&macro->params, free);
+    free(macro->name.str);
     free(macro->start);
+    free(macro);
 }
 
 status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
@@ -631,6 +630,6 @@ fail1:
 }
 
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
-    ht_destroy(&macro_inst->param_map, DOFREE);
+    HT_DESTROY_FUNC(&macro_inst->param_map, free);
     free(macro_inst);
 }

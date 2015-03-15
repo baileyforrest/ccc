@@ -57,24 +57,7 @@ status_t ht_init(htable_t *ht, const ht_params *params) {
     return ht->buckets == NULL ? CCC_NOMEM : CCC_OK;
 }
 
-void ht_destroy(htable_t *ht, bool do_free) {
-    if (NOFREE == do_free) {
-        free(ht->buckets);
-        return;
-    }
-
-    // Free each chained list
-    for (size_t i = 0; i < ht->nbuckets; ++i) {
-        sl_link_t *cur = ht->buckets[i];
-        sl_link_t *next = NULL;
-
-        while(cur != NULL) {
-            next = cur->next;
-            free(GET_HT_ELEM(ht, cur));
-            cur = next;
-        }
-    }
-
+void ht_destroy(htable_t *ht) {
     // Free the list of buckets
     free(ht->buckets);
 }
@@ -133,16 +116,9 @@ status_t ht_insert(htable_t *ht, sl_link_t *elem) {
     for(; *cur != NULL; cur = &(*cur)->next) {
         void *key2 = GET_HT_KEY(ht, *cur);
 
-        if (!ht->params.cmpfunc(key, key2)) {
-            // Different keys
-            continue;
+        if (ht->params.cmpfunc(key, key2)) {
+            return CCC_DUPLICATE;
         }
-
-        // Found a match
-        elem->next = (*cur)->next;
-        free(GET_HT_ELEM(ht, *cur));
-        *cur = elem;
-        return CCC_OK;
     }
 
     elem->next = NULL;
@@ -172,19 +148,16 @@ static sl_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
     return NULL;
 }
 
-bool ht_remove(htable_t *ht, const void *key, bool do_free) {
+void *ht_remove(htable_t *ht, const void *key) {
     sl_link_t **pp_link = ht_lookup_helper(ht, key);
     if (NULL == pp_link) {
-        return false;
+        return NULL;
     }
 
     sl_link_t *link = *pp_link;
     *pp_link = (*pp_link)->next;
     ht->params.nelems--;
-    if (DOFREE == do_free) {
-        free(GET_HT_ELEM(ht, link));
-    }
-    return true;
+    return GET_HT_ELEM(ht, link);
 }
 
 void *ht_lookup(const htable_t *ht, const void *key) {
