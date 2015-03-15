@@ -127,10 +127,8 @@ status_t pp_open(preprocessor_t *pp, const char *filename) {
 
     size_t len = strlen(filename);
     len_str_t *file = fdir_lookup(filename, len);
-    if (file == NULL &&
-        CCC_OK != (status = fdir_insert(filename, len, &file))) {
-        goto done;
-    }
+    assert(file != NULL); // pp_file_map should add the file to the directory
+
     pp->last_mark.filename = file;
     pp->last_mark.line_num = 0;
     pp->last_mark.col_num = 0;

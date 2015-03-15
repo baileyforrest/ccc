@@ -53,7 +53,9 @@ void fdir_destroy();
  * reallocate its own copy of the same string.
  *
  * @param len of the filename
- * @param result Location to store file name
+ * @param result Location to store file name. Result points to a null terminated
+ * string
+ *
  * @return CCC_OK on success, error code on failure
  */
 status_t fdir_insert(const char *filename, size_t len, len_str_t **result);

@@ -121,8 +121,8 @@ void tt_destroy(typetab_t *tt) {
     ht_destroy(&tt->hashtab, NOFREE);
 }
 
-status_t tt_insert(typetab_t *tt, type_t *type, len_str_t *name,
-                   typetab_entry_t **entry) {
+status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
+                   len_str_t *name, typetab_entry_t **entry) {
     assert(tt != NULL);
     assert(type != NULL);
     assert(name != NULL);
@@ -135,23 +135,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, len_str_t *name,
     }
 
     new_entry->type = type;
-    switch (type->type) {
-    case TYPE_VOID:
-    case TYPE_CHAR:
-    case TYPE_SHORT:
-    case TYPE_INT:
-    case TYPE_LONG:
-    case TYPE_FLOAT:
-    case TYPE_DOUBLE:  new_entry->key.type = TT_PRIM    ; break;
-
-    case TYPE_TYPEDEF: new_entry->key.type = TT_TYPEDEF ; break;
-
-    case TYPE_STRUCT:
-    case TYPE_UNION:
-    case TYPE_ENUM:    new_entry->key.type = TT_COMPOUND; break;
-    default:
-        assert(false);
-    }
+    new_entry->key.type = tt_type;
     new_entry->key.name.str = name->str;
     new_entry->key.name.len = name->len;
 

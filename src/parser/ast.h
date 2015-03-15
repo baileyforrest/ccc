@@ -32,6 +32,7 @@
  * Basic varieties of types
  */
 typedef enum basic_type_t {
+    // Basic types
     TYPE_VOID,
     TYPE_CHAR,
     TYPE_SHORT,
@@ -39,6 +40,8 @@ typedef enum basic_type_t {
     TYPE_LONG,
     TYPE_FLOAT,
     TYPE_DOUBLE,
+
+    // User defined types
     TYPE_STRUCT,
     TYPE_UNION,
     TYPE_ENUM,

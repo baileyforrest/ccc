@@ -20,6 +20,9 @@
  * Parser implementation
  *
  * Recursive descent style parser
+ *
+ * TODO: proper destruction and and memory freeing on errors
+ * TODO: Error reporting/recovery
  */
 
 #include "parser.h"
@@ -405,7 +408,8 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     // Add a new named compound type into the type table
     if (name != NULL && entry == NULL) {
         if (CCC_OK !=
-            (status = tt_insert(lex->typetab, new_type, name, &entry))) {
+            (status =
+             tt_insert(lex->typetab, new_type, TT_COMPOUND, name, &entry))) {
             goto fail;
         }
     }
