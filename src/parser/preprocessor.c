@@ -93,18 +93,18 @@ void pp_destroy(preprocessor_t *pp) {
     SL_FOREACH(cur, &pp->file_insts) {
         pp_file_destroy(GET_ELEM(&pp->file_insts, &cur));
     }
-    sl_destroy(&pp->file_insts, NOFREE); // pp_file_destroy frees
+    sl_destroy(&pp->file_insts, DOFREE);
 
     SL_FOREACH(cur, &pp->macro_insts) {
         pp_macro_inst_destroy(GET_ELEM(&pp->macro_insts, cur));
     }
-    sl_destroy(&pp->macro_insts, NOFREE); // pp_macro_inst_destroy frees
+    sl_destroy(&pp->macro_insts, DOFREE);
 
     HT_FOREACH(cur, &pp->macros) {
         pp_macro_t *macro = GET_HT_ELEM(&pp->macros, cur);
         pp_macro_destroy(macro);
     }
-    ht_destroy(&pp->macros, DOFREE); // pp_macro_destroy does not free
+    ht_destroy(&pp->macros, DOFREE);
     pp_directives_destroy(pp);
 }
 
@@ -240,6 +240,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         pp_macro_inst_t *last = sl_pop_front(&pp->macro_insts);
         pp_macro_inst_destroy(last);
+        free(last);
         macro_inst = sl_head(&pp->macro_insts);
     }
 
@@ -255,6 +256,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             pp_file_t *last = sl_pop_front(&pp->file_insts);
             pp_file_destroy(last);
+            free(last);
             file = sl_head(&pp->file_insts);
         }
     }
@@ -533,6 +535,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
 fail2:
     pp_macro_inst_destroy(new_macro_inst);
+    free(new_macro_inst);
 fail1:
     return error;
 }
@@ -601,8 +604,6 @@ status_t pp_file_destroy(pp_file_t *pp_file) {
         status = CCC_FILEERR;
     }
 
-    free(pp_file);
-
     return status;
 }
 
@@ -651,5 +652,4 @@ fail1:
 
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     ht_destroy(&macro_inst->param_map, DOFREE);
-    free(macro_inst);
 }

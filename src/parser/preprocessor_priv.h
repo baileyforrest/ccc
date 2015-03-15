@@ -214,7 +214,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
 status_t pp_file_map(const char *filename, size_t len, pp_file_t **result);
 
 /**
- * Unmaps and given pp_file_t. Does free pp_file.
+ * Unmaps and given pp_file_t. Does not free pp_file.
  *
  * @param filename Filename to open.
  * @param result Location to store result. NULL if failed
@@ -246,7 +246,7 @@ void pp_macro_destroy(pp_macro_t *macro);
 status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result);
 
 /**
- * Destroys a macro instance. Does free macro_inst.
+ * Destroys a macro instance. Does not free macro_inst.
  *
  * @param macro intance to destroy
  */

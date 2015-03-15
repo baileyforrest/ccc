@@ -23,7 +23,6 @@
 #include "parser/preprocessor.h"
 #include "parser/symtab.h"
 #include "parser/token.h"
-#include "parser/type_table.h"
 
 #include "util/file_directory.h"
 
@@ -31,7 +30,6 @@ static preprocessor_t pp;
 static symtab_t symtab;
 static symtab_t string_tab;
 static lexer_t lexer;
-static typetab_t typetab;
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -70,13 +68,14 @@ int main(int argc, char **argv) {
         token_print(&cur_token);
     } while(cur_token.type != TOKEN_EOF);
     */
+    ///*
     len_str_t *file = fdir_lookup(argv[1], strlen(argv[1]));
     trans_unit_t *ast;
     if (CCC_OK != (status = parser_parse(&lexer, file, &ast))) {
         goto fail5;
     }
+    //*/
 
-    tt_destroy(&typetab);
 fail5:
     lexer_destroy(&lexer);
 fail4:

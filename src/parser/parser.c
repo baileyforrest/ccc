@@ -23,7 +23,6 @@
  *
  * TODO: proper destruction and and memory freeing on errors
  * TODO: Error reporting/recovery
- * TODO: Add typedefs to typetable. Have typetable perscope
  */
 
 #include "parser.h"
@@ -46,6 +45,11 @@ status_t parser_parse(lexer_t *lexer, len_str_t *file, trans_unit_t **result) {
     status = par_translation_unit(&lex, file, result);
 fail:
     return status;
+}
+
+void ast_destroy(trans_unit_t *ast) {
+    (void)ast;
+    // TODO: Implement this
 }
 
 static inline int par_get_prec(token_t token) {
@@ -91,6 +95,7 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
     tunit->path = file;
     sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
     tt_init(&tunit->typetab, NULL);
+    lex->typetab = &tunit->typetab;
 
     while (lex->cur.type != TOKEN_EOF) {
         gdecl_t *gdecl;
@@ -282,7 +287,9 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
 
     // Find last node in chain
     type_t **end_node = NULL;
-    if (*type != NULL) {
+    if (*type == NULL) {
+        end_node = type;
+    } else {
         bool done = false;
         for (end_node = type; !done && *end_node != NULL; ) {
             switch ((*end_node)->type) {
@@ -350,6 +357,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         return CCC_ESYNTAX;
     }
 
+    LEX_ADVANCE(lex);
 fail:
     return status;
 }
@@ -722,6 +730,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
                 goto fail;
             }
             //}
+            LEX_MATCH(lex, RPAREN);
             node->type = func_type;
             break;
         default:
@@ -777,14 +786,6 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
         switch (lex->cur.type) {
             // Cases for casts
 
-        case ID: {
-            // Type specifier only if its a typedef name
-            tt_key_t key = {{ lex->cur.tab_entry->key.str,
-                              lex->cur.tab_entry->key.len }, TT_TYPEDEF };
-            if (tt_lookup(lex->typetab, &key) == NULL) {
-                break;
-            }
-        }
         case VOID:
         case CHAR:
         case SHORT:
@@ -807,6 +808,18 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             break;
 
             // Parens
+        case ID: {
+            // Type specifier only if its a typedef name
+            tt_key_t key = {{ lex->cur.tab_entry->key.str,
+                              lex->cur.tab_entry->key.len }, TT_TYPEDEF };
+            if (tt_lookup(lex->typetab, &key) != NULL) {
+                if (CCC_OK !=
+                    (status = par_cast_expression(lex, true, result))) {
+                    goto fail;
+                }
+                break;
+            }
+        }
         default:
             if (CCC_OK != (status = par_expression(lex, NULL, result))) {
                 goto fail;
@@ -816,6 +829,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             LEX_MATCH(lex, RPAREN);
             break;
         }
+        break;
     default:
         return CCC_ESYNTAX;
     }
@@ -1588,6 +1602,8 @@ fail:
 
 
 status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
+    status_t status = CCC_OK;
+
     switch (lex->cur.type) {
         // Cases for declaration specifier
         // Storage class specifiers
@@ -1614,7 +1630,11 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         // Type qualitifiers
     case CONST:
     case VOLATILE:
-        return par_declaration(lex, result);
+        if(CCC_OK != (status = par_declaration(lex, result))) {
+            goto fail;
+        }
+        LEX_MATCH(lex, SEMI);
+        return CCC_OK;
 
     case ID: {
         // Type specifier only if its a typedef name
@@ -1644,12 +1664,17 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         return par_jump_statement(lex, result);
 
     case SEMI: // noop
+        LEX_ADVANCE(lex);
+        ALLOC_NODE(*result, stmt_t);
+        (*result)->type = STMT_NOP;
         return CCC_OK;
     case RBRACK:
         return par_compound_statement(lex, result);
     default:
         return par_expression_statement(lex, result);
     }
+fail:
+    return status;
 }
 
 status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
@@ -1876,27 +1901,26 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     stmt_t *stmt;
     ALLOC_NODE(stmt, stmt_t);
 
-    ALLOC_NODE(*result, stmt_t);
-    (*result)->type = STMT_COMPOUND;
-    sl_init(&(*result)->compound.stmts, offsetof(stmt_t, link));
-    if (CCC_OK != (tt_init(&(*result)->compound.typetab, lex->typetab))) {
+    stmt->type = STMT_COMPOUND;
+    sl_init(&stmt->compound.stmts, offsetof(stmt_t, link));
+    if (CCC_OK != (tt_init(&stmt->compound.typetab, lex->typetab))) {
         goto fail;
     }
     // Add new typetab table to top of stack
-    lex->typetab = &(*result)->compound.typetab;
+    lex->typetab = &stmt->compound.typetab;
 
-    LEX_MATCH(lex, LBRACK);
-    while (lex->cur.type != RBRACK) {
+    LEX_MATCH(lex, LBRACE);
+    while (lex->cur.type != RBRACE) {
         stmt_t *cur = NULL;
         if (CCC_OK != (status = par_statement(lex, &cur))) {
             goto fail;
         }
-        sl_append(&(*result)->compound.stmts, &cur->link);
+        sl_append(&stmt->compound.stmts, &cur->link);
     }
     LEX_ADVANCE(lex);
 
     // Remove new typetab table to top of stack
-    lex->typetab = (*result)->compound.typetab.last;
+    lex->typetab = stmt->compound.typetab.last;
 
     *result = stmt;
 fail:
