@@ -383,7 +383,8 @@ typedef struct stmt_t {
         } for_params;
 
         struct {                         /**< Goto parameters */
-            struct len_str_t *label;        /**< Label to goto */
+            struct stmt_t *target;       /**< Parent statement to continue */
+            struct len_str_t *label;     /**< Label to goto */
         } goto_params;
 
         struct {                         /**< Continue parameters */

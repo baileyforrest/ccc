@@ -55,21 +55,35 @@ typedef struct slist_t {
 /**
  * Initalizes a singly linked list head
  *
- * TODO: Remove error code
- *
  * @param slist List head to initalize
  * @param head_offset offset of head into list element structs
  */
-status_t sl_init(slist_t *slist, size_t head_offset);
+void sl_init(slist_t *slist, size_t head_offset);
 
 
 /**
- * Does not free slist. Destroys a singly linked list. Optionally frees elements
+ * Destroys a singly linked list. Does not free slist or elements
  *
  * @param slist List head to destroy
- * @param do_free if SL_FREE, frees the elements
  */
-void sl_destroy(slist_t *slist, bool do_free);
+void sl_destroy(slist_t *slist);
+
+/**
+ * Destroys a singly linked list. Calls func on each element, which may free
+ * the element
+ *
+ * @param slist List head to destroy
+ * @param func Function to call on each element
+ */
+#define SL_DESTROY_FUNC(slist, func)                                \
+    do {                                                            \
+        for (sl_link_t *cur = (slist)->head, *next; cur != NULL;    \
+             cur = next) {                                          \
+            next = cur->next;                                       \
+            (func)(GET_ELEM((slist), cur));                         \
+        }                                                           \
+        sl_destroy((slist));                                        \
+    } while (0)
 
 /**
  * Return slist head
@@ -125,14 +139,6 @@ void *sl_pop_front(slist_t *slist);
 bool sl_remove(slist_t *slist, sl_link_t *link);
 
 /**
- * Calls callback function on each of the elements
- *
- * @param slist List to perform operations on
- * @param func The function to call on each element
- */
-void sl_foreach(slist_t *slist, void (*func)(void *));
-
-/**
  * Run code on each element
  *
  * The elements themselves must be accessed with GET_ELEM
@@ -140,9 +146,9 @@ void sl_foreach(slist_t *slist, void (*func)(void *));
  * @param CURRENT_ELEMENT pp_link_t pointer to store current element
  * @param SL_HEAD Head of the list
  */
-#define SL_FOREACH(CURRENT_ELEM, SL_HEAD) \
-    for (CURRENT_ELEM = (SL_HEAD)->head;                                       \
-         CURRENT_ELEM != NULL;                                                 \
+#define SL_FOREACH(CURRENT_ELEM, SL_HEAD)                               \
+    for (CURRENT_ELEM = (SL_HEAD)->head;                                \
+         CURRENT_ELEM != NULL;                                          \
          CURRENT_ELEM = CURRENT_ELEM->next)
 
 

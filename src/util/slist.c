@@ -32,25 +32,16 @@
 extern inline void *sl_head(slist_t *slist);
 extern inline void *sl_tail(slist_t *slist);
 
-status_t sl_init(slist_t *slist, size_t head_offset) {
+void sl_init(slist_t *slist, size_t head_offset) {
     slist->head = NULL;
     slist->tail = NULL;
     slist->head_offset = head_offset;
-
-    return CCC_OK;
 }
 
-void sl_destroy(slist_t *slist, bool do_free) {
-    if (do_free == NOFREE) {
-        memset(slist, 0, sizeof(*slist));
-        return;
-    }
-
-    for (sl_link_t *cur = slist->head, *next; cur != NULL; cur = next) {
-        next = cur->next;
-        free(GET_ELEM(slist, cur));
-    }
-    memset(slist, 0, sizeof(*slist));
+void sl_destroy(slist_t *slist) {
+    slist->head = NULL;
+    slist->tail = NULL;
+    slist->head_offset = 0;
 }
 
 void sl_append(slist_t *slist, sl_link_t *link) {
@@ -105,10 +96,4 @@ bool sl_remove(slist_t *slist, sl_link_t *link) {
     }
 
     return false;
-}
-
-void sl_foreach(slist_t *slist, void (*func)(void *)) {
-    for (sl_link_t *cur = slist->head; cur != NULL; cur = cur->next) {
-        func(GET_ELEM(slist, cur));
-    }
 }

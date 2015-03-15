@@ -47,41 +47,27 @@ status_t pp_init(preprocessor_t *pp) {
     };
 
     status_t status = CCC_OK;
-    if (CCC_OK !=
-        (status = sl_init(&pp->file_insts, offsetof(pp_file_t, link)))) {
-        goto fail1;
-    }
-
-    if (CCC_OK !=
-        (status = sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link)))) {
-        goto fail2;
-    }
-
-    if (CCC_OK !=
-        (status = sl_init(&pp->search_path, offsetof(len_str_node_t, link)))) {
-        goto fail3;
-    }
+    sl_init(&pp->file_insts, offsetof(pp_file_t, link));
+    sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link));
+    sl_init(&pp->search_path, offsetof(len_str_node_t, link));
 
     if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
-        goto fail4;
+        goto fail1;
     }
 
     // Register directive handlers
     if (CCC_OK != (status = pp_directives_init(pp))) {
-        goto fail5;
+        goto fail2;
     }
 
     return status;
 
-fail5:
-    ht_destroy(&pp->macros, DOFREE);
-fail4:
-    sl_destroy(&pp->search_path, DOFREE);
-fail3:
-    sl_destroy(&pp->macro_insts, DOFREE);
 fail2:
-    sl_destroy(&pp->file_insts, DOFREE);
+    ht_destroy(&pp->macros, DOFREE);
 fail1:
+    sl_destroy(&pp->search_path);
+    sl_destroy(&pp->macro_insts);
+    sl_destroy(&pp->file_insts);
     return status;
 }
 
@@ -89,17 +75,12 @@ fail1:
  * Release all resources in pp
  */
 void pp_destroy(preprocessor_t *pp) {
+    SL_DESTROY_FUNC(&pp->file_insts, pp_file_destroy);
+    SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
+
+
     sl_link_t *cur;
-    SL_FOREACH(cur, &pp->file_insts) {
-        pp_file_destroy(GET_ELEM(&pp->file_insts, cur));
-    }
-    sl_destroy(&pp->file_insts, DOFREE);
-
-    SL_FOREACH(cur, &pp->macro_insts) {
-        pp_macro_inst_destroy(GET_ELEM(&pp->macro_insts, cur));
-    }
-    sl_destroy(&pp->macro_insts, DOFREE);
-
+    // TODO: Fix this
     HT_FOREACH(cur, &pp->macros) {
         pp_macro_t *macro = GET_HT_ELEM(&pp->macros, cur);
         pp_macro_destroy(macro);
@@ -240,7 +221,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         pp_macro_inst_t *last = sl_pop_front(&pp->macro_insts);
         pp_macro_inst_destroy(last);
-        free(last);
         macro_inst = sl_head(&pp->macro_insts);
     }
 
@@ -256,7 +236,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             pp_file_t *last = sl_pop_front(&pp->file_insts);
             pp_file_destroy(last);
-            free(last);
             file = sl_head(&pp->file_insts);
         }
     }
@@ -535,7 +514,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
 fail2:
     pp_macro_inst_destroy(new_macro_inst);
-    free(new_macro_inst);
 fail1:
     return error;
 }
@@ -604,15 +582,17 @@ status_t pp_file_destroy(pp_file_t *pp_file) {
         status = CCC_FILEERR;
     }
 
+    free(pp_file);
     return status;
 }
 
 status_t pp_macro_init(pp_macro_t *macro) {
-    return sl_init(&macro->params, offsetof(len_str_node_t, link));
+    sl_init(&macro->params, offsetof(len_str_node_t, link));
+    return CCC_OK;
 }
 
 void pp_macro_destroy(pp_macro_t *macro) {
-    sl_destroy(&macro->params, DOFREE);
+    SL_DESTROY_FUNC(&macro->params, free);
     free(macro->start);
 }
 
@@ -652,4 +632,5 @@ fail1:
 
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     ht_destroy(&macro_inst->param_map, DOFREE);
+    free(macro_inst);
 }

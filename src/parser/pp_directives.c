@@ -79,7 +79,7 @@ done:
 
 void pp_directives_destroy(preprocessor_t *pp) {
     ht_destroy(&pp->directives, NOFREE);
-    sl_destroy(&pp->macro_insts, NOFREE);
+    sl_destroy(&pp->macro_insts);
 }
 
 /**
