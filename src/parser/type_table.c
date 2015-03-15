@@ -25,6 +25,8 @@
 #include <stdbool.h>
 #include <stdalign.h>
 
+#include "parser/ast.h"
+
 #include "util/util.h"
 
 #define TYPE_LITERAL(typename, type) \
@@ -63,8 +65,6 @@ static typetab_entry_t s_prim_types[] = {
     TYPE_TAB_LITERAL_ENTRY(double)
 };
 
-extern typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key);
-
 uint32_t typetab_key_hash(const void *void_key) {
     const tt_key_t *key = (tt_key_t *)void_key;
     uint32_t hash = strhash(&key->name);
@@ -83,9 +83,11 @@ bool typetab_key_cmp(const void *void_key1, const void *void_key2) {
     return vstrcmp(&key1->name, &key2->name);
 }
 
-status_t tt_init(typetab_t *tt) {
+status_t tt_init(typetab_t *tt, typetab_t *last) {
     assert(tt != NULL);
     status_t status = CCC_OK;
+    tt->last = last;
+
     static ht_params params = {
         0,                               // Size estimate
         offsetof(typetab_entry_t, key),  // Offset of key
@@ -147,11 +149,24 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
         goto fail1;
     }
 
-    *entry = new_entry;
+    if (entry) {
+        *entry = new_entry;
+    }
     return status;
 
 fail1:
     free(new_entry);
 fail:
     return status;
+}
+
+typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key) {
+    for (;tt != NULL; tt = tt->last) {
+        typetab_entry_t *result = ht_lookup(&tt->hashtab, key);
+        if (result != NULL) {
+            return result;
+        }
+    }
+
+    return NULL;
 }

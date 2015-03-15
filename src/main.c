@@ -70,13 +70,9 @@ int main(int argc, char **argv) {
         token_print(&cur_token);
     } while(cur_token.type != TOKEN_EOF);
     */
-    if (CCC_OK != (status = tt_init(&typetab))) {
-        goto fail5;
-    }
-
     len_str_t *file = fdir_lookup(argv[1], strlen(argv[1]));
     trans_unit_t *ast;
-    if (CCC_OK != (status = parser_parse(&lexer, &typetab, file, &ast))) {
+    if (CCC_OK != (status = parser_parse(&lexer, file, &ast))) {
         goto fail5;
     }
 

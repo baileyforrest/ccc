@@ -23,6 +23,7 @@
  *
  * TODO: proper destruction and and memory freeing on errors
  * TODO: Error reporting/recovery
+ * TODO: Add typedefs to typetable. Have typetable perscope
  */
 
 #include "parser.h"
@@ -34,16 +35,13 @@
 #include "util/logger.h"
 #include "util/util.h"
 
-status_t parser_parse(lexer_t *lexer, typetab_t *typetab, len_str_t *file,
-                      trans_unit_t **result) {
+status_t parser_parse(lexer_t *lexer, len_str_t *file, trans_unit_t **result) {
     assert(lexer != NULL);
-    assert(typetab != NULL);
     assert(file != NULL);
     assert(result != NULL);
     status_t status = CCC_OK;
     lex_wrap_t lex;
     lex.lexer = lexer;
-    lex.typetab = typetab;
     LEX_ADVANCE(&lex);
     status = par_translation_unit(&lex, file, result);
 fail:
@@ -90,8 +88,9 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
     status_t status = CCC_OK;
     trans_unit_t *tunit;
     ALLOC_NODE(tunit, trans_unit_t);
-    sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
     tunit->path = file;
+    sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
+    tt_init(&tunit->typetab, NULL);
 
     while (lex->cur.type != TOKEN_EOF) {
         gdecl_t *gdecl;
@@ -1516,13 +1515,26 @@ fail:
 
 status_t par_init_declarator(lex_wrap_t *lex, stmt_t *stmt) {
     status_t status = CCC_OK;
+    bool is_typedef = stmt->decl.type->type == TYPE_MOD &&
+        (stmt->decl.type->mod.type_mod & TMOD_TYPEDEF);
     decl_node_t *decl_node = NULL;
     if (CCC_OK != (status = par_declarator(lex, stmt->decl.type, &decl_node))) {
         goto fail;
     }
+    // Add typedefs to the typetable on the top of the stack
+    if (is_typedef) {
+        if (CCC_OK !=
+            (status = tt_insert(lex->typetab, decl_node->type,
+                                TT_TYPEDEF, decl_node->id, NULL))) {
+            goto fail;
+        }
+    }
     sl_append(&stmt->decl.decls, &decl_node->link);
 
     if (lex->cur.type == ASSIGN) {
+        if (is_typedef) {
+            // TODO: report error
+        }
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_initializer(lex, &decl_node->expr))) {
             goto fail;
@@ -1867,6 +1879,11 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     ALLOC_NODE(*result, stmt_t);
     (*result)->type = STMT_COMPOUND;
     sl_init(&(*result)->compound.stmts, offsetof(stmt_t, link));
+    if (CCC_OK != (tt_init(&(*result)->compound.typetab, lex->typetab))) {
+        goto fail;
+    }
+    // Add new typetab table to top of stack
+    lex->typetab = &(*result)->compound.typetab;
 
     LEX_MATCH(lex, LBRACK);
     while (lex->cur.type != RBRACK) {
@@ -1877,6 +1894,9 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
         sl_append(&(*result)->compound.stmts, &cur->link);
     }
     LEX_ADVANCE(lex);
+
+    // Remove new typetab table to top of stack
+    lex->typetab = (*result)->compound.typetab.last;
 
     *result = stmt;
 fail:

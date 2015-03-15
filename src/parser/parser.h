@@ -34,7 +34,6 @@
  * @param result The parsed AST
  * @return CCC_OK on success, error code on error
  */
-status_t parser_parse(lexer_t *lexer, typetab_t *typetab, len_str_t *file,
-                      trans_unit_t **result);
+status_t parser_parse(lexer_t *lexer, len_str_t *file, trans_unit_t **result);
 
 #endif /* _PARSER_H_ */

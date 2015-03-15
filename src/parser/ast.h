@@ -25,6 +25,8 @@
 #ifndef _AST_H_
 #define _AST_H_
 
+#include "parser/type_table.h"
+
 #include "util/slist.h"
 #include "util/util.h"
 
@@ -410,6 +412,7 @@ typedef struct stmt_t {
 
         struct {                         /**< Block paramaters */
             slist_t stmts;               /**< List of statements */
+            typetab_t typetab;          /**< Types defined in this scope */
         } compound;
 
         struct {                         /**< Expression parameters */
@@ -422,9 +425,10 @@ typedef struct stmt_t {
  * Translation unit - Top level AST structure
  */
 typedef struct trans_unit_t {
-    sl_link_t link;  /**< Storage link */
-    len_str_t *path; /**< Path of compilation unit */
-    slist_t gdecls;  /**< List of gdecl in compilation unit */
+    sl_link_t link;     /**< Storage link */
+    len_str_t *path;    /**< Path of compilation unit */
+    slist_t gdecls;     /**< List of gdecl in compilation unit */
+    typetab_t typetab; /**< Types defined at top level */
 } trans_unit_t;
 
 /**
