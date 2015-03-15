@@ -91,7 +91,7 @@ fail1:
 void pp_destroy(preprocessor_t *pp) {
     sl_link_t *cur;
     SL_FOREACH(cur, &pp->file_insts) {
-        pp_file_destroy(GET_ELEM(&pp->file_insts, &cur));
+        pp_file_destroy(GET_ELEM(&pp->file_insts, cur));
     }
     sl_destroy(&pp->file_insts, DOFREE);
 

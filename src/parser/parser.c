@@ -47,11 +47,6 @@ fail:
     return status;
 }
 
-void ast_destroy(trans_unit_t *ast) {
-    (void)ast;
-    // TODO: Implement this
-}
-
 static inline int par_get_prec(token_t token) {
     switch (token) {
     case STAR:
@@ -137,14 +132,6 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     if (CCC_BACKTRACK == (status = par_declarator(lex, type, &decl_node))) {
         // If the next character isn't a declarator, then its a type declaration
         gdecl->type = GDECL_DECL;
-        ALLOC_NODE(gdecl->decl, stmt_t);
-        gdecl->decl->type = STMT_DECL;
-        gdecl->decl->decl.type = type;
-        if (CCC_OK !=
-            sl_init(&gdecl->decl->decl.decls, offsetof(decl_node_t, link))) {
-            free(gdecl->decl);
-            goto fail;
-        }
         goto done;
     }
     status = CCC_OK;
@@ -542,7 +529,6 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
     sl_init(&node->decl->decl.decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
-
     if (CCC_OK != (status = par_declarator(lex, decl_type, &decl_node))) {
         goto fail;
     }
@@ -1219,8 +1205,9 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
             }
             ALLOC_NODE(expr, expr_t);
             expr->type = EXPR_MEM_ACC;
-            expr->mem_acc.op = op;
+            expr->mem_acc.base = base;
             expr->mem_acc.name = &lex->cur.tab_entry->key;
+            expr->mem_acc.op = op;
             LEX_ADVANCE(lex);
             base = expr;
             break;

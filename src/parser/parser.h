@@ -36,11 +36,4 @@
  */
 status_t parser_parse(lexer_t *lexer, len_str_t *file, trans_unit_t **result);
 
-/**
- * Destroys an AST
- *
- * @param ast The ast to destroy
- */
-void ast_destroy(trans_unit_t *ast);
-
 #endif /* _PARSER_H_ */

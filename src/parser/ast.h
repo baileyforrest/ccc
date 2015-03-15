@@ -30,6 +30,44 @@
 #include "util/slist.h"
 #include "util/util.h"
 
+// Forward declarations
+struct stmt_t;
+struct type_t;
+struct gdecl_t;
+
+/**
+ * Struct and union declaration entry
+ */
+typedef struct struct_decl_t {
+    sl_link_t link;         /**< List link */
+    struct stmt_t *decl;    /**< The declaration */
+    struct expr_t *bf_bits; /**< Bitfield bits 0 for unused */
+} struct_decl_t;
+
+/**
+ * Union declaration entry
+ */
+typedef struct enum_id_t {
+    sl_link_t link; /**< List link */
+    len_str_t *id;  /**< Name */
+    struct expr_t *val;   /**< Value */
+} enum_id_t;
+
+/**
+ * Modifiers for types. Should be stored in a bitmap
+ */
+typedef enum type_mod_t {
+    TMOD_SIGNED   = 1 << 0,
+    TMOD_UNSIGNED = 1 << 1,
+    TMOD_AUTO     = 1 << 2,
+    TMOD_REGISTER = 1 << 3,
+    TMOD_STATIC   = 1 << 4,
+    TMOD_EXTERN   = 1 << 5,
+    TMOD_TYPEDEF  = 1 << 6,
+    TMOD_CONST    = 1 << 7,
+    TMOD_VOLATILE = 1 << 8,
+} type_mod_t;
+
 /**
  * Basic varieties of types
  */
@@ -53,24 +91,65 @@ typedef enum basic_type_t {
     TYPE_ARR,    /**< Array */
     TYPE_PTR,    /**< Pointer */
     TYPE_MOD,    /**< Modified Type */
-
-    TYPE_TYPEDEF /**< Typedef type */
 } basic_type_t;
 
 /**
- * Modifiers for types. Should be stored in a bitmap
+ * Tagged union representing a type
  */
-typedef enum type_mod_t {
-    TMOD_SIGNED   = 1 << 0,
-    TMOD_UNSIGNED = 1 << 1,
-    TMOD_AUTO     = 1 << 2,
-    TMOD_REGISTER = 1 << 3,
-    TMOD_STATIC   = 1 << 4,
-    TMOD_EXTERN   = 1 << 5,
-    TMOD_TYPEDEF  = 1 << 6,
-    TMOD_CONST    = 1 << 7,
-    TMOD_VOLATILE = 1 << 8,
-} type_mod_t;
+typedef struct type_t {
+    sl_link_t link;                     /**< Storage Link */
+    basic_type_t type;                  /**< Basic type */
+    int size;                           /**< Size of this type */
+    char align;                         /**< Alignment */
+
+    /** Whether or not this should be freed with containing structure */
+    bool dealloc;
+
+    union {
+        slist_t struct_decls;           /**< List of struct/union definitions */
+        slist_t enum_ids;               /**< List of enum ids/values */
+
+        struct {                        /**< Function signature */
+            struct type_t *type;        /**< Type (May be function pointer */
+            slist_t params;             /**< Paramater signature (decl list) */
+            bool varargs;               /**< Whether or not function has VA */
+        } func;
+
+        struct {                        /**< Structure for array info */
+            struct type_t *base;        /**< Base type */
+            struct expr_t *len;         /**< Dimension length */
+        } arr;
+
+        struct {                        /**< Structure for pointer info */
+            struct type_t *base;        /**< Base type pointed to */
+            type_mod_t type_mod;        /**< Modifiers */
+        } ptr;
+
+        struct {
+            struct type_t *base;
+            type_mod_t type_mod;        /**< Bitset of type modifiers */
+        } mod;
+    };
+} type_t;
+
+typedef enum gdecl_type_t {
+    GDECL_FDEFN,    /**< Function definition */
+    GDECL_DECL      /**< Declaration */
+} gdecl_type_t;
+
+/**
+ * Global declaration
+ */
+typedef struct gdecl_t {
+    sl_link_t link;              /**< Storage Link */
+    gdecl_type_t type;           /**< Type of gdecl */
+    struct stmt_t *decl;         /**< Declaration */
+    union {
+        struct {                 /**< Function definition parameters */
+            struct stmt_t *stmt; /**< Function body */
+        } fdefn;
+    };
+} gdecl_t;
 
 /**
  * Types of operations
@@ -112,88 +191,6 @@ typedef enum oper_t {
     OP_DOT         // .
 } oper_t;
 
-// Forward declarations
-struct stmt_t;
-struct type_t;
-struct gdecl_t;
-
-/**
- * Struct and union declaration entry
- */
-typedef struct struct_decl_t {
-    sl_link_t link;         /**< List link */
-    struct stmt_t *decl;    /**< The declaration */
-    struct expr_t *bf_bits; /**< Bitfield bits 0 for unused */
-} struct_decl_t;
-
-/**
- * Union declaration entry
- */
-typedef struct enum_id_t {
-    sl_link_t link; /**< List link */
-    len_str_t *id;  /**< Name */
-    struct expr_t *val;   /**< Value */
-} enum_id_t;
-
-/**
- * Tagged union representing a type
- */
-typedef struct type_t {
-    sl_link_t link;                     /**< Storage Link */
-    basic_type_t type;                  /**< Basic type */
-    int size;                           /**< Size of this type */
-    char align;                         /**< Alignment */
-
-    /** Whether or not this should be freed with containing structure */
-    bool dealloc;
-
-    union {
-        slist_t struct_decls;           /**< List of struct/union definitions */
-        slist_t enum_ids;               /**< List of enum ids/values */
-
-        struct {                        /**< Function signature */
-            struct type_t *type;        /**< Type (May be function pointer */
-            slist_t params;             /**< Paramater signature (decl list) */
-            bool varargs;               /**< Whether or not function has VA */
-        } func;
-
-        struct {                        /**< Structure for pointer info */
-            struct type_t *base;        /**< Base type pointed to */
-            type_mod_t type_mod;        /**< Modifiers */
-        } ptr;
-
-        struct {                        /**< Structure for array info */
-            struct type_t *base;        /**< Base type */
-            struct expr_t *len;         /**< Dimension length */
-        } arr;
-
-        struct {
-            struct type_t *base;
-            type_mod_t type_mod;        /**< Bitset of type modifiers */
-        } mod;
-
-        len_str_t *typedef_name;        /**< New type's name */
-    };
-} type_t;
-
-typedef enum gdecl_type_t {
-    GDECL_FDEFN,    /**< Function definition */
-    GDECL_DECL      /**< Declaration */
-} gdecl_type_t;
-
-/**
- * Global declaration
- */
-typedef struct gdecl_t {
-    sl_link_t link;              /**< Storage Link */
-    gdecl_type_t type;           /**< Type of gdecl */
-    struct stmt_t *decl;         /**< Declaration */
-    union {
-        struct {                 /**< Function definition parameters */
-            struct stmt_t *stmt; /**< Function body */
-        } fdefn;
-    };
-} gdecl_t;
 
 /**
  * Types of expressions
@@ -210,7 +207,6 @@ typedef enum expr_type_t {
     EXPR_COND,        /**< Conditional Operator */
     EXPR_CAST,        /**< Cast expression */
     EXPR_CALL,        /**< Function call */
-    EXPR_ARR_ACC,     /**< Array access */
     EXPR_CMPD,        /**< Compound expression */
     EXPR_SIZEOF,      /**< Sizeof expression */
     EXPR_MEM_ACC,     /**< Member access */
@@ -280,8 +276,9 @@ typedef struct expr_t {
         } sizeof_params;
 
         struct {
-            oper_t op;
+            struct expr_t *base;
             len_str_t *name;
+            oper_t op;
         } mem_acc;
 
         struct {
@@ -322,15 +319,6 @@ typedef enum stmt_type_t {
 
     STMT_EXPR            /**< expression */
 } stmt_type_t;
-
-/**
- * Object representing a single switch case
- */
-typedef struct switch_case_t {
-    sl_link_t link;      /**< Storage Link */
-    intptr_t val;        /**< case value */
-    struct stmt_t *stmt; /**< Statement to execute */
-} switch_case_t;
 
 typedef struct decl_node_t {
     sl_link_t link; /**< Storage link */
@@ -412,7 +400,7 @@ typedef struct stmt_t {
 
         struct {                         /**< Block paramaters */
             slist_t stmts;               /**< List of statements */
-            typetab_t typetab;          /**< Types defined in this scope */
+            typetab_t typetab;           /**< Types defined in this scope */
         } compound;
 
         struct {                         /**< Expression parameters */
@@ -437,5 +425,75 @@ typedef struct trans_unit_t {
  * @param cu The AST to print
  */
 void ast_print(trans_unit_t *tu);
+
+/**
+ * Destroys an AST
+ *
+ * @param ast The ast to destroy
+ */
+void ast_destroy(trans_unit_t *ast);
+
+/**
+ * Destroys a struct_decl_t. Does not free, but does free child nodes
+ *
+ * @param struct_decl Object to destroy
+ */
+void ast_struct_decl_destroy(struct_decl_t *struct_decl);
+
+/**
+ * Destroys an enum_id_t. Does not free, but does free child nodes
+ *
+ * @param enum_id Object to destroy
+ */
+void ast_enum_id_destroy(enum_id_t *enum_id);
+
+
+#define OVERRIDE true
+#define NO_OVERRIDE false
+
+/**
+ * Destroys a type_t. Does not free, but does free child nodes
+ *
+ * @param type Object to destroy
+ * @param override If OVERRIDE, frees even if the dealloc flag is set.
+ * If NOOVERRIDE ignores an object with the dealloc flag set.
+ * This paramater is not recursively applied
+ */
+void ast_type_destroy(type_t *type, bool override);
+
+/**
+ * Destroys a gdecl_t. Does not free, but does free child nodes
+ *
+ * @param gdecl Object to destroy
+ */
+void ast_gdecl_destroy(gdecl_t *gdecl);
+
+/**
+ * Destroys a expr_t. Does not free, but does free child nodes
+ *
+ * @param expr Object to destroy
+ */
+void ast_expr_destroy(expr_t *expr);
+
+/**
+ * Destroys a decl_node_t. Does not free, but does free child nodes
+ *
+ * @param decl_node Object to destroy
+ */
+void ast_decl_node_destroy(decl_node_t *decl_node);
+
+/**
+ * Destroys a stmt_t. Does not free, but does free child nodes
+ *
+ * @param stmt Object to destroy
+ */
+void ast_stmt_destroy(stmt_t *stmt);
+
+/**
+ * Destroys a trans_unit_t. Does not free, but does free child nodes
+ *
+ * @param tras_unit Object to destroy
+ */
+void ast_trans_unit_destroy(trans_unit_t *trans_unit);
 
 #endif /* _AST_H_ */

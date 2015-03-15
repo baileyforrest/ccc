@@ -100,10 +100,13 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
         goto fail;
     }
 
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
-        if (CCC_OK != (status = ht_insert(&tt->hashtab,
-                                          &s_prim_types[i].link))) {
-            goto fail1;
+    // Initialize top level table with primitive types
+    if (last == NULL) {
+        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
+            if (CCC_OK != (status = ht_insert(&tt->hashtab,
+                                              &s_prim_types[i].link))) {
+                goto fail1;
+            }
         }
     }
     return status;
@@ -116,9 +119,14 @@ fail:
 
 void tt_destroy(typetab_t *tt) {
     assert(tt != NULL);
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
-        ht_remove(&tt->hashtab, &s_prim_types[i].key, NOFREE);
+
+    // Need to remove primitive types from top level table
+    if (tt->last == NULL) {
+        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
+            ht_remove(&tt->hashtab, &s_prim_types[i].key, NOFREE);
+        }
     }
+
     // TODO: Free all the types
     ht_destroy(&tt->hashtab, NOFREE);
 }

@@ -65,7 +65,9 @@ bool typetab_key_cmp(const void *key1, const void *key2);
  * Initalizes a type table
  *
  * @param tt Type table to initialize
- * @param Last Typetable in previous scope. NULL if none
+ * @param Last Typetable in previous scope. NULL if none (top level). If NULL,
+ * the typetable will get initialized with primitive types
+ *
  * @return CCC_OK on success, error code on error
  */
 status_t tt_init(typetab_t *tt, typetab_t *last);
