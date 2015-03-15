@@ -46,15 +46,14 @@ typedef bool (*ht_cmpfunc)(const void *key1, const void *key2);
 
 /**
  * Paramaters for initializing a hashtable
- * TODO: change to ht_params_t
  */
-typedef struct ht_params {
+typedef struct ht_params_t {
     size_t nelems;        /**< Hint for number of elements, 0 for unused */
     size_t key_offset;    /**< Offset of the key in the struct */
     size_t head_offset;   /**< Offset of the sl_link_t into the struct */
     ht_hashfunc hashfunc; /**< Hash function to use */
     ht_cmpfunc cmpfunc;   /**< Comparison function to use */
-} ht_params;
+} ht_params_t;
 
 /**
  * The hash table structure. Basic chained buckets.
@@ -62,7 +61,7 @@ typedef struct ht_params {
 typedef struct htable_t {
     sl_link_t **buckets; /**< The bucket array */
     size_t nbuckets;     /**< Number of buckets */
-    ht_params params;    /**< Paramaters used to initialize the hashtable */
+    ht_params_t params;  /**< Paramaters used to initialize the hashtable */
 } htable_t;
 
 /**
@@ -72,7 +71,7 @@ typedef struct htable_t {
  * @param params paramaters
  * @return CCC_OK on success, relevant error code on failure
  */
-status_t ht_init(htable_t *ht, const ht_params *params);
+status_t ht_init(htable_t *ht, const ht_params_t *params);
 
 /**
  * Destroys an hash table

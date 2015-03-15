@@ -96,7 +96,7 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
     status_t status = CCC_OK;
     tt->last = last;
 
-    static ht_params params = {
+    static ht_params_t params = {
         0,                               // Size estimate
         offsetof(typetab_entry_t, key),  // Offset of key
         offsetof(typetab_entry_t, link), // Offset of ht link

@@ -95,7 +95,7 @@ status_t st_init(symtab_t *table, bool is_sym) {
 
     size_t size = is_sym ? STATIC_ARRAY_LEN(s_reserved) * 2: 0;
 
-    ht_params params = {
+    ht_params_t params = {
         size,                           // Size estimate
         offsetof(symtab_entry_t, key),  // Offset of key
         offsetof(symtab_entry_t, link), // Offset of ht link

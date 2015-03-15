@@ -51,7 +51,7 @@ static len_str_node_t s_default_search_path[] = {
 status_t pp_directives_init(preprocessor_t *pp) {
     status_t status = CCC_OK;
 
-    static ht_params params = {
+    static ht_params_t params = {
         STATIC_ARRAY_LEN(s_directives),   // Size estimate
         offsetof(pp_directive_t, key),    // Offset of key
         offsetof(pp_directive_t, link),   // Offset of ht link

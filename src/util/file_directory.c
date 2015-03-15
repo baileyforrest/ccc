@@ -37,7 +37,7 @@ typedef struct fdir_t {
 static fdir_t s_fdir;
 
 status_t fdir_init() {
-    static const ht_params s_params = {
+    static const ht_params_t s_params = {
         0,                              // No Size estimate
         offsetof(len_str_node_t, str),  // Offset of key
         offsetof(len_str_node_t, link), // Offset of ht link

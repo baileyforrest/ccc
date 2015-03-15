@@ -38,7 +38,7 @@
 #include "util/util.h"
 
 status_t pp_init(preprocessor_t *pp) {
-    static ht_params params = {
+    static ht_params_t params = {
         0,                                // No Size estimate
         offsetof(pp_macro_t, name),       // Offset of key
         offsetof(pp_macro_t, link),       // Offset of ht link
@@ -604,7 +604,7 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
         goto fail1;
     }
 
-    static const ht_params pp_param_map_params = {
+    static const ht_params_t pp_param_map_params = {
         0,                                   // No size hint
         offsetof(pp_param_map_elem_t, key),  // Key offset
         offsetof(pp_param_map_elem_t, link), // HT link offset

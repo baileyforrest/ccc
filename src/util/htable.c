@@ -47,13 +47,13 @@
     (ht->params.hashfunc((key)))
 
 
-status_t ht_init(htable_t *ht, const ht_params *params) {
-    memcpy(&ht->params, params, sizeof(ht_params));
+status_t ht_init(htable_t *ht, const ht_params_t *params) {
+    memcpy(&ht->params, params, sizeof(ht_params_t));
     ht->nbuckets = MAX(params->nelems, MIN_BUCKETS);
     ht->params.nelems = 0;
 
     // Initialize to NULL
-    ht->buckets = calloc(ht->nbuckets, sizeof(ht_params *));
+    ht->buckets = calloc(ht->nbuckets, sizeof(sl_link_t *));
     return ht->buckets == NULL ? CCC_NOMEM : CCC_OK;
 }
 
