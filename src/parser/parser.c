@@ -123,10 +123,9 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
         }
     }
 
-    ALLOC_NODE(gdecl->decl, stmt_t);
-    gdecl->decl->type = STMT_DECL;
-    gdecl->decl->decl.type = type;
-    sl_init(&gdecl->decl->decl.decls, offsetof(decl_node_t, link));
+    ALLOC_NODE(gdecl->decl, decl_t);
+    gdecl->decl->type = type;
+    sl_init(&gdecl->decl->decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_BACKTRACK == (status = par_declarator(lex, type, &decl_node))) {
@@ -135,7 +134,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
         goto done;
     }
     status = CCC_OK;
-    sl_append(&gdecl->decl->decl.decls, &decl_node->link);
+    sl_append(&gdecl->decl->decls, &decl_node->link);
 
     if (decl_node->type->type == TYPE_FUNC) {
         if (CCC_OK != (status = par_function_definition(lex, gdecl))) {
@@ -520,16 +519,15 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
     struct_decl_t *node;
     ALLOC_NODE(node, struct_decl_t);
     node->bf_bits = NULL;
-    ALLOC_NODE(node->decl, stmt_t);
-    node->decl->type = STMT_DECL;
-    node->decl->decl.type = decl_type;
-    sl_init(&node->decl->decl.decls, offsetof(decl_node_t, link));
+    ALLOC_NODE(node->decl, decl_t);
+    node->decl->type = decl_type;
+    sl_init(&node->decl->decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_OK != (status = par_declarator(lex, decl_type, &decl_node))) {
         goto fail;
     }
-    sl_append(&node->decl->decl.decls, &decl_node->link);
+    sl_append(&node->decl->decls, &decl_node->link);
 
     if (lex->cur.type == COLON) {
         LEX_ADVANCE(lex);
@@ -540,14 +538,14 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
 
     // Update base type
     sl_append(&base->struct_decls, &node->link);
-    base->align = MAX(base->align, node->decl->decl.type->align);
+    base->align = MAX(base->align, node->decl->type->align);
 
     // Update size and alignment.
     // TODO: Handle bitfields
     if (base->type == TYPE_STRUCT) {
-        base->size += node->decl->decl.type->size;
+        base->size += node->decl->type->size;
     } else { // base->type == TYPE_UNION
-        base->size = MAX(base->size, node->decl->decl.type->size);
+        base->size = MAX(base->size, node->decl->type->size);
     }
 
 fail:
@@ -1128,7 +1126,7 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
     if (!skip_paren) {
         LEX_ADVANCE(lex);
     }
-    stmt_t *type = NULL;
+    decl_t *type = NULL;
     if (CCC_OK != (status = par_type_name(lex, &type))) {
         goto fail;
     }
@@ -1344,7 +1342,7 @@ fail:
     return status;
 }
 
-status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
+status_t par_type_name(lex_wrap_t *lex, decl_t **result) {
     status_t status = CCC_OK;
     type_t *base = NULL;
     if (CCC_OK != (status = par_specifier_qualifier(lex, &base))) {
@@ -1355,11 +1353,10 @@ status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
             goto fail;
         }
     }
-    stmt_t *decl;
-    ALLOC_NODE(decl, stmt_t);
-    decl->type = STMT_DECL;
-    decl->decl.type = base;
-    sl_init(&decl->decl.decls, offsetof(decl_node_t, link));
+    decl_t *decl;
+    ALLOC_NODE(decl, decl_t);
+    decl->type = base;
+    sl_init(&decl->decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_BACKTRACK != (status = par_declarator(lex, base, &decl_node))) {
@@ -1368,7 +1365,7 @@ status_t par_type_name(lex_wrap_t *lex, stmt_t **result) {
         }
     }
     status = CCC_OK;
-    sl_append(&decl->decl.decls, &decl_node->link);
+    sl_append(&decl->decls, &decl_node->link);
 
     *result = decl;
 fail:
@@ -1417,11 +1414,10 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
     }
     status = CCC_OK;
 
-    stmt_t *decl;
-    ALLOC_NODE(decl, stmt_t);
-    decl->type = STMT_DECL;
-    decl->decl.type = type;
-    sl_init(&decl->decl.decls, offsetof(decl_node_t, link));
+    decl_t *decl;
+    ALLOC_NODE(decl, decl_t);
+    decl->type = type;
+    sl_init(&decl->decls, offsetof(decl_node_t, link));
 
     decl_node_t *decl_node = NULL;
     if (CCC_BACKTRACK != (status = par_declarator(lex, type, &decl_node))) {
@@ -1430,7 +1426,7 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
         }
     }
     status = CCC_OK;
-    sl_append(&decl->decl.decls, &decl_node->link);
+    sl_append(&decl->decls, &decl_node->link);
     sl_append(&func->func.params, &decl->link);
 
 fail:
@@ -1477,29 +1473,28 @@ fail:
     return status;
 }
 
-status_t par_declaration(lex_wrap_t *lex, stmt_t **stmt) {
+status_t par_declaration(lex_wrap_t *lex, decl_t **decl) {
     status_t status = CCC_OK;
-    if (*stmt == NULL) {
-        ALLOC_NODE(*stmt, stmt_t);
-        (*stmt)->type = STMT_DECL;
-        (*stmt)->decl.type = NULL;
-        sl_init(&(*stmt)->decl.decls, offsetof(decl_node_t, link));
+    if (*decl == NULL) {
+        ALLOC_NODE(*decl, decl_t);
+        (*decl)->type = NULL;
+        sl_init(&(*decl)->decls, offsetof(decl_node_t, link));
 
         // Must match at least one declaration specifier
         if (CCC_OK !=
-            (status = par_declaration_specifier(lex, &(*stmt)->decl.type))) {
+            (status = par_declaration_specifier(lex, &(*decl)->type))) {
             goto fail;
         }
         // Match declaration specifers until they don't match anymore
         while (CCC_BACKTRACK !=
-               (status = par_declaration_specifier(lex, &(*stmt)->decl.type))) {
+               (status = par_declaration_specifier(lex, &(*decl)->type))) {
             if (status != CCC_OK) {
                 goto fail;
             }
         }
     }
 
-    while (CCC_BACKTRACK != (status = par_init_declarator(lex, *stmt))) {
+    while (CCC_BACKTRACK != (status = par_init_declarator(lex, *decl))) {
         if (status != CCC_OK) {
             goto fail;
         }
@@ -1510,12 +1505,12 @@ fail:
     return status;
 }
 
-status_t par_init_declarator(lex_wrap_t *lex, stmt_t *stmt) {
+status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl) {
     status_t status = CCC_OK;
-    bool is_typedef = stmt->decl.type->type == TYPE_MOD &&
-        (stmt->decl.type->mod.type_mod & TMOD_TYPEDEF);
+    bool is_typedef = decl->type->type == TYPE_MOD &&
+        (decl->type->mod.type_mod & TMOD_TYPEDEF);
     decl_node_t *decl_node = NULL;
-    if (CCC_OK != (status = par_declarator(lex, stmt->decl.type, &decl_node))) {
+    if (CCC_OK != (status = par_declarator(lex, decl->type, &decl_node))) {
         goto fail;
     }
     // Add typedefs to the typetable on the top of the stack
@@ -1526,7 +1521,7 @@ status_t par_init_declarator(lex_wrap_t *lex, stmt_t *stmt) {
             goto fail;
         }
     }
-    sl_append(&stmt->decl.decls, &decl_node->link);
+    sl_append(&decl->decls, &decl_node->link);
 
     if (lex->cur.type == ASSIGN) {
         if (is_typedef) {
@@ -1612,18 +1607,32 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
 
         // Type qualitifiers
     case CONST:
-    case VOLATILE:
-        if(CCC_OK != (status = par_declaration(lex, result))) {
+    case VOLATILE: {
+        stmt_t *stmt;
+        ALLOC_NODE(stmt, stmt_t);
+        stmt->type = STMT_DECL;
+        stmt->decl = NULL;
+        if(CCC_OK != (status = par_declaration(lex, &stmt->decl))) {
             goto fail;
         }
         LEX_MATCH(lex, SEMI);
+        *result = stmt;
         return CCC_OK;
-
+    }
     case ID: {
         // Type specifier only if its a typedef name
         tt_key_t key = { &lex->cur.tab_entry->key, TT_TYPEDEF };
         if (tt_lookup(lex->typetab, &key) != NULL) {
-            return par_declaration(lex, result);
+            stmt_t *stmt;
+            ALLOC_NODE(stmt, stmt_t);
+            stmt->type = STMT_DECL;
+            stmt->decl = NULL;
+            if (CCC_OK != (status = par_declaration(lex, &stmt->decl))) {
+                goto fail;
+            }
+
+            *result = stmt;
+            return CCC_OK;
         }
     }
     case CASE:

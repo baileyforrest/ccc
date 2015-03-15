@@ -34,13 +34,14 @@
 struct stmt_t;
 struct type_t;
 struct gdecl_t;
+struct decl_t;
 
 /**
  * Struct and union declaration entry
  */
 typedef struct struct_decl_t {
     sl_link_t link;         /**< List link */
-    struct stmt_t *decl;    /**< The declaration */
+    struct decl_t *decl;    /**< The declaration */
     struct expr_t *bf_bits; /**< Bitfield bits 0 for unused */
 } struct_decl_t;
 
@@ -143,7 +144,7 @@ typedef enum gdecl_type_t {
 typedef struct gdecl_t {
     sl_link_t link;              /**< Storage Link */
     gdecl_type_t type;           /**< Type of gdecl */
-    struct stmt_t *decl;         /**< Declaration */
+    struct decl_t *decl;         /**< Declaration */
     union {
         struct {                 /**< Function definition parameters */
             struct stmt_t *stmt; /**< Function body */
@@ -258,7 +259,7 @@ typedef struct expr_t {
 
         struct {                  /**< Cast parameters */
             struct expr_t *base;  /**< Base expression */
-            struct stmt_t *cast;  /**< Casted type */
+            struct decl_t *cast;  /**< Casted type */
         } cast;
 
         struct {                  /**< Function call paramaters */
@@ -271,7 +272,7 @@ typedef struct expr_t {
         } cmpd;
 
         struct {
-            struct stmt_t *type;
+            struct decl_t *type;
             struct expr_t *expr;
         } sizeof_params;
 
@@ -286,6 +287,20 @@ typedef struct expr_t {
         } init_list;
     };
 } expr_t;
+
+typedef struct decl_node_t {
+    sl_link_t link; /**< Storage link */
+    type_t *type;   /**< Type of variable */
+    len_str_t *id;  /**< Name of variable */
+    expr_t *expr;   /**< Expression to assign */
+} decl_node_t;
+
+typedef struct decl_t {
+    sl_link_t link;              /**< Storage link */
+    type_t *type;                /**< Type of variable */
+    slist_t decls;               /**< List of declarations (decl_node_t) */
+} decl_t;
+
 
 /**
  * Types of statements
@@ -320,13 +335,6 @@ typedef enum stmt_type_t {
     STMT_EXPR            /**< expression */
 } stmt_type_t;
 
-typedef struct decl_node_t {
-    sl_link_t link; /**< Storage link */
-    type_t *type;   /**< Type of variable */
-    len_str_t *id;  /**< Name of variable */
-    expr_t *expr;   /**< Expression to assign */
-} decl_node_t;
-
 /**
  * Tagged union representing a statement
  */
@@ -335,10 +343,7 @@ typedef struct stmt_t {
     stmt_type_t type;                    /**< Type of statement */
 
     union {
-        struct {                         /**< Declaration parameters */
-            type_t *type;                /**< Type of variable */
-            slist_t decls;               /**< List of declarations */
-        } decl;
+        decl_t *decl;                    /**< Declaration parameters */
 
         struct {                         /**< Label parameters */
             len_str_t *label;            /**< Label value */
@@ -453,7 +458,7 @@ void ast_enum_id_destroy(enum_id_t *enum_id);
 #define NO_OVERRIDE false
 
 /**
- * Destroys a type_t. Does not free, but does free child nodes
+ * Destroys a type_t.
  *
  * @param type Object to destroy
  * @param override If OVERRIDE, frees even if the dealloc flag is set.
@@ -463,35 +468,42 @@ void ast_enum_id_destroy(enum_id_t *enum_id);
 void ast_type_destroy(type_t *type, bool override);
 
 /**
- * Destroys a gdecl_t. Does not free, but does free child nodes
+ * Destroys a gdecl_t.
  *
  * @param gdecl Object to destroy
  */
 void ast_gdecl_destroy(gdecl_t *gdecl);
 
 /**
- * Destroys a expr_t. Does not free, but does free child nodes
+ * Destroys a expr_t.
  *
  * @param expr Object to destroy
  */
 void ast_expr_destroy(expr_t *expr);
 
 /**
- * Destroys a decl_node_t. Does not free, but does free child nodes
+ * Destroys a decl_node_t.
  *
  * @param decl_node Object to destroy
  */
 void ast_decl_node_destroy(decl_node_t *decl_node);
 
 /**
- * Destroys a stmt_t. Does not free, but does free child nodes
+ * Destroys a decl_t.
+ *
+ * @param decl Object to destroy
+ */
+void ast_decl_destroy(decl_t *decl);
+
+/**
+ * Destroys a stmt_t.
  *
  * @param stmt Object to destroy
  */
 void ast_stmt_destroy(stmt_t *stmt);
 
 /**
- * Destroys a trans_unit_t. Does not free, but does free child nodes
+ * Destroys a trans_unit_t.
  *
  * @param tras_unit Object to destroy
  */

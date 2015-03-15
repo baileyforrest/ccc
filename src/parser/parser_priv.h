@@ -137,7 +137,7 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
 
 status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
 
-status_t par_type_name(lex_wrap_t *lex, stmt_t **result);
+status_t par_type_name(lex_wrap_t *lex, decl_t **result);
 
 status_t par_parameter_type_list(lex_wrap_t *lex, type_t *func);
 
@@ -153,9 +153,9 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type);
  * If *stmt == NULL, allocates statement, otherwise continues parsing existing
  * declaration
  */
-status_t par_declaration(lex_wrap_t *lex, stmt_t **stmt);
+status_t par_declaration(lex_wrap_t *lex, decl_t **decl);
 
-status_t par_init_declarator(lex_wrap_t *lex, stmt_t *stmt);
+status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl);
 
 status_t par_initializer(lex_wrap_t *lex, expr_t **result);
 

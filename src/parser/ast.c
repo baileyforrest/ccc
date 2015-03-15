@@ -37,7 +37,7 @@ void ast_struct_decl_destroy(struct_decl_t *struct_decl) {
     if (struct_decl == NULL) {
         return;
     }
-    ast_stmt_destroy(struct_decl->decl);
+    ast_decl_destroy(struct_decl->decl);
     ast_expr_destroy(struct_decl->bf_bits);
     free(struct_decl);
 }
@@ -99,7 +99,7 @@ void ast_gdecl_destroy(gdecl_t *gdecl) {
     if (gdecl == NULL) {
         return;
     }
-    ast_stmt_destroy(gdecl->decl);
+    ast_decl_destroy(gdecl->decl);
 
     switch (gdecl->type) {
     case GDECL_FDEFN:
@@ -145,7 +145,7 @@ void ast_expr_destroy(expr_t *expr) {
         break;
     case EXPR_CAST:
         ast_expr_destroy(expr->cast.base);
-        ast_stmt_destroy(expr->cast.cast);
+        ast_decl_destroy(expr->cast.cast);
         break;
     case EXPR_CALL:
         ast_expr_destroy(expr->call.func);
@@ -155,7 +155,7 @@ void ast_expr_destroy(expr_t *expr) {
         SL_DESTROY_FUNC(&expr->cmpd.exprs, ast_expr_destroy);
         break;
     case EXPR_SIZEOF:
-        ast_stmt_destroy(expr->sizeof_params.type);
+        ast_decl_destroy(expr->sizeof_params.type);
         ast_expr_destroy(expr->sizeof_params.expr);
         break;
     case EXPR_MEM_ACC:
@@ -179,6 +179,25 @@ void ast_decl_node_destroy(decl_node_t *decl_node) {
     free(decl_node);
 }
 
+void ast_decl_destroy(decl_t *decl) {
+    // Make sure decl_nodes don't free base
+    bool dealloc_base;
+    if (decl->type->dealloc) {
+        dealloc_base = true;
+        decl->type->dealloc = false;
+    } else {
+        dealloc_base = false;
+    }
+    SL_DESTROY_FUNC(&decl->decls, ast_decl_node_destroy);
+
+    if (dealloc_base) {
+        decl->type->dealloc = true;
+        ast_type_destroy(decl->type, NO_OVERRIDE);
+    }
+    free(decl);
+}
+
+
 void ast_stmt_destroy(stmt_t *stmt) {
     if (stmt == NULL) {
         return;
@@ -188,23 +207,9 @@ void ast_stmt_destroy(stmt_t *stmt) {
     case STMT_NOP:
         break;
 
-    case STMT_DECL: {
-        // Make sure decl_nodes don't free base
-        bool dealloc_base;
-        if (stmt->decl.type->dealloc) {
-            dealloc_base = true;
-            stmt->decl.type->dealloc = false;
-        } else {
-            dealloc_base = false;
-        }
-        SL_DESTROY_FUNC(&stmt->decl.decls, ast_decl_node_destroy);
-
-        if (dealloc_base) {
-            stmt->decl.type->dealloc = true;
-            ast_type_destroy(stmt->decl.type, NO_OVERRIDE);
-        }
+    case STMT_DECL:
+        ast_decl_destroy(stmt->decl);
         break;
-    }
 
     case STMT_LABEL:
         ast_stmt_destroy(stmt->label.stmt);
