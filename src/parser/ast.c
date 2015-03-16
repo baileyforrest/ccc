@@ -234,6 +234,11 @@ void ast_expr_print(expr_t *expr) {
     switch (expr->type) {
     case EXPR_VOID:
         break;
+    case EXPR_PAREN:
+        printf("(");
+        ast_expr_print(expr->paren_base);
+        printf(")");
+        break;
     case EXPR_VAR:
         printf("%s", expr->var_id->str);
         break;
@@ -276,7 +281,6 @@ void ast_expr_print(expr_t *expr) {
             ast_expr_print(expr->bin.expr2);
             printf("]");
         } else {
-            // TODO: Need to record if expressions have parens
             ast_expr_print(expr->bin.expr1);
             printf(" ");
             ast_oper_print(expr->bin.op);
@@ -659,6 +663,10 @@ void ast_expr_destroy(expr_t *expr) {
     }
     switch (expr->type) {
     case EXPR_VOID:
+        break;
+    case EXPR_PAREN:
+        ast_expr_destroy(expr->paren_base);
+        break;
     case EXPR_VAR:
         break;
 

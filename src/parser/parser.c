@@ -801,14 +801,20 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
                 break;
             }
         }
-        default:
-            if (CCC_OK != (status = par_expression(lex, NULL, result))) {
+        default: {
+            expr_t *expr;
+            ALLOC_NODE(expr, expr_t);
+            expr->type = EXPR_PAREN;
+            if (CCC_OK !=
+                (status = par_expression(lex, NULL, &expr->paren_base))) {
                 goto fail;
             }
             primary = true;
             unary = true;
             LEX_MATCH(lex, RPAREN);
+            *result = expr;
             break;
+        }
         }
         break;
     default:

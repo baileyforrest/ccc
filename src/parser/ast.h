@@ -177,6 +177,7 @@ typedef enum oper_t {
  */
 typedef enum expr_type_t {
     EXPR_VOID,        /**< Void */
+    EXPR_PAREN,       /**< Parens */
     EXPR_VAR,         /**< Variable */
     EXPR_ASSIGN,      /**< Assignment */
     EXPR_CONST_INT,   /**< Constant integral type */
@@ -202,6 +203,8 @@ typedef struct expr_t {
 
     union {                       /**< Type specific info */
         len_str_t *var_id;        /**< Variable identifier */
+
+        struct expr_t *paren_base;/**< Expression in parens */
 
         struct {                  /**< Assignment paramaters */
             struct expr_t *dest;  /**< Expression to assign to */
