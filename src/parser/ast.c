@@ -21,11 +21,13 @@
  */
 
 #include "ast.h"
+#include "ast_priv.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#define INDENT "    ";
+#define INDENT ("    ")
 
 void ast_print(trans_unit_t *ast) {
     ast_trans_unit_print(ast);
@@ -56,7 +58,7 @@ void ast_gdecl_print(gdecl_t *gdecl) {
 }
 
 void ast_stmt_print(stmt_t *stmt, int indent) {
-    for (int i = 0; i < ident; ++i) {
+    for (int i = 0; i < indent; ++i) {
         printf(INDENT);
     }
 
@@ -70,12 +72,12 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
 
     case STMT_LABEL:
-        printf("%s:\n", stmt->label->label.str);
+        printf("%s:\n", stmt->label.label->str);
         ast_stmt_print(stmt->label.stmt, indent);
         break;
     case STMT_CASE:
         printf("case ");
-        ast_expr_print(stmt->case_params->val);
+        ast_expr_print(stmt->case_params.val);
         printf(":\n");
         ast_stmt_print(stmt->case_params.stmt, indent + 1);
         break;
@@ -132,7 +134,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
 
     case STMT_GOTO:
-        printf("goto %s;", stmt->goto_params->label.str);
+        printf("goto %s;", stmt->goto_params.label->str);
         break;
     case STMT_CONTINUE:
         printf("continue;");
@@ -147,12 +149,12 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
 
     case STMT_COMPOUND: {
-        print("{\n");
+        printf("{\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &stmt->compound.stmts) {
-            ast_stmt_print(GET_ELEM(&stmt->compound.stmts, cur));
+            ast_stmt_print(GET_ELEM(&stmt->compound.stmts, cur), indent + 1);
         }
-        print("}\n");
+        printf("}\n");
         break;
     }
 
@@ -165,30 +167,59 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
 }
 
 void ast_decl_print(decl_t *decl) {
-    bool is_func = decl->type == TYPE_FUNC;
-    if (is_func) {
-        ast_type_print(decl->type->type.func.type);
-    } else {
-        ast_type_print(decl->type);
-    }
-    sl_link_t *cur;
-    SL_FOREACH(cur, &decl->decls) {
-        decl_node_t *decl_node = GET_ELEM(&decl->decls, cur);
-        ast_type_print(decl_node->type);
-        printf("%s", decl_node->id.str);
-        if (decl_node->expr) {
-            printf(" = ");
-            ast_print_expr(decl_node->expr);
-        }
-    }
+    if (decl->type->type == TYPE_FUNC) {
+        ast_type_print(decl->type->func.type);
 
-    if (is_func) { // Print function parameters
+        // Functions can only have one declarator
+        decl_node_t *node = sl_head(&decl->decls);
+        ast_type_print(node->type);
+        printf("%s", node->id->str);
+
+        bool first = true;
         printf("(");
         sl_link_t *cur;
         SL_FOREACH(cur, &decl->type->func.params) {
+            if (first) {
+                first = false;
+            } else {
+                printf(", ");
+            }
             ast_decl_print(GET_ELEM(&decl->type->func.params, cur));
         }
         printf(")");
+        return;
+    }
+    ast_type_print(decl->type);
+
+    bool first = true;
+    sl_link_t *cur;
+    SL_FOREACH(cur, &decl->decls) {
+        if (first) {
+            first = false;
+        } else {
+            printf(", ");
+        }
+        decl_node_t *node = GET_ELEM(&decl->decls, cur);
+        ast_decl_node_print(node, node->type);
+    }
+}
+
+void ast_decl_node_print(decl_node_t *decl_node, type_t *type) {
+    switch (type->type) {
+    case TYPE_ARR:
+        ast_decl_node_print(decl_node, type->arr.base);
+        printf("[");
+        ast_expr_print(type->arr.len);
+        printf("]");
+        break;
+    case TYPE_PTR:
+        printf(" * ");
+        ast_type_mod_print(type->ptr.type_mod);
+        ast_decl_node_print(decl_node, type->ptr.base);
+        break;
+    default:
+        printf("%s", decl_node->id->str);
+        return;
     }
 }
 
@@ -197,24 +228,24 @@ void ast_expr_print(expr_t *expr) {
     case EXPR_VOID:
         break;
     case EXPR_VAR:
-        printf("%s", expr->var_id.str);
+        printf("%s", expr->var_id->str);
         break;
     case EXPR_ASSIGN:
-        ast_print_expr(expr->assign.dest);
+        ast_expr_print(expr->assign.dest);
         printf(" ");
-        ast_print_op(expr->assign.op);
+        ast_oper_print(expr->assign.op);
         printf("= ");
-        ast_print_expr(expr->assign.expr);
+        ast_expr_print(expr->assign.expr);
         break;
     case EXPR_CONST_INT:
         printf("%lld", expr->const_val.int_val);
-        switch (expr->const_val->type) {
+        switch (expr->const_val.type->type) {
         case TYPE_LONG:
             printf("L");
             break;
         case TYPE_MOD:
             printf("U");
-            if (expr->const_val->type.type_mod->base->type == TYPE_LONG) {
+            if (expr->const_val.type->mod.base->type == TYPE_LONG) {
                 printf("L");
             }
             break;
@@ -223,48 +254,48 @@ void ast_expr_print(expr_t *expr) {
         }
         break;
     case EXPR_CONST_FLOAT:
-        printf("%lld", expr->const_val.float_val);
-        if (expr->const_val->type == TYPE_MOD) {
+        printf("%f", expr->const_val.float_val);
+        if (expr->const_val.type->type == TYPE_MOD) {
             printf("f");
         }
         break;
     case EXPR_CONST_STR:
-        printf("%s", expr->const_val.string_val.str);
+        printf("%s", expr->const_val.str_val->str);
         break;
     case EXPR_BIN:
-        if (expr->bin.op == ARR_ACC) {
-            ast_print_expr(expr->bin.expr1);
+        if (expr->bin.op == OP_ARR_ACC) {
+            ast_expr_print(expr->bin.expr1);
             printf("[");
-            ast_print_expr(expr->bin.expr2);
+            ast_expr_print(expr->bin.expr2);
             printf("]");
         } else {
             // TODO: Need to record if expressions have parens
-            ast_print_expr(expr->bin.expr1);
+            ast_expr_print(expr->bin.expr1);
             printf(" ");
-            ast_print_op(expr->bin.op);
+            ast_oper_print(expr->bin.op);
             printf(" ");
-            ast_print_expr(expr->bin.expr2);
+            ast_expr_print(expr->bin.expr2);
         }
         break;
     case EXPR_UNARY:
         switch (expr->unary.op) {
-        case POSTINC:
-        case POSTDEC:
-            ast_print_expr(expr->unary.expr);
-            ast_print_op(expr->unary.op);
+        case OP_POSTINC:
+        case OP_POSTDEC:
+            ast_expr_print(expr->unary.expr);
+            ast_oper_print(expr->unary.op);
             break;
         default:
-            ast_print_op(expr->unary.op);
-            ast_print_expr(expr->unary.expr);
+            ast_oper_print(expr->unary.op);
+            ast_expr_print(expr->unary.expr);
             break;
         }
         break;
     case EXPR_COND:
-        ast_print_expr(expr->cond.expr1);
+        ast_expr_print(expr->cond.expr1);
         printf(" ? ");
-        ast_print_expr(expr->cond.expr2);
+        ast_expr_print(expr->cond.expr2);
         printf(" : ");
-        ast_print_expr(expr->cond.expr3);
+        ast_expr_print(expr->cond.expr3);
         break;
     case EXPR_CAST:
         printf("(");
@@ -273,11 +304,11 @@ void ast_expr_print(expr_t *expr) {
         ast_expr_print(expr->cast.base);
         break;
     case EXPR_CALL:
-        ast_print_expr(expr->call.func);
+        ast_expr_print(expr->call.func);
         printf("(");
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->call.params) {
-            ast_print_expr(GET_ELEM(&expr->call.params, cur));
+            ast_expr_print(GET_ELEM(&expr->call.params, cur));
         }
         printf(")");
         break;
@@ -290,7 +321,7 @@ void ast_expr_print(expr_t *expr) {
             } else {
                 printf(", ");
             }
-            ast_print_expr(GET_ELEM(&expr->cmpd.exprs, cur));
+            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur));
         }
         break;
     }
@@ -304,8 +335,8 @@ void ast_expr_print(expr_t *expr) {
         printf(")");
         break;
     case EXPR_MEM_ACC:
-        ast_print_expr(expr->mem_acc.base);
-        ast_print_op(expr->mem_acc.op);
+        ast_expr_print(expr->mem_acc.base);
+        ast_oper_print(expr->mem_acc.op);
         printf("%s", expr->mem_acc.name->str);
         break;
     case EXPR_INIT_LIST: {
@@ -318,7 +349,7 @@ void ast_expr_print(expr_t *expr) {
             } else {
                 printf(", ");
             }
-            ast_print_expr(GET_ELEM(&expr->cmpd.exprs, cur));
+            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur));
         }
         printf("}");
         break;
@@ -326,7 +357,7 @@ void ast_expr_print(expr_t *expr) {
     }
 }
 
-void ast_print_op(oper_t op) {
+void ast_oper_print(oper_t op) {
     switch (op) {
     case OP_NOP:
         break;
@@ -346,7 +377,7 @@ void ast_print_op(oper_t op) {
         printf("/");
         break;
     case OP_MOD:
-        printf("%");
+        printf("%%");
         break;
     case OP_LT:
         printf("<");
@@ -406,6 +437,127 @@ void ast_print_op(oper_t op) {
         printf(".");
         break;
     }
+}
+
+void ast_type_print(type_t *type) {
+    switch (type->type) {
+    case TYPE_VOID:   printf("void");   break;
+    case TYPE_CHAR:   printf("char");   break;
+    case TYPE_SHORT:  printf("short");  break;
+    case TYPE_INT:    printf("int");    break;
+    case TYPE_LONG:   printf("long");   break;
+    case TYPE_FLOAT:  printf("float");  break;
+    case TYPE_DOUBLE: printf("double"); break;
+
+    case TYPE_STRUCT:
+    case TYPE_UNION: {
+        if (type->type == TYPE_STRUCT) {
+            printf("struct {\n");
+        } else {
+            printf("union {\n");
+        }
+        sl_link_t *cur;
+        SL_FOREACH(cur, &type->struct_decls) {
+            ast_struct_decl_print(GET_ELEM(&type->struct_decls, cur));
+        }
+        printf("}");
+        break;
+    }
+    case TYPE_ENUM: {
+        printf("enum {");
+        sl_link_t *cur;
+        SL_FOREACH(cur, &type->enum_ids) {
+            enum_id_t *enum_id = GET_ELEM(&type->enum_ids, cur);
+            ast_enum_id_print(enum_id);
+            if (enum_id != sl_tail(&type->enum_ids)) {
+                printf(",");
+            }
+            printf("\n");
+        }
+        printf("}");
+        break;
+    }
+
+    case TYPE_FUNC: {
+        ast_type_print(type->func.type);
+        printf("(");
+        bool first = true;
+        sl_link_t *cur;
+        SL_FOREACH(cur, &type->func.params) {
+            if (first) {
+                first = false;
+            } else {
+                printf(", ");
+            }
+            ast_enum_id_print(GET_ELEM(&type->func.params, cur));
+        }
+        printf(")");
+        break;
+    }
+
+    case TYPE_ARR:
+        ast_type_print(type->arr.base);
+        printf("[");
+        ast_expr_print(type->arr.len);
+        printf("]");
+        break;
+    case TYPE_PTR:
+        ast_type_print(type->ptr.base);
+        printf(" * ");
+        ast_type_mod_print(type->ptr.type_mod);
+        break;
+    case TYPE_MOD:
+        ast_type_mod_print(type->mod.type_mod);
+        ast_type_print(type->mod.base);
+        break;
+    }
+}
+
+void ast_type_mod_print(type_mod_t type_mod) {
+    if (type_mod & TMOD_TYPEDEF) {
+        printf("typedef ");
+    }
+    if (type_mod & TMOD_SIGNED) {
+        printf("signed ");
+    }
+    if (type_mod & TMOD_UNSIGNED) {
+        printf("unsigned ");
+    }
+    if (type_mod & TMOD_AUTO) {
+        printf("auto ");
+    }
+    if (type_mod & TMOD_REGISTER) {
+        printf("register ");
+    }
+    if (type_mod & TMOD_STATIC) {
+        printf("static ");
+    }
+    if (type_mod & TMOD_EXTERN) {
+        printf("extern ");
+    }
+    if (type_mod & TMOD_CONST) {
+        printf("const ");
+    }
+    if (type_mod & TMOD_VOLATILE) {
+        printf("volatile ");
+    }
+}
+
+void ast_enum_id_print(enum_id_t *enum_id) {
+    printf("%s", enum_id->id->str);
+    if (enum_id->val != NULL) {
+        printf(" = ");
+        ast_expr_print(enum_id->val);
+    }
+}
+
+void ast_struct_decl_print(struct_decl_t *struct_decl) {
+    ast_decl_print(struct_decl->decl);
+    if (struct_decl->bf_bits != NULL) {
+        printf(" : ");
+        ast_expr_print(struct_decl->bf_bits);
+    }
+    printf(";\n");
 }
 
 void ast_struct_decl_destroy(struct_decl_t *struct_decl) {

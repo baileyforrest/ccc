@@ -111,7 +111,7 @@ typedef struct type_t {
         slist_t enum_ids;               /**< List of enum ids/values */
 
         struct {                        /**< Function signature */
-            struct type_t *type;        /**< Type (May be function pointer */
+            struct type_t *type;        /**< Type (May be function pointer) */
             slist_t params;             /**< Paramater signature (decl list) */
             bool varargs;               /**< Whether or not function has VA */
         } func;
@@ -127,8 +127,8 @@ typedef struct type_t {
         } ptr;
 
         struct {
-            struct type_t *base;
             type_mod_t type_mod;        /**< Bitset of type modifiers */
+            struct type_t *base;
         } mod;
     };
 } type_t;
