@@ -34,132 +34,150 @@ void token_print(lexeme_t *token) {
     assert(token != NULL);
 
     switch (token->type) {
-        CASE_BASIC_PRINT(TOKEN_EOF);     // end of file
-        // Delimiters
-        CASE_BASIC_PRINT(LBRACE);        // {
-        CASE_BASIC_PRINT(RBRACE);        // }
-        CASE_BASIC_PRINT(LPAREN);        // (
-        CASE_BASIC_PRINT(RPAREN);        // )
-        CASE_BASIC_PRINT(SEMI);          // ;
-        CASE_BASIC_PRINT(COMMA);         // ,
-        CASE_BASIC_PRINT(LBRACK);        // [
-        CASE_BASIC_PRINT(RBRACK);        // ]
-        CASE_BASIC_PRINT(DEREF);         // ->
-        CASE_BASIC_PRINT(DOT);           // .
-        CASE_BASIC_PRINT(ELIPSE);        // ...
-
-        CASE_BASIC_PRINT(COND);          // ?
-        CASE_BASIC_PRINT(COLON);         // :
-
-        // Assignment operators
-        CASE_BASIC_PRINT(ASSIGN);        // =
-        CASE_BASIC_PRINT(PLUSEQ);        // +=
-        CASE_BASIC_PRINT(MINUSEQ);       // -=
-        CASE_BASIC_PRINT(STAREQ);        // *=
-        CASE_BASIC_PRINT(DIVEQ);         // /=
-        CASE_BASIC_PRINT(MODEQ);         // %=
-        CASE_BASIC_PRINT(BITXOREQ);      // ^=
-        CASE_BASIC_PRINT(BITOREQ);       // |=
-        CASE_BASIC_PRINT(BITANDEQ);      // &=
-        CASE_BASIC_PRINT(RSHIFTEQ);      // >>=
-        CASE_BASIC_PRINT(LSHIFTEQ);      // <<=
-
-        // Comparison operators
-        CASE_BASIC_PRINT(EQ);            // ==
-        CASE_BASIC_PRINT(NE);            // !=
-        CASE_BASIC_PRINT(LT);            // <
-        CASE_BASIC_PRINT(GT);            // >
-        CASE_BASIC_PRINT(LE);            // <=
-        CASE_BASIC_PRINT(GE);            // >=
-
-        // Arithmetic
-        CASE_BASIC_PRINT(RSHIFT);        // >>
-        CASE_BASIC_PRINT(LSHIFT);        // <<
-
-        CASE_BASIC_PRINT(LOGICAND);      // &&
-        CASE_BASIC_PRINT(LOGICOR);       // ||
-        CASE_BASIC_PRINT(LOGICNOT);      // !
-
-        CASE_BASIC_PRINT(PLUS);          // +
-        CASE_BASIC_PRINT(MINUS);         // -
-        CASE_BASIC_PRINT(STAR);          // *
-        CASE_BASIC_PRINT(DIV);           // /
-        CASE_BASIC_PRINT(MOD);           // %
-
-        CASE_BASIC_PRINT(BITAND);        // &
-        CASE_BASIC_PRINT(BITOR);         // |
-        CASE_BASIC_PRINT(BITXOR);        // ^
-        CASE_BASIC_PRINT(BITNOT);        // ~
-
-        CASE_BASIC_PRINT(INC);           // ++
-        CASE_BASIC_PRINT(DEC);           // --
-
-        // Keywords
-        CASE_BASIC_PRINT(AUTO);          // auto
-        CASE_BASIC_PRINT(BREAK);         // break
-        CASE_BASIC_PRINT(CASE);          // case
-        CASE_BASIC_PRINT(CONST);         // const
-        CASE_BASIC_PRINT(CONTINUE);      // continue
-        CASE_BASIC_PRINT(DEFAULT);       // default
-        CASE_BASIC_PRINT(DO);            // do
-        CASE_BASIC_PRINT(ELSE);          // else
-        CASE_BASIC_PRINT(ENUM);          // enum
-        CASE_BASIC_PRINT(EXTERN);        // extern
-        CASE_BASIC_PRINT(FOR);           // for
-        CASE_BASIC_PRINT(GOTO);          // goto
-        CASE_BASIC_PRINT(IF);            // if
-        CASE_BASIC_PRINT(INLINE);        // inline
-        CASE_BASIC_PRINT(REGISTER);      // register
-        CASE_BASIC_PRINT(RESTRICT);      // restrict
-        CASE_BASIC_PRINT(RETURN);        // return
-        CASE_BASIC_PRINT(SIZEOF);        // sizeof
-        CASE_BASIC_PRINT(STATIC);        // static
-        CASE_BASIC_PRINT(STRUCT);        // struct
-        CASE_BASIC_PRINT(SWITCH);        // switch
-        CASE_BASIC_PRINT(TYPEDEF);       // typedef
-        CASE_BASIC_PRINT(UNION);         // union
-        CASE_BASIC_PRINT(VOLATILE);      // volatile
-        CASE_BASIC_PRINT(WHILE);         // while
-
-        // Underscore keywords
-        CASE_BASIC_PRINT(ALIGNAS);       // _Alignas
-        CASE_BASIC_PRINT(ALIGNOF);       // _Alignof
-        CASE_BASIC_PRINT(BOOL);          // _Bool
-        CASE_BASIC_PRINT(COMPLEX);       // _Complex
-        CASE_BASIC_PRINT(GENERIC);       // _Generic
-        CASE_BASIC_PRINT(IMAGINARY);     // _Imaginary
-        CASE_BASIC_PRINT(NORETURN);      // _Noreturn
-        CASE_BASIC_PRINT(STATIC_ASSERT); // _Static_assert
-        CASE_BASIC_PRINT(THREAD_LOCAL);  // _Thread_local
-
-        // Types
-        CASE_BASIC_PRINT(VOID);     // void
-
-        CASE_BASIC_PRINT(CHAR);     // char
-        CASE_BASIC_PRINT(SHORT);    // short
-        CASE_BASIC_PRINT(INT);      // int
-        CASE_BASIC_PRINT(LONG);     // long
-        CASE_BASIC_PRINT(UNSIGNED); // unsigned
-        CASE_BASIC_PRINT(SIGNED);   // signed
-
-        CASE_BASIC_PRINT(DOUBLE);   // double
-        CASE_BASIC_PRINT(FLOAT);    // float
-
         // Other
     case ID:
-        printf("ID: %s\n", token->tab_entry->key.str);
+        printf("%s", token->tab_entry->key.str);
         break;
     case STRING:
-        printf("STRING: %s\n", token->tab_entry->key.str);
+        printf("\"%s\"", token->tab_entry->key.str);
         break;
     case INTLIT:
-        printf("INTLIT: %lld, U:%d L:%d LL:%d\n", token->int_params.int_val,
-               token->int_params.hasU, token->int_params.hasL,
-               token->int_params.hasLL);
+        printf("%lld", token->int_params.int_val);
+        if (token->int_params.hasU) {
+            printf("U");
+        }
+        if (token->int_params.hasL) {
+            printf("L");
+        }
+        if (token->int_params.hasLL) {
+            printf("LL");
+        }
         break;
     case FLOATLIT:
-        printf("FLOATLIT: %f, F:%d", token->float_params.float_val,
-               token->float_params.hasF);
+        printf("%f", token->float_params.float_val);
+        if (token->float_params.hasF) {
+            printf("F");
+        }
         break;
+    default:
+        printf("%s", token_str(token->type));
     }
+    printf("\n");
+}
+
+#define CASE_TOK_STR(tok, str) \
+    case tok: str
+
+const char *token_str(token_t token) {
+    switch (token) {
+    case TOKEN_EOF:     return "EOF";
+    case LBRACE:        return "{";
+    case RBRACE:        return "}";
+    case LPAREN:        return "(";
+    case RPAREN:        return ")";
+    case SEMI:          return ";";
+    case COMMA:         return ":";
+    case LBRACK:        return "[";
+    case RBRACK:        return "]";
+    case DEREF:         return "->";
+    case DOT:           return ".";
+    case ELIPSE:        return "...";
+
+    case COND:          return "?";
+    case COLON:         return ":";
+
+    case ASSIGN:        return "=";
+    case PLUSEQ:        return "+=";
+    case MINUSEQ:       return "-=";
+    case STAREQ:        return "*=";
+    case DIVEQ:         return "/=";
+    case MODEQ:         return "%=";
+    case BITXOREQ:      return "^=";
+    case BITOREQ:       return "|=";
+    case BITANDEQ:      return "&=";
+    case RSHIFTEQ:      return ">>=";
+    case LSHIFTEQ:      return "<<=";
+
+    case EQ:            return "==";
+    case NE:            return "!=";
+    case LT:            return "<";
+    case GT:            return ">";
+    case LE:            return "<=";
+    case GE:            return ">=";
+
+    case RSHIFT:        return ">>";
+    case LSHIFT:        return "<<";
+
+    case LOGICAND:      return "&&";
+    case LOGICOR:       return "||";
+    case LOGICNOT:      return "!";
+
+    case PLUS:          return "+";
+    case MINUS:         return "-";
+    case STAR:          return "*";
+    case DIV:           return "/";
+    case MOD:           return "%";
+
+    case BITAND:        return "&";
+    case BITOR:         return "|";
+    case BITXOR:        return "^";
+    case BITNOT:        return "~";
+
+    case INC:           return "++";
+    case DEC:           return "--";
+
+    case AUTO:          return "auto";
+    case BREAK:         return "break";
+    case CASE:          return "case";
+    case CONST:         return "const";
+    case CONTINUE:      return "continue";
+    case DEFAULT:       return "default";
+    case DO:            return "do";
+    case ELSE:          return "else";
+    case ENUM:          return "enum";
+    case EXTERN:        return "extern";
+    case FOR:           return "for";
+    case GOTO:          return "goto";
+    case IF:            return "if";
+    case INLINE:        return "inline";
+    case REGISTER:      return "register";
+    case RESTRICT:      return "restrict";
+    case RETURN:        return "return";
+    case SIZEOF:        return "sizeof";
+    case STATIC:        return "static";
+    case STRUCT:        return "struct";
+    case SWITCH:        return "switch";
+    case TYPEDEF:       return "typedef";
+    case UNION:         return "union";
+    case VOLATILE:      return "volatile";
+    case WHILE:         return "while";
+
+    case ALIGNAS:       return "_Alignas";
+    case ALIGNOF:       return "_Alignof";
+    case BOOL:          return "_Bool";
+    case COMPLEX:       return "_Complex";
+    case GENERIC:       return "_Generic";
+    case IMAGINARY:     return "_Imaginary";
+    case NORETURN:      return "_Noreturn";
+    case STATIC_ASSERT: return "_Static_assert";
+    case THREAD_LOCAL:  return "_Thread_local";
+
+    case VOID:          return "void";
+    case CHAR:          return "char";
+    case SHORT:         return "short";
+    case INT:           return "int";
+    case LONG:          return "long";
+    case UNSIGNED:      return "unsigned";
+    case SIGNED:        return "signed";
+
+    case DOUBLE:        return "double";
+    case FLOAT:         return "float";
+
+    case ID:            return "<identifier>";
+    case STRING:        return "<string literal>";
+    case INTLIT:        return "<integer literal>";
+    case FLOATLIT:      return "<float literal>";
+    }
+    assert(false);
+    return NULL;
 }
