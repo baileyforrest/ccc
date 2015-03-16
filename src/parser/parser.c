@@ -880,31 +880,28 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
     bool new_left = true;
     while (new_left) {
         new_left = false;
-        token_t op1;
+        oper_t op1 = OP_NOP;
 
         switch (lex->cur.type) {
             // Binary operators
-        case STAR:
-        case DIV:
-        case MOD:
-        case PLUS:
-        case MINUS:
-        case LSHIFT:
-        case RSHIFT:
-        case LT:
-        case GT:
-        case LE:
-        case GE:
-        case EQ:
-        case NE:
-        case BITAND:
-        case BITXOR:
-        case BITOR:
-        case LOGICAND:
-        case LOGICOR:
-            op1 = lex->cur.type;
-            LEX_ADVANCE(lex);
-            break;
+        case STAR:     op1 = OP_TIMES;    break;
+        case DIV:      op1 = OP_DIV;      break;
+        case MOD:      op1 = OP_MOD;      break;
+        case PLUS:     op1 = OP_PLUS;     break;
+        case MINUS:    op1 = OP_MINUS;    break;
+        case LSHIFT:   op1 = OP_LSHIFT;   break;
+        case RSHIFT:   op1 = OP_RSHIFT;   break;
+        case LT:       op1 = OP_LT;       break;
+        case GT:       op1 = OP_GT;       break;
+        case LE:       op1 = OP_LE;       break;
+        case GE:       op1 = OP_GE;       break;
+        case EQ:       op1 = OP_EQ;       break;
+        case NE:       op1 = OP_NE;       break;
+        case BITAND:   op1 = OP_BITAND;   break;
+        case BITXOR:   op1 = OP_BITXOR;   break;
+        case BITOR:    op1 = OP_BITOR;    break;
+        case LOGICAND: op1 = OP_LOGICAND; break;
+        case LOGICOR:  op1 = OP_LOGICOR;  break;
 
         case COND: { // Conditional operator
             expr_t *new_expr_left;
@@ -931,6 +928,11 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             return CCC_OK;
         }
 
+        // Consume the operation
+        if (op1 != OP_NOP) {
+            LEX_ADVANCE(lex);
+        }
+
         if (new_left) {
             continue;
         }
@@ -942,35 +944,34 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             goto fail;
         }
 
-        token_t op2;
+        oper_t op2;
         switch (lex->cur.type) {
             // Binary operators
-        case STAR:
-        case DIV:
-        case MOD:
-        case PLUS:
-        case MINUS:
-        case LSHIFT:
-        case RSHIFT:
-        case LT:
-        case GT:
-        case LE:
-        case GE:
-        case EQ:
-        case NE:
-        case BITAND:
-        case BITXOR:
-        case BITOR:
-        case LOGICAND:
-        case LOGICOR:
-            op2 = lex->cur.type;
-            break;
+        case STAR:     op2 = OP_TIMES;    break;
+        case DIV:      op2 = OP_DIV;      break;
+        case MOD:      op2 = OP_MOD;      break;
+        case PLUS:     op2 = OP_PLUS;     break;
+        case MINUS:    op2 = OP_MINUS;    break;
+        case LSHIFT:   op2 = OP_LSHIFT;   break;
+        case RSHIFT:   op2 = OP_RSHIFT;   break;
+        case LT:       op2 = OP_LT;       break;
+        case GT:       op2 = OP_GT;       break;
+        case LE:       op2 = OP_LE;       break;
+        case GE:       op2 = OP_GE;       break;
+        case EQ:       op2 = OP_EQ;       break;
+        case NE:       op2 = OP_NE;       break;
+        case BITAND:   op2 = OP_BITAND;   break;
+        case BITXOR:   op2 = OP_BITXOR;   break;
+        case BITOR:    op2 = OP_BITOR;    break;
+        case LOGICAND: op2 = OP_LOGICAND; break;
+        case LOGICOR:  op2 = OP_LOGICOR;  break;
 
         case COND: { // Cond has lowest precedence
             LEX_ADVANCE(lex);
             expr_t *new_node;
             ALLOC_NODE(new_node, expr_t);
             new_node->type = EXPR_BIN;
+            new_node->bin.op = op1;
             new_node->bin.expr1 = left;
             new_node->bin.expr2 = right;
             expr_t *cond_node;
@@ -991,6 +992,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             expr_t *new_node;
             ALLOC_NODE(new_node, expr_t);
             new_node->type = EXPR_BIN;
+            new_node->bin.op = op1;
             new_node->bin.expr1 = left;
             new_node->bin.expr2 = right;
             *result = new_node;
@@ -1002,6 +1004,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             expr_t *new_node;
             ALLOC_NODE(new_node, expr_t);
             new_node->type = EXPR_BIN;
+            new_node->bin.op = op1;
             new_node->bin.expr1 = left;
             new_node->bin.expr2 = right;
             new_left = true;
@@ -1010,6 +1013,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             expr_t *new_node;
             ALLOC_NODE(new_node, expr_t);
             new_node->type = EXPR_BIN;
+            new_node->bin.op = op1;
             new_node->bin.expr1 = left;
 
             if (CCC_OK !=
@@ -1099,6 +1103,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         default:
             assert(false);
         }
+        LEX_ADVANCE(lex);
         base->type = EXPR_UNARY;
         base->unary.op = op;
         if (CCC_OK !=
@@ -1375,7 +1380,11 @@ fail:
 
 status_t par_parameter_type_list(lex_wrap_t *lex, type_t *func) {
     status_t status = CCC_OK;
-    par_parameter_list(lex, func);
+    if (CCC_OK != (status = par_parameter_list(lex, func))) {
+        if (status != CCC_BACKTRACK) {
+            goto fail;
+        }
+    }
 
     if (lex->cur.type != ELIPSE) {
         return CCC_OK;

@@ -159,6 +159,8 @@ typedef enum oper_t {
     OP_LSHIFT,     // Left Shift
     OP_RSHIFT,     // Right Shift
     OP_LOGICNOT,   // Logical NOT
+    OP_LOGICAND,   // Logical AND
+    OP_LOGICOR,    // Logical OR
     OP_BITNOT,     // Bitwise NOT
     OP_ARR_ACC,    // Array access
     OP_PREINC,     // Pre increment

@@ -46,6 +46,7 @@ void ast_trans_unit_print(trans_unit_t *tras_unit) {
 
 void ast_gdecl_print(gdecl_t *gdecl) {
     ast_decl_print(gdecl->decl);
+    printf("\n");
     switch (gdecl->type) {
     case GDECL_FDEFN:
         ast_stmt_print(gdecl->fdefn.stmt, 0);
@@ -53,8 +54,10 @@ void ast_gdecl_print(gdecl_t *gdecl) {
     case GDECL_DECL:
         printf(";");
         break;
+    default:
+        assert(false);
     }
-    printf("\n\n");
+    printf("\n");
 }
 
 void ast_stmt_print(stmt_t *stmt, int indent) {
@@ -69,6 +72,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
 
     case STMT_DECL:
         ast_decl_print(stmt->decl);
+        printf(";");
         break;
 
     case STMT_LABEL:
@@ -162,34 +166,15 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         ast_expr_print(stmt->expr.expr);
         printf(";");
         break;
+    default:
+        assert(false);
     }
     printf("\n");
 }
 
 void ast_decl_print(decl_t *decl) {
-    if (decl->type->type == TYPE_FUNC) {
-        ast_type_print(decl->type->func.type);
-
-        // Functions can only have one declarator
-        decl_node_t *node = sl_head(&decl->decls);
-        ast_type_print(node->type);
-        printf("%s", node->id->str);
-
-        bool first = true;
-        printf("(");
-        sl_link_t *cur;
-        SL_FOREACH(cur, &decl->type->func.params) {
-            if (first) {
-                first = false;
-            } else {
-                printf(", ");
-            }
-            ast_decl_print(GET_ELEM(&decl->type->func.params, cur));
-        }
-        printf(")");
-        return;
-    }
     ast_type_print(decl->type);
+    printf(" ");
 
     bool first = true;
     sl_link_t *cur;
@@ -201,11 +186,33 @@ void ast_decl_print(decl_t *decl) {
         }
         decl_node_t *node = GET_ELEM(&decl->decls, cur);
         ast_decl_node_print(node, node->type);
+        if (node->expr == NULL) {
+            continue;
+        }
+        printf(" = ");
+        ast_expr_print(node->expr);
     }
 }
 
 void ast_decl_node_print(decl_node_t *decl_node, type_t *type) {
     switch (type->type) {
+    case TYPE_FUNC: {
+        ast_decl_node_print(decl_node, type->func.type);
+
+        bool first = true;
+        printf("(");
+        sl_link_t *cur;
+        SL_FOREACH(cur, &decl_node->type->func.params) {
+            if (first) {
+                first = false;
+            } else {
+                printf(", ");
+            }
+            ast_decl_print(GET_ELEM(&decl_node->type->func.params, cur));
+        }
+        printf(")");
+        break;
+    }
     case TYPE_ARR:
         ast_decl_node_print(decl_node, type->arr.base);
         printf("[");
@@ -354,6 +361,8 @@ void ast_expr_print(expr_t *expr) {
         printf("}");
         break;
     }
+    default:
+        assert(false);
     }
 }
 
@@ -436,6 +445,8 @@ void ast_oper_print(oper_t op) {
     case OP_DOT:
         printf(".");
         break;
+    default:
+        assert(false);
     }
 }
 
@@ -510,6 +521,8 @@ void ast_type_print(type_t *type) {
         ast_type_mod_print(type->mod.type_mod);
         ast_type_print(type->mod.base);
         break;
+    default:
+        assert(false);
     }
 }
 
