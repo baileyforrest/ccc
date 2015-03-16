@@ -144,6 +144,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
         if (CCC_OK != (status = par_declaration(lex, &gdecl->decl))) {
             goto fail;
         }
+        LEX_MATCH(lex, SEMI); // Must end with semi colon
     }
 
 done:

@@ -133,33 +133,17 @@ typedef struct type_t {
     };
 } type_t;
 
-typedef enum gdecl_type_t {
-    GDECL_FDEFN,    /**< Function definition */
-    GDECL_DECL      /**< Declaration */
-} gdecl_type_t;
-
-/**
- * Global declaration
- */
-typedef struct gdecl_t {
-    sl_link_t link;              /**< Storage Link */
-    gdecl_type_t type;           /**< Type of gdecl */
-    struct decl_t *decl;         /**< Declaration */
-    union {
-        struct {                 /**< Function definition parameters */
-            struct stmt_t *stmt; /**< Function body */
-        } fdefn;
-    };
-} gdecl_t;
-
 /**
  * Types of operations
  */
 typedef enum oper_t {
     OP_NOP,        // Nop
     OP_PLUS,       // Plus
+    OP_UPLUS,      // Unary plus
     OP_MINUS,      // Minus
+    OP_UMINUS,     // Unary minus
     OP_TIMES,      // Times
+    OP_DEREF,      // Dereference of
     OP_DIV,        // Div
     OP_MOD,        // Mod
     OP_LT,         // Less than
@@ -169,25 +153,18 @@ typedef enum oper_t {
     OP_EQ,         // Equal
     OP_NE,         // Non equal
     OP_BITAND,     // Bitwise AND
+    OP_ADDR,       // Address of
     OP_BITXOR,     // Bitwise XOR
     OP_BITOR,      // Bitwise OR
     OP_LSHIFT,     // Left Shift
     OP_RSHIFT,     // Right Shift
     OP_LOGICNOT,   // Logical NOT
     OP_BITNOT,     // Bitwise NOT
-    OP_NEGATIVE,   // unary minus
-    OP_PINC,       // Post increment
-    OP_PDEC,       // Post Decrement
-    OP_TERN,       // Ternary Operator
     OP_ARR_ACC,    // Array access
     OP_PREINC,     // Pre increment
-    OP_PREDEC,     // Pre decrement
     OP_POSTINC,    // Post increment
+    OP_PREDEC,     // Pre decrement
     OP_POSTDEC,    // Post decrement
-    OP_ADDR,       // Address of
-    OP_DEREF,      // Dereference of
-    OP_UPLUS,      // Unary plus
-    OP_UMINUS,     // Unary minus
     OP_ARROW,      // ->
     OP_DOT         // .
 } oper_t;
@@ -258,8 +235,8 @@ typedef struct expr_t {
         } cond;
 
         struct {                  /**< Cast parameters */
-            struct expr_t *base;  /**< Base expression */
             struct decl_t *cast;  /**< Casted type */
+            struct expr_t *base;  /**< Base expression */
         } cast;
 
         struct {                  /**< Function call paramaters */
@@ -414,6 +391,27 @@ typedef struct stmt_t {
         } expr;
     };
 } stmt_t;
+
+
+typedef enum gdecl_type_t {
+    GDECL_FDEFN,    /**< Function definition */
+    GDECL_DECL      /**< Declaration */
+} gdecl_type_t;
+
+/**
+ * Global declaration
+ */
+typedef struct gdecl_t {
+    sl_link_t link;              /**< Storage Link */
+    gdecl_type_t type;           /**< Type of gdecl */
+    struct decl_t *decl;         /**< Declaration */
+    union {
+        struct {                 /**< Function definition parameters */
+            struct stmt_t *stmt; /**< Function body */
+        } fdefn;
+    };
+} gdecl_t;
+
 
 /**
  * Translation unit - Top level AST structure
