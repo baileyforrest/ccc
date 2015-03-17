@@ -35,8 +35,6 @@
  * All AST destructor functions ignore NULL, so child nodes should be
  * initialized to NULL.
  *
- * TODO: proper destruction and and memory freeing on errors
- * TODO: Error reporting/recovery
  * TODO: Make sure all relevent members initialized on creation
  */
 
@@ -529,7 +527,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type) {
         case STRUCT:
         case UNION:
         case ENUM:
-            if(CCC_OK != (status = par_type_specifier(lex, type))) {
+            if (CCC_OK != (status = par_type_specifier(lex, type))) {
                 goto fail;
             }
             break;

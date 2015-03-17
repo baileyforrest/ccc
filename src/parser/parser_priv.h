@@ -139,6 +139,8 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type);
  * auto, register, static, extern, typedef
  *
  * This function may allocate a new TYPE_MOD node if one does not exist.
+ * This function should only be called if there is known to be a storage class
+ * specifer next.
  *
  * @param lex Current lexer state
  * @param type The location to store the result.
@@ -149,11 +151,13 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type);
 /**
  * Parses a type specifier
  *
- * This function may allocate a new node of the appropriate type if one does not
- * exist.
- *
  * void, char, short, int, long, float, double, signed, unsigned,
  * <struct-or-union-specifier>, <enum-specifier>, <typedef-name>
+ *
+ * This function may allocate a new node of the appropriate type if one does not
+ * exist.
+ * This function should only be called if there is known to be a type specifer
+ * next.
  *
  * @param lex Current lexer state
  * @param type The location to store the result.
@@ -166,6 +170,8 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type);
  *
  * This function may allocate a new node of the appropriate type if one does not
  * exist.
+ * This function should only be called if there is known to be an enum
+ * specifer next.
  *
  * @param lex Current lexer state
  * @param type The location to store the result.
@@ -333,6 +339,9 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
 /**
  * Parses an assignment operator after the unary expression.
  *
+ * This function should only be called if there is known to be an assignment
+ * expression next.
+ *
  * @param lex Current lexer state
  * @param left The unary expression being assigned to
  * @param result Location to store the result
@@ -347,6 +356,9 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
  * The original grammar included paren expressions, but that is not included
  * here due to ambiguity with casts. Parens are handled in
  * par_non_binary_expression.
+ *
+ * This function should only be called if there is known to be an primary
+ * expression next.
  *
  * @param lex Current lexer state
  * @param result Location to store the result
@@ -458,6 +470,9 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result);
 
 /**
  * Parses a labeled statement.(goto label, case, default)
+
+ * This function should only be called if there is known to be an labeled
+ * statement next.
  *
  * @param lex Current lexer state
  * @param result Location to store the result
@@ -468,6 +483,9 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result);
 /**
  * Parses a selection statement. (if, switch)
  *
+ * This function should only be called if there is known to be an selection
+ * statement next.
+ *
  * @param lex Current lexer state
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
@@ -477,6 +495,9 @@ status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result);
 /**
  * Parses an iteration statement (do, while, for)
  *
+ * This function should only be called if there is known to be an iteration
+ * statement next.
+ *
  * @param lex Current lexer state
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
@@ -485,6 +506,9 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result);
 
 /**
  * Parses a jump statement.(goto, continue, break, return)
+ *
+ * This function should only be called if there is known to be an jump
+ * statement next.
  *
  * @param lex Current lexer state
  * @param result Location to store the result
