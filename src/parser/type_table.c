@@ -133,7 +133,7 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
 
     // Only free the type if its a compound type
     if (entry->key.type == TT_COMPOUND) {
-        ast_type_destroy(entry->type, OVERRIDE);
+        ast_type_destroy(entry->type, AST_OVERRIDE);
     }
     free(entry);
 }

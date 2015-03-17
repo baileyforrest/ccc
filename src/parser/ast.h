@@ -106,6 +106,7 @@ typedef struct type_t {
     char align;                         /**< Alignment */
 
     /** Whether or not this should be freed with containing structure */
+    // TODO: Remove this flag and replace with policy decision based on type
     bool dealloc;
 
     union {
@@ -460,8 +461,8 @@ void ast_struct_decl_destroy(struct_decl_t *struct_decl);
 void ast_enum_id_destroy(enum_id_t *enum_id);
 
 
-#define OVERRIDE true
-#define NO_OVERRIDE false
+#define AST_OVERRIDE true
+#define AST_NO_OVERRIDE false
 
 /**
  * Destroys a type_t.

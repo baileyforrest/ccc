@@ -655,19 +655,19 @@ void ast_type_destroy(type_t *type, bool override) {
         break;
 
     case TYPE_FUNC:
-        ast_type_destroy(type->func.type, NO_OVERRIDE);
+        ast_type_destroy(type->func.type, AST_NO_OVERRIDE);
         SL_DESTROY_FUNC(&type->func.params, ast_stmt_destroy);
         break;
 
     case TYPE_ARR:
-        ast_type_destroy(type->arr.base, NO_OVERRIDE);
+        ast_type_destroy(type->arr.base, AST_NO_OVERRIDE);
         ast_expr_destroy(type->arr.len);
         break;
     case TYPE_PTR:
-        ast_type_destroy(type->ptr.base, NO_OVERRIDE);
+        ast_type_destroy(type->ptr.base, AST_NO_OVERRIDE);
         break;
     case TYPE_MOD:
-        ast_type_destroy(type->mod.base, NO_OVERRIDE);
+        ast_type_destroy(type->mod.base, AST_NO_OVERRIDE);
         break;
     default:
         assert(false);
@@ -713,7 +713,7 @@ void ast_expr_destroy(expr_t *expr) {
     case EXPR_CONST_INT:
     case EXPR_CONST_FLOAT:
     case EXPR_CONST_STR:
-        ast_type_destroy(expr->const_val.type, NO_OVERRIDE);
+        ast_type_destroy(expr->const_val.type, AST_NO_OVERRIDE);
         break;
     case EXPR_BIN:
         ast_expr_destroy(expr->bin.expr1);
@@ -758,7 +758,7 @@ void ast_decl_node_destroy(decl_node_t *decl_node) {
     if (decl_node == NULL) {
         return;
     }
-    ast_type_destroy(decl_node->type, NO_OVERRIDE);
+    ast_type_destroy(decl_node->type, AST_NO_OVERRIDE);
     ast_expr_destroy(decl_node->expr);
     free(decl_node);
 }
@@ -776,7 +776,7 @@ void ast_decl_destroy(decl_t *decl) {
 
     if (dealloc_base) {
         decl->type->dealloc = true;
-        ast_type_destroy(decl->type, NO_OVERRIDE);
+        ast_type_destroy(decl->type, AST_NO_OVERRIDE);
     }
     free(decl);
 }
