@@ -104,6 +104,7 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
  * Parses an external declaration (declaration or function definition)
  *
  * @param lex Current lexer state
+ * @param result Lecation to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result);
@@ -363,135 +364,152 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
 status_t par_type_name(lex_wrap_t *lex, decl_t **result);
 
 /**
- * Parses a
+ * Parses a funtion parameter type list, which may include vaargs
  *
  * @param lex Current lexer state
+ * @param func Function to parse paramaters for
  * @return CCC_OK on success, error code on error
  */
 status_t par_parameter_type_list(lex_wrap_t *lex, type_t *func);
 
 /**
- * Parses a
+ * Parses a parameter list, a list of types and parameters, as well as trailing
+ * comma before vaargs
  *
  * @param lex Current lexer state
+ * @param func Function to parse paramaters for
  * @return CCC_OK on success, error code on error
  */
 status_t par_parameter_list(lex_wrap_t *lex, type_t *func);
 
 /**
- * Parses a
+ * Parses a parameter declaration
  *
  * @param lex Current lexer state
+ * @param func Function to parse paramaters for
  * @return CCC_OK on success, error code on error
  */
 status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func);
 
 /**
- * Parses a
+ * Parses a list of enum declarations
  *
  * @param lex Current lexer state
+ * @param enum type to parse declarations for
  * @return CCC_OK on success, error code on error
  */
 status_t par_enumerator_list(lex_wrap_t *lex, type_t *type);
 
 /**
- * Parses a
+ * Parses a single enum declaration, which is a name and possibly a value
  *
  * @param lex Current lexer state
+ * @param enum type to parse declarations for
  * @return CCC_OK on success, error code on error
  */
 status_t par_enumerator(lex_wrap_t *lex, type_t *type);
 
 /**
- * Parses a
+ * Parses a declaration.
  *
  * @param lex Current lexer state
+ * @param decl Location to store declaration. If *decl != NULL, it will add onto
+ *     an existing declaration. Otherwise a new declaration will be allocated
  * @return CCC_OK on success, error code on error
- */
-/**
- * If *stmt == NULL, allocates statement, otherwise continues parsing existing
- * declaration
  */
 status_t par_declaration(lex_wrap_t *lex, decl_t **decl);
 
 /**
- * Parses a
+ * Parses an init declarator, which is a declarator with an optional
+ * initialization.
  *
  * @param lex Current lexer state
+ * @param decl Declaration to parse init declarators for
  * @return CCC_OK on success, error code on error
  */
 status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl);
 
 /**
- * Parses a
+ * Parses an initalizer, which is either an expression or a initizer list
  *
  * @param lex Current lexer state
+ * @param Lecation to store the resulting initializer
  * @return CCC_OK on success, error code on error
  */
 status_t par_initializer(lex_wrap_t *lex, expr_t **result);
 
 /**
- * Parses a
+ * Parses an initializer list.
  *
  * @param lex Current lexer state
+ * @param result Location to store the resulting initializer list
  * @return CCC_OK on success, error code on error
  */
 status_t par_initializer_list(lex_wrap_t *lex, expr_t **result);
 
 /**
- * Parses a
+ * Parses a statement
  *
  * @param lex Current lexer state
- * @return CCC_OK on success, error code on error
- */
-status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result);
-
-/**
- * Parses a
- *
- * @param lex Current lexer state
+ * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_statement(lex_wrap_t *lex, stmt_t **result);
 
 /**
- * Parses a
+ * Parses a labeled statement.(goto label, case, default)
  *
  * @param lex Current lexer state
+ * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result);
 
 /**
- * Parses a
+ * Parses a selection statement. (if, switch)
  *
  * @param lex Current lexer state
- * @return CCC_OK on success, error code on error
- */
-status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result);
-
-/**
- * Parses a
- *
- * @param lex Current lexer state
+ * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result);
 
 /**
- * Parses a
+ * Parses an iteration statement (do, while, for)
  *
  * @param lex Current lexer state
+ * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result);
 
 /**
- * Parses a
+ * Parses a jump statement.(goto, continue, break, return)
  *
  * @param lex Current lexer state
+ * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result);
+
+/**
+ * Parses a compound statement, multiple statements in a block
+ *
+ * @param lex Current lexer state
+ * @param result Location to store the result
+ * @return CCC_OK on success, error code on error
+ */
+status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result);
+
+
+/**
+ * Parses an expression statement. (Possibly empty statement)
+ *
+ * @param lex Current lexer state
+ * @param result Location to store the result
+ * @return CCC_OK on success, error code on error
+ */
+status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result);
+
 
 #endif /* _PARSER_PRIV_H_ */

@@ -1561,9 +1561,6 @@ fail:
 
 status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
     status_t status = CCC_OK;
-    if (CCC_OK != (status = par_parameter_declaration(lex, func))) {
-        goto fail;
-    }
     while (CCC_BACKTRACK != (status = par_parameter_declaration(lex, func))) {
         if (status != CCC_OK) {
             goto fail;
@@ -1577,26 +1574,36 @@ fail:
 status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
     status_t status = CCC_OK;
     type_t *type = NULL;
+    decl_t *decl = NULL;
+
+    // Must have type specifers
     if (CCC_OK != (status = par_declaration_specifiers(lex, &type))) {
         if (type == NULL || status != CCC_BACKTRACK) {
             goto fail;
         }
     }
 
-    decl_t *decl;
     ALLOC_NODE(decl, decl_t);
     decl->type = type;
     sl_init(&decl->decls, offsetof(decl_node_t, link));
 
+    // Declarators are optional
     if (CCC_BACKTRACK != (status = par_declarator_base(lex, decl))) {
         if (status != CCC_OK) {
             goto fail;
         }
     }
     status = CCC_OK;
+
+    // Add declaration to the function
     sl_append(&func->func.params, &decl->link);
 
 fail:
+    if (decl == NULL) {
+        ast_type_destroy(type, AST_NO_OVERRIDE);
+    } else {
+        ast_decl_destroy(decl);
+    }
     return status;
 }
 
@@ -1606,11 +1613,16 @@ status_t par_enumerator_list(lex_wrap_t *lex, type_t *type) {
     if (CCC_OK != (status = par_enumerator(lex, type))) {
         goto fail;
     }
+
+    // Trailing comma on last entry is allowed
     while (lex->cur.type == COMMA) {
         if (CCC_OK != (status = par_enumerator(lex, type))) {
-            goto fail;
+            if (status != CCC_BACKTRACK) {
+                goto fail;
+            }
         }
     }
+    status = CCC_OK;
 
 fail:
     return status;
@@ -1619,14 +1631,15 @@ fail:
 status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     status_t status = CCC_OK;
     if (lex->cur.type != ID) {
-        status = CCC_ESYNTAX;
-        goto fail;
+        return CCC_BACKTRACK;
     }
-    enum_id_t *node;
+    enum_id_t *node = NULL;
     ALLOC_NODE(node, enum_id_t);
     node->id = &lex->cur.tab_entry->key;
+    node->val = NULL;
     LEX_ADVANCE(lex);
 
+    // Parse enum value if there is one
     if (lex->cur.type == EQ) {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_expression(lex, NULL, &node->val))) {
@@ -1635,8 +1648,9 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     }
     sl_append(&type->enum_ids, &node->link);
     return status;
+
 fail:
-    free(node);
+    ast_enum_id_destroy(node);
     return status;
 }
 
@@ -1688,7 +1702,12 @@ status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl) {
 
     if (lex->cur.type == ASSIGN) {
         if (is_typedef) {
-            // TODO: report error
+            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+                     "Typedef '%s' is initialized",
+                     decl_node->id->str);
+            logger_log(&lex->cur.mark, logger_fmt_buf, LOG_WARN);
+            status = CCC_ESYNTAX;
+            goto fail;
         }
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_initializer(lex, &decl_node->expr))) {
@@ -1702,6 +1721,8 @@ fail:
 
 status_t par_initializer(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
+
+    // Not left bracket, so its an expression
     if (lex->cur.type != LBRACK) {
         return par_expression(lex, NULL, result);
     }
@@ -1720,30 +1741,33 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
     ALLOC_NODE(expr, expr_t);
     expr->type = EXPR_INIT_LIST;
     sl_init(&expr->init_list.exprs, offsetof(expr_t, link));
-    expr_t *cur = NULL;
-    if (CCC_OK != (status = par_initializer(lex, &cur))) {
-        goto fail;
-    }
-    sl_append(&expr->init_list.exprs, &cur->link);
 
-    while (lex->cur.type == COMMA) {
-        LEX_ADVANCE(lex);
-        if (lex->cur.type == RBRACK) {
+    while (true) {
+        if (lex->cur.type == COMMA) {
+            LEX_ADVANCE(lex);
+        }
+        if (lex->cur.type == RBRACK) { // Trailing commas allowed
             break;
         }
+        expr_t *cur = NULL;
         if (CCC_OK != (status = par_initializer(lex, &cur))) {
             goto fail;
         }
         sl_append(&expr->init_list.exprs, &cur->link);
     }
+
     *result = expr;
+    return status;
+
 fail:
+    ast_expr_destroy(expr);
     return status;
 }
 
 
 status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
+    stmt_t *stmt = NULL;
 
     switch (lex->cur.type) {
         // Cases for declaration specifier
@@ -1771,7 +1795,6 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         // Type qualitifiers
     case CONST:
     case VOLATILE: {
-        stmt_t *stmt;
         ALLOC_NODE(stmt, stmt_t);
         stmt->type = STMT_DECL;
         stmt->decl = NULL;
@@ -1779,14 +1802,12 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
             goto fail;
         }
         LEX_MATCH(lex, SEMI);
-        *result = stmt;
-        return CCC_OK;
+        break;
     }
     case ID: {
         // Type specifier only if its a typedef name
         tt_key_t key = { &lex->cur.tab_entry->key, TT_TYPEDEF };
         if (tt_lookup(lex->typetab, &key) != NULL) {
-            stmt_t *stmt;
             ALLOC_NODE(stmt, stmt_t);
             stmt->type = STMT_DECL;
             stmt->decl = NULL;
@@ -1794,9 +1815,10 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
                 goto fail;
             }
 
-            *result = stmt;
-            return CCC_OK;
+            goto done;
         }
+
+        // FALL THROUGH
     }
     case CASE:
     case DEFAULT:
@@ -1816,38 +1838,43 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     case BREAK:
     case RETURN:
         return par_jump_statement(lex, result);
-
-    case SEMI: // noop
-        LEX_ADVANCE(lex);
-        ALLOC_NODE(*result, stmt_t);
-        (*result)->type = STMT_NOP;
-        return CCC_OK;
     case RBRACK:
         return par_compound_statement(lex, result);
     default:
         return par_expression_statement(lex, result);
     }
+
+done:
+    *result = stmt;
+    return status;
+
 fail:
+    ast_stmt_destroy(stmt);
     return status;
 }
 
 status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
-    stmt_t *stmt;
+    stmt_t *stmt = NULL;
     ALLOC_NODE(stmt, stmt_t);
+    stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
     switch (lex->cur.type) {
     case ID:
         stmt->type = STMT_LABEL;
         stmt->label.label = &lex->cur.tab_entry->key;
+        stmt->label.stmt = NULL;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, COLON);
         if (CCC_OK != (status = par_statement(lex, &stmt->label.stmt))) {
             goto fail;
         }
         break;
+
     case CASE:
         LEX_ADVANCE(lex);
         stmt->type = STMT_CASE;
+        stmt->case_params.val = NULL;
+        stmt->case_params.stmt = NULL;
 
         if (CCC_OK !=
             (status = par_expression(lex, NULL, &stmt->case_params.val))) {
@@ -1859,51 +1886,62 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
             goto fail;
         }
         break;
+
     case DEFAULT:
         LEX_ADVANCE(lex);
         stmt->type = STMT_DEFAULT;
+        stmt->default_params.stmt = NULL;
+
         if (CCC_OK !=
             (status = par_statement(lex, &stmt->default_params.stmt))) {
             goto fail;
         }
         break;
+
     default:
-        return CCC_ESYNTAX;
+        assert(false);
     }
 
     *result = stmt;
     return status;
+
 fail:
-    free(stmt);
+    ast_stmt_destroy(stmt);
     return status;
 }
 
 status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
-    stmt_t *stmt;
+    stmt_t *stmt = NULL;
     ALLOC_NODE(stmt, stmt_t);
+    stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
+
     switch (lex->cur.type) {
     case IF:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
         stmt->type = STMT_IF;
+        stmt->if_params.expr = NULL;
+        stmt->if_params.true_stmt = NULL;
+        stmt->if_params.false_stmt = NULL;
+
         if (CCC_OK !=
             (status = par_expression(lex, NULL, &stmt->if_params.expr))) {
             goto fail;
         }
+
         LEX_MATCH(lex, RPAREN);
         if (CCC_OK !=
             (status = par_statement(lex, &stmt->if_params.true_stmt))) {
             goto fail;
         }
+
         if (lex->cur.type == ELSE) {
             LEX_ADVANCE(lex);
             if (CCC_OK !=
                 (status = par_statement(lex, &stmt->if_params.false_stmt))) {
                 goto fail;
             }
-        } else {
-            stmt->if_params.false_stmt = NULL;
         }
         break;
 
@@ -1911,38 +1949,50 @@ status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
         stmt->type = STMT_SWITCH;
+        stmt->switch_params.expr = NULL;
+        stmt->switch_params.stmt = NULL;
+
         if (CCC_OK !=
             (status = par_expression(lex, NULL, &stmt->switch_params.expr))) {
             goto fail;
         }
+
         LEX_MATCH(lex, RPAREN);
         if (CCC_OK !=
             (status = par_statement(lex, &stmt->switch_params.stmt))) {
             goto fail;
         }
         break;
+
     default:
-        return CCC_ESYNTAX;
+        assert(false);
     }
 
     *result = stmt;
     return status;
+
 fail:
+    ast_stmt_destroy(stmt);
     return status;
 }
 
 status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
-    stmt_t *stmt;
+    stmt_t *stmt = NULL;
     ALLOC_NODE(stmt, stmt_t);
+    stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
 
     switch (lex->cur.type) {
     case DO:
         LEX_ADVANCE(lex);
         stmt->type = STMT_DO;
+        stmt->do_params.stmt = NULL;
+        stmt->do_params.expr = NULL;
+
         if (CCC_OK != (status = par_statement(lex, &stmt->do_params.stmt))) {
             goto fail;
         }
+
         LEX_MATCH(lex, WHILE);
         LEX_MATCH(lex, LPAREN);
         if (CCC_OK !=
@@ -1952,23 +2002,34 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_MATCH(lex, RPAREN);
         LEX_MATCH(lex, SEMI);
         break;
+
     case WHILE:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
         stmt->type = STMT_WHILE;
+        stmt->while_params.expr = NULL;
+        stmt->while_params.stmt = NULL;
+
         if (CCC_OK !=
             (status = par_expression(lex, NULL, &stmt->while_params.expr))) {
             goto fail;
         }
+
         LEX_MATCH(lex, RPAREN);
         if (CCC_OK != (status = par_statement(lex, &stmt->while_params.stmt))) {
             goto fail;
         }
         break;
+
     case FOR:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
         stmt->type = STMT_FOR;
+        stmt->for_params.expr1 = NULL;
+        stmt->for_params.expr2 = NULL;
+        stmt->for_params.expr3 = NULL;
+        stmt->for_params.stmt = NULL;
+
         if (lex->cur.type != SEMI) {
             if (CCC_OK !=
                 (status = par_expression(lex, NULL, &stmt->for_params.expr1))) {
@@ -1976,6 +2037,7 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
             }
         }
         LEX_MATCH(lex, SEMI);
+
         if (lex->cur.type != SEMI) {
             if (CCC_OK !=
                 (status = par_expression(lex, NULL, &stmt->for_params.expr2))) {
@@ -1983,6 +2045,7 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
             }
         }
         LEX_MATCH(lex, SEMI);
+
         if (lex->cur.type != SEMI) {
             if (CCC_OK !=
                 (status = par_expression(lex, NULL, &stmt->for_params.expr3))) {
@@ -1991,23 +2054,29 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         }
         LEX_MATCH(lex, SEMI);
         LEX_MATCH(lex, RPAREN);
+
         if (CCC_OK != (status = par_statement(lex, &stmt->for_params.stmt))) {
             goto fail;
         }
         break;
+
     default:
-        return CCC_ESYNTAX;
+        assert(false);
     }
 
     *result = stmt;
+    return status;
+
 fail:
+    ast_stmt_destroy(stmt);
     return status;
 }
 
 status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
-    stmt_t *stmt;
+    stmt_t *stmt = NULL;
     ALLOC_NODE(stmt, stmt_t);
+    stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
 
     switch (lex->cur.type) {
     case GOTO:
@@ -2021,31 +2090,39 @@ status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, SEMI);
         break;
+
     case CONTINUE:
     case BREAK:
         LEX_ADVANCE(lex);
         stmt->type = STMT_BREAK;
         if (lex->cur.type == CONTINUE) {
             stmt->continue_params.parent = NULL;
-        } else {
+        } else { // lex->cur.type == BREAK
             stmt->break_params.parent = NULL;
         }
         LEX_MATCH(lex, SEMI);
         break;
+
     case RETURN:
         LEX_ADVANCE(lex);
         stmt->type = STMT_RETURN;
+        stmt->return_params.expr = NULL;
+
         if (CCC_OK !=
             (status = par_expression(lex, false, &stmt->return_params.expr))) {
             goto fail;
         }
         LEX_MATCH(lex, SEMI);
         break;
+
     default:
-        return CCC_ESYNTAX;
+        assert(false);
     }
     *result = stmt;
+    return status;
+
 fail:
+    ast_stmt_destroy(stmt);
     return status;
 }
 
@@ -2054,9 +2131,10 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt;
     ALLOC_NODE(stmt, stmt_t);
-
     stmt->type = STMT_COMPOUND;
     sl_init(&stmt->compound.stmts, offsetof(stmt_t, link));
+
+    // TODO: Make sure calling tt_destroy on a failed typetab is okay
     if (CCC_OK != (tt_init(&stmt->compound.typetab, lex->typetab))) {
         goto fail;
     }
@@ -2071,13 +2149,16 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
         }
         sl_append(&stmt->compound.stmts, &cur->link);
     }
-    LEX_ADVANCE(lex);
+    LEX_ADVANCE(lex); // Consume RBRACE
 
-    // Remove new typetab table to top of stack
+    // Restore old type table to top of stack
     lex->typetab = stmt->compound.typetab.last;
 
     *result = stmt;
+    return status;
+
 fail:
+    ast_stmt_destroy(stmt);
     return status;
 }
 
@@ -2091,6 +2172,7 @@ status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result) {
         stmt->type = STMT_NOP;
     } else {
         stmt->type = STMT_EXPR;
+        stmt->expr.expr = NULL;
         if (CCC_OK != (status = par_expression(lex, NULL, &stmt->expr.expr))) {
             goto fail;
         }
@@ -2099,6 +2181,9 @@ status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result) {
     LEX_MATCH(lex, SEMI);
 
     *result = stmt;
+    return status;
+
 fail:
+    ast_stmt_destroy(stmt);
     return status;
 }
