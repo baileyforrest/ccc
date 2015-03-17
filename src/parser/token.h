@@ -180,7 +180,7 @@ void token_print(lexeme_t *token);
 /**
  * Returns a pointer to a token's string representation
  */
-const char * token_str(token_t token);
+const char *token_str(token_t token);
 
 
 #endif /* _TOKEN_H_ */

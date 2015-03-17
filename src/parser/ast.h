@@ -73,6 +73,8 @@ typedef enum type_mod_t {
  * Basic varieties of types
  */
 typedef enum basic_type_t {
+    TYPE_PAREN,  /**< Parens in type */
+
     // Basic types
     TYPE_VOID,
     TYPE_CHAR,
@@ -107,6 +109,7 @@ typedef struct type_t {
     bool dealloc;
 
     union {
+        struct type_t *paren_base;      /**< Type in parens */
         slist_t struct_decls;           /**< List of struct/union definitions */
         slist_t enum_ids;               /**< List of enum ids/values */
 
