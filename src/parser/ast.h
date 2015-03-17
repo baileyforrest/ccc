@@ -403,8 +403,9 @@ typedef struct stmt_t {
 
 
 typedef enum gdecl_type_t {
-    GDECL_FDEFN,    /**< Function definition */
-    GDECL_DECL      /**< Declaration */
+    GDECL_NOP,   /**< No operation */
+    GDECL_FDEFN, /**< Function definition */
+    GDECL_DECL   /**< Declaration */
 } gdecl_type_t;
 
 /**

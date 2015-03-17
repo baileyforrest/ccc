@@ -685,6 +685,7 @@ void ast_gdecl_destroy(gdecl_t *gdecl) {
     case GDECL_FDEFN:
         ast_stmt_destroy(gdecl->fdefn.stmt);
         break;
+    case GDECL_NOP:
     case GDECL_DECL:
         break;
     default:
