@@ -454,23 +454,42 @@ void ast_oper_print(oper_t op) {
     }
 }
 
+const char *ast_basic_type_str(basic_type_t type) {
+    switch (type) {
+    case TYPE_VOID:   return "void";   break;
+    case TYPE_CHAR:   return "char";   break;
+    case TYPE_SHORT:  return "short";  break;
+    case TYPE_INT:    return "int";    break;
+    case TYPE_LONG:   return "long";   break;
+    case TYPE_FLOAT:  return "float";  break;
+    case TYPE_DOUBLE: return "double"; break;
+
+    case TYPE_STRUCT: return "struct"; break;
+    case TYPE_UNION:  return "union";  break;
+    case TYPE_ENUM:   return "enum";   break;
+    default:
+        assert(false);
+    }
+
+    return NULL;
+}
+
 void ast_type_print(type_t *type) {
     switch (type->type) {
-    case TYPE_VOID:   printf("void");   break;
-    case TYPE_CHAR:   printf("char");   break;
-    case TYPE_SHORT:  printf("short");  break;
-    case TYPE_INT:    printf("int");    break;
-    case TYPE_LONG:   printf("long");   break;
-    case TYPE_FLOAT:  printf("float");  break;
-    case TYPE_DOUBLE: printf("double"); break;
+    case TYPE_VOID:
+    case TYPE_CHAR:
+    case TYPE_SHORT:
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+        printf(ast_basic_type_str(type->type));
+        break;
 
     case TYPE_STRUCT:
     case TYPE_UNION: {
-        if (type->type == TYPE_STRUCT) {
-            printf("struct {\n");
-        } else {
-            printf("union {\n");
-        }
+        printf(ast_basic_type_str(type->type));
+        printf(" {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_decls) {
             ast_struct_decl_print(GET_ELEM(&type->struct_decls, cur));
@@ -479,7 +498,8 @@ void ast_type_print(type_t *type) {
         break;
     }
     case TYPE_ENUM: {
-        printf("enum {");
+        printf(ast_basic_type_str(type->type));
+        printf(" {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->enum_ids) {
             enum_id_t *enum_id = GET_ELEM(&type->enum_ids, cur);
@@ -529,34 +549,50 @@ void ast_type_print(type_t *type) {
         assert(false);
     }
 }
+const char *ast_type_mod_str(type_mod_t type_mod) {
+    switch (type_mod) {
+    case TMOD_SIGNED:   return "signed";
+    case TMOD_UNSIGNED: return "unsigned";
+    case TMOD_AUTO:     return "auto";
+    case TMOD_REGISTER: return "register";
+    case TMOD_STATIC:   return "static";
+    case TMOD_EXTERN:   return "extern";
+    case TMOD_TYPEDEF:  return "typedef";
+    case TMOD_CONST:    return "const";
+    case TMOD_VOLATILE: return "volatile";
+    default:
+        assert(false);
+    }
+    return NULL;
+}
 
 void ast_type_mod_print(type_mod_t type_mod) {
     if (type_mod & TMOD_TYPEDEF) {
-        printf("typedef ");
+        ast_type_mod_str(TMOD_TYPEDEF);
     }
     if (type_mod & TMOD_SIGNED) {
-        printf("signed ");
+        ast_type_mod_str(TMOD_SIGNED);
     }
     if (type_mod & TMOD_UNSIGNED) {
-        printf("unsigned ");
+        ast_type_mod_str(TMOD_UNSIGNED);
     }
     if (type_mod & TMOD_AUTO) {
-        printf("auto ");
+        ast_type_mod_str(TMOD_AUTO);
     }
     if (type_mod & TMOD_REGISTER) {
-        printf("register ");
+        ast_type_mod_str(TMOD_REGISTER);
     }
     if (type_mod & TMOD_STATIC) {
-        printf("static ");
+        ast_type_mod_str(TMOD_STATIC);
     }
     if (type_mod & TMOD_EXTERN) {
-        printf("extern ");
+        ast_type_mod_str(TMOD_EXTERN);
     }
     if (type_mod & TMOD_CONST) {
-        printf("const ");
+        ast_type_mod_str(TMOD_CONST);
     }
     if (type_mod & TMOD_VOLATILE) {
-        printf("volatile ");
+        ast_type_mod_str(TMOD_VOLATILE);
     }
 }
 

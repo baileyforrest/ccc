@@ -109,123 +109,172 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
 status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result);
 
 /**
- * Parses a
+ * Parses a function definition after the return type, function name, and
+ * parameter list in parens.
  *
  * @param lex Current lexer state
+ * @param gdecl Global declaration with the provided information
  * @return CCC_OK on success, error code on error
  */
 status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl);
 
 /**
- * If *type == NULL, allocates statement, otherwise continues parsing existing
- * declaration
- */
-/**
- * Parses a
+ * Parses declaration specifers until there are none left. This function
+ * allocates a new type object.
+ *
+ * The types may form a chain, storage class specifers and type qualifiers
+ * are always in the front in a TYPE_MOD type node.
  *
  * @param lex Current lexer state
- * @return CCC_OK on success, error code on error
+ * @param type Location to store resulting type
+ * @return CCC_OK on success, CCC_BACKTRACK if the next token does now allow
+ *     parsing a declaratios_specifier, error code on error
  */
 status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a
+ * Parses a storage class specifer.
+ *
+ * auto, register, static, extern, typedef
+ *
+ * This function may allocate a new TYPE_MOD node if one does not exist.
  *
  * @param lex Current lexer state
+ * @param type The location to store the result.
  * @return CCC_OK on success, error code on error
  */
 status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a
+ * Parses a type specifier
+ *
+ * This function may allocate a new node of the appropriate type if one does not
+ * exist.
+ *
+ * void, char, short, int, long, float, double, signed, unsigned,
+ * <struct-or-union-specifier>, <enum-specifier>, <typedef-name>
  *
  * @param lex Current lexer state
+ * @param type The location to store the result.
  * @return CCC_OK on success, error code on error
  */
 status_t par_type_specifier(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a
+ * Parses a struct, union, or enum specifer.
+ *
+ * This function may allocate a new node of the appropriate type if one does not
+ * exist.
  *
  * @param lex Current lexer state
+ * @param type The location to store the result.
  * @return CCC_OK on success, error code on error
  */
 status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a
+ * Parses a single declaration in a struct specifier.
  *
  * @param lex Current lexer state
+ * @param type The struct specifier type to add declarations on to
  * @return CCC_OK on success, error code on error
  */
 status_t par_struct_declaration(lex_wrap_t *lex, type_t *type);
 
 /**
- * Parses a
+ * Parses specifers qualifiers until there are none left. This function
+ * allocates a new type object.
  *
  * @param lex Current lexer state
- * @return CCC_OK on success, error code on error
+ * @param type The location to store the result.
+ * @return CCC_OK on success, CCC_BACKTRACK if the next token does now allow
+ *     parsing a declaratios_specifier, error code on error
  */
-status_t par_specifier_qualifier(lex_wrap_t *lex, type_t **type);
+status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a
+ * Parses a struct declarator list.
  *
  * @param lex Current lexer state
+ * @param base The struct type being constructed
+ * @param base The base type of the decl
  * @return CCC_OK on success, error code on error
  */
 status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
                                     type_t *decl_type);
 /**
- * Parses a
+ * Parses a struct declarator
  *
  * @param lex Current lexer state
+ * @param base The struct type being constructed
+ * @param base The base type of the decl
  * @return CCC_OK on success, error code on error
  */
-
 status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
                                type_t *decl_type);
 
-status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl);
 /**
- * Parses a
+ * Parses a declarator given a preexisting declaration
  *
  * @param lex Current lexer state
+ * @param decl The declaration to parse a declarator for
  * @return CCC_OK on success, error code on error
+ */
+status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl);
+
+/**
+ * Declarator parsing helper function.
+ *
+ * Delarators are identifers with (possibly const or volatile) pointers
+ * possibly in parens.
+ *
+ * @param lex Current lexer state
+ * @param base The base type of the declaration
+ * @param decl_node The declaration's node
+ * @return CCC_OK on success, CCC_BACKTRACK if a declarator cannot be parsed,
+ *     error code on error
  */
 status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t *decl_node);
 
 /**
- * Parses a
+ * Parses a pointer with an optionally const or valitle type qualifiers.
+ *
+ * The pointers are always at the front of the type chain.
  *
  * @param lex Current lexer state
+ * @param mod The modified type
  * @return CCC_OK on success, error code on error
  */
 status_t par_pointer(lex_wrap_t *lex, type_t **mod);
 
 /**
- * Parses a
+ * Parses a type qualifier. (const, volatile)
  *
  * @param lex Current lexer state
- * @return CCC_OK on success, error code on error
+ * @param mod The type to modify. May add a new node on the front of the chain.
+ * @return CCC_OK on success, CCC_BACKTRACK if a type_qualifier cannot be
+ *     parsed, error code on error
  */
 status_t par_type_qualifier(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a
+ * Parses a direct declarator.
  *
  * @param lex Current lexer state
+ * @param node The declaration node being processed
+ * @param base The base type of the declaration
  * @return CCC_OK on success, error code on error
  */
 status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
                                type_t *base);
 /**
- * Parses a
+ * Parses a non binary expression (cast, unary, postfix, primary, constant)
  *
  * @param lex Current lexer state
+ * @param is_unary true if the parsed expression is unary, false otherwise
+ * @param result The parsed expression
  * @return CCC_OK on success, error code on error
  */
-
 status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
                                    expr_t **result);
 

@@ -515,4 +515,7 @@ void ast_stmt_destroy(stmt_t *stmt);
  */
 void ast_trans_unit_destroy(trans_unit_t *trans_unit);
 
+const char *ast_type_mod_str(type_mod_t type_mod);
+const char *ast_basic_type_str(basic_type_t type);
+
 #endif /* _AST_H_ */
