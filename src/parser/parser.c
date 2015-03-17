@@ -633,7 +633,6 @@ fail:
     return status;
 }
 
-// TODO: Handle abstract-declarator
 status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t *decl_node) {
     status_t status = CCC_OK;
 
@@ -642,6 +641,7 @@ status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t *decl_node) {
             goto fail;
         }
     }
+
     if (CCC_OK != (status = par_direct_declarator(lex, decl_node, base))) {
         goto fail;
     }
@@ -727,7 +727,8 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
                                type_t *base) {
     status_t status = CCC_OK;
 
-    if (lex->cur.type == LPAREN) {
+    switch (lex->cur.type) {
+    case LPAREN: {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_declarator(lex, base, node))) {
             goto fail;
@@ -742,9 +743,18 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         paren_type->align = node->type->align;
 
         node->type = paren_type;
-    } else if (lex->cur.type == ID) {
+        break;
+    }
+
+    case ID:
         node->id = &lex->cur.tab_entry->key;
         LEX_ADVANCE(lex);
+        break;
+
+    default:
+        // Default is not an error, because may be abstract without an
+        // identifier or parens
+        break;
     }
 
     bool done = false;
@@ -2132,7 +2142,6 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     stmt->type = STMT_COMPOUND;
     sl_init(&stmt->compound.stmts, offsetof(stmt_t, link));
 
-    // TODO: Make sure calling tt_destroy on a failed typetab is okay
     if (CCC_OK != (tt_init(&stmt->compound.typetab, lex->typetab))) {
         goto fail;
     }

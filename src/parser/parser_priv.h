@@ -221,7 +221,7 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
                                type_t *decl_type);
 
 /**
- * Parses a declarator given a preexisting declaration
+ * Parses a posibly abstract declarator given a preexisting declaration.
  *
  * @param lex Current lexer state
  * @param decl The declaration to parse a declarator for
@@ -230,7 +230,7 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
 status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl);
 
 /**
- * Declarator parsing helper function.
+ * Declarator parsing helper function. Parses a possibly abstract declarator.
  *
  * Delarators are identifers with (possibly const or volatile) pointers
  * possibly in parens.
@@ -265,7 +265,9 @@ status_t par_pointer(lex_wrap_t *lex, type_t **mod);
 status_t par_type_qualifier(lex_wrap_t *lex, type_t **type);
 
 /**
- * Parses a direct declarator.
+ * Parses a possibly abstract direct declarator.
+ *
+ * May make no change to decl_node if abstract
  *
  * @param lex Current lexer state
  * @param node The declaration node being processed

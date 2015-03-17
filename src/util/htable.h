@@ -77,6 +77,8 @@ status_t ht_init(htable_t *ht, const ht_params_t *params);
  * Destroys an hash table
  * Does not free ht itself. Does not free elements, only backing store
  *
+ * Calling this function on a hashtable that failed to initialize is safe
+ *
  * @param ht The hashtable to destroy
  * @param do_free DOFREE (true) if elements should be freed. NOFREE otherwise
  */

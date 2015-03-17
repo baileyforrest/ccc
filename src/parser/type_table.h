@@ -75,6 +75,8 @@ status_t tt_init(typetab_t *tt, typetab_t *last);
 /**
  * Destroys a type table
  *
+ * Calling this function on a tt that falied to initialize is safe
+ *
  * @param tt Type table to destroy
  * @return CCC_OK on success, error code on error
  */
