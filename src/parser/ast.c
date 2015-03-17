@@ -54,6 +54,7 @@ void ast_gdecl_print(gdecl_t *gdecl) {
     case GDECL_DECL:
         printf(";");
         break;
+    case GDECL_NOP: // Should never have GDECL_NOP in properly formed AST
     default:
         assert(false);
     }
@@ -166,6 +167,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         ast_expr_print(stmt->expr.expr);
         printf(";");
         break;
+
     default:
         assert(false);
     }
@@ -226,7 +228,6 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type) {
         break;
     default:
         printf("%s", decl_node->id->str);
-        return;
     }
 }
 
@@ -365,6 +366,7 @@ void ast_expr_print(expr_t *expr) {
         printf("}");
         break;
     }
+
     default:
         assert(false);
     }
@@ -491,8 +493,8 @@ void ast_type_print(type_t *type) {
         printf(ast_basic_type_str(type->type));
         printf(" {\n");
         sl_link_t *cur;
-        SL_FOREACH(cur, &type->struct_decls) {
-            ast_struct_decl_print(GET_ELEM(&type->struct_decls, cur));
+        SL_FOREACH(cur, &type->struct_params.decls) {
+            ast_struct_decl_print(GET_ELEM(&type->struct_params.decls, cur));
         }
         printf("}");
         break;
@@ -501,10 +503,10 @@ void ast_type_print(type_t *type) {
         printf(ast_basic_type_str(type->type));
         printf(" {\n");
         sl_link_t *cur;
-        SL_FOREACH(cur, &type->enum_ids) {
-            enum_id_t *enum_id = GET_ELEM(&type->enum_ids, cur);
+        SL_FOREACH(cur, &type->enum_params.ids) {
+            enum_id_t *enum_id = GET_ELEM(&type->enum_params.ids, cur);
             ast_enum_id_print(enum_id);
-            if (enum_id != sl_tail(&type->enum_ids)) {
+            if (enum_id != sl_tail(&type->enum_params.ids)) {
                 printf(",");
             }
             printf("\n");
@@ -630,11 +632,41 @@ void ast_enum_id_destroy(enum_id_t *enum_id) {
     free(enum_id);
 }
 
-void ast_type_destroy(type_t *type, bool override) {
+void ast_type_protected_destroy(type_t *type) {
+    switch (type->type) {
+    case TYPE_VOID:
+    case TYPE_CHAR:
+    case TYPE_SHORT:
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+        return; // These are statically allocated
+
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+        // Must be unananymous
+        assert(type->struct_params.name != NULL);
+        SL_DESTROY_FUNC(&type->struct_params.decls, ast_struct_decl_destroy);
+        break;
+    case TYPE_ENUM:
+        // Must be unananymous
+        assert(type->enum_params.name != NULL);
+        SL_DESTROY_FUNC(&type->enum_params.ids, ast_enum_id_destroy);
+        break;
+    default:
+        assert(false);
+    }
+    free(type);
+}
+
+void ast_type_destroy(type_t *type) {
     // Do nothing if marked as not being deallocated
-    if (type == NULL || (!override && !type->dealloc)) {
+    if (type == NULL) {
         return;
     }
+
+    type_t *declarator_type = NULL;
 
     switch (type->type) {
     case TYPE_VOID:
@@ -644,34 +676,63 @@ void ast_type_destroy(type_t *type, bool override) {
     case TYPE_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
-        break;
+        return; // These are statically allocated
 
     case TYPE_STRUCT:
     case TYPE_UNION:
-        SL_DESTROY_FUNC(&type->struct_decls, ast_struct_decl_destroy);
+        // Only free anonymous struct/union
+        if (type->struct_params.name != NULL) {
+            return;
+        }
+        SL_DESTROY_FUNC(&type->struct_params.decls, ast_struct_decl_destroy);
         break;
     case TYPE_ENUM:
-        SL_DESTROY_FUNC(&type->enum_ids, ast_enum_id_destroy);
+        // Only free anonymous enum
+        if (type->enum_params.name != NULL) {
+            return;
+        }
+        SL_DESTROY_FUNC(&type->enum_params.ids, ast_enum_id_destroy);
         break;
 
+    case TYPE_MOD:
+        ast_type_destroy(type->mod.base);
+        break;
+
+    case TYPE_PAREN:
+        declarator_type = type->paren_base;
+        break;
     case TYPE_FUNC:
-        ast_type_destroy(type->func.type, AST_NO_OVERRIDE);
+        declarator_type = type->func.type;
         SL_DESTROY_FUNC(&type->func.params, ast_stmt_destroy);
         break;
-
     case TYPE_ARR:
-        ast_type_destroy(type->arr.base, AST_NO_OVERRIDE);
+        declarator_type = type->arr.base;
         ast_expr_destroy(type->arr.len);
         break;
     case TYPE_PTR:
-        ast_type_destroy(type->ptr.base, AST_NO_OVERRIDE);
+        declarator_type = type->ptr.base;
+        ast_type_destroy(type->ptr.base);
         break;
-    case TYPE_MOD:
-        ast_type_destroy(type->mod.base, AST_NO_OVERRIDE);
-        break;
+
     default:
         assert(false);
     }
+
+    // Avoid freeing base of a declarator type so the base isn't freed multiple
+    // times
+    if (declarator_type != NULL) {
+        switch (declarator_type->type) {
+        case TYPE_PAREN:
+        case TYPE_FUNC:
+        case TYPE_ARR:
+        case TYPE_PTR:
+            ast_type_destroy(declarator_type);
+            break;
+        default:
+            break;
+        }
+    }
+
     free(type);
 }
 
@@ -714,7 +775,7 @@ void ast_expr_destroy(expr_t *expr) {
     case EXPR_CONST_INT:
     case EXPR_CONST_FLOAT:
     case EXPR_CONST_STR:
-        ast_type_destroy(expr->const_val.type, AST_NO_OVERRIDE);
+        ast_type_destroy(expr->const_val.type);
         break;
     case EXPR_BIN:
         ast_expr_destroy(expr->bin.expr1);
@@ -759,26 +820,15 @@ void ast_decl_node_destroy(decl_node_t *decl_node) {
     if (decl_node == NULL) {
         return;
     }
-    ast_type_destroy(decl_node->type, AST_NO_OVERRIDE);
+    ast_type_destroy(decl_node->type);
     ast_expr_destroy(decl_node->expr);
     free(decl_node);
 }
 
 void ast_decl_destroy(decl_t *decl) {
     // Make sure decl_nodes don't free base
-    bool dealloc_base;
-    if (decl->type->dealloc) {
-        dealloc_base = true;
-        decl->type->dealloc = false;
-    } else {
-        dealloc_base = false;
-    }
     SL_DESTROY_FUNC(&decl->decls, ast_decl_node_destroy);
-
-    if (dealloc_base) {
-        decl->type->dealloc = true;
-        ast_type_destroy(decl->type, AST_NO_OVERRIDE);
-    }
+    ast_type_destroy(decl->type);
     free(decl);
 }
 

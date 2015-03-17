@@ -30,8 +30,7 @@
 #include "util/util.h"
 
 #define TYPE_LITERAL(typename, type) \
-    { { NULL }, typename, sizeof(type), alignof(type), false, \
-      { .ptr = { NULL, 0 } } }
+    { { NULL }, typename, sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
 
 static len_str_t void_str   = LEN_STR_LITERAL("void");
 static len_str_t char_str   = LEN_STR_LITERAL("char");
@@ -131,11 +130,7 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
         return;
     }
 
-    // Only free the type if its a compound type
-    if (entry->key.type == TT_COMPOUND) {
-        ast_type_destroy(entry->type, AST_OVERRIDE);
-    }
-    free(entry);
+    ast_type_protected_destroy(entry->type);
 }
 
 void tt_destroy(typetab_t *tt) {

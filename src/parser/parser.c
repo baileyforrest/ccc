@@ -271,7 +271,6 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
         type_t *new_type;
         ALLOC_NODE(new_type, type_t);
         new_type->type = TYPE_MOD;
-        new_type->dealloc = true;
         if (*type != NULL) {
             new_type->size = (*type)->size;
             new_type->align = (*type)->align;
@@ -354,7 +353,6 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         if (mod_node == NULL) {
             ALLOC_NODE(mod_node, type_t);
             mod_node->type = TYPE_MOD;
-            mod_node->dealloc = true;
             mod_node->size = (*type)->size;
             mod_node->align = (*type)->align;
             mod_node->mod.base = *type;
@@ -388,8 +386,10 @@ fail:
 status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
 
-    basic_type_t btype;
+    type_t *new_type = NULL;
+    len_str_t *name = NULL;
 
+    basic_type_t btype;
     switch (lex->cur.type) {
     case STRUCT: btype = TYPE_STRUCT; break;
     case UNION:  btype = TYPE_UNION;  break;
@@ -399,7 +399,6 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     }
     LEX_ADVANCE(lex);
 
-    len_str_t *name = NULL;
     typetab_entry_t *entry = NULL;
     if (lex->cur.type == ID) {
         name = &lex->cur.tab_entry->key;
@@ -424,17 +423,18 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         }
     }
 
-    type_t *new_type = NULL;
     if (entry == NULL) { // Allocate a new type if it doesn't exist
         ALLOC_NODE(new_type, type_t);
         new_type->type = btype;
         new_type->size = 0; // Mark as unitialized
         new_type->align = 0;
-        new_type->dealloc = false;
         if (btype == TYPE_ENUM) {
-            sl_init(&new_type->enum_ids, offsetof(enum_id_t, link));
+            new_type->enum_params.name = name;
+            sl_init(&new_type->enum_params.ids, offsetof(enum_id_t, link));
         } else {
-            sl_init(&new_type->struct_decls, offsetof(struct_decl_t, link));
+            new_type->struct_params.name = name;
+            sl_init(&new_type->struct_params.decls,
+                    offsetof(struct_decl_t, link));
         }
     }
 
@@ -489,7 +489,11 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     return status;
 
 fail:
-    ast_type_destroy(new_type, AST_NO_OVERRIDE);
+    if (name == NULL) {
+        ast_type_destroy(new_type);
+    } else {
+        ast_type_protected_destroy(new_type);
+    }
     return status;
 }
 
@@ -607,7 +611,7 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
     }
 
     // Update base type
-    sl_append(&base->struct_decls, &node->link);
+    sl_append(&base->struct_params.decls, &node->link);
 
     return status;
 
@@ -684,7 +688,6 @@ status_t par_pointer(lex_wrap_t *lex, type_t **mod) {
     new_type->type = TYPE_PTR;
     new_type->size = PTR_SIZE;
     new_type->align = PTR_ALIGN;
-    new_type->dealloc = true;
     new_type->ptr.base = *mod;
     new_type->ptr.type_mod = mods;
 
@@ -713,7 +716,6 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
     } else {
         ALLOC_NODE(mod_node, type_t);
         mod_node->type = TYPE_MOD;
-        mod_node->dealloc = true;
         if (*type != NULL) {
             mod_node->size = (*type)->size;
             mod_node->align = (*type)->align;
@@ -748,7 +750,6 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         type_t *paren_type;
         ALLOC_NODE(paren_type, type_t);
         paren_type->type = TYPE_PAREN;
-        paren_type->dealloc = true;
         paren_type->size = node->type->size;
         paren_type->align = node->type->align;
         paren_type->paren_base = node->type;
@@ -776,7 +777,6 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             type_t *arr_type;
             ALLOC_NODE(arr_type, type_t);
             arr_type->type = TYPE_ARR;
-            arr_type->dealloc = true;
             arr_type->align = node->type->align;
             arr_type->size = 0;
             arr_type->arr.base = node->type;
@@ -799,7 +799,6 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             type_t *func_type;
             ALLOC_NODE(func_type, type_t);
             func_type->type = TYPE_FUNC;
-            func_type->dealloc = true;
             func_type->align = PTR_ALIGN;
             func_type->size = PTR_SIZE;
             func_type->func.type = node->type;
@@ -1470,7 +1469,6 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         type->type = TYPE_ARR;
         type->size = base->const_val.str_val->len + 1;
         type->align = 1;
-        type->dealloc = true;
         type->arr.base = tt_char;
         type->arr.len = NULL;
         base->const_val.type = type;
@@ -1501,7 +1499,6 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             type_mod->type = TYPE_MOD;
             type_mod->size = type->size;
             type_mod->align = type->align;
-            type_mod->dealloc = true;
             type_mod->mod.type_mod = TMOD_UNSIGNED;
             type_mod->mod.base = type;
             type = type_mod;
@@ -1556,7 +1553,7 @@ status_t par_type_name(lex_wrap_t *lex, decl_t **result) {
 
 fail:
     if (decl == NULL) {
-        ast_type_destroy(base, AST_NO_OVERRIDE);
+        ast_type_destroy(base);
     } else {
         ast_decl_destroy(decl);
     }
@@ -1622,7 +1619,7 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
 
 fail:
     if (decl == NULL) {
-        ast_type_destroy(type, AST_NO_OVERRIDE);
+        ast_type_destroy(type);
     } else {
         ast_decl_destroy(decl);
     }
@@ -1668,7 +1665,7 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
             goto fail;
         }
     }
-    sl_append(&type->enum_ids, &node->link);
+    sl_append(&type->enum_params.ids, &node->link);
     return status;
 
 fail:

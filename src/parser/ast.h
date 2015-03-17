@@ -73,8 +73,6 @@ typedef enum type_mod_t {
  * Basic varieties of types
  */
 typedef enum basic_type_t {
-    TYPE_PAREN,  /**< Parens in type */
-
     // Basic types
     TYPE_VOID,
     TYPE_CHAR,
@@ -89,11 +87,12 @@ typedef enum basic_type_t {
     TYPE_UNION,
     TYPE_ENUM,
 
-    TYPE_FUNC,   /**< Function */
+    TYPE_MOD,    /**< Modified Type */
 
+    TYPE_PAREN,  /**< Parens in type */
+    TYPE_FUNC,   /**< Function */
     TYPE_ARR,    /**< Array */
     TYPE_PTR,    /**< Pointer */
-    TYPE_MOD,    /**< Modified Type */
 } basic_type_t;
 
 /**
@@ -105,14 +104,24 @@ typedef struct type_t {
     int size;                           /**< Size of this type */
     char align;                         /**< Alignment */
 
-    /** Whether or not this should be freed with containing structure */
-    // TODO: Remove this flag and replace with policy decision based on type
-    bool dealloc;
-
     union {
+        struct {                        /**< Struct/union params */
+            len_str_t *name;            /**< Name of struct/union */
+            slist_t decls;              /**< List of struct/union definitions */
+        } struct_params;
+
+        struct {
+            len_str_t *name;            /**< Name of struct/union */
+            slist_t ids;                /**< List of enum ids/values */
+        } enum_params;
+
+        struct {
+            type_mod_t type_mod;        /**< Bitset of type modifiers */
+            struct type_t *base;
+        } mod;
+
+        // From direct declarators
         struct type_t *paren_base;      /**< Type in parens */
-        slist_t struct_decls;           /**< List of struct/union definitions */
-        slist_t enum_ids;               /**< List of enum ids/values */
 
         struct {                        /**< Function signature */
             struct type_t *type;        /**< Type (May be function pointer) */
@@ -129,11 +138,6 @@ typedef struct type_t {
             struct type_t *base;        /**< Base type pointed to */
             type_mod_t type_mod;        /**< Modifiers */
         } ptr;
-
-        struct {
-            type_mod_t type_mod;        /**< Bitset of type modifiers */
-            struct type_t *base;
-        } mod;
     };
 } type_t;
 
@@ -461,19 +465,26 @@ void ast_struct_decl_destroy(struct_decl_t *struct_decl);
  */
 void ast_enum_id_destroy(enum_id_t *enum_id);
 
-
-#define AST_OVERRIDE true
-#define AST_NO_OVERRIDE false
-
 /**
- * Destroys a type_t.
+ * Destroys a type_t that is protected. A protected type is one that is shared
+ * by multiple types. Namely, a named struct, union, or enum, primitive types
  *
  * @param type Object to destroy
  * @param override If OVERRIDE, frees even if the dealloc flag is set.
  * If NOOVERRIDE ignores an object with the dealloc flag set.
  * This paramater is not recursively applied
  */
-void ast_type_destroy(type_t *type, bool override);
+void ast_type_protected_destroy(type_t *type);
+
+/**
+ * Destroys a type_t that is not protected.
+ *
+ * @param type Object to destroy
+ * @param override If OVERRIDE, frees even if the dealloc flag is set.
+ * If NOOVERRIDE ignores an object with the dealloc flag set.
+ * This paramater is not recursively applied
+ */
+void ast_type_destroy(type_t *type);
 
 /**
  * Destroys a gdecl_t.
