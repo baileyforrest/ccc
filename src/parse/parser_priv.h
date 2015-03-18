@@ -24,7 +24,7 @@
 #define _PARSER_PRIV_H_
 
 #include "util/status.h"
-#include "parser/type_table.h"
+#include "parse/type_table.h"
 
 #include <stdio.h>
 

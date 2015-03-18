@@ -23,9 +23,9 @@
 #ifndef _PARSER_H_
 #define _PARSER_H_
 
-#include "parser/ast.h"
-#include "parser/lexer.h"
-#include "parser/type_table.h"
+#include "parse/ast.h"
+#include "parse/lexer.h"
+#include "parse/type_table.h"
 
 /**
  * Parses input from a lexer into an AST

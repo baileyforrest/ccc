@@ -25,7 +25,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "parser/symtab.h"
+#include "parse/symtab.h"
 
 #define CASE_BASIC_PRINT(token) \
     case token: printf(#token "\n"); break

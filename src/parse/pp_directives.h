@@ -23,7 +23,7 @@
 #ifndef _PP_DIRECTIVE_H_
 #define _PP_DIRECTIVE_H_
 
-#include "parser/preprocessor.h"
+#include "parse/preprocessor.h"
 #include "util/htable.h"
 #include "util/slist.h"
 #include "util/status.h"

@@ -25,7 +25,7 @@
 #include <stdbool.h>
 #include <stdalign.h>
 
-#include "parser/ast.h"
+#include "parse/ast.h"
 
 #include "util/util.h"
 

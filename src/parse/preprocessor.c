@@ -32,7 +32,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "parser/pp_directives.h"
+#include "parse/pp_directives.h"
+
 #include "util/slist.h"
 #include "util/htable.h"
 #include "util/util.h"

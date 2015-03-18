@@ -17,12 +17,12 @@
   along with CCC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "parser/ast.h"
-#include "parser/lexer.h"
-#include "parser/parser.h"
-#include "parser/preprocessor.h"
-#include "parser/symtab.h"
-#include "parser/token.h"
+#include "parse/ast.h"
+#include "parse/lexer.h"
+#include "parse/parser.h"
+#include "parse/preprocessor.h"
+#include "parse/symtab.h"
+#include "parse/token.h"
 
 #include "util/file_directory.h"
 

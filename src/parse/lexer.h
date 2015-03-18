@@ -23,9 +23,9 @@
 #ifndef _LEXER_H_
 #define _LEXER_H_
 
-#include "parser/preprocessor.h"
-#include "parser/token.h"
-#include "parser/symtab.h"
+#include "parse/preprocessor.h"
+#include "parse/token.h"
+#include "parse/symtab.h"
 
 #define CHAR_BITS (sizeof(char) * 8);
 #define SHORT_BITS (sizeof(short) * 8);

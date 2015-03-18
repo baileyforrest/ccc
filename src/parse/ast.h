@@ -23,7 +23,7 @@
 #ifndef _AST_H_
 #define _AST_H_
 
-#include "parser/type_table.h"
+#include "parse/type_table.h"
 
 #include "util/slist.h"
 #include "util/util.h"
