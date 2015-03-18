@@ -29,10 +29,28 @@
  * Structure for representing a location in a file
  */
 typedef struct fmark_t {
-    len_str_t *filename; /**< Note that this should not be freed with fmark_t */
-    int line_num;        /**< Line number */
-    int col_num;         /**< Column number */
+    struct fmark_t *last;   /**< Last mark in stack */
+    len_str_t *file;        /**< Filename */
+    const char *line_start; /**< Start of current line */
+    int line;               /**< Line number */
+    int col;                /**< Column number */
 } fmark_t;
+
+/**
+ * Copy a mark chain
+ *
+ * @param mark Mark chain to copy
+ * @param result Location to store resurt
+ * @return CCC_OK on success, error code on error
+ */
+status_t fmark_copy_chain(fmark_t *mark, fmark_t **result);
+
+/**
+ * Free a mark chain
+ *
+ * @param mark Head of mark chain to free
+ */
+void fmark_chain_free(fmark_t *mark);
 
 /**
  * Initializes the file directiory

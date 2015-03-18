@@ -103,9 +103,9 @@ status_t pp_open(preprocessor_t *pp, const char *filename) {
     len_str_t *file = fdir_lookup(filename, len);
     assert(file != NULL); // pp_file_map should add the file to the directory
 
-    pp->last_mark.filename = file;
-    pp->last_mark.line_num = 0;
-    pp->last_mark.col_num = 0;
+    pp->last_mark.file = file;
+    pp->last_mark.line = 0;
+    pp->last_mark.col = 0;
 
     pp->cur_param = NULL;
     pp->param_end = NULL;

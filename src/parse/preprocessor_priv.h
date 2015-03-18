@@ -141,12 +141,14 @@
     do {                                                    \
         pp_file_t *pp_file = sl_head(&(pp)->file_insts);    \
         assert(NULL != pp_file);                            \
+        /* TODO: Fix this after refactoring                 \
         fmark_t mark = {                                    \
-            (pp_file)->filename,                            \
-            (pp_file)->line_num,                            \
-            (pp_file)->col_num                              \
+            (pp_file)->file,                                \
+            (pp_file)->line,                                \
+            (pp_file)->col                                  \
         };                                                  \
         logger_log(&mark, (message), (type));               \
+        */                                                  \
     } while(0)
 
 /**

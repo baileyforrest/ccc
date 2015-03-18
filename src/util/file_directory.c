@@ -30,6 +30,40 @@
 #include "util/htable.h"
 #include "util/util.h"
 
+status_t fmark_copy_chain(fmark_t *mark, fmark_t **result) {
+    status_t status = CCC_OK;
+    fmark_t *res = NULL;
+
+    for (fmark_t *cur = mark, *res_cur = NULL; cur != NULL; cur = cur->last) {
+        fmark_t *new_mark = malloc(sizeof(fmark_t));
+        if (res == NULL) {
+            res = new_mark;
+        } else {
+            res_cur->last = new_mark;
+        }
+        if (new_mark == NULL) {
+            status = CCC_NOMEM;
+            goto fail;
+        }
+        memcpy(new_mark, cur, sizeof(fmark_t));
+        res_cur = new_mark;
+    }
+
+    *result = res;
+    return status;
+
+fail:
+    fmark_chain_free(res);
+    return status;
+}
+
+void fmark_chain_free(fmark_t *mark) {
+    for (fmark_t *cur = mark, *next = NULL; cur != NULL; cur = next) {
+        next = cur->last;
+        free(cur);
+    }
+}
+
 typedef struct fdir_t {
     htable_t table;
 } fdir_t;
