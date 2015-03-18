@@ -18,8 +18,6 @@
  */
 /**
  * AST Interface
- *
- * TODO: Finalize and document this
  */
 
 #ifndef _AST_H_
@@ -64,7 +62,7 @@ typedef enum type_mod_t {
  * Basic varieties of types
  */
 typedef enum basic_type_t {
-    // Basic types
+    // Primitive types
     TYPE_VOID,
     TYPE_CHAR,
     TYPE_SHORT,
@@ -78,63 +76,62 @@ typedef enum basic_type_t {
     TYPE_UNION,
     TYPE_ENUM,
 
-    TYPE_TYPEDEF,
+    TYPE_TYPEDEF, /**< Typedef name */
 
-    TYPE_MOD,    /**< Modified Type */
+    TYPE_MOD,     /**< Modified Type */
 
-    TYPE_PAREN,  /**< Parens in type */
-    TYPE_FUNC,   /**< Function */
-    TYPE_ARR,    /**< Array */
-    TYPE_PTR,    /**< Pointer */
+    TYPE_PAREN,   /**< Parens in type */
+    TYPE_FUNC,    /**< Function */
+    TYPE_ARR,     /**< Array */
+    TYPE_PTR,     /**< Pointer */
 } basic_type_t;
 
 /**
  * Tagged union representing a type
  */
 typedef struct type_t {
-    sl_link_t link;                     /**< Storage Link */
-    basic_type_t type;                  /**< Basic type */
-    int size;                           /**< Size of this type */
-    char align;                         /**< Alignment */
+    sl_link_t link;                /**< Storage Link */
+    basic_type_t type;             /**< Basic type */
+    int size;                      /**< Size of this type */
+    char align;                    /**< Alignment */
 
     union {
-        struct {                        /**< Struct/union params */
-            len_str_t *name;            /**< Name of struct/union */
-            slist_t decls;              /**< List of struct/union definitions */
+        struct {                   /**< Struct/union params */
+            len_str_t *name;       /**< Name of struct/union, NULL if anon */
+            slist_t decls;         /**< List of struct/union definitions */
         } struct_params;
 
         struct {
-            len_str_t *name;            /**< Name of struct/union */
-            slist_t ids;                /**< List of enum ids/values */
+            len_str_t *name;       /**< Name of struct/union, NULL if anon */
+            slist_t ids;           /**< List of enum ids/values (enum_id_t) */
         } enum_params;
 
-        struct {
-            type_mod_t type_mod;        /**< Bitset of type modifiers */
-            struct type_t *base;
+        struct {                   /**< Modified type params */
+            type_mod_t type_mod;   /**< Bitset of type modifiers */
+            struct type_t *base;   /**< Base type */
         } mod;
 
-        struct {
-            len_str_t *name;            /**< Name of typedef type */
-            struct type_t *base;        /**< Base of typedef type */
+        struct {                   /**< Typedef params */
+            len_str_t *name;       /**< Name of typedef type */
+            struct type_t *base;   /**< Base of typedef type */
         } typedef_params;
 
-        // From direct declarators
-        struct type_t *paren_base;      /**< Type in parens */
+        struct type_t *paren_base; /**< Type in parens */
 
-        struct {                        /**< Function signature */
-            struct type_t *type;        /**< Type (May be function pointer) */
-            slist_t params;             /**< Paramater signature (decl list) */
-            bool varargs;               /**< Whether or not function has VA */
+        struct {                   /**< Function signature */
+            struct type_t *type;   /**< Type (May be function pointer) */
+            slist_t params;        /**< Paramater signature (decl list) */
+            bool varargs;          /**< Whether or not function has VA */
         } func;
 
-        struct {                        /**< Structure for array info */
-            struct type_t *base;        /**< Base type */
-            struct expr_t *len;         /**< Dimension length */
+        struct {                   /**< Structure for array info */
+            struct type_t *base;   /**< Base type */
+            struct expr_t *len;    /**< Dimension length */
         } arr;
 
-        struct {                        /**< Structure for pointer info */
-            struct type_t *base;        /**< Base type pointed to */
-            type_mod_t type_mod;        /**< Modifiers */
+        struct {                   /**< Structure for pointer info */
+            struct type_t *base;   /**< Base type pointed to */
+            type_mod_t type_mod;   /**< Modifiers */
         } ptr;
     };
 } type_t;
@@ -174,7 +171,7 @@ typedef enum oper_t {
     OP_PREDEC,     // Pre decrement
     OP_POSTDEC,    // Post decrement
     OP_ARROW,      // ->
-    OP_DOT         // .
+    OP_DOT,        // .
 } oper_t;
 
 
@@ -188,7 +185,7 @@ typedef enum expr_type_t {
     EXPR_ASSIGN,      /**< Assignment */
     EXPR_CONST_INT,   /**< Constant integral type */
     EXPR_CONST_FLOAT, /**< Constant floating point type */
-    EXPR_CONST_STR,   /**< Constant string tye */
+    EXPR_CONST_STR,   /**< Constant string type */
     EXPR_BIN,         /**< Binary Operation */
     EXPR_UNARY,       /**< Unary Operation */
     EXPR_COND,        /**< Conditional Operator */
@@ -197,85 +194,90 @@ typedef enum expr_type_t {
     EXPR_CMPD,        /**< Compound expression */
     EXPR_SIZEOF,      /**< Sizeof expression */
     EXPR_MEM_ACC,     /**< Member access */
-    EXPR_INIT_LIST    /**< Initializer list */
+    EXPR_INIT_LIST,   /**< Initializer list */
 } expr_type_t;
 
 /**
  * Tagged union for expressions
  */
 typedef struct expr_t {
-    sl_link_t link;               /**< Storage link */
-    expr_type_t type;             /**< Expression type */
+    sl_link_t link;                 /**< Storage link */
+    expr_type_t type;               /**< Expression type */
 
-    union {                       /**< Type specific info */
-        len_str_t *var_id;        /**< Variable identifier */
+    union {
+        len_str_t *var_id;          /**< Variable identifier */
 
-        struct expr_t *paren_base;/**< Expression in parens */
+        struct expr_t *paren_base;  /**< Expression in parens */
 
-        struct {                  /**< Assignment paramaters */
-            struct expr_t *dest;  /**< Expression to assign to */
-            struct expr_t *expr;  /**< Expression to assign */
-            oper_t op;            /**< Operation for expression (+=) */
+        struct {                    /**< Assignment paramaters */
+            struct expr_t *dest;    /**< Expression to assign to */
+            struct expr_t *expr;    /**< Expression to assign */
+            oper_t op;              /**< Operation for expression e.g. (+=) */
         } assign;
 
-        struct {
-            type_t *type;
-            union {               /**< Constant value */
-                long long int_val;/**< Int constant */
-                double float_val; /**< Float constant */
-                len_str_t *str_val;/**< String constant */
+        struct {                    /**< Constast paramaters */
+            type_t *type;           /**< The type of the constant */
+            union {                 /**< Constant value */
+                long long int_val;  /**< Int constant */
+                double float_val;   /**< Float constant */
+                len_str_t *str_val; /**< String constant */
             };
         } const_val;
 
-        struct {                  /**< Binary operation */
-            oper_t op;            /**< Type of operation */
-            struct expr_t *expr1; /**< Expr 1 */
-            struct expr_t *expr2; /**< Expr 2 */
+        struct {                    /**< Binary operation */
+            oper_t op;              /**< Type of operation */
+            struct expr_t *expr1;   /**< Expr 1 */
+            struct expr_t *expr2;   /**< Expr 2 */
         } bin;
 
-        struct {                  /**< Binary operation */
-            oper_t op;            /**< Type of operation */
-            struct expr_t *expr;  /**< Expression  */
+        struct {                    /**< Unary operation */
+            oper_t op;              /**< Type of operation */
+            struct expr_t *expr;    /**< Expression  */
         } unary;
 
-        struct {                  /**< Operation paramaters */
-            oper_t op;            /**< Type of operation */
-            struct expr_t *expr1; /**< Expr 1 */
-            struct expr_t *expr2; /**< Expr 2 */
-            struct expr_t *expr3; /**< Expr 3 */
+        struct {                    /**< Operation paramaters */
+            oper_t op;              /**< Type of operation */
+            struct expr_t *expr1;   /**< Expr 1 */
+            struct expr_t *expr2;   /**< Expr 2 */
+            struct expr_t *expr3;   /**< Expr 3 */
         } cond;
 
-        struct {                  /**< Cast parameters */
-            struct decl_t *cast;  /**< Casted type */
-            struct expr_t *base;  /**< Base expression */
+        struct {                    /**< Cast parameters */
+            struct decl_t *cast;    /**< Casted type */
+            struct expr_t *base;    /**< Base expression */
         } cast;
 
-        struct {                  /**< Function call paramaters */
-            struct expr_t *func;  /**< The function to call */
-            slist_t params;       /**< The function paramaters (expressions) */
+        struct {                    /**< Function call paramaters */
+            struct expr_t *func;    /**< The function to call */
+            slist_t params;         /**< The function paramaters (expr_t) */
         } call;
 
-        struct {                  /**< Compound expression */
-            slist_t exprs;        /**< List of expressions */
+        struct {                    /**< Compound expression */
+            slist_t exprs;          /**< List of expressions */
         } cmpd;
 
-        struct {
-            struct decl_t *type;
-            struct expr_t *expr;
+        struct {                    /**< Sizeof paramaters */
+            struct decl_t *type;    /**< Type to get sizeof. NULL if expr */
+            struct expr_t *expr;    /**< Expr to get sizeof. NULL if type */
         } sizeof_params;
 
-        struct {
-            struct expr_t *base;
-            len_str_t *name;
-            oper_t op;
+        struct {                    /**< Member access of a compound type */
+            struct expr_t *base;    /**< Expression to get type */
+            len_str_t *name;        /**< Name of member */
+            oper_t op;              /**< Operation (., ->) */
         } mem_acc;
 
-        struct {
-            slist_t exprs;        /**< List of expressions */
+        struct {                    /**< Initalizer list */
+            slist_t exprs;          /**< List of expressions */
         } init_list;
     };
 } expr_t;
 
+/**
+ * One declaration on a given type.
+ *
+ * e.g. int foo, *bar; foo and *bar are the decl nodes
+ */
 typedef struct decl_node_t {
     sl_link_t link; /**< Storage link */
     type_t *type;   /**< Type of variable */
@@ -283,10 +285,13 @@ typedef struct decl_node_t {
     expr_t *expr;   /**< Expression to assign, bitfield bits for struct/union */
 } decl_node_t;
 
+/**
+ * A declaration
+ */
 typedef struct decl_t {
-    sl_link_t link;              /**< Storage link */
-    type_t *type;                /**< Type of variable */
-    slist_t decls;               /**< List of declarations (decl_node_t) */
+    sl_link_t link; /**< Storage link */
+    type_t *type;   /**< Type of variable */
+    slist_t decls;  /**< List of declarations (decl_node_t) */
 } decl_t;
 
 
@@ -294,120 +299,123 @@ typedef struct decl_t {
  * Types of statements
  */
 typedef enum stmt_type_t {
-    STMT_NOP,            /**< No op statement */
+    STMT_NOP,      /**< No op statement */
 
-    STMT_DECL,           /**< Declaration */
+    STMT_DECL,     /**< Declaration */
 
     // Labeled Statements
-    STMT_LABEL,          /**< Label */
-    STMT_CASE,           /**< case */
-    STMT_DEFAULT,        /**< default */
+    STMT_LABEL,    /**< Label */
+    STMT_CASE,     /**< case */
+    STMT_DEFAULT,  /**< default */
 
     // Selection statements
-    STMT_IF,             /**< if */
-    STMT_SWITCH,         /**< switch */
+    STMT_IF,       /**< if */
+    STMT_SWITCH,   /**< switch */
 
     // Iteration statements
-    STMT_DO,             /**< do while */
-    STMT_WHILE,          /**< while */
-    STMT_FOR,            /**< for */
+    STMT_DO,       /**< do while */
+    STMT_WHILE,    /**< while */
+    STMT_FOR,      /**< for */
 
     // Jump statements
-    STMT_GOTO,           /**< goto */
-    STMT_CONTINUE,       /**< continue */
-    STMT_BREAK,          /**< break */
-    STMT_RETURN,         /**< Return */
+    STMT_GOTO,     /**< goto */
+    STMT_CONTINUE, /**< continue */
+    STMT_BREAK,    /**< break */
+    STMT_RETURN,   /**< Return */
 
-    STMT_COMPOUND,       /**< block of statements */
+    STMT_COMPOUND, /**< block of statements */
 
-    STMT_EXPR            /**< expression */
+    STMT_EXPR,     /**< expression */
 } stmt_type_t;
 
 /**
  * Tagged union representing a statement
  */
 typedef struct stmt_t {
-    sl_link_t link;                      /**< Storage link */
-    stmt_type_t type;                    /**< Type of statement */
+    sl_link_t link;                    /**< Storage link */
+    stmt_type_t type;                  /**< Type of statement */
 
     union {
-        decl_t *decl;                    /**< Declaration parameters */
+        decl_t *decl;                  /**< Declaration parameters */
 
-        struct {                         /**< Label parameters */
-            len_str_t *label;            /**< Label value */
-            struct stmt_t *stmt;         /**< Statement labeled */
+        struct {                       /**< Label parameters */
+            len_str_t *label;          /**< Label value */
+            struct stmt_t *stmt;       /**< Statement labeled */
         } label;
 
-        struct {                         /**< case parameters */
-            expr_t *val;                 /**< Expression value */
-            struct stmt_t *stmt;         /**< Statement labeled */
+        struct {                       /**< case parameters */
+            expr_t *val;               /**< Expression value */
+            struct stmt_t *stmt;       /**< Statement labeled */
         } case_params;
 
-        struct {                         /**< default parameters */
-            struct stmt_t *stmt;         /**< Statement labeled */
+        struct {                       /**< default parameters */
+            struct stmt_t *stmt;       /**< Statement labeled */
         } default_params;
 
-        struct {                         /**< if paramaters */
-            expr_t *expr;                /**< Conditional expression */
-            struct stmt_t *true_stmt;    /**< Statement to execute if true */
-            struct stmt_t *false_stmt;   /**< Statement to execute if false */
+        struct {                       /**< if paramaters */
+            expr_t *expr;              /**< Conditional expression */
+            struct stmt_t *true_stmt;  /**< Statement to execute if true */
+            /** Statement to execute if false, NULL if none  */
+            struct stmt_t *false_stmt;
         } if_params;
 
-        struct {                         /**< Switch paramaters */
-            expr_t *expr;                /**< Expression to switch on */
-            struct stmt_t *stmt;         /**< Statement */
+        struct {                       /**< Switch paramaters */
+            expr_t *expr;              /**< Expression to switch on */
+            struct stmt_t *stmt;       /**< Statement */
         } switch_params;
 
-        struct {                         /**< Do while paramaters */
-            struct stmt_t *stmt;         /**< Statement in loop */
-            expr_t *expr;                /**< Conditional expression */
+        struct {                       /**< Do while paramaters */
+            struct stmt_t *stmt;       /**< Statement in loop */
+            expr_t *expr;              /**< Conditional expression */
         } do_params;
 
-        struct {                         /**< While parameters */
-            expr_t *expr;                /**< Conditional expression */
-            struct stmt_t *stmt;         /**< Statement in loop */
+        struct {                       /**< While parameters */
+            expr_t *expr;              /**< Conditional expression */
+            struct stmt_t *stmt;       /**< Statement in loop */
         } while_params;
 
-        struct {                         /**< For paramaters */
-            expr_t *expr1;               /**< Expression 1 */
-            expr_t *expr2;               /**< Expression 2 */
-            expr_t *expr3;               /**< Expression 3 */
-            struct stmt_t *stmt;         /**< Statement in loop */
+        struct {                       /**< For paramaters */
+            expr_t *expr1;             /**< Expression 1 */
+            expr_t *expr2;             /**< Expression 2 */
+            expr_t *expr3;             /**< Expression 3 */
+            struct stmt_t *stmt;       /**< Statement in loop */
         } for_params;
 
-        struct {                         /**< Goto parameters */
-            struct stmt_t *target;       /**< Parent statement to continue */
-            struct len_str_t *label;     /**< Label to goto */
+        struct {                       /**< Goto parameters */
+            struct stmt_t *target;     /**< Parent statement to continue */
+            struct len_str_t *label;   /**< Label to goto */
         } goto_params;
 
-        struct {                         /**< Continue parameters */
-            struct stmt_t *parent;       /**< Parent statement to continue */
+        struct {                       /**< Continue parameters */
+            struct stmt_t *parent;     /**< Parent statement to continue */
         } continue_params;
 
-        struct {                         /**< Break parameters */
-            struct stmt_t *parent;       /**< Parent statement */
+        struct {                       /**< Break parameters */
+            struct stmt_t *parent;     /**< Parent statement */
         } break_params;
 
-        struct {                         /**< Return paramaters */
-            expr_t *expr;                /**< Expression to return */
-        } return_params;;
+        struct {                       /**< Return paramaters */
+            expr_t *expr;              /**< Expression to return */
+        } return_params;
 
-        struct {                         /**< Block paramaters */
-            slist_t stmts;               /**< List of statements */
-            typetab_t typetab;           /**< Types defined in this scope */
+        struct {                       /**< Compound paramaters */
+            slist_t stmts;             /**< List of statements */
+            typetab_t typetab;         /**< Types and vars defined in scope */
         } compound;
 
-        struct {                         /**< Expression parameters */
-            expr_t *expr;                /**< Expression to execute */
+        struct {                       /**< Expression parameters */
+            expr_t *expr;              /**< Expression to execute */
         } expr;
     };
 } stmt_t;
 
-
+/**
+ * Global declaration
+ */
 typedef enum gdecl_type_t {
-    GDECL_NOP,   /**< No operation */
+    GDECL_NOP,   /**< No operation, shouldn't exist in valid AST */
     GDECL_FDEFN, /**< Function definition */
-    GDECL_DECL   /**< Declaration */
+    GDECL_DECL,  /**< Declaration */
 } gdecl_type_t;
 
 /**
@@ -432,7 +440,7 @@ typedef struct trans_unit_t {
     sl_link_t link;     /**< Storage link */
     len_str_t *path;    /**< Path of compilation unit */
     slist_t gdecls;     /**< List of gdecl in compilation unit */
-    typetab_t typetab; /**< Types defined at top level */
+    typetab_t typetab;  /**< Types defined at top level */
 } trans_unit_t;
 
 /**
@@ -519,7 +527,20 @@ void ast_stmt_destroy(stmt_t *stmt);
  */
 void ast_trans_unit_destroy(trans_unit_t *trans_unit);
 
+/**
+ * Get a string of a type modifier
+ *
+ * @param type_mod The type to get string for
+ * @return Returns static string of type_mod
+ */
 const char *ast_type_mod_str(type_mod_t type_mod);
+
+/**
+ * Get a string of a basic type
+ *
+ * @param type_mod The type to get string for
+ * @return Returns static string of basic type
+ */
 const char *ast_basic_type_str(basic_type_t type);
 
 #endif /* _AST_H_ */
