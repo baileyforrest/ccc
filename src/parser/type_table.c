@@ -125,12 +125,26 @@ fail:
 }
 
 static void typetab_entry_destroy(typetab_entry_t *entry) {
-    // Ignore primitive types, they are in static memory
-    if (entry->key.type == TT_PRIM) {
+    switch (entry->key.type) {
+    case TT_PRIM:
+        // Ignore primitive types, they are in static memory
         return;
+    case TT_COMPOUND:
+        ast_type_protected_destroy(entry->type);
+        break;
+    case TT_TYPEDEF:
+        switch (entry->type->type) {
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+        case TYPE_ENUM:
+            ast_type_protected_destroy(entry->type);
+            break;
+        default:
+            ast_type_destroy(entry->type);
+        }
+        break;
     }
-
-    ast_type_protected_destroy(entry->type);
+    free(entry);
 }
 
 void tt_destroy(typetab_t *tt) {

@@ -515,6 +515,21 @@ void ast_type_print(type_t *type) {
         break;
     }
 
+    case TYPE_TYPEDEF:
+        printf("%.*s", (int)type->typedef_params.name->len,
+               type->typedef_params.name->str);
+        break;
+
+    case TYPE_MOD:
+        ast_type_mod_print(type->mod.type_mod);
+        ast_type_print(type->mod.base);
+        break;
+
+    case TYPE_PAREN:
+        printf("(");
+        ast_type_print(type->paren_base);
+        printf(")");
+        break;
     case TYPE_FUNC: {
         ast_type_print(type->func.type);
         printf("(");
@@ -531,7 +546,6 @@ void ast_type_print(type_t *type) {
         printf(")");
         break;
     }
-
     case TYPE_ARR:
         ast_type_print(type->arr.base);
         printf("[");
@@ -543,10 +557,7 @@ void ast_type_print(type_t *type) {
         printf(" * ");
         ast_type_mod_print(type->ptr.type_mod);
         break;
-    case TYPE_MOD:
-        ast_type_mod_print(type->mod.type_mod);
-        ast_type_print(type->mod.base);
-        break;
+
     default:
         assert(false);
     }
@@ -692,6 +703,10 @@ void ast_type_destroy(type_t *type) {
             return;
         }
         SL_DESTROY_FUNC(&type->enum_params.ids, ast_enum_id_destroy);
+        break;
+
+    case TYPE_TYPEDEF:
+        // Do nothing, base is stored in the type table
         break;
 
     case TYPE_MOD:

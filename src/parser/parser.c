@@ -306,6 +306,9 @@ fail:
 status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
 
+    type_t *new_node = NULL;
+    type_t *old_type = *type;
+
     // Check first node for mod node
     type_t *mod_node = NULL;
     if (*type != NULL && (*type)->type == TYPE_MOD) {
@@ -333,7 +336,11 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         tt_key_t key = { &lex->cur.tab_entry->key , TT_TYPEDEF };
         typetab_entry_t *entry = tt_lookup(lex->typetab, &key);
         assert(entry != NULL); // Must be checked before calling
-        *end_node = entry->type;
+        ALLOC_NODE(new_node, type_t);
+        new_node->type = TYPE_TYPEDEF;
+        new_node->typedef_params.name = &lex->cur.tab_entry->key;
+        new_node->typedef_params.base = entry->type;
+        *end_node = new_node;
         break;
     }
         // Primitive types
@@ -352,6 +359,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         type_mod_t mod = lex->cur.type == SIGNED ? TMOD_SIGNED : TMOD_UNSIGNED;
         if (mod_node == NULL) {
             ALLOC_NODE(mod_node, type_t);
+            new_node = mod_node;
             mod_node->type = TYPE_MOD;
             mod_node->size = (*type)->size;
             mod_node->align = (*type)->align;
@@ -379,7 +387,11 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     }
 
     LEX_ADVANCE(lex);
+    return status;
+
 fail:
+    ast_type_destroy(new_node);
+    *type = old_type;
     return status;
 }
 

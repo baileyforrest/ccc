@@ -87,6 +87,8 @@ typedef enum basic_type_t {
     TYPE_UNION,
     TYPE_ENUM,
 
+    TYPE_TYPEDEF,
+
     TYPE_MOD,    /**< Modified Type */
 
     TYPE_PAREN,  /**< Parens in type */
@@ -119,6 +121,11 @@ typedef struct type_t {
             type_mod_t type_mod;        /**< Bitset of type modifiers */
             struct type_t *base;
         } mod;
+
+        struct {
+            len_str_t *name;            /**< Name of typedef type */
+            struct type_t *base;        /**< Base of typedef type */
+        } typedef_params;
 
         // From direct declarators
         struct type_t *paren_base;      /**< Type in parens */
