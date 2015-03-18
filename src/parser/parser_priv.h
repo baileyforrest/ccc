@@ -218,7 +218,7 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
  * @return CCC_OK on success, error code on error
  */
 status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
-                               type_t *decl_type);
+                               decl_t *decl);
 
 /**
  * Parses a posibly abstract declarator given a preexisting declaration.

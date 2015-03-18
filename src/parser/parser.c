@@ -446,7 +446,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         } else {
             new_type->struct_params.name = name;
             sl_init(&new_type->struct_params.decls,
-                    offsetof(struct_decl_t, link));
+                    offsetof(decl_t, link));
         }
     }
 
@@ -512,7 +512,7 @@ fail:
 status_t par_struct_declaration(lex_wrap_t *lex, type_t *type) {
     status_t status = CCC_OK;
     type_t *decl_type = NULL;
-    if (CCC_OK != (status = par_specifier_qualifiers(lex, &type))) {
+    if (CCC_OK != (status = par_specifier_qualifiers(lex, &decl_type))) {
         if (type == NULL || status != CCC_BACKTRACK) {
             goto fail;
         }
@@ -577,42 +577,44 @@ fail:
 status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
                                     type_t *decl_type) {
     status_t status = CCC_OK;
-    if (CCC_OK != (status = par_struct_declarator(lex, base, decl_type))) {
+    decl_t *decl = NULL;
+    ALLOC_NODE(decl, decl_t);
+    decl->type = decl_type;
+    sl_init(&decl->decls, offsetof(decl_node_t, link));
+
+    if (CCC_OK != (status = par_struct_declarator(lex, base, decl))) {
         goto fail;
     }
     while (lex->cur.type == COMMA) {
-        if (CCC_OK != (status = par_struct_declarator(lex, base, decl_type))) {
+        if (CCC_OK != (status = par_struct_declarator(lex, base, decl))) {
             goto fail;
         }
     }
 
+    sl_append(&base->struct_params.decls, &decl->link);
+    return status;
+
 fail:
+    ast_decl_destroy(decl);
     return status;
 }
 
 status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
-                               type_t *decl_type) {
+                               decl_t *decl) {
     status_t status = CCC_OK;
-    struct_decl_t *node;
-    ALLOC_NODE(node, struct_decl_t);
-    node->decl = NULL;
-    node->bf_bits = NULL;
-    ALLOC_NODE(node->decl, decl_t);
-    node->decl->type = decl_type;
-    sl_init(&node->decl->decls, offsetof(decl_node_t, link));
 
-    if (CCC_OK != (status = par_declarator_base(lex, node->decl))) {
+    if (CCC_OK != (status = par_declarator_base(lex, decl))) {
         goto fail;
     }
+    decl_node_t *dnode = sl_tail(&decl->decls);
 
     if (lex->cur.type == COLON) {
         LEX_ADVANCE(lex);
-        if (CCC_OK != (status = par_expression(lex, NULL, &node->bf_bits))) {
+        if (CCC_OK != (status = par_expression(lex, NULL, &dnode->expr))) {
             goto fail;
         }
     }
 
-    decl_node_t *dnode = sl_tail(&node->decl->decls);
     base->align = MAX(base->align, dnode->type->align);
 
     // TODO: Handle bitfields
@@ -622,13 +624,7 @@ status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
         base->size = MAX(base->size, dnode->type->size);
     }
 
-    // Update base type
-    sl_append(&base->struct_params.decls, &node->link);
-
-    return status;
-
 fail:
-    ast_struct_decl_destroy(node);
     return status;
 }
 

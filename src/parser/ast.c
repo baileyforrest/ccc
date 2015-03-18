@@ -45,7 +45,7 @@ void ast_trans_unit_print(trans_unit_t *tras_unit) {
 }
 
 void ast_gdecl_print(gdecl_t *gdecl) {
-    ast_decl_print(gdecl->decl);
+    ast_decl_print(gdecl->decl, TYPE_VOID);
     printf("\n");
     switch (gdecl->type) {
     case GDECL_FDEFN:
@@ -72,7 +72,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
 
     case STMT_DECL:
-        ast_decl_print(stmt->decl);
+        ast_decl_print(stmt->decl, TYPE_VOID);
         printf(";");
         break;
 
@@ -174,7 +174,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
     printf("\n");
 }
 
-void ast_decl_print(decl_t *decl) {
+void ast_decl_print(decl_t *decl, basic_type_t type) {
     ast_type_print(decl->type);
     printf(" ");
 
@@ -191,7 +191,15 @@ void ast_decl_print(decl_t *decl) {
         if (node->expr == NULL) {
             continue;
         }
-        printf(" = ");
+        switch (type) {
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+            printf(" : ");
+            break;
+        default:
+            printf(" = ");
+            break;
+        }
         ast_expr_print(node->expr);
     }
 }
@@ -210,7 +218,8 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type) {
             } else {
                 printf(", ");
             }
-            ast_decl_print(GET_ELEM(&decl_node->type->func.params, cur));
+            ast_decl_print(GET_ELEM(&decl_node->type->func.params, cur),
+                           TYPE_VOID);
         }
         printf(")");
         break;
@@ -311,7 +320,7 @@ void ast_expr_print(expr_t *expr) {
         break;
     case EXPR_CAST:
         printf("(");
-        ast_decl_print(expr->cast.cast);
+        ast_decl_print(expr->cast.cast, TYPE_VOID);
         printf(")");
         ast_expr_print(expr->cast.base);
         break;
@@ -340,7 +349,7 @@ void ast_expr_print(expr_t *expr) {
     case EXPR_SIZEOF:
         printf("sizeof (");
         if (expr->sizeof_params.type != NULL) {
-            ast_decl_print(expr->sizeof_params.type);
+            ast_decl_print(expr->sizeof_params.type, TYPE_VOID);
         } else {
             ast_expr_print(expr->sizeof_params.expr);
         }
@@ -494,7 +503,8 @@ void ast_type_print(type_t *type) {
         printf(" {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_params.decls) {
-            ast_struct_decl_print(GET_ELEM(&type->struct_params.decls, cur));
+            ast_decl_print(GET_ELEM(&type->struct_params.decls, cur),
+                           TYPE_STRUCT);
         }
         printf("}");
         break;
@@ -617,24 +627,6 @@ void ast_enum_id_print(enum_id_t *enum_id) {
     }
 }
 
-void ast_struct_decl_print(struct_decl_t *struct_decl) {
-    ast_decl_print(struct_decl->decl);
-    if (struct_decl->bf_bits != NULL) {
-        printf(" : ");
-        ast_expr_print(struct_decl->bf_bits);
-    }
-    printf(";\n");
-}
-
-void ast_struct_decl_destroy(struct_decl_t *struct_decl) {
-    if (struct_decl == NULL) {
-        return;
-    }
-    ast_decl_destroy(struct_decl->decl);
-    ast_expr_destroy(struct_decl->bf_bits);
-    free(struct_decl);
-}
-
 void ast_enum_id_destroy(enum_id_t *enum_id) {
     if (enum_id == NULL) {
         return;
@@ -658,7 +650,7 @@ void ast_type_protected_destroy(type_t *type) {
     case TYPE_UNION:
         // Must be unananymous
         assert(type->struct_params.name != NULL);
-        SL_DESTROY_FUNC(&type->struct_params.decls, ast_struct_decl_destroy);
+        SL_DESTROY_FUNC(&type->struct_params.decls, ast_decl_destroy);
         break;
     case TYPE_ENUM:
         // Must be unananymous
@@ -695,7 +687,7 @@ void ast_type_destroy(type_t *type) {
         if (type->struct_params.name != NULL) {
             return;
         }
-        SL_DESTROY_FUNC(&type->struct_params.decls, ast_struct_decl_destroy);
+        SL_DESTROY_FUNC(&type->struct_params.decls, ast_decl_destroy);
         break;
     case TYPE_ENUM:
         // Only free anonymous enum

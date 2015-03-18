@@ -37,21 +37,12 @@ struct gdecl_t;
 struct decl_t;
 
 /**
- * Struct and union declaration entry
- */
-typedef struct struct_decl_t {
-    sl_link_t link;         /**< List link */
-    struct decl_t *decl;    /**< The declaration */
-    struct expr_t *bf_bits; /**< Bitfield bits 0 for unused */
-} struct_decl_t;
-
-/**
  * Union declaration entry
  */
 typedef struct enum_id_t {
-    sl_link_t link; /**< List link */
-    len_str_t *id;  /**< Name */
-    struct expr_t *val;   /**< Value */
+    sl_link_t link;     /**< List link */
+    len_str_t *id;      /**< Name */
+    struct expr_t *val; /**< Value */
 } enum_id_t;
 
 /**
@@ -289,7 +280,7 @@ typedef struct decl_node_t {
     sl_link_t link; /**< Storage link */
     type_t *type;   /**< Type of variable */
     len_str_t *id;  /**< Name of variable */
-    expr_t *expr;   /**< Expression to assign */
+    expr_t *expr;   /**< Expression to assign, bitfield bits for struct/union */
 } decl_node_t;
 
 typedef struct decl_t {
@@ -457,13 +448,6 @@ void ast_print(trans_unit_t *tu);
  * @param ast The ast to destroy
  */
 void ast_destroy(trans_unit_t *ast);
-
-/**
- * Destroys a struct_decl_t. Does not free, but does free child nodes
- *
- * @param struct_decl Object to destroy
- */
-void ast_struct_decl_destroy(struct_decl_t *struct_decl);
 
 /**
  * Destroys an enum_id_t. Does not free, but does free child nodes
