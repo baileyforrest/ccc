@@ -322,8 +322,46 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         end_node = type;
     }
 
-    // We found a node that is type, so we cannot have two
+    // Handle repeat end nodes
     if (*end_node != NULL) {
+        bool okay = false;
+        switch ((*end_node)->type) {
+        case TYPE_INT:
+            // Just have int overwritten with the correct type
+            if (lex->cur.type == SHORT) {
+                *end_node = tt_short;
+                okay = true;
+            }
+            if (lex->cur.type == LONG) {
+                *end_node = tt_long;
+                okay = true;
+            }
+            break;
+        case TYPE_SHORT:
+            // Skip the int on the short
+            if (lex->cur.type == INT) {
+                okay = true;
+            }
+            break;
+        case TYPE_LONG:
+            // Skip the int on the long
+            if (lex->cur.type == INT) {
+                okay = true;
+            }
+            if (lex->cur.type == LONG) { // Create long long int
+                *end_node = tt_long_long;
+                okay = true;
+            }
+            break;
+        default:
+            break;
+        }
+        if (okay) {
+            LEX_ADVANCE(lex);
+            return CCC_OK;
+        }
+
+        // We found a node that is type, so we cannot have two
         logger_log(&lex->cur.mark, "Multiple type specifers",
                    LOG_ERR);
         status = CCC_ESYNTAX;
@@ -1494,7 +1532,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         base->const_val.int_val = lex->cur.int_params.int_val;
         type_t *type;
         if (lex->cur.int_params.hasLL) {
-            type = tt_long; // TODO: Add long long support
+            type = tt_long_long;
         } else if (lex->cur.int_params.hasL) {
             type = tt_long;
         } else {

@@ -55,6 +55,7 @@ extern struct type_t * const tt_char;
 extern struct type_t * const tt_short;
 extern struct type_t * const tt_int;
 extern struct type_t * const tt_long;
+extern struct type_t * const tt_long_long;
 extern struct type_t * const tt_float;
 extern struct type_t * const tt_double;
 

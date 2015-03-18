@@ -262,6 +262,9 @@ void ast_expr_print(expr_t *expr) {
     case EXPR_CONST_INT:
         printf("%lld", expr->const_val.int_val);
         switch (expr->const_val.type->type) {
+        case TYPE_LONG_LONG:
+            printf("LL");
+            break;
         case TYPE_LONG:
             printf("L");
             break;
@@ -269,6 +272,9 @@ void ast_expr_print(expr_t *expr) {
             printf("U");
             if (expr->const_val.type->mod.base->type == TYPE_LONG) {
                 printf("L");
+            }
+            if (expr->const_val.type->mod.base->type == TYPE_LONG_LONG) {
+                printf("LL");
             }
             break;
         default:
@@ -467,17 +473,18 @@ void ast_oper_print(oper_t op) {
 
 const char *ast_basic_type_str(basic_type_t type) {
     switch (type) {
-    case TYPE_VOID:   return "void";   break;
-    case TYPE_CHAR:   return "char";   break;
-    case TYPE_SHORT:  return "short";  break;
-    case TYPE_INT:    return "int";    break;
-    case TYPE_LONG:   return "long";   break;
-    case TYPE_FLOAT:  return "float";  break;
-    case TYPE_DOUBLE: return "double"; break;
+    case TYPE_VOID:      return "void";      break;
+    case TYPE_CHAR:      return "char";      break;
+    case TYPE_SHORT:     return "short";     break;
+    case TYPE_INT:       return "int";       break;
+    case TYPE_LONG:      return "long";      break;
+    case TYPE_LONG_LONG: return "long long"; break;
+    case TYPE_FLOAT:     return "float";     break;
+    case TYPE_DOUBLE:    return "double";    break;
 
-    case TYPE_STRUCT: return "struct"; break;
-    case TYPE_UNION:  return "union";  break;
-    case TYPE_ENUM:   return "enum";   break;
+    case TYPE_STRUCT:    return "struct";    break;
+    case TYPE_UNION:     return "union";     break;
+    case TYPE_ENUM:      return "enum";      break;
     default:
         assert(false);
     }
@@ -492,6 +499,7 @@ void ast_type_print(type_t *type) {
     case TYPE_SHORT:
     case TYPE_INT:
     case TYPE_LONG:
+    case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
         printf(ast_basic_type_str(type->type));
@@ -642,6 +650,7 @@ void ast_type_protected_destroy(type_t *type) {
     case TYPE_SHORT:
     case TYPE_INT:
     case TYPE_LONG:
+    case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
         return; // These are statically allocated
@@ -677,6 +686,7 @@ void ast_type_destroy(type_t *type) {
     case TYPE_SHORT:
     case TYPE_INT:
     case TYPE_LONG:
+    case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
         return; // These are statically allocated

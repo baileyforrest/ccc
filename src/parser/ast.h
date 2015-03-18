@@ -68,6 +68,7 @@ typedef enum basic_type_t {
     TYPE_SHORT,
     TYPE_INT,
     TYPE_LONG,
+    TYPE_LONG_LONG,
     TYPE_FLOAT,
     TYPE_DOUBLE,
 
