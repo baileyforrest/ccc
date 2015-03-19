@@ -140,7 +140,7 @@ status_t fdir_insert(const char *filename, size_t len, fdir_entry_t **result) {
     entry->buf = MAP_FAILED;
     entry->fd = -1;
 
-    entry->filename.str = (char *)entry + sizeof(len_str_node_t);
+    entry->filename.str = (char *)entry + sizeof(*entry);
     entry->filename.len = len;
 
     strncpy(entry->filename.str, filename, len);

@@ -164,7 +164,7 @@ status_t pp_file_map(const char *filename, size_t len, pp_file_t *last_file,
         goto fail;
     }
     fmark_t *last_mark = last_file == NULL ? NULL : &last_file->stream.mark;
-    ts_init(&pp_file->stream, entry->buf, entry->buf, &entry->filename,
+    ts_init(&pp_file->stream, entry->buf, entry->end, &entry->filename,
             entry->buf, last_mark, 1, 1);
     pp_file->if_count = 0;
 
@@ -473,6 +473,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     case ASCII_LOWER:
     case ASCII_UPPER:
     case '_':
+        ts_advance(&lookahead); // Skip cur char
         break;
     default:
         return ts_advance(stream);
@@ -515,11 +516,11 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         goto fail;
     }
 
-    if (ts_cur(&lookahead) != '(' && macro->num_params != 0) {
+    if (macro->num_params != 0 && ts_cur(&lookahead) != '(') {
         // If macro requires params, but none are provided, this is just
         // treated as identifier
         return ts_advance(stream);
-    } else {
+    } else if (macro->num_params != 0) {
         ts_advance(&lookahead); // Skip the paren
         // Need to create param map
 

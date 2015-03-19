@@ -75,9 +75,9 @@ int main(int argc, char **argv) {
         (status = parser_parse(&lexer, &fdir_entry->filename, &ast))) {
         goto fail5;
     }
-    //*/
     ast_print(ast);
     ast_destroy(ast);
+    //*/
 
 fail5:
     lexer_destroy(&lexer);

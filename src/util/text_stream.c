@@ -124,7 +124,8 @@ size_t ts_skip_ws_and_comment(tstream_t *ts) {
         }
     }
 
-    return num_chars;
+    // Subtract one because terminator was counted
+    return num_chars - 1;
 }
 
 
@@ -133,7 +134,6 @@ size_t ts_advance_identifier(tstream_t *ts) {
     bool done = false;
     bool first = true;
     while (!done && !ts_end(ts)) {
-        num_chars++;
 
         /* Charaters allowed to be in idenitifer */
         switch (ts_cur(ts)) {
@@ -145,6 +145,7 @@ size_t ts_advance_identifier(tstream_t *ts) {
         case ASCII_LOWER:
         case ASCII_UPPER:
         case '_':
+            num_chars++;
             ts_advance(ts);
             break;
         default: /* Found ts->end */
@@ -160,13 +161,12 @@ size_t ts_skip_line(tstream_t *ts) {
     size_t num_chars = 0;
     int last = -1;
     while (!ts_end(ts)) {
-        num_chars++;
-
         /* Skip until we reach an unescaped newline */
         if (ts_cur(ts) == '\n' && last != '\\') {
             ts_advance(ts);
             break;
         }
+        num_chars++;
         last = ts_advance(ts);
     }
 
