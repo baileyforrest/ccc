@@ -32,8 +32,8 @@
 #include "util/file_directory.h"
 
 typedef struct tstream_t {
-    const char *cur;
-    const char *end;
+    char *cur;
+    char *end;
     fmark_t mark;
 } tstream_t;
 
@@ -49,12 +49,26 @@ typedef struct tstream_t {
  * @param Current line number
  * @param Current column number
  */
-void ts_init(tstream_t *ts, const char *start, const char *end,
-             len_str_t *file, const char *line_start, fmark_t *last,
+void ts_init(tstream_t *ts, char *start, char *end,
+             len_str_t *file, char *line_start, fmark_t *last,
              int line, int col);
 
+#define TS_COPY_DEEP true
+#define TS_COPY_SHALLOW false
+
 /**
- * Destroys a text stream
+ * Creates a deep copy of the src stream. (All file marks in the chain are
+ * allocated)
+ *
+ * @param dest Destination
+ * @param src Source
+ * @return CCC_OK on success, error code on error
+ */
+status_t ts_copy(tstream_t *dest, const tstream_t *src, bool deep);
+
+/**
+ * Destroys a text stream. This function should only be called on a deep copy
+ * created with ts_copy.
  *
  * @param ts Text stream to destroy
  */
@@ -66,7 +80,7 @@ void ts_destroy(tstream_t *ts);
  * @param ts Text stream to use
  * @return the current character
  */
-inline const char *ts_location(tstream_t *ts) {
+inline char *ts_location(tstream_t *ts) {
     return ts->cur;
 }
 
@@ -74,13 +88,26 @@ inline const char *ts_location(tstream_t *ts) {
  * Returns the current character in the text stream
  *
  * @param ts Text stream to use
- * @return the current character
+ * @return The current character
  */
 inline int ts_cur(tstream_t *ts) {
     if (ts->cur == ts->end) {
         return EOF;
     }
     return *ts->cur;
+}
+
+/**
+ * Returns the next character in the text stream
+ *
+ * @param ts Text stream to use
+ * @return The next character
+ */
+inline int ts_next(tstream_t *ts) {
+    if (ts->cur == ts->end || ts->cur + 1 == ts->end) {
+        return EOF;
+    }
+    return *(ts->cur + 1);
 }
 
 /**
@@ -107,7 +134,7 @@ int ts_advance(tstream_t *ts);
  * @param ts Text stream to use
  * @return The number of characters skipped
  */
-int ts_skip_ws_and_comment(tstream_t *ts);
+size_t ts_skip_ws_and_comment(tstream_t *ts);
 
 /**
  * Advance ts past an identifier
@@ -115,7 +142,7 @@ int ts_skip_ws_and_comment(tstream_t *ts);
  * @param ts Text stream to use
  * @return The length of the identifier
  */
-int ts_advance_identifier(tstream_t *ts);
+size_t ts_advance_identifier(tstream_t *ts);
 
 /**
  * Skip until the start of the next line.
@@ -123,6 +150,6 @@ int ts_advance_identifier(tstream_t *ts);
  * @param ts Text stream to use
  * @return The number of characters skipped
  */
-int ts_skip_line(tstream_t *ts);
+size_t ts_skip_line(tstream_t *ts);
 
 #endif /* _TEXT_STREAM_H_ */

@@ -53,6 +53,19 @@ status_t fmark_copy_chain(fmark_t *mark, fmark_t **result);
 void fmark_chain_free(fmark_t *mark);
 
 /**
+ * File directory entry.
+ *
+ * Contains a filename and buffer of file contents
+ */
+typedef struct fdir_entry_t {
+    sl_link_t link;     /**< List link */
+    len_str_t filename; /**< Filename */
+    char *buf;          /**< Buffer of file */
+    char *end;          /**< Max location */
+    int fd;             /**< File descriptor of open file */
+} fdir_entry_t;
+
+/**
  * Initializes the file directiory
  *
  * @return CCC_OK on success, error code on failure
@@ -68,23 +81,24 @@ void fdir_destroy();
  * Add a file to the file directory. Returns the current entry if it exists.
  *
  * @param filename Name of the file to add. Note that this function will
- * reallocate its own copy of the same string.
+ *     reallocate its own copy of the same string.
  *
  * @param len of the filename
  * @param result Location to store file name. Result points to a null terminated
- * string
+ *     string
  *
  * @return CCC_OK on success, error code on failure
  */
-status_t fdir_insert(const char *filename, size_t len, len_str_t **result);
+status_t fdir_insert(const char *filename, size_t len, fdir_entry_t **result);
 
 /**
  * Retrieves the file entry with given filename
-
+ *
  * @param filename Name of the file to lookup
  * @param len of the filename
- * @return Returns the len_str of the file if successful, NULL on failure
+ * @return Returns the file directory entry of the file if successful, NULL on
+ *     failure
  */
-len_str_t *fdir_lookup(const char *filename, size_t len);
+fdir_entry_t *fdir_lookup(const char *filename, size_t len);
 
 #endif /* _FILE_DIRECTORY_H_ */

@@ -69,9 +69,10 @@ int main(int argc, char **argv) {
     } while(cur_token.type != TOKEN_EOF);
     */
     ///*
-    len_str_t *file = fdir_lookup(argv[1], strlen(argv[1]));
+    fdir_entry_t *fdir_entry = fdir_lookup(argv[1], strlen(argv[1]));
     trans_unit_t *ast;
-    if (CCC_OK != (status = parser_parse(&lexer, file, &ast))) {
+    if (CCC_OK !=
+        (status = parser_parse(&lexer, &fdir_entry->filename, &ast))) {
         goto fail5;
     }
     //*/

@@ -25,9 +25,10 @@
 
 #include <stdbool.h>
 
+#include "util/file_directory.h"
 #include "util/htable.h"
 #include "util/slist.h"
-#include "util/file_directory.h"
+#include "util/text_stream.h"
 
 
 /**
@@ -40,11 +41,7 @@ typedef struct preprocessor_t {
     htable_t macros;           /**< Macro table */
     htable_t directives;       /**< Preprocessor directives */
 
-    // TODO: Update this correctly
-    fmark_t last_mark;         /**< Mark of the last found token */
-
-    const char *cur_param;
-    const char *param_end;
+    tstream_t cur_param;      /**< Current macro parameter's stream */
     bool param_stringify;      /**< Whether or not we are stringifying */
 
     // Paramaters for reading preprocessor commands
@@ -52,6 +49,7 @@ typedef struct preprocessor_t {
     bool line_comment;         /**< true if in a line comment */
     bool string;               /**< true if in string */
     bool char_line;            /**< true if non whitespace on current line */
+    bool ignore;               /**< Conditional compilation - ignore output */
 } preprocessor_t;
 
 
@@ -91,17 +89,17 @@ void pp_close(preprocessor_t *pp);
  * @param pp The preprocessor to get the mark from from
  * @param mark Pointer to mark to populate
  */
-void pp_lastmark(preprocessor_t *pp, fmark_t *mark);
+void pp_lastmark(preprocessor_t *pp, fmark_t **mark);
 
 
-#define PP_EOF (0)
+#define PP_EOF 0
 
 /**
  * Fetch next character from preprocessor
  *
  * @param pp The preprocessor to get characters from
- * @return the next character. PP_EOF on EOF. Negative value on error. It is a
- * negated status_t
+ * @return the next character. PP_EOF on end of input. Negative value on error.
+ * It is a negated status_t
  */
 int pp_nextchar(preprocessor_t *pp);
 

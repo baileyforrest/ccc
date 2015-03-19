@@ -25,17 +25,15 @@
 
 #include <stddef.h>
 #include <string.h>
+
 #include <assert.h>
-#include <fcntl.h>
 #include <ctype.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 #include "parse/pp_directives.h"
 
-#include "util/slist.h"
 #include "util/htable.h"
+#include "util/slist.h"
+#include "util/text_stream.h"
 #include "util/util.h"
 
 status_t pp_init(preprocessor_t *pp) {
@@ -91,125 +89,200 @@ void pp_close(preprocessor_t *pp) {
  */
 status_t pp_open(preprocessor_t *pp, const char *filename) {
     status_t status = CCC_OK;
+    size_t len = strlen(filename);
     pp_file_t *pp_file;
     if (CCC_OK !=
-        (status = pp_file_map(filename, strlen(filename), &pp_file))) {
-        goto done;
+        (status = pp_file_map(filename, len, NULL, &pp_file))) {
+        goto fail;
     }
 
     sl_prepend(&pp->file_insts, &pp_file->link);
 
-    size_t len = strlen(filename);
-    len_str_t *file = fdir_lookup(filename, len);
+    fdir_entry_t *file = fdir_lookup(filename, len);
     assert(file != NULL); // pp_file_map should add the file to the directory
 
-    pp->last_mark.file = file;
-    pp->last_mark.line = 0;
-    pp->last_mark.col = 0;
-
-    pp->cur_param = NULL;
-    pp->param_end = NULL;
+    pp->cur_param.cur = NULL;
     pp->param_stringify = false;
 
     pp->block_comment = false;
     pp->line_comment = false;
     pp->string = false;
     pp->char_line = false;
+    pp->ignore = false;
 
-done:
+fail:
     return status;
 }
 
-void pp_lastmark(preprocessor_t *pp, fmark_t *mark) {
-    memcpy(mark, &pp->last_mark, sizeof(fmark_t));
+void pp_lastmark(preprocessor_t *pp, fmark_t **mark) {
+    assert(mark != NULL);
+
+    pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
+    pp_file_t *file = sl_head(&pp->file_insts);
+
+    if (macro_inst != NULL) {
+        *mark = &macro_inst->stream.mark;
+    } else if (file != NULL) {
+        *mark = &file->stream.mark;
+    }
+}
+
+int pp_search_string_concat(preprocessor_t *pp, tstream_t *stream) {
+    tstream_t lookahead;
+    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+
+    ts_skip_ws_and_comment(&lookahead);
+
+    // Concatenate strings
+    if (ts_cur(&lookahead) == '"') {
+        ts_advance(&lookahead);
+
+        // Copy lookahead back into stream
+        ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+        return pp_nextchar(pp);
+    }
+
+    pp->string = false;
+    return '"';
+}
+
+int pp_nextchar(preprocessor_t *pp) {
+    return pp_nextchar_helper(pp, false);
+}
+
+status_t pp_file_map(const char *filename, size_t len, pp_file_t *last_file,
+                     pp_file_t **result) {
+    status_t status = CCC_OK;
+    pp_file_t *pp_file = malloc(sizeof(pp_file_t));
+    if (NULL == pp_file) {
+        status = CCC_NOMEM;
+        goto fail;
+    }
+
+    fdir_entry_t *entry;
+    if (CCC_OK != (status = fdir_insert(filename, len, &entry))) {
+        goto fail;
+    }
+    fmark_t *last_mark = last_file == NULL ? NULL : &last_file->stream.mark;
+    ts_init(&pp_file->stream, entry->buf, entry->buf, &entry->filename,
+            entry->buf, last_mark, 1, 1);
+    pp_file->if_count = 0;
+
+    *result = pp_file;
+    return status;
+
+fail:
+    pp_file_destroy(pp_file);
+    return status;
+}
+
+void pp_file_destroy(pp_file_t *pp_file) {
+    free(pp_file);
+}
+
+status_t pp_macro_create(char *name, size_t len, pp_macro_t **result) {
+    status_t status = CCC_OK;
+    // Allocate macro and name in one chunk
+    pp_macro_t *macro = malloc(sizeof(pp_macro_t) + len + 1);
+    if (macro == NULL) {
+        status = CCC_NOMEM;
+        goto fail;
+    }
+    sl_init(&macro->params, offsetof(len_str_node_t, link));
+
+    // Set to safe value for destruction
+    ((tstream_t *)&macro->stream)->mark.last = NULL;
+
+    macro->name.str = (char *)macro + sizeof(pp_macro_t);
+    macro->name.len = len;
+    strncpy(macro->name.str, name, len);
+    macro->name.str[len] = '\0';
+
+    *result = macro;
+    return status;
+
+fail:
+    pp_macro_destroy(macro);
+    return status;
+}
+
+void pp_macro_destroy(pp_macro_t *macro) {
+    SL_DESTROY_FUNC(&macro->params, free);
+    ts_destroy((tstream_t *)&macro->stream);
+    free(macro);
+}
+
+status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
+    status_t status = CCC_OK;
+
+    pp_macro_inst_t *macro_inst = malloc(sizeof(pp_macro_inst_t));
+    if (macro_inst == NULL) {
+        status = CCC_NOMEM;
+        goto fail;
+    }
+
+    static const ht_params_t pp_param_map_params = {
+        0,                                   // No size hint
+        offsetof(pp_param_map_elem_t, key),  // Key offset
+        offsetof(pp_param_map_elem_t, link), // HT link offset
+        strhash,                             // String Hash function
+        vstrcmp                              // void string compare
+    };
+
+    if (CCC_OK !=
+        (status = ht_init(&macro_inst->param_map, &pp_param_map_params))) {
+        goto fail;
+    }
+
+    // Shallow copy because macro already has a copy of its fmarks
+    ts_copy(&macro_inst->stream, &macro->stream, TS_COPY_SHALLOW);
+
+    *result = macro_inst;
+    return status;
+
+fail:
+    pp_macro_inst_destroy(macro_inst);
+    return status;
+}
+
+void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
+    if (macro_inst == NULL) {
+        return;
+    }
+    HT_DESTROY_FUNC(&macro_inst->param_map, free);
+    free(macro_inst);
 }
 
 int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
-    // We are in a macro paramater, just copy the string
-    if (NULL != pp->cur_param) {
-        int result = *(pp->cur_param++);
-
-        // Record if we reached end of the paramater
-        if (pp->cur_param == pp->param_end) {
-            pp->cur_param = NULL;
-            pp->param_end = NULL;
-
-            pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
-
-            // Check for concatenate operator
-            assert(NULL != macro_inst);
-            char *cur = macro_inst->cur;
-            char *end = macro_inst->end;
-
-            SKIP_WS_AND_COMMENT(cur, end);
-            if (cur == end || '#' != *cur) {
-                return result;
-            }
-
-            if (++cur == end) {
-                LOG_ERROR(pp, "Unexpected #", LOG_ERR);
-                return -(int)CCC_ESYNTAX;
-            }
-
-            // Not ##
-            if ('#' != *(cur++)) {
-                return result;
-            }
-
-            SKIP_WS_AND_COMMENT(cur, end);
-            char *lookahead = cur;
-
-            ADVANCE_IDENTIFIER(lookahead, end);
-            if (cur == end) {
-                LOG_ERROR(pp, "Expected macro paramater after ##", LOG_ERR);
-                return -(int)CCC_ESYNTAX;
-            }
-
-            len_str_t lookup = {
-                cur,
-                (size_t)(lookahead - cur)
-            };
-
-            pp_param_map_elem_t *param =
-                ht_lookup(&macro_inst->param_map, &lookup);
-
-            // Found a parameter
-            // Advance lookahead to end of param, and set param state in pp
-            if (NULL == param) {
-                assert(false &&
-                       "Expected macro paramater after ##");
-            }
-
-            macro_inst->cur = lookahead;
-            // Substitute next parameter
-            pp->cur_param = param->val.str;
-            pp->param_end = param->val.str + param->val.len;
-
+    if (pp->cur_param.cur != NULL) {
+        // We are in a macro paramater, just copy the string
+        int result = ts_advance(&pp->cur_param);
+        if (result != EOF) {
             return result;
         }
+        // Record if we reached end of the paramater
+        pp->cur_param.cur = NULL;
 
-        return result;
     }
 
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
     pp_file_t *file = sl_head(&pp->file_insts);
 
-    char **cur;
-    char *end;
+    // Handle closing quote of stringification
+    if (pp->param_stringify) {
+        assert(macro_inst != NULL);
+        pp->param_stringify = false;
+        return pp_search_string_concat(pp, &macro_inst->stream);
+    }
+
+    tstream_t *stream; // Stream to work on
 
     // Try to find an incomplete macro on the stack
-    while (NULL != macro_inst) {
-        cur = &macro_inst->cur;
-        end = macro_inst->end;
+    while (macro_inst != NULL) {
+        stream = &macro_inst->stream;
 
-        if (*cur != end) { // Found an unfinished macro
+        if (!ts_end(stream)) { // Found an unfinished macro
             break;
-        }
-
-        // Handle closing quote of stringification
-        if (pp->param_stringify) {
-            pp->param_stringify = false;
-            return '"';
         }
 
         pp_macro_inst_t *last = sl_pop_front(&pp->macro_insts);
@@ -218,12 +291,11 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     // if we're done with macros, try to find an incomplete file
-    if (NULL == macro_inst) {
-        while (NULL != file) {
-            cur = &file->cur;
-            end = file->end;
+    if (macro_inst == NULL) {
+        while (file != NULL) {
+            stream = &file->stream;
 
-            if (*cur != end) { // Found an unfinished file
+            if (!ts_end(stream)) { // Found an unfinished file
                 break;
             }
 
@@ -234,185 +306,203 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     // Finished processing all files
-    if (NULL == file) {
+    if (file == NULL) {
         return PP_EOF;
     }
 
-    int cur_char = **cur;
-    char *next_char = *cur + 1;
+    int cur_char = ts_cur(stream);
+    int next_char = ts_next(stream);
+
+    // Handle comments
+    if (cur_char == '/' && !pp->line_comment && !pp->block_comment &&
+        !pp->string) {
+        if (next_char == '/') {
+            pp->line_comment = true;
+        } else if (next_char == '*') {
+            pp->block_comment = true;
+        }
+    }
+
+    // If we're in a comment, return whitespace
+    if (pp->line_comment) {
+        if (cur_char == '\n') {
+            pp->line_comment = false;
+        }
+        ts_advance(stream);
+        return ' ';
+    }
+
+    if (pp->block_comment) {
+        // If we're in a comment, this must be safe (must have been a last char)
+        int last_char = *(ts_location(stream) - 1);
+        if (last_char == '*' && cur_char == '/') {
+            pp->block_comment = false;
+        }
+        ts_advance(stream);
+        return ' ';
+    }
 
     // Found a character on line, don't process new directives
     if (!pp->char_line && cur_char != '#' && !isspace(cur_char)) {
         pp->char_line = true;
     }
 
-    // Record comments
-    if (cur_char == '/' && next_char != end &&
-        !pp->line_comment && !pp->block_comment && !pp->string) {
-        if (*next_char == '/') {
-            pp->line_comment = true;
-        } else if (*next_char == '*') {
-            pp->block_comment = true;
-        }
-    }
-
+    // Handle strings
     if (!pp->string && cur_char == '"') {
         pp->string = true;
+        return ts_advance(stream);
     }
 
     if (pp->string && cur_char == '"') {
-        char *lookahead = next_char;
-        SKIP_WS_AND_COMMENT(lookahead, end);
-
-        // Concatenate strings
-        if (lookahead != end && '"' == *lookahead) {
-            *cur = lookahead;
-            return pp_nextchar(pp);
-        }
-
-        pp->string = false;
+        return pp_search_string_concat(pp, stream);
     }
 
-    bool check_directive = false;
-
-    // Reset line variables
-    if ('\n' == cur_char) {
+    if (cur_char == '\n') {
         pp->char_line = false;
-        pp->line_comment = false;
     }
 
-    // If we're in a comment, return whitespace
-    if (pp->block_comment || pp->line_comment) {
-        (*cur)++; // advance the cur pointer
-        return ' ';
+    bool concat = false;
+    tstream_t lookahead;
+    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+
+    // Handle concatenation
+    if (macro_inst != NULL && (cur_char != ' ' && cur_char != '\t') &&
+        (next_char == ' ' || next_char == '\t' || next_char == '#')) {
+        ts_advance(&lookahead);
+
+        // Skip multiple ## with only white space around them
+        while (!ts_end(&lookahead)) {
+            ts_skip_ws_and_comment(&lookahead);
+
+            if (ts_cur(&lookahead) == '#' && ts_next(&lookahead) == '#') {
+                concat = true;
+            }
+
+            ts_skip_ws_and_comment(&lookahead);
+            if (!(ts_cur(&lookahead) == '#' && ts_next(&lookahead) == '#')) {
+                break;
+            }
+        }
+        next_char = ts_cur(&lookahead);
     }
 
     switch (cur_char) {
-        // Cases which cannot be before a macro. Macros are identifiers
+        // Cases which cannot be before a macro. Macros are identifiers, so if
+        // we are already in an identifier, next char cannot be a macro
     case ASCII_LOWER:
     case ASCII_UPPER:
     case ASCII_DIGIT:
     case '_':
-        // Return the current character
-        // Also advance the current cur pointer
-        return *((*cur)++);
+        if (!concat) {
+            return ts_advance(stream);
+        }
+        break;
 
     case '#':
-        // Skip cases which ignore preprocessor
-        if (pp->block_comment || pp->line_comment || pp->string ||
-            pp->char_line) {
-            return *((*cur)++);
-        }
-
-        if (NULL != macro_inst) {
-            if (next_char == end) {
-                (*cur)++;
-                LOG_ERROR(pp, "Unexpected EOF in macro", LOG_ERR);
-                return -(int)CCC_ESYNTAX;
-            }
-
-            if ('#' != *next_char) {
-                // Stringification, should be a macro paramater
-                char *lookahead = next_char;
-                ADVANCE_IDENTIFIER(lookahead, end);
-
-                len_str_t lookup = {
-                    next_char,
-                    (size_t)(lookahead - next_char)
-                };
-
-                pp_param_map_elem_t *param =
-                    ht_lookup(&macro_inst->param_map, &lookup);
-
-                // Found a parameter
-                // Advance lookahead to end of param, and set param state in pp
-                if (NULL == param) {
-                    LOG_ERROR(pp,
-                              "Expected macro paramater for stringification",
-                              LOG_ERR);
-                    return -(int)CCC_ESYNTAX;
-                }
-
-                *cur = lookahead;
-
-                // Substitute current paramater
-                pp->cur_param = param->val.str;
-                pp->param_end = param->val.str + param->val.len;
-                pp->param_stringify = true;
-
-                // We are stringifying, so return a double quote
-                return '"';
-            }
-
-            return *((*cur)++);
-        }
-
-        // Not currently processing a macro
-        check_directive = true;
-    default:
-        break;
-        // Fall through, need to look for macros
-    }
-
-    // if next character is not alphanumeric, we know this shouldn't be a macro
-    if (next_char == end || !isalnum(*next_char)) {
-        return *((*cur)++);
-    }
-
-    // Need to look ahead current identifier and see if its a macro
-    char *lookahead = next_char;
-
-    ADVANCE_IDENTIFIER(lookahead, end);
-
-    len_str_t lookup = {
-        next_char,
-        (size_t)(lookahead - next_char)
-    };
-
-    // Check for preprocessor directive matching the string
-    if (check_directive && !ignore_directive) {
-        pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
-
-        if (NULL == directive) {
-            LOG_ERROR(pp, "Invalid preprocessor command", LOG_ERR);
+        // If we found a character before the #, just ignore it
+        if (pp->char_line) {
+            logger_log(&stream->mark, "Stray '#' in program", LOG_ERR);
+            ts_advance(stream);
             return -(int)CCC_ESYNTAX;
         }
 
-        // Skip over directive name
-        *cur = lookahead;
+        // Check for preprocessor directive if we're not in a macro
+        if (macro_inst == NULL) {
+            if (ignore_directive) {
+                logger_log(&stream->mark, "Unexpected '#' in directive",
+                           LOG_ERR);
+            }
+            ts_advance(stream);
+            ts_skip_ws_and_comment(stream);
+            char *start = ts_location(stream);
+            size_t len = ts_advance_identifier(stream);
+            len_str_t lookup = { start, len };
+            pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
 
-        // Perform directive action and return next character
-        status_t status = directive->action(pp);
-        // Skip the rest of the line
-        lookahead = *cur;
-        SKIP_LINE(lookahead, end);
-        *cur = lookahead;
-        if (CCC_OK != status) {
-            return status;
+            if (directive == NULL) {
+                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+                         "Invalid preprocessing directive %.*s", (int)len,
+                         start);
+                logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+                ts_skip_line(stream); // Skip rest of line
+                return -(int)CCC_ESYNTAX;
+            }
+
+            // Perform directive action
+            status_t status = directive->action(pp);
+            ts_skip_line(stream); // Skip rest of line
+
+            if (status != CCC_OK) {
+                return status;
+            }
+            // Return next character after directive
+            return pp_nextchar(pp);
+        } else {
+            // In macro, must be stringification, concatenation handled abave
+            ts_advance(stream);
+            char *start = ts_location(stream);
+            size_t len = ts_advance_identifier(stream);
+            len_str_t lookup = { start, len };
+            pp_param_map_elem_t *param =
+                ht_lookup(&macro_inst->param_map, &lookup);
+
+            if (param == NULL) {
+                logger_log(&stream->mark,
+                           "'#' Is not followed by a macro paramater", LOG_ERR);
+                return -(int)CCC_ESYNTAX;
+            }
+
+            // Found a parameter, set param state in pp
+            ts_copy(&pp->cur_param, stream, TS_COPY_SHALLOW);
+            pp->cur_param.cur = param->val.str;
+            pp->cur_param.end = param->val.str + param->val.len;
+            pp->param_stringify = true;
+
+            // We are stringifying, so return a double quote
+            return '"';
         }
-        return pp_nextchar(pp);
+        break;
+    default:
+        break;
+        // Fall through, need to look for macros parameters
     }
 
+    // if next character cannot start an identifier, we know not to check for
+    // a macro
+    switch (next_char) {
+    case ASCII_LOWER:
+    case ASCII_UPPER:
+    case '_':
+        break;
+    default:
+        return ts_advance(stream);
+    }
+
+    char *start = ts_location(&lookahead);
+    size_t len = ts_advance_identifier(&lookahead);
+    len_str_t lookup = { start, len };
+
     // Macro paramaters take precidence, look them up first
-    if (NULL != macro_inst) {
+    if (macro_inst != NULL) {
         pp_param_map_elem_t *param = ht_lookup(&macro_inst->param_map, &lookup);
 
         // Found a parameter
         // Advance lookahead to end of param, and set param state in pp
-        if (NULL != param) {
-            int retval = **cur;
-            *cur = lookahead;
-            pp->cur_param = param->val.str;
-            pp->param_end = param->val.str + param->val.len;
-            return retval;
+        if (param != NULL) {
+            // Skip over parameter name
+            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+            ts_copy(&pp->cur_param, &lookahead, TS_COPY_SHALLOW);
+            pp->cur_param.cur = param->val.str;
+            pp->cur_param.end = param->val.str + param->val.len;
+            return cur_char;
         }
     }
 
     // Look up in the macro table
     pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
 
-    if (NULL == macro) { // No macro found
-        return *((*cur)++);
+    if (macro == NULL) { // No macro found
+        return ts_advance(stream);
     }
 
     pp_macro_inst_t *new_macro_inst;
@@ -420,21 +510,17 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     int error;
 
     if (CCC_OK != status) {
-        LOG_ERROR(pp, "Failed to create new macro.", LOG_ERR);
+        logger_log(&stream->mark, "Failed to create new macro.", LOG_ERR);
         error = -(int)status;
-        goto fail1;
+        goto fail;
     }
 
-    // No paramaters on macro
-    if (lookahead == end || *lookahead != '(') {
-
+    if (ts_cur(&lookahead) != '(' && macro->num_params != 0) {
         // If macro requires params, but none are provided, this is just
         // treated as identifier
-        if (macro->num_params != 0) {
-            return *((*cur)++);
-        }
+        return ts_advance(stream);
     } else {
-        lookahead++; // Skip the paren
+        ts_advance(&lookahead); // Skip the paren
         // Need to create param map
 
         int num_params = 0;
@@ -444,33 +530,36 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         sl_link_t *cur_link;
         SL_FOREACH(cur_link, &macro->params) {
             num_params++;
-            char *cur_param = lookahead;
-            while (lookahead != end) {
-                if (*lookahead == ',') { // end of current param
+            char *cur_param = ts_location(&lookahead);
+            while (!ts_end(&lookahead)) {
+                if (ts_cur(&lookahead) == ',') { // end of current param
                     break;
                 }
-                if (*lookahead == ')') { // end of all params
+                if (ts_cur(&lookahead) == ')') { // end of all params
                     done = true;
                     break;
                 }
-                lookahead++; // Blindly copy param data
+                ts_advance(&lookahead); // Blindly copy param data
             }
 
-            if (lookahead == end && *lookahead != ')') {
-                LOG_ERROR(pp, "Unexpected EOF while scanning macro paramaters",
-                          LOG_ERR);
+            if (ts_end(&lookahead)
+                && (num_params != macro->num_params || !done)) {
+                logger_log(&stream->mark,
+                           "Unexpected EOF while scanning macro paramaters",
+                           LOG_ERR);
                 error = -(int)CCC_ESYNTAX;
-                goto fail2;
+                goto fail;
             }
 
-            size_t cur_len = lookahead - cur_param;
+            size_t cur_len = ts_location(&lookahead) - cur_param;
 
             pp_param_map_elem_t *param_elem =
                 malloc(sizeof(pp_param_map_elem_t));
             if (NULL == param_elem) {
-                LOG_ERROR(pp, "Out of memory while scanning macro", LOG_ERR);
+                logger_log(&stream->mark, "Out of memory while scanning macro",
+                           LOG_ERR);
                 error = -(int)CCC_NOMEM;
-                goto fail2;
+                goto fail;
             }
 
             // Get current paramater in macro
@@ -484,153 +573,26 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             ht_insert(&new_macro_inst->param_map, &param_elem->link);
 
-            lookahead++;
+            ts_advance(&lookahead);
+
+            if (done && num_params != macro->num_params) {
+                logger_log(&stream->mark,
+                           "Incorrect number of macro paramaters", LOG_ERR);
+                error = -(int)CCC_ESYNTAX;
+                goto fail;
+            }
         }
 
-        if (done && num_params != macro->num_params) {
-            LOG_ERROR(pp, "Incorrect number of macro paramaters", LOG_ERR);
-            error = -(int)CCC_ESYNTAX;
-            goto fail2;
-        }
     }
-
-    new_macro_inst->cur = macro->start;
-    new_macro_inst->end = macro->end;
 
     // Add new macro instance to the stack
     sl_prepend(&pp->macro_insts, &new_macro_inst->link);
 
-    int retval = **cur;   // Return current character
-    *cur = lookahead; // Set current to the end of the macro and params
+    // Set current to the end of the macro and params
+    ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+    return cur_char;
 
-    return retval;
-
-fail2:
+fail:
     pp_macro_inst_destroy(new_macro_inst);
-fail1:
     return error;
-}
-
-int pp_nextchar(preprocessor_t *pp) {
-    return pp_nextchar_helper(pp, false);
-}
-
-status_t pp_file_map(const char *filename, size_t len, pp_file_t **result) {
-    status_t status = CCC_OK;
-    pp_file_t *pp_file = malloc(sizeof(pp_file_t));
-    if (NULL == pp_file) {
-        status = CCC_NOMEM;
-        goto fail1;
-    }
-
-    if (-1 == (pp_file->fd = open(filename, O_RDONLY, 0))) {
-        status = CCC_FILEERR;
-        goto fail2;
-    }
-
-    struct stat st;
-    if (-1 == (fstat(pp_file->fd, &st))) {
-        status = CCC_FILEERR;
-        goto fail2;
-    }
-    size_t size = st.st_size;
-
-    if (MAP_FAILED == (pp_file->buf =
-         mmap(NULL, size, PROT_READ, MAP_PRIVATE, pp_file->fd, 0))) {
-        status = CCC_FILEERR;
-        goto fail2;
-    }
-    pp_file->cur = pp_file->buf;
-    pp_file->end = pp_file->buf + size;
-    pp_file->if_count = 0;
-
-    if (CCC_OK != (status = fdir_insert(filename, len, &pp_file->filename))) {
-        goto fail3;
-    }
-
-    pp_file->line_num = 0;
-    pp_file->col_num = 0;
-
-    *result = pp_file;
-    return status;
-
-fail3:
-    munmap(pp_file->buf, (size_t)(pp_file->end - pp_file->buf));
-fail2:
-    free(pp_file);
-fail1:
-    *result = NULL;
-    return status;
-}
-
-status_t pp_file_destroy(pp_file_t *pp_file) {
-    status_t status = CCC_OK;
-
-    // If we failed to close the file, just continue
-    if (-1 == munmap(pp_file->buf, (size_t)(pp_file->end - pp_file->buf))) {
-        status = CCC_FILEERR;
-    }
-
-    if (-1 == close(pp_file->fd)) {
-        status = CCC_FILEERR;
-    }
-
-    free(pp_file);
-    return status;
-}
-
-status_t pp_macro_create(pp_macro_t **macro) {
-    pp_macro_t *result = malloc(sizeof(pp_macro_t));
-    if (result == NULL) {
-        return CCC_NOMEM;
-    }
-    sl_init(&result->params, offsetof(len_str_node_t, link));
-    *macro = result;
-    return CCC_OK;
-}
-
-void pp_macro_destroy(pp_macro_t *macro) {
-    SL_DESTROY_FUNC(&macro->params, free);
-    free(macro->name.str);
-    free(macro->start);
-    free(macro);
-}
-
-status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
-    status_t status = CCC_OK;
-
-    pp_macro_inst_t *macro_inst = malloc(sizeof(pp_macro_inst_t));
-    if (NULL == macro_inst) {
-        status = CCC_NOMEM;
-        goto fail1;
-    }
-
-    static const ht_params_t pp_param_map_params = {
-        0,                                   // No size hint
-        offsetof(pp_param_map_elem_t, key),  // Key offset
-        offsetof(pp_param_map_elem_t, link), // HT link offset
-        strhash,                             // String Hash function
-        vstrcmp                              // void string compare
-    };
-
-    if (CCC_OK !=
-        (status = ht_init(&macro_inst->param_map, &pp_param_map_params))) {
-        goto fail2;
-    }
-
-    macro_inst->cur = macro->start;
-    macro_inst->end = macro->end;
-    *result = macro_inst;
-
-    return status;
-
-fail2:
-    free(macro_inst);
-fail1:
-    return status;
-}
-
-void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
-    HT_DESTROY_FUNC(&macro_inst->param_map, free);
-    free(macro_inst);
 }

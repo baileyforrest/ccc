@@ -27,8 +27,24 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "util/htable.h"
 #include "util/util.h"
+
+/**
+ * Destroys a file_directory entry
+ *
+ * Note that there is no associated constructor because fdir_insert serves as
+ * the constructor.
+ *
+ * @param entry Entry to destroy
+ * @return CCC_OK on success, error code on error.
+ */
+static status_t fdir_entry_destroy(fdir_entry_t *entry);
 
 status_t fmark_copy_chain(fmark_t *mark, fmark_t **result) {
     status_t status = CCC_OK;
@@ -72,52 +88,97 @@ static fdir_t s_fdir;
 
 status_t fdir_init() {
     static const ht_params_t s_params = {
-        0,                              // No Size estimate
-        offsetof(len_str_node_t, str),  // Offset of key
-        offsetof(len_str_node_t, link), // Offset of ht link
-        strhash,                        // Hash function
-        vstrcmp,                        // void string compare
+        0,                                // No Size estimate
+        offsetof(fdir_entry_t, filename), // Offset of key
+        offsetof(fdir_entry_t, link),     // Offset of ht link
+        strhash,                          // Hash function
+        vstrcmp,                          // void string compare
     };
 
     return ht_init(&s_fdir.table, &s_params);
 }
 
+static status_t fdir_entry_destroy(fdir_entry_t *entry) {
+    status_t status = CCC_OK;
+    if (entry == NULL) {
+        return status;
+    }
+
+    if (entry->buf != MAP_FAILED &&
+        (-1 == munmap(entry->buf, (size_t)(entry->end - entry->buf)))) {
+        status = CCC_FILEERR;
+    }
+
+    if (entry->fd != -1 && (-1 == close(entry->fd))) {
+        status = CCC_FILEERR;
+    }
+
+    free(entry);
+    return status;
+}
+
 void fdir_destroy() {
-    HT_DESTROY_FUNC(&s_fdir.table, free);
+    HT_DESTROY_FUNC(&s_fdir.table, fdir_entry_destroy);
 }
 
-status_t fdir_insert(const char *filename, size_t len, len_str_t **result) {
+status_t fdir_insert(const char *filename, size_t len, fdir_entry_t **result) {
+    status_t status = CCC_OK;
+
     len_str_t lookup = { (char *)filename, len };
-    len_str_node_t *current = ht_lookup(&s_fdir.table, &lookup);
-    if (NULL != current) {
-        *result = &current->str;
+    fdir_entry_t *entry = ht_lookup(&s_fdir.table, &lookup);
+    if (entry != NULL) {
+        goto done;
     }
 
-    // Allocate the string and len_str structure in one region
-    len_str_node_t *new_len_str = malloc(sizeof(len_str_node_t) + len + 1);
-    if (NULL == new_len_str) {
-        return CCC_NOMEM;
+    // Allocate the entry and name string in one region
+    entry = malloc(sizeof(fdir_entry_t) + len + 1);
+    if (entry == NULL) {
+        status = CCC_NOMEM;
+        goto fail;
+    }
+    // Initialize to safe values for destructor
+    entry->buf = MAP_FAILED;
+    entry->fd = -1;
+
+    entry->filename.str = (char *)entry + sizeof(len_str_node_t);
+    entry->filename.len = len;
+
+    strncpy(entry->filename.str, filename, len);
+    entry->filename.str[len] = '\0';
+
+    if (-1 == (entry->fd = open(filename, O_RDONLY, 0))) {
+        status = CCC_FILEERR;
+        goto fail;
     }
 
-    new_len_str->str.str = (char *)new_len_str + sizeof(len_str_node_t);
-    new_len_str->str.len = len;
+    struct stat st;
+    if (-1 == (fstat(entry->fd, &st))) {
+        status = CCC_FILEERR;
+        goto fail;
+    }
+    size_t size = st.st_size;
 
-    strncpy(new_len_str->str.str, filename, len);
-    new_len_str->str.str[len] = '\0';
+    if (MAP_FAILED ==
+        (entry->buf = mmap(NULL, size, PROT_READ, MAP_PRIVATE, entry->fd, 0))) {
+        status = CCC_FILEERR;
+        goto fail;
+    }
+    entry->end = entry->buf + size;
 
-    ht_insert(&s_fdir.table, &new_len_str->link);
+    if (CCC_OK != (status = ht_insert(&s_fdir.table, &entry->link))) {
+        goto fail;
+    }
 
-    *result = &new_len_str->str;
-    return CCC_OK;
+done:
+    *result = entry;
+    return status;
+
+fail:
+    fdir_entry_destroy(entry);
+    return status;
 }
 
-len_str_t *fdir_lookup(const char *filename, size_t len) {
+fdir_entry_t *fdir_lookup(const char *filename, size_t len) {
     len_str_t lookup = { (char *)filename, len };
-    len_str_node_t *result = ht_lookup(&s_fdir.table, &lookup);
-
-    if (NULL == result) {
-        return NULL;
-    }
-
-    return &result->str;
+    return ht_lookup(&s_fdir.table, &lookup);
 }

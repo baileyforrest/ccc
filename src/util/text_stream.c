@@ -25,12 +25,13 @@
 #include <assert.h>
 #include <stdio.h>
 
-extern inline const char *ts_location(tstream_t *ts);
+extern inline char *ts_location(tstream_t *ts);
 extern inline int ts_cur(tstream_t *ts);
 extern inline bool ts_end(tstream_t *ts);
+extern inline int ts_next(tstream_t *ts);
 
-void ts_init(tstream_t *ts, const char *start, const char *end,
-             len_str_t *file, const char *line_start, fmark_t *last,
+void ts_init(tstream_t *ts, char *start, char *end,
+             len_str_t *file, char *line_start, fmark_t *last,
              int line, int col) {
     assert(ts != NULL);
     ts->cur = start;
@@ -42,9 +43,18 @@ void ts_init(tstream_t *ts, const char *start, const char *end,
     ts->mark.col = col;
 }
 
+status_t ts_copy(tstream_t *dest, const tstream_t *src, bool deep) {
+    status_t status = CCC_OK;
+    memcpy(dest, src, sizeof(tstream_t));
+
+    if (deep == TS_COPY_DEEP) {
+        status = fmark_copy_chain(src->mark.last, &dest->mark.last);
+    }
+    return status;
+}
+
 void ts_destroy(tstream_t *ts) {
-    // No op
-    (void)ts;
+    fmark_chain_free(ts->mark.last);
 }
 
 int ts_advance(tstream_t *ts) {
@@ -61,8 +71,8 @@ int ts_advance(tstream_t *ts) {
     return *(ts->cur++);
 }
 
-int ts_skip_ws_and_comment(tstream_t *ts) {
-    int num_chars = 0;
+size_t ts_skip_ws_and_comment(tstream_t *ts) {
+    size_t num_chars = 0;
     bool done = false;
     bool comment = false;
     while (!done && !ts_end(ts)) {
@@ -118,8 +128,8 @@ int ts_skip_ws_and_comment(tstream_t *ts) {
 }
 
 
-int ts_advance_identifier(tstream_t *ts) {
-    int num_chars = 0;
+size_t ts_advance_identifier(tstream_t *ts) {
+    size_t num_chars = 0;
     bool done = false;
     bool first = true;
     while (!done && !ts_end(ts)) {
@@ -146,8 +156,8 @@ int ts_advance_identifier(tstream_t *ts) {
     return num_chars;
 }
 
-int ts_skip_line(tstream_t *ts) {
-    int num_chars = 0;
+size_t ts_skip_line(tstream_t *ts) {
+    size_t num_chars = 0;
     int last = -1;
     while (!ts_end(ts)) {
         num_chars++;
