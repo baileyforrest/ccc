@@ -114,17 +114,9 @@ fail:
     return status;
 }
 
-void pp_lastmark(preprocessor_t *pp, fmark_t **mark) {
-    assert(mark != NULL);
-
-    pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
-    pp_file_t *file = sl_head(&pp->file_insts);
-
-    if (macro_inst != NULL) {
-        *mark = &macro_inst->stream.mark;
-    } else if (file != NULL) {
-        *mark = &file->stream.mark;
-    }
+void pp_last_mark(preprocessor_t *pp, fmark_t *result) {
+    assert(result != NULL);
+    memcpy(result, &pp->last_mark, sizeof(fmark_t));
 }
 
 int pp_search_string_concat(preprocessor_t *pp, tstream_t *stream) {
@@ -309,6 +301,9 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     if (file == NULL) {
         return PP_EOF;
     }
+
+    // Get copy of current location, the last mark
+    memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
 
     int cur_char = ts_cur(stream);
     int next_char = ts_next(stream);

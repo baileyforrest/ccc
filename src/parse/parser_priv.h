@@ -32,7 +32,7 @@
     do {                                                            \
         loc = malloc(sizeof(type));                                 \
         if (loc == NULL) {                                          \
-            logger_log(lex->cur.mark, "Out of memory in parser",   \
+            logger_log(&lex->cur.mark, "Out of memory in parser",   \
                        LOG_ERR);                                    \
             status = CCC_NOMEM;                                     \
             goto fail;                                              \
@@ -63,9 +63,9 @@
         token_t cur = (wrap)->cur.type;                                 \
         if (cur != (token)) {                                           \
             snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,                  \
-                     "Parse Error: Expected %s, Found: %s.",            \
+                     "Parse Error: Expected %s. Found: %s.",            \
                      token_str(token), token_str(cur));                 \
-            logger_log((wrap)->cur.mark, logger_fmt_buf, LOG_ERR);      \
+            logger_log(&(wrap)->cur.mark, logger_fmt_buf, LOG_ERR);     \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \

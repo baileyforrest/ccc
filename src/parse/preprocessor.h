@@ -41,7 +41,8 @@ typedef struct preprocessor_t {
     htable_t macros;           /**< Macro table */
     htable_t directives;       /**< Preprocessor directives */
 
-    tstream_t cur_param;      /**< Current macro parameter's stream */
+    fmark_t last_mark;         /**< Mark of last returned token */
+    tstream_t cur_param;       /**< Current macro parameter's stream */
     bool param_stringify;      /**< Whether or not we are stringifying */
 
     // Paramaters for reading preprocessor commands
@@ -89,7 +90,7 @@ void pp_close(preprocessor_t *pp);
  * @param pp The preprocessor to get the mark from from
  * @param mark Pointer to mark to populate
  */
-void pp_lastmark(preprocessor_t *pp, fmark_t **mark);
+void pp_last_mark(preprocessor_t *pp, fmark_t *mark);
 
 
 #define PP_EOF 0

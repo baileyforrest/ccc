@@ -153,7 +153,7 @@ typedef struct symtab_entry_t symtab_entry_t; // Forward definition
  */
 typedef struct lexeme_t {
     token_t type;                  /**< Type of lememe */
-    fmark_t *mark;                 /**< Location of lexeme */
+    fmark_t mark;                  /**< Location of lexeme */
 
     union {
         symtab_entry_t *tab_entry; /**< For string/id types */

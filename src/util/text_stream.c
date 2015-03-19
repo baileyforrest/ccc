@@ -66,6 +66,8 @@ int ts_advance(tstream_t *ts) {
         ts->mark.line++;
         ts->mark.col = 1;
         ts->mark.line_start = ts->cur + 1;
+    } else {
+        ts->mark.col++;
     }
 
     return *(ts->cur++);

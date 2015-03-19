@@ -26,6 +26,9 @@
 
 #include <stdio.h>
 
+void logger_log_line(fmark_t *mark);
+
+
 char logger_fmt_buf[LOG_FMT_BUF_SIZE];
 
 typedef struct logger_t {
@@ -45,26 +48,47 @@ void logger_destroy() {
     // No op
 }
 
+void logger_log_line(fmark_t *mark) {
+    // Print the line
+    for (const char *c = mark->line_start; *c != '\n'; ++c) {
+        putchar(*c);
+    }
+    putchar('\n');
+
+    // Print the error marker
+    for (int i = 0; i < mark->col - 1; ++i) {
+        putchar(' ');
+    }
+    putchar('^');
+    putchar('\n');
+}
+
 void logger_log(fmark_t *mark, const char *message, log_type_t type) {
     char *header;
 
     switch (type) {
     case LOG_ERR:
-        header = "error: ";
+        header = "error:";
         logger.has_error = true;
         break;
 
     case LOG_WARN:
-        header = "warning: ";
+        header = "warning:";
         logger.has_warning = true;
         break;
 
     default:
-        header = "info: ";
+        header = "info:";
         break;
     }
 
-    // TODO: Print multiple levels
     printf("%s:%d:%d %s %s\n", mark->file->str, mark->line, mark->col, header,
            message);
+    logger_log_line(mark);
+
+    for (fmark_t *cur = mark->last; cur != NULL; cur = cur->last) {
+        printf("%s:%d:%d note: %s\n", mark->file->str, mark->line, mark->col,
+               "In expansion of macro");
+        logger_log_line(cur);
+    }
 }
