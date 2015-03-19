@@ -18,15 +18,14 @@
 */
 /**
  * Lexer implementation
- *
- * TODO: Make error handling a bit cleaner
  */
 
 #include "lexer.h"
 
+#include <stdio.h>
+
 #include <assert.h>
 #include <math.h>
-#include <stdio.h>
 
 #include "util/logger.h"
 
@@ -346,9 +345,9 @@ end:
 status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     status_t status = CCC_OK;
 
-    long long accum = 0;
-
-    // TODO: Check for overflow
+    // Unsigned so modular overflow is defined
+    unsigned long long accum = 0;
+    unsigned bits = 0;
 
     // 0 is handled separately for hex/octal
     switch (cur) {
@@ -373,6 +372,9 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
                 default:
                     done = true;
                 }
+                if (!done) {
+                    bits += 4;
+                }
             } while (!done);
             break;
         }
@@ -391,6 +393,7 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
                     done = true;
                 }
                 if (!done) {
+                    bits += 3;
                     NEXT_CHAR_NOERR(lexer->pp, cur);
                 }
             } while (!done);
@@ -407,9 +410,15 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         bool done = false;
         do {
             switch (cur) {
-            case ASCII_DIGIT:
+            case ASCII_DIGIT: {
+                unsigned long long last = accum;
                 accum = accum * 10 + (cur - '0');
+                if (accum < last) {
+                    // Overflow, just add bits to mark it
+                    bits += sizeof(long long) * 8;
+                }
                 break;
+            }
             case '.': case 'e': case 'E':
                 goto handle_float;
             default:
@@ -501,6 +510,11 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
                 done = true;
             }
         } while(!done);
+    }
+
+    if (bits && bits > sizeof(long long) * 8) {
+        logger_log(&result->mark, "Integer constant too large",
+                   LOG_WARN);
     }
 
     lexer->next_char = cur;

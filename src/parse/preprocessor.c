@@ -18,6 +18,8 @@
 */
 /**
  * Implementation for preprocessor/file reader
+ *
+ * TODO: On errors, skip input to prevent infinite loops in lexer
  */
 
 #include "preprocessor.h"
