@@ -522,8 +522,12 @@ void ast_type_print(type_t *type) {
         printf(" {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->enum_params.ids) {
-            enum_id_t *enum_id = GET_ELEM(&type->enum_params.ids, cur);
-            ast_enum_id_print(enum_id);
+            decl_node_t *enum_id = GET_ELEM(&type->enum_params.ids, cur);
+            printf("%.*s", (int)enum_id->id->len, enum_id->id->str);
+            if (enum_id->expr != NULL) {
+                printf(" = ");
+                ast_expr_print(enum_id->expr);
+            }
             if (enum_id != sl_tail(&type->enum_params.ids)) {
                 printf(",");
             }
@@ -559,7 +563,7 @@ void ast_type_print(type_t *type) {
             } else {
                 printf(", ");
             }
-            ast_enum_id_print(GET_ELEM(&type->func.params, cur));
+            ast_decl_print(GET_ELEM(&type->func.params, cur), TYPE_VOID);
         }
         printf(")");
         break;
@@ -627,22 +631,6 @@ void ast_type_mod_print(type_mod_t type_mod) {
     }
 }
 
-void ast_enum_id_print(enum_id_t *enum_id) {
-    printf("%s", enum_id->id->str);
-    if (enum_id->val != NULL) {
-        printf(" = ");
-        ast_expr_print(enum_id->val);
-    }
-}
-
-void ast_enum_id_destroy(enum_id_t *enum_id) {
-    if (enum_id == NULL) {
-        return;
-    }
-    ast_expr_destroy(enum_id->val);
-    free(enum_id);
-}
-
 void ast_type_protected_destroy(type_t *type) {
     switch (type->type) {
     case TYPE_VOID:
@@ -664,7 +652,7 @@ void ast_type_protected_destroy(type_t *type) {
     case TYPE_ENUM:
         // Must be unananymous
         assert(type->enum_params.name != NULL);
-        SL_DESTROY_FUNC(&type->enum_params.ids, ast_enum_id_destroy);
+        SL_DESTROY_FUNC(&type->enum_params.ids, ast_decl_node_destroy);
         break;
     default:
         assert(false);
@@ -704,7 +692,7 @@ void ast_type_destroy(type_t *type) {
         if (type->enum_params.name != NULL) {
             return;
         }
-        SL_DESTROY_FUNC(&type->enum_params.ids, ast_enum_id_destroy);
+        SL_DESTROY_FUNC(&type->enum_params.ids, ast_decl_node_destroy);
         break;
 
     case TYPE_TYPEDEF:

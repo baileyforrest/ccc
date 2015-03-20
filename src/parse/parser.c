@@ -480,7 +480,8 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         new_type->align = 0;
         if (btype == TYPE_ENUM) {
             new_type->enum_params.name = name;
-            sl_init(&new_type->enum_params.ids, offsetof(enum_id_t, link));
+            new_type->enum_params.type = tt_int;
+            sl_init(&new_type->enum_params.ids, offsetof(decl_node_t, link));
         } else {
             new_type->struct_params.name = name;
             sl_init(&new_type->struct_params.decls,
@@ -1675,6 +1676,7 @@ fail:
 status_t par_enumerator_list(lex_wrap_t *lex, type_t *type) {
     assert(type->type == TYPE_ENUM);
     status_t status = CCC_OK;
+
     if (CCC_OK != (status = par_enumerator(lex, type))) {
         goto fail;
     }
@@ -1698,16 +1700,17 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     if (lex->cur.type != ID) {
         return CCC_BACKTRACK;
     }
-    enum_id_t *node = NULL;
-    ALLOC_NODE(lex, node, enum_id_t);
+    decl_node_t *node = NULL;
+    ALLOC_NODE(lex, node, decl_node_t);
+    node->type = type->enum_params.type;
     node->id = &lex->cur.tab_entry->key;
-    node->val = NULL;
+    node->expr = NULL;
     LEX_ADVANCE(lex);
 
     // Parse enum value if there is one
     if (lex->cur.type == EQ) {
         LEX_ADVANCE(lex);
-        if (CCC_OK != (status = par_expression(lex, NULL, &node->val))) {
+        if (CCC_OK != (status = par_expression(lex, NULL, &node->expr))) {
             goto fail;
         }
     }
@@ -1715,7 +1718,7 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     return status;
 
 fail:
-    ast_enum_id_destroy(node);
+    ast_decl_node_destroy(node);
     return status;
 }
 

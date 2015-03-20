@@ -89,11 +89,4 @@ void ast_type_print(type_t *type);
  */
 void ast_type_mod_print(type_mod_t type_mod);
 
-/**
- * Prints an enum_id_t
- *
- * @param enum_id enum_id_t to print
- */
-void ast_enum_id_print(enum_id_t *enum_id);
-
 #endif /* _AST_PRIV_H_ */

@@ -36,16 +36,6 @@ struct gdecl_t;
 struct decl_t;
 
 /**
- * Union declaration entry
- */
-typedef struct enum_id_t {
-    sl_link_t link;     /**< List link */
-    fmark_t mark;       /**< File mark */
-    len_str_t *id;      /**< Name */
-    struct expr_t *val; /**< Value */
-} enum_id_t;
-
-/**
  * Modifiers for types. Should be stored in a bitmap
  */
 typedef enum type_mod_t {
@@ -107,7 +97,8 @@ typedef struct type_t {
 
         struct {
             len_str_t *name;       /**< Name of struct/union, NULL if anon */
-            slist_t ids;           /**< List of enum ids/values (enum_id_t) */
+            struct type_t *type;   /**< Type of enum elements */
+            slist_t ids;           /**< List of enum ids/values (decl_node_t) */
         } enum_params;
 
         struct {                   /**< Modified type params */
@@ -466,13 +457,6 @@ void ast_print(trans_unit_t *tu);
  * @param ast The ast to destroy
  */
 void ast_destroy(trans_unit_t *ast);
-
-/**
- * Destroys an enum_id_t. Does not free, but does free child nodes
- *
- * @param enum_id Object to destroy
- */
-void ast_enum_id_destroy(enum_id_t *enum_id);
 
 /**
  * Destroys a type_t that is protected. A protected type is one that is shared

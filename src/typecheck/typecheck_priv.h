@@ -26,20 +26,12 @@
 #include "typecheck.h"
 
 /**
- * Typechecks an enum_id_t. Does not free, but does free child nodes
+ * Typechecks a trans_unit_t.
  *
- * @param enum_id Object to typecheck
+ * @param tras_unit Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_enum_id(enum_id_t *enum_id);
-
-/**
- * Typechecks a type_t that is not protected.
- *
- * @param type Object to typecheck
- * @return true if the node type checks, false otherwise
- */
-bool typecheck_type(type_t *type);
+bool typecheck_trans_unit(trans_unit_t *trans_unit);
 
 /**
  * Typechecks a gdecl_t.
@@ -50,20 +42,12 @@ bool typecheck_type(type_t *type);
 bool typecheck_gdecl(gdecl_t *gdecl);
 
 /**
- * Typechecks a expr_t.
+ * Typechecks a stmt_t.
  *
- * @param expr Object to typecheck
+ * @param stmt Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_expr(expr_t *expr);
-
-/**
- * Typechecks a decl_node_t.
- *
- * @param decl_node Object to typecheck
- * @return true if the node type checks, false otherwise
- */
-bool typecheck_decl_node(decl_node_t *decl_node);
+bool typecheck_stmt(stmt_t *stmt);
 
 /**
  * Typechecks a decl_t.
@@ -74,19 +58,28 @@ bool typecheck_decl_node(decl_node_t *decl_node);
 bool typecheck_decl(decl_t *decl);
 
 /**
- * Typechecks a stmt_t.
+ * Typechecks a decl_node_t.
  *
- * @param stmt Object to typecheck
+ * @param decl_node Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_stmt(stmt_t *stmt);
+bool typecheck_decl_node(decl_node_t *decl_node);
 
 /**
- * Typechecks a trans_unit_t.
+ * Typechecks a expr_t.
  *
- * @param tras_unit Object to typecheck
+ * @param expr Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_trans_unit(trans_unit_t *trans_unit);
+bool typecheck_expr(expr_t *expr);
+
+
+/**
+ * Typechecks a type_t that is not protected.
+ *
+ * @param type Object to typecheck
+ * @return true if the node type checks, false otherwise
+ */
+bool typecheck_type(type_t *type);
 
 #endif /* _TYPECHECK_PRIV_H_ */

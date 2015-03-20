@@ -28,3 +28,17 @@ bool typecheck_ast(trans_unit_t *tunit) {
     (void)tunit;
     return false;
 }
+
+bool typecheck_trans_unit(trans_unit_t *trans_unit);
+
+bool typecheck_gdecl(gdecl_t *gdecl);
+
+bool typecheck_stmt(stmt_t *stmt);
+
+bool typecheck_decl(decl_t *decl);
+
+bool typecheck_decl_node(decl_node_t *decl_node);
+
+bool typecheck_expr(expr_t *expr);
+
+bool typecheck_type(type_t *type);
