@@ -36,7 +36,8 @@ typedef struct typetab_t {
 typedef enum tt_type_t {
     TT_PRIM,
     TT_TYPEDEF,
-    TT_COMPOUND /* struct, union, enum */
+    TT_COMPOUND, /* struct, union, enum */
+    TT_VAR,      /* Variable */
 } tt_type_t;
 
 typedef struct tt_key_t {

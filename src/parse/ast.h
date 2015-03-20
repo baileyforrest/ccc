@@ -114,8 +114,11 @@ typedef struct type_t {
         struct type_t *paren_base; /**< Type in parens */
 
         struct {                   /**< Function signature */
-            struct type_t *type;   /**< Type (May be function pointer) */
+            // TODO: Fix parsing this so pointers point to this
+            struct type_t *type;   /**< Return type */
             slist_t params;        /**< Paramater signature (decl list) */
+            // TODO: Fill this
+            int num_params;        /**< Number of paramaters */
             bool varargs;          /**< Whether or not function has VA */
         } func;
 
@@ -199,6 +202,7 @@ typedef struct expr_t {
     sl_link_t link;                 /**< Storage link */
     fmark_t mark;                   /**< File mark */
     expr_type_t type;               /**< Expression type */
+    type_t *etype;                  /**< Evaluated type of the expression */
 
     union {
         len_str_t *var_id;          /**< Variable identifier */

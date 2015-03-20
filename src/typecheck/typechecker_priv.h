@@ -20,10 +20,21 @@
  * Type checker private interface
  */
 
-#ifndef _TYPECHECK_PRIV_H_
-#define _TYPECHECK_PRIV_H_
+#ifndef _TYPECHECKER_PRIV_H_
+#define _TYPECHECKER_PRIV_H_
 
-#include "typecheck.h"
+#include "typechecker.h"
+
+#define TC_CONST true
+#define TC_NOCONST false
+
+
+/**
+ * Container for type checking context
+ */
+typedef struct tc_state {
+    typetab_t *typetab; /*< Type table on top of the stack */
+} tc_state;
 
 /**
  * Typechecks a trans_unit_t.
@@ -31,7 +42,7 @@
  * @param tras_unit Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_trans_unit(trans_unit_t *trans_unit);
+bool typecheck_trans_unit(tc_state *tcs, trans_unit_t *trans_unit);
 
 /**
  * Typechecks a gdecl_t.
@@ -39,7 +50,7 @@ bool typecheck_trans_unit(trans_unit_t *trans_unit);
  * @param gdecl Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_gdecl(gdecl_t *gdecl);
+bool typecheck_gdecl(tc_state *tcs, gdecl_t *gdecl);
 
 /**
  * Typechecks a stmt_t.
@@ -47,7 +58,7 @@ bool typecheck_gdecl(gdecl_t *gdecl);
  * @param stmt Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_stmt(stmt_t *stmt);
+bool typecheck_stmt(tc_state *tcs, stmt_t *stmt);
 
 /**
  * Typechecks a decl_t.
@@ -55,7 +66,7 @@ bool typecheck_stmt(stmt_t *stmt);
  * @param decl Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_decl(decl_t *decl);
+bool typecheck_decl(tc_state *tcs, decl_t *decl);
 
 /**
  * Typechecks a decl_node_t.
@@ -63,16 +74,16 @@ bool typecheck_decl(decl_t *decl);
  * @param decl_node Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_decl_node(decl_node_t *decl_node);
+bool typecheck_decl_node(tc_state *tcs, decl_node_t *decl_node);
 
 /**
  * Typechecks a expr_t.
  *
  * @param expr Object to typecheck
+ * @param constant if TC_CONST, make sure the expression is constant.
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_expr(expr_t *expr);
-
+bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant);
 
 /**
  * Typechecks a type_t that is not protected.
@@ -80,6 +91,6 @@ bool typecheck_expr(expr_t *expr);
  * @param type Object to typecheck
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_type(type_t *type);
+bool typecheck_type(tc_state *tcs, type_t *type);
 
-#endif /* _TYPECHECK_PRIV_H_ */
+#endif /* _TYPECHECKER_PRIV_H_ */

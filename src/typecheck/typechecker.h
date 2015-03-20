@@ -20,8 +20,8 @@
  * Type checker interface
  */
 
-#ifndef _TYPECHECK_H_
-#define _TYPECHECK_H_
+#ifndef _TYPECHECKER_H_
+#define _TYPECHECKER_H_
 
 #include <stdbool.h>
 
@@ -30,9 +30,9 @@
 /**
  * Typecheck an ast. Error and warnings will be sent to the logger.
  *
- * @param tunit The translation unit to typecheck
+ * @param ast The AST to typecheck
  * @return true if the tranlation unit typechecks, false otherwise
  */
-bool typecheck_ast(trans_unit_t *tunit);
+bool typecheck_ast(trans_unit_t *ast);
 
-#endif /* _TYPECHECK_H_ */
+#endif /* _TYPECHECKER_H_ */
