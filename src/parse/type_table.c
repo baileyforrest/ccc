@@ -29,8 +29,11 @@
 
 #include "util/util.h"
 
+static len_str_t s_prim_filename = LEN_STR_LITERAL("<primitive_type>");
+
 #define TYPE_LITERAL(typename, type) \
-    { { NULL }, typename, sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
+    { { NULL }, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, \
+       sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
 
 static len_str_t void_str      = LEN_STR_LITERAL("void");
 static len_str_t char_str      = LEN_STR_LITERAL("char");

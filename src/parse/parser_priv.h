@@ -28,7 +28,7 @@
 
 #include <stdio.h>
 
-#define ALLOC_NODE(loc, type)                                       \
+#define ALLOC_NODE(lex, loc, type)                                  \
     do {                                                            \
         loc = malloc(sizeof(type));                                 \
         if (loc == NULL) {                                          \
@@ -37,6 +37,7 @@
             status = CCC_NOMEM;                                     \
             goto fail;                                              \
         }                                                           \
+        memcpy(&(loc)->mark, &(lex)->cur.mark, sizeof(fmark_t));    \
     } while (0)
 
 /**

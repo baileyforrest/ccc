@@ -96,7 +96,7 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
                               trans_unit_t **result) {
     status_t status = CCC_OK;
     trans_unit_t *tunit = NULL;
-    ALLOC_NODE(tunit, trans_unit_t);
+    ALLOC_NODE(lex, tunit, trans_unit_t);
     tunit->path = file;
     sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
     if (CCC_OK != (status = tt_init(&tunit->typetab, NULL))) {
@@ -123,11 +123,11 @@ fail:
 status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     status_t status = CCC_OK;
     gdecl_t *gdecl = NULL;
-    ALLOC_NODE(gdecl, gdecl_t);
+    ALLOC_NODE(lex, gdecl, gdecl_t);
     gdecl->type = GDECL_NOP;
     gdecl->decl = NULL;
 
-    ALLOC_NODE(gdecl->decl, decl_t);
+    ALLOC_NODE(lex, gdecl->decl, decl_t);
     gdecl->decl->type = NULL;
     sl_init(&gdecl->decl->decls, offsetof(decl_node_t, link));
 
@@ -269,7 +269,7 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
     // Allocate new type mod node if one isn't assigned
     if (*type == NULL || (*type)->type != TYPE_MOD) {
         type_t *new_type;
-        ALLOC_NODE(new_type, type_t);
+        ALLOC_NODE(lex, new_type, type_t);
         new_type->type = TYPE_MOD;
         if (*type != NULL) {
             new_type->size = (*type)->size;
@@ -374,7 +374,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         tt_key_t key = { &lex->cur.tab_entry->key , TT_TYPEDEF };
         typetab_entry_t *entry = tt_lookup(lex->typetab, &key);
         assert(entry != NULL); // Must be checked before calling
-        ALLOC_NODE(new_node, type_t);
+        ALLOC_NODE(lex, new_node, type_t);
         new_node->type = TYPE_TYPEDEF;
         new_node->typedef_params.name = &lex->cur.tab_entry->key;
         new_node->typedef_params.base = entry->type;
@@ -396,7 +396,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     case UNSIGNED: {
         type_mod_t mod = lex->cur.type == SIGNED ? TMOD_SIGNED : TMOD_UNSIGNED;
         if (mod_node == NULL) {
-            ALLOC_NODE(mod_node, type_t);
+            ALLOC_NODE(lex, mod_node, type_t);
             new_node = mod_node;
             mod_node->type = TYPE_MOD;
             mod_node->size = (*type)->size;
@@ -474,7 +474,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     }
 
     if (entry == NULL) { // Allocate a new type if it doesn't exist
-        ALLOC_NODE(new_type, type_t);
+        ALLOC_NODE(lex, new_type, type_t);
         new_type->type = btype;
         new_type->size = 0; // Mark as unitialized
         new_type->align = 0;
@@ -616,7 +616,7 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
                                     type_t *decl_type) {
     status_t status = CCC_OK;
     decl_t *decl = NULL;
-    ALLOC_NODE(decl, decl_t);
+    ALLOC_NODE(lex, decl, decl_t);
     decl->type = decl_type;
     sl_init(&decl->decls, offsetof(decl_node_t, link));
 
@@ -677,7 +677,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     }
     status_t status = CCC_OK;
     decl_node_t *decl_node;
-    ALLOC_NODE(decl_node, decl_node_t);
+    ALLOC_NODE(lex, decl_node, decl_node_t);
     decl_node->type = decl->type;
     decl_node->id = NULL;
     decl_node->expr = NULL;
@@ -729,7 +729,7 @@ status_t par_pointer(lex_wrap_t *lex, type_t **mod) {
     if (new_type != NULL) {
         mods = new_type->mod.type_mod;
     } else {
-        ALLOC_NODE(new_type, type_t);
+        ALLOC_NODE(lex, new_type, type_t);
     }
     new_type->type = TYPE_PTR;
     new_type->size = PTR_SIZE;
@@ -760,7 +760,7 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
     if (*type != NULL && (*type)->type == TYPE_MOD) {
         mod_node = *type;
     } else {
-        ALLOC_NODE(mod_node, type_t);
+        ALLOC_NODE(lex, mod_node, type_t);
         mod_node->type = TYPE_MOD;
         if (*type != NULL) {
             mod_node->size = (*type)->size;
@@ -794,7 +794,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         LEX_MATCH(lex, RPAREN);
 
         type_t *paren_type;
-        ALLOC_NODE(paren_type, type_t);
+        ALLOC_NODE(lex, paren_type, type_t);
         paren_type->type = TYPE_PAREN;
         paren_type->size = node->type->size;
         paren_type->align = node->type->align;
@@ -821,7 +821,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         case LBRACK: // Array dimension
             LEX_ADVANCE(lex);
             type_t *arr_type;
-            ALLOC_NODE(arr_type, type_t);
+            ALLOC_NODE(lex, arr_type, type_t);
             arr_type->type = TYPE_ARR;
             arr_type->align = node->type->align;
             arr_type->size = 0;
@@ -843,7 +843,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         case LPAREN:
             LEX_ADVANCE(lex);
             type_t *func_type;
-            ALLOC_NODE(func_type, type_t);
+            ALLOC_NODE(lex, func_type, type_t);
             func_type->type = TYPE_FUNC;
             func_type->align = PTR_ALIGN;
             func_type->size = PTR_SIZE;
@@ -955,7 +955,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
         }
         default: { // Paren expression
             expr_t *expr;
-            ALLOC_NODE(expr, expr_t);
+            ALLOC_NODE(lex, expr, expr_t);
             expr->type = EXPR_PAREN;
             expr->paren_base = NULL;
             if (CCC_OK !=
@@ -1070,7 +1070,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
 
         case COND: { // Conditional operator
             LEX_ADVANCE(lex);
-            ALLOC_NODE(new_node, expr_t);
+            ALLOC_NODE(lex, new_node, expr_t);
             new_node->type = EXPR_COND;
             new_node->cond.expr1 = left;
             new_node->cond.expr2 = NULL;
@@ -1133,14 +1133,14 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
 
         case COND: { // Cond has lowest precedence, combine left and right
             LEX_ADVANCE(lex);
-            ALLOC_NODE(new_node, expr_t);
+            ALLOC_NODE(lex, new_node, expr_t);
             new_node->type = EXPR_BIN;
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
             new_node->bin.expr2 = right;
 
             expr_t *cond_node;
-            ALLOC_NODE(cond_node, expr_t);
+            ALLOC_NODE(lex, cond_node, expr_t);
             cond_node->type = EXPR_COND;
             cond_node->cond.expr1 = new_node;
             cond_node->cond.expr2 = NULL;
@@ -1162,7 +1162,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             return CCC_OK;
         }
         default: { // Not binary 2, just combine the left and light
-            ALLOC_NODE(new_node, expr_t);
+            ALLOC_NODE(lex, new_node, expr_t);
             new_node->type = EXPR_BIN;
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
@@ -1175,7 +1175,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
         if (par_get_binary_prec(op1) >= par_get_binary_prec(op2)) {
             // op1 has greater or equal precedence, so combine left and right
             // and restart loop with new left
-            ALLOC_NODE(new_node, expr_t);
+            ALLOC_NODE(lex, new_node, expr_t);
             new_node->type = EXPR_BIN;
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
@@ -1185,7 +1185,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
         } else {
             // op2 has greater precedence, parse expression with right as the
             // left side, then combine with the current left
-            ALLOC_NODE(new_node, expr_t);
+            ALLOC_NODE(lex, new_node, expr_t);
             new_node->type = EXPR_BIN;
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
@@ -1228,7 +1228,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
 
     case INC:
     case DEC: {
-        ALLOC_NODE(base, expr_t);
+        ALLOC_NODE(lex, base, expr_t);
         oper_t op = lex->cur.type == INC ? OP_PREINC : OP_PREDEC;
         LEX_ADVANCE(lex);
         base->type = EXPR_UNARY;
@@ -1242,7 +1242,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
 
     case SIZEOF:
         LEX_ADVANCE(lex);
-        ALLOC_NODE(base, expr_t);
+        ALLOC_NODE(lex, base, expr_t);
         base->type = EXPR_SIZEOF;
         base->sizeof_params.type = NULL;
         base->sizeof_params.expr = NULL;
@@ -1278,7 +1278,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             assert(false);
         }
         LEX_ADVANCE(lex);
-        ALLOC_NODE(base, expr_t);
+        ALLOC_NODE(lex, base, expr_t);
         base->type = EXPR_UNARY;
         base->unary.op = op;
         base->unary.expr = NULL;
@@ -1318,7 +1318,7 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
     }
     LEX_MATCH(lex, RPAREN);
 
-    ALLOC_NODE(expr, expr_t);
+    ALLOC_NODE(lex, expr, expr_t);
     expr->type = EXPR_CAST;
     expr->cast.cast = type;
     expr->cast.base = NULL;
@@ -1348,7 +1348,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
         switch (lex->cur.type) {
         case LBRACK: // Array index
             LEX_ADVANCE(lex);
-            ALLOC_NODE(expr, expr_t);
+            ALLOC_NODE(lex, expr, expr_t);
             expr->type = EXPR_BIN;
             expr->bin.op = OP_ARR_ACC;
             expr->bin.expr1 = base;
@@ -1367,7 +1367,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
 
         case LPAREN: // Function call
             LEX_ADVANCE(lex);
-            ALLOC_NODE(expr, expr_t);
+            ALLOC_NODE(lex, expr, expr_t);
             expr->type = EXPR_CALL;
             expr->call.func = base;
             sl_init(&expr->call.params, offsetof(expr_t, link));
@@ -1400,7 +1400,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
                 status = CCC_ESYNTAX;
                 goto fail;
             }
-            ALLOC_NODE(expr, expr_t);
+            ALLOC_NODE(lex, expr, expr_t);
             expr->type = EXPR_MEM_ACC;
             expr->mem_acc.base = base;
             expr->mem_acc.name = &lex->cur.tab_entry->key;
@@ -1417,7 +1417,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
         case DEC: {
             oper_t op = lex->cur.type == INC ? OP_POSTINC : OP_POSTDEC;
             LEX_ADVANCE(lex);
-            ALLOC_NODE(expr, expr_t);
+            ALLOC_NODE(lex, expr, expr_t);
             expr->type = EXPR_UNARY;
             expr->unary.op = op;
             expr->unary.expr = base;
@@ -1474,7 +1474,7 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
     LEX_ADVANCE(lex);
 
     expr_t *expr = NULL;
-    ALLOC_NODE(expr, expr_t);
+    ALLOC_NODE(lex, expr, expr_t);
     expr->type = EXPR_ASSIGN;
     expr->assign.dest = left;
     expr->assign.op = op;
@@ -1496,7 +1496,7 @@ fail:
 status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *base = NULL;
-    ALLOC_NODE(base, expr_t);
+    ALLOC_NODE(lex, base, expr_t);
     base->type = EXPR_VOID; // For safe destruction
 
     switch (lex->cur.type) {
@@ -1511,7 +1511,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         base->const_val.str_val = &lex->cur.tab_entry->key;
         base->const_val.type = NULL;
         type_t *type;
-        ALLOC_NODE(type, type_t);
+        ALLOC_NODE(lex, type, type_t);
         type->type = TYPE_ARR;
         type->size = base->const_val.str_val->len + 1;
         type->align = 1;
@@ -1519,7 +1519,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         type->arr.len = NULL;
         base->const_val.type = type;
         expr_t *len;
-        ALLOC_NODE(len, expr_t);
+        ALLOC_NODE(lex, len, expr_t);
         len->type = EXPR_CONST_INT;
         len->const_val.int_val = base->const_val.str_val->len + 1;
         len->const_val.type = tt_long;
@@ -1541,7 +1541,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
 
         if (lex->cur.int_params.hasU) {
             type_t *type_mod;
-            ALLOC_NODE(type_mod, type_t);
+            ALLOC_NODE(lex, type_mod, type_t);
             type_mod->type = TYPE_MOD;
             type_mod->size = type->size;
             type_mod->align = type->align;
@@ -1583,7 +1583,7 @@ status_t par_type_name(lex_wrap_t *lex, decl_t **result) {
             goto fail;
         }
     }
-    ALLOC_NODE(decl, decl_t);
+    ALLOC_NODE(lex, decl, decl_t);
     decl->type = base;
     sl_init(&decl->decls, offsetof(decl_node_t, link));
 
@@ -1648,7 +1648,7 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
         }
     }
 
-    ALLOC_NODE(decl, decl_t);
+    ALLOC_NODE(lex, decl, decl_t);
     decl->type = type;
     sl_init(&decl->decls, offsetof(decl_node_t, link));
 
@@ -1699,7 +1699,7 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
         return CCC_BACKTRACK;
     }
     enum_id_t *node = NULL;
-    ALLOC_NODE(node, enum_id_t);
+    ALLOC_NODE(lex, node, enum_id_t);
     node->id = &lex->cur.tab_entry->key;
     node->val = NULL;
     LEX_ADVANCE(lex);
@@ -1722,7 +1722,7 @@ fail:
 status_t par_declaration(lex_wrap_t *lex, decl_t **decl) {
     status_t status = CCC_OK;
     if (*decl == NULL) {
-        ALLOC_NODE(*decl, decl_t);
+        ALLOC_NODE(lex, *decl, decl_t);
         (*decl)->type = NULL;
         sl_init(&(*decl)->decls, offsetof(decl_node_t, link));
 
@@ -1803,7 +1803,7 @@ fail:
 status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *expr;
-    ALLOC_NODE(expr, expr_t);
+    ALLOC_NODE(lex, expr, expr_t);
     expr->type = EXPR_INIT_LIST;
     sl_init(&expr->init_list.exprs, offsetof(expr_t, link));
 
@@ -1860,7 +1860,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         // Type qualitifiers
     case CONST:
     case VOLATILE: {
-        ALLOC_NODE(stmt, stmt_t);
+        ALLOC_NODE(lex, stmt, stmt_t);
         stmt->type = STMT_DECL;
         stmt->decl = NULL;
         if(CCC_OK != (status = par_declaration(lex, &stmt->decl))) {
@@ -1873,7 +1873,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         // Type specifier only if its a typedef name
         tt_key_t key = { &lex->cur.tab_entry->key, TT_TYPEDEF };
         if (tt_lookup(lex->typetab, &key) != NULL) {
-            ALLOC_NODE(stmt, stmt_t);
+            ALLOC_NODE(lex, stmt, stmt_t);
             stmt->type = STMT_DECL;
             stmt->decl = NULL;
             if (CCC_OK != (status = par_declaration(lex, &stmt->decl))) {
@@ -1921,7 +1921,7 @@ fail:
 status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
-    ALLOC_NODE(stmt, stmt_t);
+    ALLOC_NODE(lex, stmt, stmt_t);
     stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
 
     switch (lex->cur.type) {
@@ -1979,7 +1979,7 @@ fail:
 status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
-    ALLOC_NODE(stmt, stmt_t);
+    ALLOC_NODE(lex, stmt, stmt_t);
     stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
 
     switch (lex->cur.type) {
@@ -2045,7 +2045,7 @@ fail:
 status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
-    ALLOC_NODE(stmt, stmt_t);
+    ALLOC_NODE(lex, stmt, stmt_t);
     stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
 
     switch (lex->cur.type) {
@@ -2141,7 +2141,7 @@ fail:
 status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
-    ALLOC_NODE(stmt, stmt_t);
+    ALLOC_NODE(lex, stmt, stmt_t);
     stmt->type = STMT_NOP; // Initialize to NOP for safe destruction
 
     switch (lex->cur.type) {
@@ -2196,7 +2196,7 @@ fail:
 status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt;
-    ALLOC_NODE(stmt, stmt_t);
+    ALLOC_NODE(lex, stmt, stmt_t);
     stmt->type = STMT_COMPOUND;
     sl_init(&stmt->compound.stmts, offsetof(stmt_t, link));
 
@@ -2231,7 +2231,7 @@ fail:
 status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt;
-    ALLOC_NODE(stmt, stmt_t);
+    ALLOC_NODE(lex, stmt, stmt_t);
 
     if (lex->cur.type == SEMI) {
         stmt->type = STMT_NOP;

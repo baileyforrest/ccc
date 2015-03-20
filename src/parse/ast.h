@@ -25,6 +25,7 @@
 
 #include "parse/type_table.h"
 
+#include "util/file_directory.h"
 #include "util/slist.h"
 #include "util/util.h"
 
@@ -39,6 +40,7 @@ struct decl_t;
  */
 typedef struct enum_id_t {
     sl_link_t link;     /**< List link */
+    fmark_t mark;       /**< File mark */
     len_str_t *id;      /**< Name */
     struct expr_t *val; /**< Value */
 } enum_id_t;
@@ -92,6 +94,7 @@ typedef enum basic_type_t {
  */
 typedef struct type_t {
     sl_link_t link;                /**< Storage Link */
+    fmark_t mark;                  /**< File mark */
     basic_type_t type;             /**< Basic type */
     int size;                      /**< Size of this type */
     char align;                    /**< Alignment */
@@ -203,6 +206,7 @@ typedef enum expr_type_t {
  */
 typedef struct expr_t {
     sl_link_t link;                 /**< Storage link */
+    fmark_t mark;                   /**< File mark */
     expr_type_t type;               /**< Expression type */
 
     union {
@@ -281,6 +285,7 @@ typedef struct expr_t {
  */
 typedef struct decl_node_t {
     sl_link_t link; /**< Storage link */
+    fmark_t mark;   /**< File mark */
     type_t *type;   /**< Type of variable */
     len_str_t *id;  /**< Name of variable */
     expr_t *expr;   /**< Expression to assign, bitfield bits for struct/union */
@@ -291,6 +296,7 @@ typedef struct decl_node_t {
  */
 typedef struct decl_t {
     sl_link_t link; /**< Storage link */
+    fmark_t mark;   /**< File mark */
     type_t *type;   /**< Type of variable */
     slist_t decls;  /**< List of declarations (decl_node_t) */
 } decl_t;
@@ -334,6 +340,7 @@ typedef enum stmt_type_t {
  */
 typedef struct stmt_t {
     sl_link_t link;                    /**< Storage link */
+    fmark_t mark;                      /**< File mark */
     stmt_type_t type;                  /**< Type of statement */
 
     union {
@@ -424,6 +431,7 @@ typedef enum gdecl_type_t {
  */
 typedef struct gdecl_t {
     sl_link_t link;              /**< Storage Link */
+    fmark_t mark;                /**< File mark */
     gdecl_type_t type;           /**< Type of gdecl */
     struct decl_t *decl;         /**< Declaration */
     union {
@@ -439,6 +447,7 @@ typedef struct gdecl_t {
  */
 typedef struct trans_unit_t {
     sl_link_t link;     /**< Storage link */
+    fmark_t mark;       /**< File mark */
     len_str_t *path;    /**< Path of compilation unit */
     slist_t gdecls;     /**< List of gdecl in compilation unit */
     typetab_t typetab;  /**< Types defined at top level */
@@ -470,9 +479,6 @@ void ast_enum_id_destroy(enum_id_t *enum_id);
  * by multiple types. Namely, a named struct, union, or enum, primitive types
  *
  * @param type Object to destroy
- * @param override If OVERRIDE, frees even if the dealloc flag is set.
- * If NOOVERRIDE ignores an object with the dealloc flag set.
- * This paramater is not recursively applied
  */
 void ast_type_protected_destroy(type_t *type);
 
@@ -480,9 +486,6 @@ void ast_type_protected_destroy(type_t *type);
  * Destroys a type_t that is not protected.
  *
  * @param type Object to destroy
- * @param override If OVERRIDE, frees even if the dealloc flag is set.
- * If NOOVERRIDE ignores an object with the dealloc flag set.
- * This paramater is not recursively applied
  */
 void ast_type_destroy(type_t *type);
 
