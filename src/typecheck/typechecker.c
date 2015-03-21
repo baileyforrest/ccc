@@ -24,14 +24,109 @@
 #include "typechecker_priv.h"
 
 #include <assert.h>
+#include <stdio.h>
 
+#include "util/logger.h"
 
 bool typecheck_ast(trans_unit_t *ast) {
-    tc_state tcs = { NULL };
+    tc_state_t tcs = { NULL, NULL, NULL, NULL, NULL };
     return typecheck_trans_unit(&tcs, ast);
 }
 
-bool typecheck_trans_unit(tc_state *tcs, trans_unit_t *trans_unit) {
+bool typecheck_type_integral(type_t *type) {
+    switch (type->type) {
+    case TYPE_CHAR:
+    case TYPE_SHORT:
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_LONG_LONG:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_ENUM:
+        return true;
+
+    case TYPE_TYPEDEF:
+        return typecheck_type_integral(type->typedef_params.base);
+    case TYPE_MOD:
+        return typecheck_type_integral(type->mod.base);
+    case TYPE_PAREN:
+        return typecheck_type_integral(type->paren_base);
+
+    case TYPE_VOID:
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+
+    case TYPE_FUNC:
+    case TYPE_ARR:
+    case TYPE_PTR:
+        break;
+
+    default:
+        assert(false);
+    }
+
+    return false;
+}
+
+bool typecheck_type_conditional(type_t *type) {
+    switch (type->type) {
+    // Primitive types
+    case TYPE_CHAR:
+    case TYPE_SHORT:
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_LONG_LONG:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+
+    case TYPE_ENUM:
+    case TYPE_FUNC:
+    case TYPE_ARR:
+    case TYPE_PTR:
+        return true;
+
+    case TYPE_TYPEDEF:
+        return typecheck_type_conditional(type->typedef_params.base);
+    case TYPE_MOD:
+        return typecheck_type_conditional(type->mod.base);
+    case TYPE_PAREN:
+        return typecheck_type_conditional(type->paren_base);
+
+    case TYPE_VOID:
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+        break;
+
+    default:
+        assert(false);
+    }
+
+    return false;
+}
+
+
+bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
+    bool retval = typecheck_expr(tcs, expr, TC_NOCONST);
+    if (!(retval &= typecheck_type_integral(expr->etype))) {
+        logger_log(&expr->mark, "Integral value required", LOG_ERR);
+    }
+
+    return retval;
+}
+
+bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr) {
+    bool retval = typecheck_expr(tcs, expr, TC_NOCONST);
+    if (!(retval &= typecheck_type_conditional(expr->etype))) {
+        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+                 "used %s type value where scalar is required",
+                 ast_basic_type_str(expr->etype->type));
+        logger_log(&expr->mark, logger_fmt_buf, LOG_ERR);
+    }
+
+    return retval;
+}
+
+bool typecheck_trans_unit(tc_state_t *tcs, trans_unit_t *trans_unit) {
     typetab_t *save_tab = tcs->typetab;
     tcs->typetab = &trans_unit->typetab;
     bool retval = true;
@@ -45,7 +140,7 @@ bool typecheck_trans_unit(tc_state *tcs, trans_unit_t *trans_unit) {
     return retval;
 }
 
-bool typecheck_gdecl(tc_state *tcs, gdecl_t *gdecl) {
+bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
     bool retval = true;
 
     retval &= typecheck_decl(tcs, gdecl->decl, TC_NOCONST);
@@ -65,7 +160,7 @@ bool typecheck_gdecl(tc_state *tcs, gdecl_t *gdecl) {
     return retval;
 }
 
-bool typecheck_stmt(tc_state *tcs, stmt_t *stmt) {
+bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
     bool retval = true;
     switch (stmt->type) {
     case STMT_NOP:
@@ -77,60 +172,116 @@ bool typecheck_stmt(tc_state *tcs, stmt_t *stmt) {
     case STMT_LABEL:
         return typecheck_stmt(tcs, stmt->label.stmt);
     case STMT_CASE:
-        retval &= typecheck_expr(tcs, stmt->case_params.val, TC_CONST);
-        // TODO: Make sure expression is an integral type
-        retval &= typecheck_stmt(tcs, stmt->case_params->stmt);
-        // TODO: Make sure inside a switch statement
+        if (tcs->last_switch == NULL) {
+            logger_log(&stmt->mark,
+                       "'case' label not within a switch statement",
+                       LOG_ERR);
+            retval = false;
+        } else {
+            sl_append(&tcs->last_switch->switch_params.cases,
+                      &stmt->case_params.link);
+        }
+        retval &= typecheck_expr_integral(tcs, stmt->case_params.val);
+        retval &= typecheck_stmt(tcs, stmt->case_params.stmt);
         return retval;
     case STMT_DEFAULT:
-        // TODO: Make sure inside a switch statement
-        return typecheck_stmt(tcs, stmt->default_params);
+        if (tcs->last_switch == NULL) {
+            logger_log(&stmt->mark,
+                       "'default' label not within a switch statement",
+                       LOG_ERR);
+            retval = false;
+        } else {
+            tcs->last_switch->switch_params.default_stmt = stmt;
+        }
+        retval &= typecheck_stmt(tcs, stmt->default_params.stmt);
+        return retval;
 
     case STMT_IF:
         retval &= typecheck_expr(tcs, stmt->if_params.expr, TC_NOCONST);
-        // TODO: Make sure expr some sort of true/false type
+        retval &= typecheck_expr_conditional(tcs, stmt->if_params.expr);
         retval &= typecheck_stmt(tcs, stmt->if_params.true_stmt);
-        if (stmt->if_params.true_false != NULL) {
-            retval &= typecheck_stmt(tcs, stmt->if_params.true_false);
+        if (stmt->if_params.false_stmt != NULL) {
+            retval &= typecheck_stmt(tcs, stmt->if_params.false_stmt);
         }
         return retval;
-    case STMT_SWITCH:
-        retval &= typecheck_expr(tcs, stmt->switch_params.expr,
-                                 TC_NOCONST);
-        // TODO: Make sure expr some sort of value type
-        // TODO: Set current switch statement
-        retval &= typecheck_stmt(tcs, stmt->switch_params.stmt);
-        return retval;
+    case STMT_SWITCH: {
+        retval &= typecheck_expr_integral(tcs, stmt->switch_params.expr);
 
-    case STMT_DO:
-        // TODO: Set current loop
+        stmt_t *switch_save = tcs->last_switch;
+        stmt_t *break_save = tcs->last_break;
+        tcs->last_switch = stmt;
+        tcs->last_break = stmt;
+
+        retval &= typecheck_stmt(tcs, stmt->switch_params.stmt);
+
+        tcs->last_switch = switch_save;
+        tcs->last_break = break_save;
+        return retval;
+    }
+
+    case STMT_DO: {
+        stmt_t *loop_save = tcs->last_loop;
+        stmt_t *break_save = tcs->last_break;
+        tcs->last_loop = stmt;
+        tcs->last_break = stmt;
+
         retval &= typecheck_stmt(tcs, stmt->do_params.stmt);
-        retval &= typecheck_expr(tcs, stmt->do_params.expr, TC_NOCONST);
-        // TODO: Make sure expr some sort of true/false type
+        retval &= typecheck_expr_conditional(tcs, stmt->do_params.expr);
+
+        tcs->last_loop = loop_save;
+        tcs->last_break = break_save;
         return retval;
-    case STMT_WHILE:
-        // TODO: Set current loop
-        retval &= typecheck_expr(tcs, stmt->while_params.expr, TC_NOCONST);
-        // TODO: Make sure expr some sort of true/false type
+    }
+    case STMT_WHILE: {
+        retval &= typecheck_expr_conditional(tcs, stmt->while_params.expr);
+
+        stmt_t *loop_save = tcs->last_loop;
+        stmt_t *break_save = tcs->last_break;
+        tcs->last_loop = stmt;
+        tcs->last_break = stmt;
+
         retval &= typecheck_stmt(tcs, stmt->while_params.stmt);
+
+        tcs->last_loop = loop_save;
+        tcs->last_break = break_save;
         return retval;
+    }
     case STMT_FOR:
-        // TODO: Set current loop
         retval &= typecheck_expr(tcs, stmt->for_params.expr1, TC_NOCONST);
-        retval &= typecheck_expr(tcs, stmt->for_params.expr2, TC_NOCONST);
-        // TODO: Make sure expr some sort of true/false type
+        retval &= typecheck_expr_conditional(tcs, stmt->for_params.expr2);
         retval &= typecheck_expr(tcs, stmt->for_params.expr3, TC_NOCONST);
+
+        stmt_t *loop_save = tcs->last_loop;
+        stmt_t *break_save = tcs->last_break;
+        tcs->last_loop = stmt;
+        tcs->last_break = stmt;
+
         retval &= typecheck_stmt(tcs, stmt->for_params.stmt);
+
+        tcs->last_loop = loop_save;
+        tcs->last_break = break_save;
         return retval;
 
     case STMT_GOTO:
         // TODO: Need to store a table of GOTOs and labels in a function
         return retval;
     case STMT_CONTINUE:
-        // TODO: Need to make sure in a loop, set parent
+        if (tcs->last_loop == NULL) {
+            logger_log(&stmt->mark, "continue statement not within a loop",
+                       LOG_ERR);
+            retval = false;
+        } else {
+            stmt->continue_params.parent = tcs->last_loop;
+        }
         return retval;
     case STMT_BREAK:
-        // TODO: Need to make sure in a loop or switch statement, set parent
+        if (tcs->last_break == NULL) {
+            logger_log(&stmt->mark, "break statement not within loop or switch",
+                       LOG_ERR);
+            retval = false;
+        } else {
+            stmt->break_params.parent = tcs->last_loop;
+        }
         return retval;
     case STMT_RETURN:
         retval &= typecheck_expr(tcs, stmt->return_params.expr,
@@ -163,30 +314,31 @@ bool typecheck_stmt(tc_state *tcs, stmt_t *stmt) {
     return retval;
 }
 
-bool typecheck_decl(tc_state *tcs, decl_t *decl, bool constant) {
+bool typecheck_decl(tc_state_t *tcs, decl_t *decl, bool constant) {
     bool retval = true;
 
-    retval &= typecheck_type(decl->type);
+    retval &= typecheck_type(tcs, decl->type);
     sl_link_t *cur;
     SL_FOREACH(cur, &decl->decls) {
-        retval &= typecheck_decr_node(tcs, GET_ELEM(&decl->decls, cur),
+        retval &= typecheck_decl_node(tcs, GET_ELEM(&decl->decls, cur),
                                       constant);
     }
 
     return retval;
 }
 
-bool typecheck_decl_node(tc_state *tcs, decl_node_t *decl_node, bool constant) {
+bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
+                         bool constant) {
     bool retval = true;
-    retval &= typecheck_type(decl_node->type);
-    retval &= typecheck_expr(decl_node->expr, constant);
+    retval &= typecheck_type(tcs, decl_node->type);
+    retval &= typecheck_expr(tcs, decl_node->expr, constant);
     // TODO: Make sure expression is compatible with type
     // if constant == TC_CONST, make sure they are compatible with int
 
     return retval;
 }
 
-bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
+bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     bool retval = true;
     switch(expr->type) {
     case EXPR_VOID:
@@ -194,25 +346,25 @@ bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
         return retval;
     case EXPR_PAREN:
         retval &= typecheck_expr(tcs, expr->paren_base, constant);
-        expr->etype = expr->paren_base.etype;
+        expr->etype = expr->paren_base->etype;
         return retval;
     case EXPR_VAR: {
         tt_key_t lookup = { expr->var_id, TT_VAR };
-        typetab_entry_t *entry = tt_lookup(tcs->typetab, lookup);
+        typetab_entry_t *entry = tt_lookup(tcs->typetab, &lookup);
         if (entry == NULL) {
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE, "'%.s' undeclared.",
+            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE, "'%.*s' undeclared.",
                      (int)expr->var_id->len, expr->var_id->str);
             logger_log(&expr->mark, logger_fmt_buf, LOG_ERR);
             retval = false;
         }
-        expr->etype = type;
+        expr->etype = entry->type;
         return retval;
     }
     case EXPR_ASSIGN:
         retval &= typecheck_expr(tcs, expr->assign.dest, TC_NOCONST);
         retval &= typecheck_expr(tcs, expr->assign.expr, TC_NOCONST);
         // TODO: Make sure dest can be assigned to expr
-        expr->etype = expr->assign.dest.etype;
+        expr->etype = expr->assign.dest->etype;
         return retval;
     case EXPR_CONST_INT:
         expr->etype = expr->const_val.type;
@@ -230,26 +382,28 @@ bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_expr(tcs, expr->bin.expr2, TC_NOCONST);
         // TODO: Make sure expr1 & expr2 are compatible with op
         // TODO: Perform type promotion
-        expr->etype = expr->bin.expr1.etype; // TODO: Temporary
+        expr->etype = expr->bin.expr1->etype; // TODO: Temporary
         return retval;
     case EXPR_UNARY:
-        retval &= typecheck_expr(tcs, unary->bin.expr, TC_NOCONST);
-        // TODO: Make sure retval compatible with op
-        expr->etype = expr->unary.expr.etype;
+        retval &= typecheck_expr(tcs, expr->unary.expr, TC_NOCONST);
+        // TODO: Make sure expr compatible with op
+        expr->etype = expr->unary.expr->etype;
         return retval;
     case EXPR_COND:
-        retval &= typecheck_expr(tcs, expr->cond.expr1, TC_NOCONST);
+        retval &= typecheck_expr_conditional(tcs, expr->cond.expr1);
         retval &= typecheck_expr(tcs, expr->cond.expr2, TC_NOCONST);
         retval &= typecheck_expr(tcs, expr->cond.expr3, TC_NOCONST);
         // TODO: Make sure expr1 can be true/false
         // TODO: Make sure expr2 and expr3 are same type, perform promotion
-        expr->etype = expr->cond.expr1.etype; // TODO: Temporary
+        expr->etype = expr->cond.expr1->etype; // TODO: Temporary
         return retval;
-    case EXPR_CAST:
+    case EXPR_CAST: {
         retval &= typecheck_expr(tcs, expr->cast.base, TC_NOCONST);
+        decl_node_t *node = sl_head(&expr->cast.cast->decls);
         // TODO: make sure can be casted to type
-        expr->etype = expr->cast.cast;
+        expr->etype = node->type;
         return retval;
+    }
     case EXPR_CALL: {
         retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST);
         type_t *func_sig = expr->call.func->etype;
@@ -263,13 +417,14 @@ bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
         sl_link_t *cur_sig, *cur_expr;
         cur_sig = func_sig->func.params.head;
         cur_expr = expr->call.params.head;
-        while (cur_sig != NULL && cur_exp != NULL) {
+        while (cur_sig != NULL && cur_expr != NULL) {
             decl_t *decl = GET_ELEM(&func_sig->func.params, cur_sig);
             decl_node_t *param = sl_head(&decl->decls);
             expr_t *expr = GET_ELEM(&expr->call.params, cur_expr);
-            retval &= typecheck_expr(expr, TC_NOCONST);
+            retval &= typecheck_expr(tcs, expr, TC_NOCONST);
 
             // TODO: Make sure expr->etype and param->type are compatible
+            (void)param;
             if (false) {
                 snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
                          "incompatible type for argument %d of function",
@@ -286,17 +441,17 @@ bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
             logger_log(&expr->mark, "too few arguments to function", LOG_ERR);
             // TODO: print type
         }
-        if (cur_exp != NULL) {
+        if (cur_expr != NULL) {
             logger_log(&expr->mark, "too many arguments to function", LOG_ERR);
             // TODO: print type
         }
-        expr->etype = func_sig.type;
+        expr->etype = func_sig->func.type;
         return retval;
     }
     case EXPR_CMPD: {
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->cmpd.exprs) {
-            retval &= typecheck_expr(GET_ELEM(&expr->cmpd.exprs, cur),
+            retval &= typecheck_expr(tcs, GET_ELEM(&expr->cmpd.exprs, cur),
                                      TC_NOCONST);
         }
         expr_t *tail = sl_tail(&expr->cmpd.exprs);
@@ -305,28 +460,29 @@ bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
     }
     case EXPR_SIZEOF:
         if (expr->sizeof_params.type != NULL) {
-            retval &= typecheck_type(expr->sizeof_params.type);
+            retval &= typecheck_decl(tcs, expr->sizeof_params.type, TC_NOCONST);
         }
         if (expr->sizeof_params.expr != NULL) {
-            retval &= typecheck_expr(expr->sizeof_params.expr, NC_NOCONST);
+            retval &= typecheck_expr(tcs, expr->sizeof_params.expr, TC_NOCONST);
         }
         expr->etype = tt_long; // TODO: Fix this
         return retval;
     case EXPR_MEM_ACC:
-        retval &= typecheck_expr(expr->mem_acc.base, NC_NOCONST);
+        retval &= typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST);
         // TODO: Make sure compatible type with op, make sure member exists
-        expr->etype = expr->mem_acc.base; // TODO: Return member's type
+        expr->etype = expr->mem_acc.base->etype; // TODO: Return member's type
         return retval;
-    case EXPR_INIT_LIST:
+    case EXPR_INIT_LIST: {
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->init_list.exprs) {
-            retval &= typecheck_expr(GET_ELEM(&expr->init_list.exprs, cur),
+            retval &= typecheck_expr(tcs, GET_ELEM(&expr->init_list.exprs, cur),
                                      TC_NOCONST);
         }
         // TODO: This needs to be set by user of init list, and verified with
         // the exprs
         expr->etype = NULL;
         return retval;
+    }
     default:
         assert(false);
     }
@@ -338,7 +494,7 @@ bool typecheck_expr(tc_state *tcs, expr_t *expr, bool constant) {
 // to prevent this. For example: hashtable of type pointers inside tcs.
 // We're only really afraid of compound types, so maybe only store those/or
 // implement a policy decision
-bool typecheck_type(tc_state *tcs, type_t *type) {
+bool typecheck_type(tc_state_t *tcs, type_t *type) {
     bool retval = true;
 
     switch(type->type) {
@@ -356,17 +512,19 @@ bool typecheck_type(tc_state *tcs, type_t *type) {
     case TYPE_UNION: {
         sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_params.decls) {
-            retval &= typecheck_decl(GET_ELEM(&type->struct_params.decls, cur),
+            retval &= typecheck_decl(tcs,
+                                     GET_ELEM(&type->struct_params.decls, cur),
                                      TC_CONST);
         }
         return retval;
     }
     case TYPE_ENUM: {
-        retval &= typecheck_type(type->enum_params.type);
+        retval &= typecheck_type(tcs, type->enum_params.type);
         sl_link_t *cur;
         SL_FOREACH(cur, &type->enum_params.ids) {
-            retval &= typecheck_decl_node(GET_ELEM(&type->enum_params.ids, cur),
-                                     TC_CONST);
+            retval &= typecheck_decl_node(tcs,
+                                          GET_ELEM(&type->enum_params.ids, cur),
+                                          TC_CONST);
         }
         return retval;
     }
@@ -375,26 +533,46 @@ bool typecheck_type(tc_state *tcs, type_t *type) {
         return retval;
 
     case TYPE_MOD:
-        retval &= typecheck_type(type->mod.base);
-        // TODO: Check for contradictory modifiers
+        retval &= typecheck_type(tcs, type->mod.base);
+        if (type->mod.type_mod & TMOD_SIGNED &&
+            type->mod.type_mod & TMOD_UNSIGNED) {
+            logger_log(&type->mark,
+                       "both ‘signed’ and ‘unsigned’ in declaration specifiers",
+                       LOG_ERR);
+            retval = false;
+        }
+        switch (type->mod.type_mod &
+                (TMOD_AUTO | TMOD_REGISTER | TMOD_STATIC | TMOD_EXTERN)) {
+        case TMOD_NONE:
+        case TMOD_AUTO:
+        case TMOD_REGISTER:
+        case TMOD_STATIC:
+        case TMOD_EXTERN:
+            break;
+        default:
+            logger_log(&type->mark,
+                       "multiple storage classes in declaration specifiers",
+                       LOG_ERR);
+            retval = false;
+        }
         return retval;
 
     case TYPE_PAREN:
-        return typecheck_type(type->paren_base);
+        return typecheck_type(tcs, type->paren_base);
     case TYPE_FUNC:
-        retval &= typecheck_type(type->func.type);
+        retval &= typecheck_type(tcs, type->func.type);
         sl_link_t *cur;
         SL_FOREACH(cur, &type->func.params) {
-            retval &= typecheck_decl(GET_ELEM(&type->func.params, cur),
+            retval &= typecheck_decl(tcs, GET_ELEM(&type->func.params, cur),
                                      TC_CONST);
         }
         return retval;
     case TYPE_ARR:
-        retval &= typecheck_type(type->arr.base);
-        retval &= typecheck_expr(type->arr.len, TC_CONST);
+        retval &= typecheck_type(tcs, type->arr.base);
+        retval &= typecheck_expr(tcs, type->arr.len, TC_CONST);
         return retval;
     case TYPE_PTR:
-        return typecheck_type(base);
+        return typecheck_type(tcs, type->ptr.base);
 
     default:
         assert(false);

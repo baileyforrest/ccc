@@ -39,6 +39,7 @@ struct decl_t;
  * Modifiers for types. Should be stored in a bitmap
  */
 typedef enum type_mod_t {
+    TMOD_NONE     = 0,
     TMOD_SIGNED   = 1 << 0,
     TMOD_UNSIGNED = 1 << 1,
     TMOD_AUTO     = 1 << 2,
@@ -117,7 +118,6 @@ typedef struct type_t {
             // TODO: Fix parsing this so pointers point to this
             struct type_t *type;   /**< Return type */
             slist_t params;        /**< Paramater signature (decl list) */
-            // TODO: Fill this
             int num_params;        /**< Number of paramaters */
             bool varargs;          /**< Whether or not function has VA */
         } func;
@@ -202,7 +202,7 @@ typedef struct expr_t {
     sl_link_t link;                 /**< Storage link */
     fmark_t mark;                   /**< File mark */
     expr_type_t type;               /**< Expression type */
-    type_t *etype;                  /**< Evaluated type of the expression */
+    type_t *etype;                  /**< Not Owned: Type of the expression */
 
     union {
         len_str_t *var_id;          /**< Variable identifier */
@@ -347,6 +347,7 @@ typedef struct stmt_t {
         } label;
 
         struct {                       /**< case parameters */
+            sl_link_t link;            /**< Link in case statement */
             expr_t *val;               /**< Expression value */
             struct stmt_t *stmt;       /**< Statement labeled */
         } case_params;
@@ -365,6 +366,8 @@ typedef struct stmt_t {
         struct {                       /**< Switch paramaters */
             expr_t *expr;              /**< Expression to switch on */
             struct stmt_t *stmt;       /**< Statement */
+            slist_t cases;             /**< Not Owned: List of cast params */
+            struct stmt_t *default_stmt; /**< Not Owned: Default statement */
         } switch_params;
 
         struct {                       /**< Do while paramaters */
@@ -390,11 +393,11 @@ typedef struct stmt_t {
         } goto_params;
 
         struct {                       /**< Continue parameters */
-            struct stmt_t *parent;     /**< Parent statement to continue */
+            struct stmt_t *parent;     /**< Not Owned: Loop to continue */
         } continue_params;
 
         struct {                       /**< Break parameters */
-            struct stmt_t *parent;     /**< Parent statement */
+            struct stmt_t *parent;     /**< Not Owned: Parent statement */
         } break_params;
 
         struct {                       /**< Return paramaters */

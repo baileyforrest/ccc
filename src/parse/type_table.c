@@ -150,6 +150,9 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
             ast_type_destroy(entry->type);
         }
         break;
+    case TT_VAR:
+        // Ignore variables, the type is in the decl node
+        break;
     }
     free(entry);
 }

@@ -849,6 +849,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             func_type->align = PTR_ALIGN;
             func_type->size = PTR_SIZE;
             func_type->func.type = node->type;
+            func_type->func.num_params = 0;
             func_type->func.varargs = false;
             sl_init(&func_type->func.params, offsetof(stmt_t, link));
             node->type = func_type;
@@ -1631,6 +1632,7 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
         if (status != CCC_OK) {
             goto fail;
         }
+        func->func.num_params++;
     }
     status = CCC_OK;
 fail:
@@ -2020,6 +2022,8 @@ status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
         stmt->type = STMT_SWITCH;
         stmt->switch_params.expr = NULL;
         stmt->switch_params.stmt = NULL;
+        stmt->switch_params.default_stmt = NULL;
+        sl_init(&stmt->switch_params.cases, offsetof(stmt_t, case_params.link));
 
         if (CCC_OK !=
             (status = par_expression(lex, NULL, &stmt->switch_params.expr))) {
