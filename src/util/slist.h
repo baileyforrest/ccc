@@ -139,6 +139,14 @@ void *sl_pop_front(slist_t *slist);
 bool sl_remove(slist_t *slist, sl_link_t *link);
 
 /**
+ * Adds the contents of list2 onto the front of list1. Sets list2 to empty
+ *
+ * @param list1 List to prepend to
+ * @param list2 List list to clear
+ */
+void sl_concat_front(slist_t *list1, slist_t *list2);
+
+/**
  * Run code on each element
  *
  * The elements themselves must be accessed with GET_ELEM

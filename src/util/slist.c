@@ -97,3 +97,11 @@ bool sl_remove(slist_t *slist, sl_link_t *link) {
 
     return false;
 }
+
+void sl_concat_front(slist_t *list1, slist_t *list2) {
+    list2->tail->next = list1->head;
+    list1->head = list2->head;
+
+    list2->head = NULL;
+    list2->tail = NULL;
+}

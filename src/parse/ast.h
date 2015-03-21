@@ -25,6 +25,8 @@
 
 #include "parse/type_table.h"
 
+#include <stdarg.h>
+
 #include "util/file_directory.h"
 #include "util/slist.h"
 #include "util/util.h"
