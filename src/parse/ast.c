@@ -225,18 +225,18 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type) {
         break;
     }
     case TYPE_ARR:
-        ast_decl_node_print(decl_node, type->arr.base);
         printf("[");
         ast_expr_print(type->arr.len);
         printf("]");
+        ast_decl_node_print(decl_node, type->arr.base);
         break;
     case TYPE_PTR:
-        printf(" * ");
+        printf("* ");
         ast_type_mod_print(type->ptr.type_mod);
         ast_decl_node_print(decl_node, type->ptr.base);
         break;
     default:
-        printf("%s", decl_node->id->str);
+        printf("%.*s", (int)decl_node->id->len, decl_node->id->str);
     }
 }
 
@@ -603,31 +603,31 @@ const char *ast_type_mod_str(type_mod_t type_mod) {
 
 void ast_type_mod_print(type_mod_t type_mod) {
     if (type_mod & TMOD_TYPEDEF) {
-        ast_type_mod_str(TMOD_TYPEDEF);
+        printf("%s ", ast_type_mod_str(TMOD_TYPEDEF));
     }
     if (type_mod & TMOD_SIGNED) {
-        ast_type_mod_str(TMOD_SIGNED);
+        printf("%s ", ast_type_mod_str(TMOD_SIGNED));
     }
     if (type_mod & TMOD_UNSIGNED) {
-        ast_type_mod_str(TMOD_UNSIGNED);
+        printf("%s ", ast_type_mod_str(TMOD_UNSIGNED));
     }
     if (type_mod & TMOD_AUTO) {
-        ast_type_mod_str(TMOD_AUTO);
+        printf("%s ", ast_type_mod_str(TMOD_AUTO));
     }
     if (type_mod & TMOD_REGISTER) {
-        ast_type_mod_str(TMOD_REGISTER);
+        printf("%s ", ast_type_mod_str(TMOD_REGISTER));
     }
     if (type_mod & TMOD_STATIC) {
-        ast_type_mod_str(TMOD_STATIC);
+        printf("%s ", ast_type_mod_str(TMOD_STATIC));
     }
     if (type_mod & TMOD_EXTERN) {
-        ast_type_mod_str(TMOD_EXTERN);
+        printf("%s ", ast_type_mod_str(TMOD_EXTERN));
     }
     if (type_mod & TMOD_CONST) {
-        ast_type_mod_str(TMOD_CONST);
+        printf("%s ", ast_type_mod_str(TMOD_CONST));
     }
     if (type_mod & TMOD_VOLATILE) {
-        ast_type_mod_str(TMOD_VOLATILE);
+        printf("%s ", ast_type_mod_str(TMOD_VOLATILE));
     }
 }
 
@@ -708,7 +708,7 @@ void ast_type_destroy(type_t *type) {
         break;
     case TYPE_FUNC:
         declarator_type = type->func.type;
-        SL_DESTROY_FUNC(&type->func.params, ast_stmt_destroy);
+        SL_DESTROY_FUNC(&type->func.params, ast_decl_destroy);
         break;
     case TYPE_ARR:
         declarator_type = type->arr.base;
@@ -716,7 +716,6 @@ void ast_type_destroy(type_t *type) {
         break;
     case TYPE_PTR:
         declarator_type = type->ptr.base;
-        ast_type_destroy(type->ptr.base);
         break;
 
     default:

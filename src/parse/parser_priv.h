@@ -237,12 +237,14 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl);
  * possibly in parens.
  *
  * @param lex Current lexer state
- * @param base The base type of the declaration
  * @param decl_node The declaration's node
+ * @param patch Pointer to the location pointing to original type of node.
+ *     This is necessary for left to right parsing
  * @return CCC_OK on success, CCC_BACKTRACK if a declarator cannot be parsed,
  *     error code on error
  */
-status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t *decl_node);
+status_t par_declarator(lex_wrap_t *lex, decl_node_t *decl_node,
+                        type_t ***patch);
 
 /**
  * Parses a pointer with an optionally const or valitle type qualifiers.
@@ -250,10 +252,11 @@ status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t *decl_node);
  * The pointers are always at the front of the type chain.
  *
  * @param lex Current lexer state
- * @param mod The modified type
+ * @param base_ptr Pointer to base element, where new pointer nodes should be
+ *     added
  * @return CCC_OK on success, error code on error
  */
-status_t par_pointer(lex_wrap_t *lex, type_t **mod);
+status_t par_pointer(lex_wrap_t *lex, type_t **base_ptr);
 
 /**
  * Parses a type qualifier. (const, volatile)
@@ -272,11 +275,12 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type);
  *
  * @param lex Current lexer state
  * @param node The declaration node being processed
- * @param base The base type of the declaration
+ * @param patch Pointer to the location pointing to original type of node.
+ *     This is necessary for left to right parsing
  * @return CCC_OK on success, error code on error
  */
 status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
-                               type_t *base);
+                               type_t ***patch);
 /**
  * Parses a non binary expression (cast, unary, postfix, primary, constant)
  *

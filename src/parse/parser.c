@@ -682,7 +682,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     decl_node->type = decl->type;
     decl_node->id = NULL;
     decl_node->expr = NULL;
-    if (CCC_OK != (status = par_declarator(lex, decl->type, decl_node))) {
+    if (CCC_OK != (status = par_declarator(lex, decl_node, NULL))) {
         goto fail;
     }
     sl_append(&decl->decls, &decl_node->link);
@@ -694,17 +694,24 @@ fail:
     return status;
 }
 
-status_t par_declarator(lex_wrap_t *lex, type_t *base, decl_node_t *decl_node) {
+status_t par_declarator(lex_wrap_t *lex, decl_node_t *decl_node,
+                        type_t ***patch) {
     status_t status = CCC_OK;
 
+    type_t **lpatch = &decl_node->type;
     while (lex->cur.type == STAR) {
-        if (CCC_OK != (status = par_pointer(lex, &decl_node->type))) {
+        if (CCC_OK != (status = par_pointer(lex, lpatch))) {
             goto fail;
         }
+        lpatch = &(*lpatch)->ptr.base;
     }
 
-    if (CCC_OK != (status = par_direct_declarator(lex, decl_node, base))) {
+    if (CCC_OK != (status = par_direct_declarator(lex, decl_node, patch))) {
         goto fail;
+    }
+
+    if (patch != NULL) {
+        *patch = lpatch;
     }
 
     return status;
@@ -714,7 +721,7 @@ fail:
     return status;
 }
 
-status_t par_pointer(lex_wrap_t *lex, type_t **mod) {
+status_t par_pointer(lex_wrap_t *lex, type_t **base_ptr) {
     status_t status = CCC_OK;
     LEX_MATCH(lex, STAR);
 
@@ -730,15 +737,17 @@ status_t par_pointer(lex_wrap_t *lex, type_t **mod) {
     if (new_type != NULL) {
         mods = new_type->mod.type_mod;
     } else {
+        mods = TMOD_NONE;
         ALLOC_NODE(lex, new_type, type_t);
     }
     new_type->type = TYPE_PTR;
     new_type->size = PTR_SIZE;
     new_type->align = PTR_ALIGN;
-    new_type->ptr.base = *mod;
     new_type->ptr.type_mod = mods;
 
-    *mod = new_type;
+    new_type->ptr.base = *base_ptr;
+    *base_ptr = new_type;
+
     return status;
 
 fail:
@@ -755,6 +764,7 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
     default:
         return CCC_BACKTRACK;
     }
+    LEX_ADVANCE(lex);
 
     // Check first node for mod node
     type_t *mod_node;
@@ -770,6 +780,7 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
             mod_node->size = 0;
             mod_node->align = 0;
         }
+        mod_node->mod.type_mod = TMOD_NONE;
         mod_node->mod.base = *type;
         *type = mod_node;
     }
@@ -783,17 +794,20 @@ fail:
 }
 
 status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
-                               type_t *base) {
+                               type_t ***patch) {
     status_t status = CCC_OK;
+    type_t *base = node->type;
+    type_t **lpatch = NULL;
 
     switch (lex->cur.type) {
     case LPAREN: {
         LEX_ADVANCE(lex);
-        if (CCC_OK != (status = par_declarator(lex, base, node))) {
+        if (CCC_OK != (status = par_declarator(lex, node, &lpatch))) {
             goto fail;
         }
         LEX_MATCH(lex, RPAREN);
 
+        /* TODO: Enable this later
         type_t *paren_type;
         ALLOC_NODE(lex, paren_type, type_t);
         paren_type->type = TYPE_PAREN;
@@ -802,6 +816,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         paren_type->paren_base = node->type;
 
         node->type = paren_type;
+        */
         break;
     }
 
@@ -816,6 +831,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         break;
     }
 
+    type_t **last_node = &base;
     bool done = false;
     while (!done) {
         switch (lex->cur.type) {
@@ -824,12 +840,13 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             type_t *arr_type;
             ALLOC_NODE(lex, arr_type, type_t);
             arr_type->type = TYPE_ARR;
-            arr_type->align = node->type->align;
+            arr_type->align = base->align;
             arr_type->size = 0;
-            arr_type->arr.base = node->type;
             arr_type->arr.len = NULL;
 
-            node->type = arr_type;
+            arr_type->arr.base = *last_node;
+            *last_node = arr_type;
+            last_node = &arr_type->arr.base;
 
             if (lex->cur.type == RBRACK) {
                 LEX_ADVANCE(lex);
@@ -848,11 +865,13 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             func_type->type = TYPE_FUNC;
             func_type->align = PTR_ALIGN;
             func_type->size = PTR_SIZE;
-            func_type->func.type = node->type;
             func_type->func.num_params = 0;
             func_type->func.varargs = false;
             sl_init(&func_type->func.params, offsetof(stmt_t, link));
-            node->type = func_type;
+
+            func_type->func.type = *last_node;
+            *last_node = func_type;
+            last_node = &func_type->func.type;
 
             /* TODO: Support old decl syntax
             if (lex->cur.type == ID) {
@@ -871,6 +890,16 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         default:
             done = true;
         }
+    }
+
+    if (lpatch == NULL) {
+        node->type = base;
+    } else if (last_node != &base) {
+        *lpatch = base;
+    }
+
+    if (patch != NULL && last_node != &base) {
+        *patch = last_node;
     }
 
 fail:
@@ -1665,6 +1694,7 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
 
     // Add declaration to the function
     sl_append(&func->func.params, &decl->link);
+    return status;
 
 fail:
     if (decl == NULL) {
