@@ -807,16 +807,15 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         }
         LEX_MATCH(lex, RPAREN);
 
-        /* TODO: Enable this later
+        ///* TODO: Enable this later
         type_t *paren_type;
         ALLOC_NODE(lex, paren_type, type_t);
         paren_type->type = TYPE_PAREN;
-        paren_type->size = node->type->size;
-        paren_type->align = node->type->align;
-        paren_type->paren_base = node->type;
-
-        node->type = paren_type;
-        */
+        paren_type->paren_base = *lpatch;
+        *lpatch = paren_type;
+        lpatch = &paren_type->paren_base;
+        paren_type->size = paren_type->paren_base->size;
+        paren_type->align = paren_type->paren_base->align;
         break;
     }
 
@@ -898,8 +897,12 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         *lpatch = base;
     }
 
-    if (patch != NULL && last_node != &base) {
-        *patch = last_node;
+    if (patch != NULL) {
+        if (last_node != &base) {
+            *patch = last_node;
+        } else {
+            *patch = NULL;
+        }
     }
 
 fail:

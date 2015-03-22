@@ -28,6 +28,7 @@
 #include <stdlib.h>
 
 #define INDENT ("    ")
+#define INDENT_LEN (sizeof(INDENT) - 1)
 
 void ast_directed_print(char **buf, size_t *remain, const char *fmt, ...) {
     va_list ap;
@@ -268,13 +269,22 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
         char *cur = print_buf;
         switch (type->type) {
         case TYPE_PAREN:
-            // TODO: This
+            PUT_CUR('(');
+            ALLOC_COPY_NODE();
+            sl_prepend(&accum, &node->link);
+
+            remain = PRINT_BUF_SIZE - 1;
+            cur = print_buf;
+            PUT_CUR(')');
+            ALLOC_COPY_NODE();
+            sl_append(&accum, &node->link);
+            type = type->paren_base;
             break;
         case TYPE_FUNC: {
             PUT_CUR('(');
             bool first = true;
             sl_link_t *cur_link;
-            SL_FOREACH(cur_link, &decl_node->type->func.params) {
+            SL_FOREACH(cur_link, &type->func.params) {
                 if (remain == 0) {
                     continue;
                 }
@@ -285,7 +295,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
                     PUT_CUR(' ');
                 }
                 ast_decl_print(
-                    GET_ELEM(&decl_node->type->func.params, cur_link),
+                    GET_ELEM(&type->func.params, cur_link),
                     TYPE_VOID, &cur, &remain);
             }
             if (remain > 0) {
@@ -314,7 +324,6 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
                 size_t remain = PRINT_BUF_SIZE - 1;
                 char *cur = print_buf;
                 PUT_CUR('*');
-                PUT_CUR(' ');
                 ast_type_mod_print(type->ptr.type_mod, &cur, &remain);
                 ALLOC_COPY_NODE();
                 sl_append(&temp, &node->link);
