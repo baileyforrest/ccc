@@ -18,8 +18,6 @@
 */
 /**
  * Implementation for preprocessor/file reader
- *
- * TODO: On errors, skip input to prevent infinite loops in lexer
  */
 
 #include "preprocessor.h"
@@ -430,6 +428,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             ts_skip_line(stream); // Skip rest of line
 
             if (status != CCC_OK) {
+                ts_advance(stream);
                 return status;
             }
             // Return next character after directive
@@ -446,6 +445,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             if (param == NULL) {
                 logger_log(&stream->mark,
                            "'#' Is not followed by a macro paramater", LOG_ERR);
+                ts_advance(stream);
                 return -(int)CCC_ESYNTAX;
             }
 
@@ -591,6 +591,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     return cur_char;
 
 fail:
+    ts_advance(stream); // Skip character to prevent infinite loop
     pp_macro_inst_destroy(new_macro_inst);
     return error;
 }

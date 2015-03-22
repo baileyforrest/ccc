@@ -807,7 +807,6 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         }
         LEX_MATCH(lex, RPAREN);
 
-        ///* TODO: Enable this later
         type_t *paren_type;
         ALLOC_NODE(lex, paren_type, type_t);
         paren_type->type = TYPE_PAREN;

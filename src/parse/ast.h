@@ -117,7 +117,6 @@ typedef struct type_t {
         struct type_t *paren_base; /**< Type in parens */
 
         struct {                   /**< Function signature */
-            // TODO: Fix parsing this so pointers point to this
             struct type_t *type;   /**< Return type */
             slist_t params;        /**< Paramater signature (decl list) */
             int num_params;        /**< Number of paramaters */
