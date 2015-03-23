@@ -4,3 +4,5 @@ GRTAGS
 GTAGS
 doxygen.warn
 \#*\#
+*.log
+*.sum
