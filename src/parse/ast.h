@@ -343,6 +343,7 @@ typedef struct stmt_t {
         decl_t *decl;                  /**< Declaration parameters */
 
         struct {                       /**< Label parameters */
+            sl_link_t link;            /**< Link for label hash table */
             len_str_t *label;          /**< Label value */
             struct stmt_t *stmt;       /**< Statement labeled */
         } label;
@@ -389,7 +390,7 @@ typedef struct stmt_t {
         } for_params;
 
         struct {                       /**< Goto parameters */
-            struct stmt_t *target;     /**< Parent statement to continue */
+            sl_link_t link;            /**< Link for GOTO list */
             struct len_str_t *label;   /**< Label to goto */
         } goto_params;
 
@@ -436,6 +437,8 @@ typedef struct gdecl_t {
     union {
         struct {                 /**< Function definition parameters */
             struct stmt_t *stmt; /**< Function body */
+            htable_t labels;     /**< Labels in function */
+            slist_t gotos;       /**< Goto statements in function */
         } fdefn;
     };
 } gdecl_t;

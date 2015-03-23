@@ -33,10 +33,10 @@
  */
 typedef struct tc_state_t {
     typetab_t *typetab; /*< Type table on top of the stack */
+    gdecl_t *func;
     stmt_t *last_switch;
     stmt_t *last_loop;
     stmt_t *last_break;
-    decl_t *last_func;
 } tc_state_t;
 
 /**

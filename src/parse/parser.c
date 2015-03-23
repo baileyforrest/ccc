@@ -42,6 +42,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "util/htable.h"
 #include "util/logger.h"
 #include "util/util.h"
 
@@ -188,6 +189,20 @@ status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
     status_t status = CCC_OK;
     gdecl->type = GDECL_FDEFN;
     gdecl->fdefn.stmt = NULL;
+    sl_init(&gdecl->fdefn.gotos, offsetof(stmt_t, goto_params.link));
+
+    static const ht_params_t s_gdecl_ht_params = {
+        0,                              // Size estimate
+        offsetof(stmt_t, label.label),  // Offset of key
+        offsetof(stmt_t, label.link),   // Offset of ht link
+        ind_strhash,                    // Hash function
+        ind_vstrcmp,                    // void string compare
+    };
+
+    if (CCC_OK !=
+        (status = ht_init(&gdecl->fdefn.labels, &s_gdecl_ht_params))) {
+        goto fail;
+    }
 
     /* TODO: Handle old style function signature
     while (lex->cur.type != RPAREN) {

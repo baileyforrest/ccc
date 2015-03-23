@@ -150,9 +150,27 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
         // Valid AST shouldn't have this
         assert(false);
         break;
-    case GDECL_FDEFN:
+    case GDECL_FDEFN: {
+        gdecl_t *func_save = tcs->func;
+        tcs->func = gdecl;
         retval &= typecheck_stmt(tcs, gdecl->fdefn.stmt);
+        sl_link_t *cur;
+        SL_FOREACH(cur, &gdecl->fdefn.gotos) {
+            stmt_t *goto_stmt = GET_ELEM(&gdecl->fdefn.gotos, cur);
+            stmt_t *label = ht_lookup(&tcs->func->fdefn.labels,
+                                      goto_stmt->goto_params.label);
+            if (label == NULL) {
+                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+                         "label %*.s used but not defined",
+                         (int)goto_stmt->goto_params.label->len,
+                         goto_stmt->goto_params.label->str);
+                logger_log(&goto_stmt->mark, logger_fmt_buf, LOG_ERR);
+                retval = false;
+            }
+        }
+        tcs->func = func_save;
         break;
+    }
     case GDECL_DECL:
         break;
     }
@@ -161,6 +179,7 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
 }
 
 bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
+    status_t status;
     bool retval = true;
     switch (stmt->type) {
     case STMT_NOP:
@@ -170,7 +189,14 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return typecheck_decl(tcs, stmt->decl, TC_NOCONST);
 
     case STMT_LABEL:
-        return typecheck_stmt(tcs, stmt->label.stmt);
+        retval &= typecheck_stmt(tcs, stmt->label.stmt);
+
+        assert(tcs->func != NULL);
+        if (CCC_OK != (status = ht_insert(&tcs->func->fdefn.labels,
+                                          &stmt->label.link))) {
+            goto fail;
+        }
+        return retval;
     case STMT_CASE:
         if (tcs->last_switch == NULL) {
             logger_log(&stmt->mark,
@@ -263,7 +289,8 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
 
     case STMT_GOTO:
-        // TODO: Need to store a table of GOTOs and labels in a function
+        assert(tcs->func != NULL);
+        sl_append(&tcs->func->fdefn.gotos, &stmt->goto_params.link);
         return retval;
     case STMT_CONTINUE:
         if (tcs->last_loop == NULL) {
@@ -311,6 +338,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         assert(false);
     }
 
+fail:
     return retval;
 }
 

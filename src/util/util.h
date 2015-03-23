@@ -97,7 +97,7 @@ typedef struct len_str_node_t {
  *
  * Source: http://www.cse.yorku.ca/~oz/hash.html
  *
- * @param len_str The len_str to hash
+ * @param vstr The len_str_t to hash
  */
 inline uint32_t strhash(const void *vstr) {
     const len_str_t *len_str = (const len_str_t *)vstr;
@@ -114,11 +114,21 @@ inline uint32_t strhash(const void *vstr) {
 }
 
 /**
+ * Same as str_hash, except the keys are pointers to a len_str_t
+ *
+ * @param vstrp Pointer to the len_str_t to hash
+ */
+inline uint32_t ind_strhash(const void *vstrp) {
+    const len_str_t **len_strp = (const len_str_t **)vstrp;
+    return strhash(*len_strp);
+}
+
+/**
  * String compare with void pointers to be compatible with the hash table
  * interface
  *
- * @param len_str1 First string
- * @param len_str2 Second string
+ * @param vstr1 First string
+ * @param vstr2 Second string
  */
 inline bool vstrcmp(const void *vstr1, const void *vstr2) {
     const len_str_t *str1 = (const len_str_t *)vstr1;
@@ -129,6 +139,18 @@ inline bool vstrcmp(const void *vstr1, const void *vstr2) {
     }
 
     return strncmp(str1->str, str2->str, str1->len) == 0;
+}
+
+/**
+ * Same as vstrcmp, except the keys are pointers to a len_str_t
+ *
+ * @param vstrp1 Pointer to first string
+ * @param vstrp2 Pointer to second string
+ */
+inline bool ind_vstrcmp(const void *vstrp1, const void *vstrp2) {
+    const len_str_t **strp1 = (const len_str_t **)vstrp1;
+    const len_str_t **strp2 = (const len_str_t **)vstrp2;
+    return vstrcmp(*strp1, *strp2);
 }
 
 #define ASCII_LOWER \
