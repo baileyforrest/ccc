@@ -172,7 +172,10 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         SL_FOREACH(cur, &stmt->compound.stmts) {
             ast_stmt_print(GET_ELEM(&stmt->compound.stmts, cur), indent + 1);
         }
-        printf("}\n");
+        for (int i = 0; i < indent; ++i) {
+            printf(INDENT);
+        }
+        printf("}");
         break;
     }
 

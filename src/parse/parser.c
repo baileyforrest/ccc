@@ -1302,7 +1302,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         if (CCC_OK != (status = par_primary_expression(lex, &base))) {
             goto fail;
         }
-        if (CCC_OK != (status = par_postfix_expression(lex, base, result))) {
+        if (CCC_OK != (status = par_postfix_expression(lex, base, &base))) {
             goto fail;
         }
         break;
@@ -1823,8 +1823,17 @@ status_t par_declaration(lex_wrap_t *lex, decl_t **decl) {
         }
     }
 
-    while (CCC_BACKTRACK != (status = par_init_declarator(lex, *decl))) {
-        if (status != CCC_OK) {
+    if (CCC_BACKTRACK == (status = par_init_declarator(lex, *decl))) {
+        // No init declarators
+        return CCC_OK;
+    }
+
+    while (LEX_CUR(lex).type == COMMA) {
+        LEX_ADVANCE(lex);
+        if (CCC_OK != (status = par_init_declarator(lex, *decl))) {
+            if (status == CCC_BACKTRACK) {
+                status = CCC_ESYNTAX;
+            }
             goto fail;
         }
     }
@@ -1994,7 +2003,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     case BREAK:
     case RETURN:
         return par_jump_statement(lex, result);
-    case RBRACK:
+    case LBRACE:
         return par_compound_statement(lex, result);
     default:
         return par_expression_statement(lex, result);
