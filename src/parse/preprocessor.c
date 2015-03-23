@@ -308,6 +308,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     int cur_char = ts_cur(stream);
     int next_char = ts_next(stream);
 
+    bool new_block_comment = false;
     // Handle comments
     if (cur_char == '/' && !pp->line_comment && !pp->block_comment &&
         !pp->string) {
@@ -315,6 +316,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             pp->line_comment = true;
         } else if (next_char == '*') {
             pp->block_comment = true;
+            new_block_comment = true;
         }
     }
 
@@ -328,10 +330,13 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     if (pp->block_comment) {
-        // If we're in a comment, this must be safe (must have been a last char)
-        int last_char = *(ts_location(stream) - 1);
-        if (last_char == '*' && cur_char == '/') {
-            pp->block_comment = false;
+        if (!new_block_comment) {
+            // If we're in a comment, this must be safe
+            // (must have been a last char)
+            int last_char = *(ts_location(stream) - 1);
+            if (last_char == '*' && cur_char == '/') {
+                pp->block_comment = false;
+            }
         }
         ts_advance(stream);
         return ' ';

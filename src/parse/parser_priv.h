@@ -28,17 +28,35 @@
 
 #include <stdio.h>
 
-#define ALLOC_NODE(lex, loc, type)                                  \
-    do {                                                            \
-        loc = malloc(sizeof(type));                                 \
-        if (loc == NULL) {                                          \
-            logger_log(&lex->cur.mark, "Out of memory in parser",   \
-                       LOG_ERR);                                    \
-            status = CCC_NOMEM;                                     \
-            goto fail;                                              \
-        }                                                           \
-        memcpy(&(loc)->mark, &(lex)->cur.mark, sizeof(fmark_t));    \
-    } while (0)
+/**
+ * Number of tokens to store. Must be power of two.
+ */
+#define LEX_LOOKAHEAD 2 // Store current token and next token
+
+/**
+ * Container for lexer containing lex context
+ */
+typedef struct lex_wrap_t {
+    lexer_t *lexer;                  /*< Lexer */
+    typetab_t *typetab;              /*< Type table on top of stack */
+    lexeme_t lexemes[LEX_LOOKAHEAD]; /*< Ring buffer of lexemes */
+    int lex_idx;                     /*< Index of current lexeme */
+} lex_wrap_t;
+
+/**
+ * Get the current lexeme
+ *
+ * @param Lexer wrapper to get lexeme from
+ */
+#define LEX_CUR(wrap) ((wrap)->lexemes[(wrap)->lex_idx])
+
+/**
+ * Get the next lexeme
+ *
+ * @param Lexer wrapper to get lexeme from
+ */
+#define LEX_NEXT(wrap) \
+    ((wrap)->lexemes[((wrap)->lex_idx + 1) & (LEX_LOOKAHEAD - 1)])
 
 /**
  * Advance lexer wrapper to next token
@@ -48,9 +66,11 @@
 #define LEX_ADVANCE(wrap)                                               \
     do {                                                                \
         if (CCC_OK !=                                                   \
-            (status = lexer_next_token((wrap)->lexer, &(wrap)->cur))) { \
+            (status = lexer_next_token((wrap)->lexer,                   \
+                                       &LEX_CUR(wrap)))) {              \
             goto fail;                                                  \
         }                                                               \
+        (wrap)->lex_idx = ((wrap)->lex_idx + 1) & (LEX_LOOKAHEAD - 1);  \
     } while (0)
 
 /**
@@ -61,12 +81,12 @@
  */
 #define LEX_MATCH(wrap, token)                                          \
     do {                                                                \
-        token_t cur = (wrap)->cur.type;                                 \
+        token_t cur = LEX_CUR(wrap).type;                               \
         if (cur != (token)) {                                           \
             snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,                  \
                      "Parse Error: Expected %s. Found: %s.",            \
                      token_str(token), token_str(cur));                 \
-            logger_log(&(wrap)->cur.mark, logger_fmt_buf, LOG_ERR);     \
+            logger_log(&LEX_CUR(wrap).mark, logger_fmt_buf, LOG_ERR);   \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \
@@ -74,13 +94,24 @@
     } while (0)
 
 /**
- * Container for lexer containing lex context
+ * Allocate an AST node, handling error properly if allocation fails
+ *
+ * @param Current lex state
+ * @param loc lvalue to store new type
+ * @param type The type to allocate
  */
-typedef struct lex_wrap_t {
-    lexer_t *lexer;     /* Lexer */
-    typetab_t *typetab; /* Type table on top of stack */
-    lexeme_t cur;       /* Current token */
-} lex_wrap_t;
+#define ALLOC_NODE(lex, loc, type)                                  \
+    do {                                                            \
+        loc = malloc(sizeof(type));                                 \
+        if (loc == NULL) {                                          \
+            logger_log(&LEX_CUR(lex).mark, "Out of memory in parser",    \
+                       LOG_ERR);                                    \
+            status = CCC_NOMEM;                                     \
+            goto fail;                                              \
+        }                                                           \
+        memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));   \
+    } while (0)
+
 
 /**
  * Returns the relative precedence of a binary operator
