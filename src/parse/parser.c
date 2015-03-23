@@ -405,6 +405,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         new_node->type = TYPE_TYPEDEF;
         new_node->typedef_params.name = &LEX_CUR(lex).tab_entry->key;
         new_node->typedef_params.base = entry->type;
+        new_node->typedef_params.type = TYPE_VOID;
         *end_node = new_node;
         break;
     }
@@ -495,7 +496,16 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
                 status = CCC_ESYNTAX;
                 goto fail;
             }
-            *type = entry->type;
+            type_t *typedef_type;
+            ALLOC_NODE(lex, typedef_type, type_t);
+            typedef_type->type = TYPE_TYPEDEF;
+            typedef_type->size = entry->type->size;
+            typedef_type->align = entry->type->align;
+            typedef_type->typedef_params.name = name;
+            typedef_type->typedef_params.base = entry->type;
+            typedef_type->typedef_params.type = btype;
+
+            *type = typedef_type;
             return CCC_OK;
         }
     }
@@ -525,7 +535,16 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
                 }
             }
 
-            *type = new_type;
+            type_t *typedef_type;
+            ALLOC_NODE(lex, typedef_type, type_t);
+            typedef_type->type = TYPE_TYPEDEF;
+            typedef_type->size = 0; // Mark as uninitialized
+            typedef_type->align = 0;
+            typedef_type->typedef_params.name = name;
+            typedef_type->typedef_params.base = new_type;
+            typedef_type->typedef_params.type = btype;
+
+            *type = typedef_type;
             return CCC_OK;
         } else { // Can't have a compound type without a name or definition
             logger_log(&LEX_CUR(lex).mark,

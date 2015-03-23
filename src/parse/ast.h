@@ -112,6 +112,7 @@ typedef struct type_t {
         struct {                   /**< Typedef params */
             len_str_t *name;       /**< Name of typedef type */
             struct type_t *base;   /**< Base of typedef type */
+            basic_type_t type;     /**< (struct/union/enum/void=regular) */
         } typedef_params;
 
         struct type_t *paren_base; /**< Type in parens */

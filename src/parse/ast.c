@@ -190,12 +190,12 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
 void ast_decl_print(decl_t *decl, basic_type_t type, char **dest,
                     size_t *remain) {
     ast_type_print(decl->type, dest, remain);
-    ast_directed_print(dest, remain, " ");
 
     bool first = true;
     sl_link_t *cur;
     SL_FOREACH(cur, &decl->decls) {
         if (first) {
+            ast_directed_print(dest, remain, " ");
             first = false;
         } else {
             ast_directed_print(dest, remain, ", ");
@@ -659,9 +659,21 @@ void ast_type_print(type_t *type, char **dest, size_t *remain) {
     }
 
     case TYPE_TYPEDEF:
+        switch (type->typedef_params.type) {
+        case TYPE_VOID:
+            break;
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+        case TYPE_ENUM:
+            ast_directed_print(dest, remain, "%s ",
+                               ast_basic_type_str(type->typedef_params.type));
+            break;
+        default:
+            assert(false);
+        }
         ast_directed_print(dest, remain, "%.*s",
-                    (int)type->typedef_params.name->len,
-               type->typedef_params.name->str);
+                           (int)type->typedef_params.name->len,
+                           type->typedef_params.name->str);
         break;
 
     case TYPE_MOD:
