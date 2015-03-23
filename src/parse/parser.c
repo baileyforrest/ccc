@@ -132,7 +132,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     status_t status = CCC_OK;
     gdecl_t *gdecl = NULL;
     ALLOC_NODE(lex, gdecl, gdecl_t);
-    gdecl->type = GDECL_NOP;
+    gdecl->type = GDECL_DECL;
     gdecl->decl = NULL;
 
     ALLOC_NODE(lex, gdecl->decl, decl_t);
@@ -1078,7 +1078,7 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
         if (unary1) {
             // Search for assignment operators
             switch (LEX_CUR(lex).type) {
-            case EQ:
+            case ASSIGN:
             case STAREQ:
             case DIVEQ:
             case MODEQ:
@@ -1440,6 +1440,9 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
                     goto fail;
                 }
                 sl_append(&expr->call.params, &param->link);
+                if (LEX_CUR(lex).type == RPAREN) {
+                    break;
+                }
                 LEX_MATCH(lex, COMMA);
             }
             LEX_ADVANCE(lex);
@@ -1519,7 +1522,7 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
     status_t status = CCC_OK;
     oper_t op;
     switch (LEX_CUR(lex).type) {
-    case EQ:       op = OP_NOP;    break;
+    case ASSIGN:   op = OP_NOP;    break;
     case STAREQ:   op = OP_TIMES;  break;
     case DIVEQ:    op = OP_DIV;    break;
     case MODEQ:    op = OP_MOD;    break;
@@ -1771,7 +1774,7 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     LEX_ADVANCE(lex);
 
     // Parse enum value if there is one
-    if (LEX_CUR(lex).type == EQ) {
+    if (LEX_CUR(lex).type == ASSIGN) {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_expression(lex, NULL, &node->expr))) {
             goto fail;

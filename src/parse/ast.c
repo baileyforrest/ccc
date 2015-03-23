@@ -59,9 +59,9 @@ void ast_trans_unit_print(trans_unit_t *tras_unit) {
 
 void ast_gdecl_print(gdecl_t *gdecl) {
     ast_decl_print(gdecl->decl, TYPE_VOID, NULL, NULL);
-    printf("\n");
     switch (gdecl->type) {
     case GDECL_FDEFN:
+        printf("\n");
         ast_stmt_print(gdecl->fdefn.stmt, 0);
         break;
     case GDECL_DECL:
@@ -71,7 +71,7 @@ void ast_gdecl_print(gdecl_t *gdecl) {
     default:
         assert(false);
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 void ast_stmt_print(stmt_t *stmt, int indent) {
@@ -202,19 +202,21 @@ void ast_decl_print(decl_t *decl, basic_type_t type, char **dest,
         }
         decl_node_t *node = GET_ELEM(&decl->decls, cur);
         ast_decl_node_print(node, node->type, dest, remain);
-        if (node->expr == NULL) {
-            continue;
+        if (node->expr != NULL) {
+            switch (type) {
+            case TYPE_STRUCT:
+            case TYPE_UNION:
+                ast_directed_print(dest, remain, " : ");
+                break;
+            default:
+                ast_directed_print(dest, remain, " = ");
+                break;
+            }
+            ast_expr_print(node->expr, dest, remain);
         }
-        switch (type) {
-        case TYPE_STRUCT:
-        case TYPE_UNION:
-            ast_directed_print(dest, remain, " : ");
-            break;
-        default:
-            ast_directed_print(dest, remain, " = ");
-            break;
+        if (type == TYPE_STRUCT || type == TYPE_UNION) {
+            ast_directed_print(dest, remain, ";");
         }
-        ast_expr_print(node->expr, dest, remain);
     }
 }
 
@@ -238,15 +240,18 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
     sl_init(&accum, offsetof(len_str_node_t, link));
     sl_init(&temp, offsetof(len_str_node_t, link));
 
-    len_str_node_t *node = malloc(sizeof(*node) + decl_node->id->len + 1);
-    if (node == NULL) {
-        goto fail;
+    len_str_node_t *node = NULL;
+    if (decl_node->id != NULL) {
+        node = malloc(sizeof(*node) + decl_node->id->len + 1);
+        if (node == NULL) {
+            goto fail;
+        }
+        node->str.str = (char *)node + sizeof(*node);
+        strncpy(node->str.str, decl_node->id->str, decl_node->id->len);
+        node->str.str[decl_node->id->len] = '\0';
+        node->str.len = decl_node->id->len;
+        sl_append(&accum, &node->link);
     }
-    node->str.str = (char *)node + sizeof(*node);
-    strncpy(node->str.str, decl_node->id->str, decl_node->id->len);
-    node->str.str[decl_node->id->len] = '\0';
-    node->str.len = decl_node->id->len;
-    sl_append(&accum, &node->link);
 
 #define OFFSET (PRINT_BUF_SIZE - remain - 1)
 #define PUT_CUR(chr) *(cur++) = (chr); remain--
@@ -616,13 +621,20 @@ void ast_type_print(type_t *type, char **dest, size_t *remain) {
     case TYPE_STRUCT:
     case TYPE_UNION: {
         ast_directed_print(dest, remain, ast_basic_type_str(type->type));
+
+        if (type->struct_params.name != NULL) {
+            ast_directed_print(dest, remain, " %.*s",
+                    type->struct_params.name->len,
+                    type->struct_params.name->str);
+        }
+
         ast_directed_print(dest, remain, " {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_params.decls) {
             ast_decl_print(GET_ELEM(&type->struct_params.decls, cur),
                     TYPE_STRUCT, dest, remain);
         }
-        ast_directed_print(dest, remain, "}");
+        ast_directed_print(dest, remain, "\n}");
         break;
     }
     case TYPE_ENUM: {
