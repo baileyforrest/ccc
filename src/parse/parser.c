@@ -113,7 +113,6 @@ status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
     lex->typetab = &tunit->typetab; // Set top type table to translation units
 
     while (LEX_CUR(lex).type != TOKEN_EOF) {
-    //while (((lex)->lexemes[(lex)->lex_idx]).type != TOKEN_EOF) {
         gdecl_t *gdecl;
         if (CCC_OK != (status = par_external_declaration(lex, &gdecl))) {
             goto fail;
@@ -175,7 +174,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
             goto fail;
         }
     } else {
-        if (CCC_OK != (status = par_declaration(lex, &gdecl->decl))) {
+        if (CCC_OK != (status = par_declaration(lex, &gdecl->decl, true))) {
             goto fail;
         }
         LEX_MATCH(lex, SEMI); // Must end with semi colon
@@ -1104,6 +1103,7 @@ fail:
 
 status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
     status_t status = CCC_OK;
+    expr_t *new_node = NULL; // Newly allocated expression
 
     if (left == NULL) { // Only search for first operand if not provided
         bool unary1;
@@ -1137,8 +1137,6 @@ status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             }
         }
     }
-
-    expr_t *new_node; // Newly allocated expression
 
     // This loop runs to combine binary expressions
     bool new_left = true;
@@ -1827,7 +1825,7 @@ fail:
     return status;
 }
 
-status_t par_declaration(lex_wrap_t *lex, decl_t **decl) {
+status_t par_declaration(lex_wrap_t *lex, decl_t **decl, bool partial) {
     status_t status = CCC_OK;
     if (*decl == NULL) {
         ALLOC_NODE(lex, *decl, decl_t);
@@ -1843,14 +1841,14 @@ status_t par_declaration(lex_wrap_t *lex, decl_t **decl) {
         }
     }
 
-    if (CCC_BACKTRACK == (status = par_init_declarator(lex, *decl))) {
+    if (CCC_BACKTRACK == (status = par_init_declarator(lex, *decl, partial))) {
         // No init declarators
         return CCC_OK;
     }
 
     while (LEX_CUR(lex).type == COMMA) {
         LEX_ADVANCE(lex);
-        if (CCC_OK != (status = par_init_declarator(lex, *decl))) {
+        if (CCC_OK != (status = par_init_declarator(lex, *decl, false))) {
             if (status == CCC_BACKTRACK) {
                 status = CCC_ESYNTAX;
             }
@@ -1863,10 +1861,10 @@ fail:
     return status;
 }
 
-status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl) {
+status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl, bool partial) {
     status_t status = CCC_OK;
 
-    if (CCC_OK != (status = par_declarator_base(lex, decl))) {
+    if (!partial && CCC_OK != (status = par_declarator_base(lex, decl))) {
         goto fail;
     }
     decl_node_t *decl_node = sl_tail(&decl->decls);
@@ -1896,14 +1894,14 @@ status_t par_initializer(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
 
     // Not left bracket, so its an expression
-    if (LEX_CUR(lex).type != LBRACK) {
+    if (LEX_CUR(lex).type != LBRACE) {
         return par_expression(lex, NULL, result);
     }
     LEX_ADVANCE(lex);
     if (CCC_OK != (status = par_initializer_list(lex, result))) {
         goto fail;
     }
-    LEX_MATCH(lex, RBRACK);
+    LEX_MATCH(lex, RBRACE);
 fail:
     return status;
 }
@@ -1919,7 +1917,7 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
         if (LEX_CUR(lex).type == COMMA) {
             LEX_ADVANCE(lex);
         }
-        if (LEX_CUR(lex).type == RBRACK) { // Trailing commas allowed
+        if (LEX_CUR(lex).type == RBRACE) { // Trailing commas allowed
             break;
         }
         expr_t *cur = NULL;
@@ -1971,7 +1969,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         ALLOC_NODE(lex, stmt, stmt_t);
         stmt->type = STMT_DECL;
         stmt->decl = NULL;
-        if(CCC_OK != (status = par_declaration(lex, &stmt->decl))) {
+        if(CCC_OK != (status = par_declaration(lex, &stmt->decl, false))) {
             goto fail;
         }
         LEX_MATCH(lex, SEMI);
@@ -1985,7 +1983,8 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
                 ALLOC_NODE(lex, stmt, stmt_t);
                 stmt->type = STMT_DECL;
                 stmt->decl = NULL;
-                if (CCC_OK != (status = par_declaration(lex, &stmt->decl))) {
+                if (CCC_OK != (status = par_declaration(lex, &stmt->decl,
+                                                        false))) {
                     goto fail;
                 }
 

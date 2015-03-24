@@ -354,6 +354,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     if (pp->string && cur_char == '"') {
+        ts_advance(stream);
         return pp_search_string_concat(pp, stream);
     }
 

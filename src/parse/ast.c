@@ -218,7 +218,7 @@ void ast_decl_print(decl_t *decl, basic_type_t type, char **dest,
             ast_expr_print(node->expr, dest, remain);
         }
         if (type == TYPE_STRUCT || type == TYPE_UNION) {
-            ast_directed_print(dest, remain, ";");
+            ast_directed_print(dest, remain, ";\n");
         }
     }
 }
@@ -494,7 +494,7 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
             }
             ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur), dest, remain);
         }
-        ast_directed_print(dest, remain, "}");
+        ast_directed_print(dest, remain, " }");
         break;
     }
 
@@ -637,7 +637,7 @@ void ast_type_print(type_t *type, char **dest, size_t *remain) {
             ast_decl_print(GET_ELEM(&type->struct_params.decls, cur),
                     TYPE_STRUCT, dest, remain);
         }
-        ast_directed_print(dest, remain, "\n}");
+        ast_directed_print(dest, remain, "}");
         break;
     }
     case TYPE_ENUM: {
@@ -871,6 +871,14 @@ void ast_type_destroy(type_t *type) {
     case TYPE_MOD:
         ast_type_destroy(type->mod.base);
         break;
+
+    case TYPE_PAREN:
+    case TYPE_FUNC:
+    case TYPE_ARR:
+    case TYPE_PTR:
+        ast_decl_node_type_destroy(type);
+        return;
+
     default:
         assert(false);
     }

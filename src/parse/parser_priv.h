@@ -465,9 +465,11 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type);
  * @param lex Current lexer state
  * @param decl Location to store declaration. If *decl != NULL, it will add onto
  *     an existing declaration. Otherwise a new declaration will be allocated
+ * @param partial, if true, the first decl_node is parsed. This is necessary
+ *     to differentiate between functions and declarations
  * @return CCC_OK on success, error code on error
  */
-status_t par_declaration(lex_wrap_t *lex, decl_t **decl);
+status_t par_declaration(lex_wrap_t *lex, decl_t **decl, bool partial);
 
 /**
  * Parses an init declarator, which is a declarator with an optional
@@ -475,9 +477,11 @@ status_t par_declaration(lex_wrap_t *lex, decl_t **decl);
  *
  * @param lex Current lexer state
  * @param decl Declaration to parse init declarators for
+ * @param partial, if true, the first decl_node is parsed. This is necessary
+ *     to differentiate between functions and declarations
  * @return CCC_OK on success, error code on error
  */
-status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl);
+status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl, bool partial);
 
 /**
  * Parses an initalizer, which is either an expression or a initizer list
