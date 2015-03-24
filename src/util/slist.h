@@ -28,10 +28,6 @@
 
 #include "util/status.h"
 
-/** Pointer to element represented by head */
-#define GET_ELEM(list, head) \
-    ((void *)(head) - (list)->head_offset)
-
 /**
  * Single Linked Link list node.
  *
@@ -51,6 +47,28 @@ typedef struct slist_t {
     sl_link_t *tail;    /**< Tail of the list for fast append */
     size_t head_offset; /**< Offset of head into element structure */
 } slist_t;
+
+/**
+ * Pointer to element represented by head
+ *
+ * @param list List to get element from
+ * @param head The sl_link_t * representing the element
+ */
+#define GET_ELEM(list, head) ((void *)(head) - (list)->head_offset)
+
+/**
+ * sl_link_t literal
+ *
+ * TODO: Replace { NULL } in code with this
+ */
+#define SL_LINK_LIT { NULL }
+
+/**
+ * Literal for an empty slist
+ *
+ * @param head_offset offset of head into list element structs
+ */
+#define SLIST_LIT(head_offset) { NULL, NULL, head_offset }
 
 /**
  * Initalizes a singly linked list head

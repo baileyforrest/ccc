@@ -34,56 +34,56 @@
  */
 static symtab_entry_t s_reserved[] = {
     // Keywords
-    { { NULL }, LEN_STR_LITERAL("auto"          ), AUTO          },
-    { { NULL }, LEN_STR_LITERAL("break"         ), BREAK         },
-    { { NULL }, LEN_STR_LITERAL("case"          ), CASE          },
-    { { NULL }, LEN_STR_LITERAL("const"         ), CONST         },
-    { { NULL }, LEN_STR_LITERAL("continue"      ), CONTINUE      },
-    { { NULL }, LEN_STR_LITERAL("default"       ), DEFAULT       },
-    { { NULL }, LEN_STR_LITERAL("do"            ), DO            },
-    { { NULL }, LEN_STR_LITERAL("else"          ), ELSE          },
-    { { NULL }, LEN_STR_LITERAL("enum"          ), ENUM          },
-    { { NULL }, LEN_STR_LITERAL("extern"        ), EXTERN        },
-    { { NULL }, LEN_STR_LITERAL("for"           ), FOR           },
-    { { NULL }, LEN_STR_LITERAL("goto"          ), GOTO          },
-    { { NULL }, LEN_STR_LITERAL("if"            ), IF            },
-    { { NULL }, LEN_STR_LITERAL("inline"        ), INLINE        },
-    { { NULL }, LEN_STR_LITERAL("register"      ), REGISTER      },
-    { { NULL }, LEN_STR_LITERAL("restrict"      ), RESTRICT      },
-    { { NULL }, LEN_STR_LITERAL("return"        ), RETURN        },
-    { { NULL }, LEN_STR_LITERAL("sizeof"        ), SIZEOF        },
-    { { NULL }, LEN_STR_LITERAL("static"        ), STATIC        },
-    { { NULL }, LEN_STR_LITERAL("struct"        ), STRUCT        },
-    { { NULL }, LEN_STR_LITERAL("switch"        ), SWITCH        },
-    { { NULL }, LEN_STR_LITERAL("typedef"       ), TYPEDEF       },
-    { { NULL }, LEN_STR_LITERAL("union"         ), UNION         },
-    { { NULL }, LEN_STR_LITERAL("volatile"      ), VOLATILE      },
-    { { NULL }, LEN_STR_LITERAL("while"         ), WHILE         },
+    { { NULL }, LEN_STR_LIT("auto"          ), AUTO          },
+    { { NULL }, LEN_STR_LIT("break"         ), BREAK         },
+    { { NULL }, LEN_STR_LIT("case"          ), CASE          },
+    { { NULL }, LEN_STR_LIT("const"         ), CONST         },
+    { { NULL }, LEN_STR_LIT("continue"      ), CONTINUE      },
+    { { NULL }, LEN_STR_LIT("default"       ), DEFAULT       },
+    { { NULL }, LEN_STR_LIT("do"            ), DO            },
+    { { NULL }, LEN_STR_LIT("else"          ), ELSE          },
+    { { NULL }, LEN_STR_LIT("enum"          ), ENUM          },
+    { { NULL }, LEN_STR_LIT("extern"        ), EXTERN        },
+    { { NULL }, LEN_STR_LIT("for"           ), FOR           },
+    { { NULL }, LEN_STR_LIT("goto"          ), GOTO          },
+    { { NULL }, LEN_STR_LIT("if"            ), IF            },
+    { { NULL }, LEN_STR_LIT("inline"        ), INLINE        },
+    { { NULL }, LEN_STR_LIT("register"      ), REGISTER      },
+    { { NULL }, LEN_STR_LIT("restrict"      ), RESTRICT      },
+    { { NULL }, LEN_STR_LIT("return"        ), RETURN        },
+    { { NULL }, LEN_STR_LIT("sizeof"        ), SIZEOF        },
+    { { NULL }, LEN_STR_LIT("static"        ), STATIC        },
+    { { NULL }, LEN_STR_LIT("struct"        ), STRUCT        },
+    { { NULL }, LEN_STR_LIT("switch"        ), SWITCH        },
+    { { NULL }, LEN_STR_LIT("typedef"       ), TYPEDEF       },
+    { { NULL }, LEN_STR_LIT("union"         ), UNION         },
+    { { NULL }, LEN_STR_LIT("volatile"      ), VOLATILE      },
+    { { NULL }, LEN_STR_LIT("while"         ), WHILE         },
 
     // Underscore keywords
-    { { NULL }, LEN_STR_LITERAL("_Alignas"      ), ALIGNAS       },
-    { { NULL }, LEN_STR_LITERAL("_Alignof"      ), ALIGNOF       },
-    { { NULL }, LEN_STR_LITERAL("_Bool"         ), BOOL          },
-    { { NULL }, LEN_STR_LITERAL("_Complex"      ), COMPLEX       },
-    { { NULL }, LEN_STR_LITERAL("_Generic"      ), GENERIC       },
-    { { NULL }, LEN_STR_LITERAL("_Imaginary"    ), IMAGINARY     },
-    { { NULL }, LEN_STR_LITERAL("_Noreturn"     ), NORETURN      },
-    { { NULL }, LEN_STR_LITERAL("_Static_assert"), STATIC_ASSERT },
-    { { NULL }, LEN_STR_LITERAL("_Thread_local" ), THREAD_LOCAL  },
+    { { NULL }, LEN_STR_LIT("_Alignas"      ), ALIGNAS       },
+    { { NULL }, LEN_STR_LIT("_Alignof"      ), ALIGNOF       },
+    { { NULL }, LEN_STR_LIT("_Bool"         ), BOOL          },
+    { { NULL }, LEN_STR_LIT("_Complex"      ), COMPLEX       },
+    { { NULL }, LEN_STR_LIT("_Generic"      ), GENERIC       },
+    { { NULL }, LEN_STR_LIT("_Imaginary"    ), IMAGINARY     },
+    { { NULL }, LEN_STR_LIT("_Noreturn"     ), NORETURN      },
+    { { NULL }, LEN_STR_LIT("_Static_assert"), STATIC_ASSERT },
+    { { NULL }, LEN_STR_LIT("_Thread_local" ), THREAD_LOCAL  },
 
     // Types
-    { { NULL }, LEN_STR_LITERAL("void"          ), VOID          },
+    { { NULL }, LEN_STR_LIT("void"          ), VOID          },
 
-    { { NULL }, LEN_STR_LITERAL("char"          ), CHAR          },
-    { { NULL }, LEN_STR_LITERAL("short"         ), SHORT         },
-    { { NULL }, LEN_STR_LITERAL("int"           ), INT           },
-    { { NULL }, LEN_STR_LITERAL("long"          ), LONG          },
+    { { NULL }, LEN_STR_LIT("char"          ), CHAR          },
+    { { NULL }, LEN_STR_LIT("short"         ), SHORT         },
+    { { NULL }, LEN_STR_LIT("int"           ), INT           },
+    { { NULL }, LEN_STR_LIT("long"          ), LONG          },
 
-    { { NULL }, LEN_STR_LITERAL("unsigned"      ), UNSIGNED      },
-    { { NULL }, LEN_STR_LITERAL("signed"        ), SIGNED        },
+    { { NULL }, LEN_STR_LIT("unsigned"      ), UNSIGNED      },
+    { { NULL }, LEN_STR_LIT("signed"        ), SIGNED        },
 
-    { { NULL }, LEN_STR_LITERAL("double"        ), DOUBLE        },
-    { { NULL }, LEN_STR_LITERAL("float"         ), FLOAT         },
+    { { NULL }, LEN_STR_LIT("double"        ), DOUBLE        },
+    { { NULL }, LEN_STR_LIT("float"         ), FLOAT         },
 };
 
 /**
@@ -132,7 +132,7 @@ void st_destroy(symtab_t *table) {
     if (table->is_sym) {
         // Remove all of the static entries first, because they aren't heap
         // allocated
-        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); i++) {
+        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); ++i) {
             ht_remove(&table->hashtab, &s_reserved[i].key);
         }
     }

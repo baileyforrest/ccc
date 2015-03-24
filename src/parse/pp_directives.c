@@ -35,17 +35,18 @@
 #define MAX_PATH_LEN 4096 /**< Max include path len */
 
 static pp_directive_t s_directives[] = {
-    { { NULL }, LEN_STR_LITERAL("define" ), pp_directive_define  },
-    { { NULL }, LEN_STR_LITERAL("include"), pp_directive_include },
-    { { NULL }, LEN_STR_LITERAL("ifndef" ), pp_directive_ifndef  },
-    { { NULL }, LEN_STR_LITERAL("endif"  ), pp_directive_endif   }
+    { { NULL }, LEN_STR_LIT("define" ), pp_directive_define  },
+    { { NULL }, LEN_STR_LIT("include"), pp_directive_include },
+    { { NULL }, LEN_STR_LIT("ifndef" ), pp_directive_ifndef  },
+    { { NULL }, LEN_STR_LIT("endif"  ), pp_directive_endif   },
+    { { NULL }, LEN_STR_LIT("undef"  ), pp_directive_undef   }
 };
 
 // Default search path for #include files. Ordering is important
 static len_str_node_t s_default_search_path[] = {
-    { { NULL }, LEN_STR_LITERAL(".") }, // Current directory
-    { { NULL }, LEN_STR_LITERAL("/usr/local/include") },
-    { { NULL }, LEN_STR_LITERAL("/usr/include") }
+    { { NULL }, LEN_STR_LIT("./") }, // Current directory
+    { { NULL }, LEN_STR_LIT("/usr/local/include/") },
+    { { NULL }, LEN_STR_LIT("/usr/include/") }
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {
@@ -411,17 +412,20 @@ status_t pp_directive_include(preprocessor_t *pp) {
         pp_file_t *pp_file;
         status_t status = pp_file_map(s_path_buf, len, file, &pp_file);
         if (CCC_OK != status) {
-            logger_log(&stream->mark, "Failed to include file", LOG_ERR);
-            status = CCC_ESYNTAX;
             goto fail;
         }
 
         // Add the file to the top of the stack
         sl_prepend(&pp->file_insts, &pp_file->link);
-        break;
+        return CCC_OK;
     }
 
 fail:
+    snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
+             "Failed to include file: %.*s", (int)suffix.len, suffix.str);
+    logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+    status = CCC_ESYNTAX;
+
     return status;
 }
 
@@ -492,4 +496,29 @@ status_t pp_directive_endif(preprocessor_t *pp) {
     }
 
     return CCC_OK;
+}
+
+status_t pp_directive_undef(preprocessor_t *pp) {
+    assert(sl_head(&pp->macro_insts) == NULL && "undef inside macro!");
+
+    status_t status = CCC_OK;
+    pp_file_t *file = sl_head(&pp->file_insts);
+    tstream_t *stream = &file->stream;
+
+    // Skip whitespace before name
+    ts_skip_ws_and_comment(stream);
+    if (ts_end(stream)) {
+        logger_log(&stream->mark, "Unexpected EOF inside undef", LOG_ERR);
+        status = CCC_ESYNTAX;
+        goto fail;
+    }
+
+    // Read the name of the macro
+    char *cur = ts_location(stream);
+    size_t name_len = ts_advance_identifier(stream);
+    len_str_t lookup = { cur, name_len };
+    ht_remove(&pp->macros, &lookup);
+
+fail:
+    return status;
 }

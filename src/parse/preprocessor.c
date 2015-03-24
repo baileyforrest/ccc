@@ -36,6 +36,25 @@
 #include "util/text_stream.h"
 #include "util/util.h"
 
+//static const char s_built_in_filename[] = BUILT_IN_FILENAME;
+static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
+
+#define PREDEF_MACRO_LIT(name, word)                                    \
+    { SL_LINK_LIT, LEN_STR_LIT(name),                                   \
+      TSTREAM_LIT(word, NULL, &s_built_in_file, BUILT_IN_FILENAME, 0, 0), \
+      SLIST_LIT(offsetof(len_str_node_t, link)), 0 }
+
+static pp_macro_t s_predef_macros[] = {
+    // TODO: Handle file, line, date, time
+    PREDEF_MACRO_LIT("__FILE__", "TODO"),
+    PREDEF_MACRO_LIT("__LINE__", "TODO"),
+    PREDEF_MACRO_LIT("__DATE__", "TODO"),
+    PREDEF_MACRO_LIT("__TIME__", "TODO"),
+    PREDEF_MACRO_LIT("__STDC__", "1"), // ISO C
+    PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L"), // C11
+    PREDEF_MACRO_LIT("__STDC_HOSTED__", "1") // Standard libraries available
+};
+
 status_t pp_init(preprocessor_t *pp) {
     static ht_params_t params = {
         0,                                // No Size estimate
@@ -59,6 +78,13 @@ status_t pp_init(preprocessor_t *pp) {
         goto fail2;
     }
 
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
+        if (CCC_OK != (status = ht_insert(&pp->macros,
+                                          &s_predef_macros[i].link))) {
+            goto fail2;
+        }
+    }
+
     return status;
 
 fail2:
@@ -76,6 +102,12 @@ fail1:
 void pp_destroy(preprocessor_t *pp) {
     SL_DESTROY_FUNC(&pp->file_insts, pp_file_destroy);
     SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
+
+    // Remove all of the static entries first, because they aren't heap
+    // allocated
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
+        ht_remove(&pp->macros, &s_predef_macros[i].name);
+    }
     HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
     pp_directives_destroy(pp);
 }

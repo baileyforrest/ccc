@@ -86,4 +86,10 @@ status_t pp_directive_ifndef(preprocessor_t *pp);
  */
 status_t pp_directive_endif(preprocessor_t *pp);
 
+/**
+ * Directive for #undef
+ * @param pp The preprocessor act on
+ */
+status_t pp_directive_undef(preprocessor_t *pp);
+
 #endif /* _PP_DIRECTIVE_H_ */

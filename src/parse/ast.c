@@ -627,15 +627,15 @@ void ast_type_print(type_t *type, char **dest, size_t *remain) {
 
         if (type->struct_params.name != NULL) {
             ast_directed_print(dest, remain, " %.*s",
-                    type->struct_params.name->len,
-                    type->struct_params.name->str);
+                               type->struct_params.name->len,
+                               type->struct_params.name->str);
         }
 
         ast_directed_print(dest, remain, " {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_params.decls) {
             ast_decl_print(GET_ELEM(&type->struct_params.decls, cur),
-                    TYPE_STRUCT, dest, remain);
+                           TYPE_STRUCT, dest, remain);
         }
         ast_directed_print(dest, remain, "}");
         break;

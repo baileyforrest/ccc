@@ -29,20 +29,20 @@
 
 #include "util/util.h"
 
-static len_str_t s_prim_filename = LEN_STR_LITERAL("<primitive_type>");
+static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
 
 #define TYPE_LITERAL(typename, type) \
     { { NULL }, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, \
        sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
 
-static len_str_t void_str      = LEN_STR_LITERAL("void");
-static len_str_t char_str      = LEN_STR_LITERAL("char");
-static len_str_t short_str     = LEN_STR_LITERAL("short");
-static len_str_t int_str       = LEN_STR_LITERAL("int");
-static len_str_t long_str      = LEN_STR_LITERAL("long");
-static len_str_t long_long_str = LEN_STR_LITERAL("long long");
-static len_str_t float_str     = LEN_STR_LITERAL("float");
-static len_str_t double_str    = LEN_STR_LITERAL("double");
+static len_str_t void_str      = LEN_STR_LIT("void");
+static len_str_t char_str      = LEN_STR_LIT("char");
+static len_str_t short_str     = LEN_STR_LIT("short");
+static len_str_t int_str       = LEN_STR_LIT("int");
+static len_str_t long_str      = LEN_STR_LIT("long");
+static len_str_t long_long_str = LEN_STR_LIT("long long");
+static len_str_t float_str     = LEN_STR_LIT("float");
+static len_str_t double_str    = LEN_STR_LIT("double");
 
 static type_t stt_void      = TYPE_LITERAL(TYPE_VOID  , void     );
 static type_t stt_char      = TYPE_LITERAL(TYPE_CHAR  , char     );

@@ -37,6 +37,23 @@ typedef struct fmark_t {
 } fmark_t;
 
 /**
+ * Name of "file" for built in objects
+ */
+#define BUILT_IN_FILENAME "<built in>"
+
+/**
+ * File mark literal
+ *
+ * @param file Filename
+ * @param line_start Pointer to start of current line
+ * @param last Last file mark on stack
+ * @param line Current line number
+ * @param col Current column number
+ */
+#define FMARK_LIT(last, file, line_start, line, col) \
+    { last, file, line, line, col }
+
+/**
  * Copy a mark chain
  *
  * @param mark Mark chain to copy

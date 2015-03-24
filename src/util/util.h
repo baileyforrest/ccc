@@ -80,7 +80,7 @@ typedef struct len_str_t {
  *
  * @param str The string to create the literal it with
  */
-#define LEN_STR_LITERAL(str) { str, sizeof(str) - 1 }
+#define LEN_STR_LIT(str) { str, sizeof(str) - 1 }
 
 
 /**

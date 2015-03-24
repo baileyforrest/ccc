@@ -38,6 +38,20 @@ typedef struct tstream_t {
 } tstream_t;
 
 /**
+ * Text stream literal
+ *
+ * @param str String to create stream from
+ * @param file Filename
+ * @param line_start Pointer to start of current line
+ * @param last Last file mark on stack
+ * @param line Current line number
+ * @param col Current column number
+ */
+#define TSTREAM_LIT(word, last, file, line_start, line, col)    \
+    { word, word + (sizeof(word) - 1),                          \
+            FMARK_LIT(last, file, line_start, line, col) }
+
+/**
  * Initializes a text stream
  *
  * @param ts Text stream to initalize
@@ -46,8 +60,8 @@ typedef struct tstream_t {
  * @param file Filename of the file the stream is processing
  * @param line_start Pointer to start of current line
  * @param last Last file mark on stack
- * @param Current line number
- * @param Current column number
+ * @param line Current line number
+ * @param col Current column number
  */
 void ts_init(tstream_t *ts, char *start, char *end,
              len_str_t *file, char *line_start, fmark_t *last,
