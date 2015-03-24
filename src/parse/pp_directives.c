@@ -389,17 +389,17 @@ status_t pp_directive_include(preprocessor_t *pp) {
     // Search for the string in all of the search paths
     sl_link_t *link;
     SL_FOREACH(link, &pp->search_path) {
-        len_str_t *cur = GET_ELEM(&pp->search_path, link);
+        len_str_node_t *cur = GET_ELEM(&pp->search_path, link);
 
-        if (cur->len + suffix.len + 1 > MAX_PATH_LEN) {
+        if (cur->str.len + suffix.len + 1 > MAX_PATH_LEN) {
             logger_log(&stream->mark, "Include path name too long", LOG_ERR);
             status = CCC_ESYNTAX;
             goto fail;
         }
 
-        strncpy(s_path_buf, cur->str, cur->len);
-        strncpy(s_path_buf + cur->len, suffix.str, suffix.len);
-        size_t len = cur->len + suffix.len;
+        strncpy(s_path_buf, cur->str.str, cur->str.len);
+        strncpy(s_path_buf + cur->str.len, suffix.str, suffix.len);
+        size_t len = cur->str.len + suffix.len;
         s_path_buf[len] = '\0';
 
         // File isn't accessible

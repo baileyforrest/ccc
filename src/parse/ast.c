@@ -802,13 +802,40 @@ void ast_type_protected_destroy(type_t *type) {
     free(type);
 }
 
-void ast_type_destroy(type_t *type) {
-    // Do nothing if marked as not being deallocated
+void ast_decl_node_type_destroy(type_t *type) {
     if (type == NULL) {
         return;
     }
 
     type_t *declarator_type = NULL;
+
+    switch (type->type) {
+    case TYPE_PAREN:
+        declarator_type = type->paren_base;
+        break;
+    case TYPE_FUNC:
+        declarator_type = type->func.type;
+        SL_DESTROY_FUNC(&type->func.params, ast_decl_destroy);
+        break;
+    case TYPE_ARR:
+        declarator_type = type->arr.base;
+        ast_expr_destroy(type->arr.len);
+        break;
+    case TYPE_PTR:
+        declarator_type = type->ptr.base;
+        break;
+    default:
+        return;
+    }
+
+    ast_decl_node_type_destroy(declarator_type);
+    free(type);
+}
+
+void ast_type_destroy(type_t *type) {
+    if (type == NULL) {
+        return;
+    }
 
     switch (type->type) {
     case TYPE_VOID:
@@ -844,39 +871,8 @@ void ast_type_destroy(type_t *type) {
     case TYPE_MOD:
         ast_type_destroy(type->mod.base);
         break;
-
-    case TYPE_PAREN:
-        declarator_type = type->paren_base;
-        break;
-    case TYPE_FUNC:
-        declarator_type = type->func.type;
-        SL_DESTROY_FUNC(&type->func.params, ast_decl_destroy);
-        break;
-    case TYPE_ARR:
-        declarator_type = type->arr.base;
-        ast_expr_destroy(type->arr.len);
-        break;
-    case TYPE_PTR:
-        declarator_type = type->ptr.base;
-        break;
-
     default:
         assert(false);
-    }
-
-    // Avoid freeing base of a declarator type so the base isn't freed multiple
-    // times
-    if (declarator_type != NULL) {
-        switch (declarator_type->type) {
-        case TYPE_PAREN:
-        case TYPE_FUNC:
-        case TYPE_ARR:
-        case TYPE_PTR:
-            ast_type_destroy(declarator_type);
-            break;
-        default:
-            break;
-        }
     }
 
     free(type);
@@ -967,15 +963,27 @@ void ast_decl_node_destroy(decl_node_t *decl_node) {
     if (decl_node == NULL) {
         return;
     }
-    ast_type_destroy(decl_node->type);
+    ast_decl_node_type_destroy(decl_node->type);
     ast_expr_destroy(decl_node->expr);
     free(decl_node);
 }
 
 void ast_decl_destroy(decl_t *decl) {
-    // Make sure decl_nodes don't free base
-    SL_DESTROY_FUNC(&decl->decls, ast_decl_node_destroy);
-    ast_type_destroy(decl->type);
+    if (decl == NULL) {
+        return;
+    }
+    bool is_typedef = decl->type->type == TYPE_MOD &&
+        decl->type->mod.type_mod & TMOD_TYPEDEF;
+
+    if (is_typedef) {
+        // If its a typedef, just free the decl nodes, because the types are
+        // stored in a typetable, and there shouldn't be any expressions
+        SL_DESTROY_FUNC(&decl->decls, free);
+    } else {
+        // Make sure decl_nodes don't free base
+        SL_DESTROY_FUNC(&decl->decls, ast_decl_node_destroy);
+        ast_type_destroy(decl->type);
+    }
     free(decl);
 }
 

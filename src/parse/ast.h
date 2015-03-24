@@ -479,7 +479,17 @@ void ast_destroy(trans_unit_t *ast);
 void ast_type_protected_destroy(type_t *type);
 
 /**
- * Destroys a type_t that is not protected.
+ * Destroys a type_t that on a decl_node
+ *
+ * This distinction is necessary to avoid having the base type of a decl being
+ * freed multiple times.
+ *
+ * @param type Object to destroy
+ */
+void ast_decl_node_type_destroy(type_t *type);
+
+/**
+ * Destroys a type_t that is not on a decl_node
  *
  * @param type Object to destroy
  */

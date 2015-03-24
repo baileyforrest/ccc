@@ -170,7 +170,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
 
     status_t status = CCC_OK;
     typetab_entry_t *new_entry = malloc(sizeof(typetab_entry_t));
-    if (entry == NULL) {
+    if (new_entry == NULL) {
         status = CCC_NOMEM;
         goto fail;
     }

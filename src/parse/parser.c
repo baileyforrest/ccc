@@ -427,9 +427,15 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             ALLOC_NODE(lex, mod_node, type_t);
             new_node = mod_node;
             mod_node->type = TYPE_MOD;
-            mod_node->size = (*type)->size;
-            mod_node->align = (*type)->align;
+            if (*type == NULL) {
+                mod_node->size = 0;
+                mod_node->align = 0;
+            } else {
+                mod_node->size = (*type)->size;
+                mod_node->align = (*type)->align;
+            }
             mod_node->mod.base = *type;
+            mod_node->mod.type_mod = TMOD_NONE;
             *type = mod_node;
         }
 
@@ -600,7 +606,7 @@ status_t par_struct_declaration(lex_wrap_t *lex, type_t *type) {
     status_t status = CCC_OK;
     type_t *decl_type = NULL;
     if (CCC_OK != (status = par_specifier_qualifiers(lex, &decl_type))) {
-        if (type == NULL || status != CCC_BACKTRACK) {
+        if (decl_type == NULL || status != CCC_BACKTRACK) {
             goto fail;
         }
     }
@@ -734,6 +740,18 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
         goto fail;
     }
     sl_append(&decl->decls, &decl_node->link);
+
+    bool is_typedef = decl->type->type == TYPE_MOD &&
+        (decl->type->mod.type_mod & TMOD_TYPEDEF);
+
+    // Add typedefs to the typetable on the top of the stack
+    if (is_typedef) {
+        if (CCC_OK !=
+            (status = tt_insert(lex->typetab, decl_node->type,
+                                TT_TYPEDEF, decl_node->id, NULL))) {
+            goto fail;
+        }
+    }
 
     return status;
 
@@ -1334,10 +1352,12 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             }
         } else { // Parsing unary expression failed, sizeof typename
             base->sizeof_params.expr = NULL;
+            LEX_MATCH(lex, LPAREN);
             if (CCC_OK !=
                 (status = par_type_name(lex, &base->sizeof_params.type))) {
                 goto fail;
             }
+            LEX_MATCH(lex, RPAREN);
         }
         break;
 
@@ -1845,23 +1865,14 @@ fail:
 
 status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl) {
     status_t status = CCC_OK;
-    bool is_typedef = decl->type->type == TYPE_MOD &&
-        (decl->type->mod.type_mod & TMOD_TYPEDEF);
 
     if (CCC_OK != (status = par_declarator_base(lex, decl))) {
         goto fail;
     }
     decl_node_t *decl_node = sl_tail(&decl->decls);
 
-    // Add typedefs to the typetable on the top of the stack
-    if (is_typedef) {
-        if (CCC_OK !=
-            (status = tt_insert(lex->typetab, decl_node->type,
-                                TT_TYPEDEF, decl_node->id, NULL))) {
-            goto fail;
-        }
-    }
-
+    bool is_typedef = decl->type->type == TYPE_MOD &&
+        (decl->type->mod.type_mod & TMOD_TYPEDEF);
     if (LEX_CUR(lex).type == ASSIGN) {
         if (is_typedef) {
             snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
