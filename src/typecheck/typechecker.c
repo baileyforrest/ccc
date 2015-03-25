@@ -29,12 +29,12 @@
 #include "util/logger.h"
 
 bool typecheck_ast(trans_unit_t *ast) {
-    tc_state_t tcs = { NULL, NULL, NULL, NULL, NULL };
+    tc_state_t tcs = TCS_LIT;
     return typecheck_trans_unit(&tcs, ast);
 }
 
 bool typecheck_const_expr(expr_t *expr, long long *result) {
-    tc_state_t tcs = { NULL, NULL, NULL, NULL, NULL };
+    tc_state_t tcs = TCS_LIT;
     if (!typecheck_expr(&tcs, expr, TC_CONST)) {
         return false;
     }
@@ -43,10 +43,95 @@ bool typecheck_const_expr(expr_t *expr, long long *result) {
     return true;
 }
 
+/**
+ * TODO: Support more types of expressions
+ */
 void typecheck_const_expr_eval(expr_t *expr, long long *result) {
-    // TODO: This
-    (void)expr;
-    (void)result;
+    switch (expr->type) {
+    case EXPR_PAREN:
+        typecheck_const_expr_eval(expr->paren_base, result);
+        return;
+    case EXPR_CONST_INT:
+        *result = expr->const_val.int_val;
+        return;
+    case EXPR_BIN: {
+        long long temp1;
+        long long temp2;
+        typecheck_const_expr_eval(expr->bin.expr1, &temp1);
+        typecheck_const_expr_eval(expr->bin.expr2, &temp2);
+        switch (expr->bin.op) {
+        case OP_TIMES:    *result = temp1 *  temp2; break;
+        case OP_DIV:      *result = temp1 /  temp2; break;
+        case OP_MOD:      *result = temp1 %  temp2; break;
+        case OP_PLUS:     *result = temp1 +  temp2; break;
+        case OP_MINUS:    *result = temp1 -  temp2; break;
+        case OP_LSHIFT:   *result = temp1 << temp2; break;
+        case OP_RSHIFT:   *result = temp1 >> temp2; break;
+        case OP_LT:       *result = temp1 <  temp2; break;
+        case OP_GT:       *result = temp1 >  temp2; break;
+        case OP_LE:       *result = temp1 <= temp2; break;
+        case OP_GE:       *result = temp1 >= temp2; break;
+        case OP_EQ:       *result = temp1 == temp2; break;
+        case OP_NE:       *result = temp1 != temp2; break;
+        case OP_BITAND:   *result = temp1 &  temp2; break;
+        case OP_BITXOR:   *result = temp1 ^  temp2; break;
+        case OP_BITOR:    *result = temp1 |  temp2; break;
+        case OP_LOGICAND: *result = temp1 && temp2; break;
+        case OP_LOGICOR:  *result = temp1 || temp2; break;
+        default:
+            assert(false);
+        }
+        return;
+    }
+    case EXPR_UNARY: {
+        long long temp;
+        typecheck_const_expr_eval(expr->unary.expr, &temp);
+        switch (expr->unary.op) {
+        case OP_UPLUS:    *result =  temp; break;
+        case OP_UMINUS:   *result = -temp; break;
+        case OP_BITNOT:   *result = ~temp; break;
+        case OP_LOGICNOT: *result = !temp; break;
+        default:
+            assert(false);
+        }
+        return;
+    }
+    case EXPR_COND: {
+        long long temp;
+        typecheck_const_expr_eval(expr->cond.expr1, &temp);
+        if (temp) {
+            typecheck_const_expr_eval(expr->cond.expr2, result);
+        } else {
+            typecheck_const_expr_eval(expr->cond.expr3, result);
+        }
+        return;
+    }
+    case EXPR_CAST:
+        typecheck_const_expr_eval(expr->cast.base, result);
+        return;
+
+    case EXPR_SIZEOF:
+        if (expr->sizeof_params.type != NULL) {
+            decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
+            assert(node != NULL);
+            *result = node->type->size;
+        } else {
+            assert(expr->sizeof_params.expr != NULL);
+            *result = expr->sizeof_params.expr->etype->size;
+        }
+        return;
+    case EXPR_VOID:
+    case EXPR_VAR:
+    case EXPR_ASSIGN:
+    case EXPR_CONST_FLOAT:
+    case EXPR_CONST_STR:
+    case EXPR_CALL:
+    case EXPR_CMPD:
+    case EXPR_MEM_ACC:
+    case EXPR_INIT_LIST:
+    default:
+        assert(false);
+    }
 }
 
 bool typecheck_type_integral(type_t *type) {

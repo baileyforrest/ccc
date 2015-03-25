@@ -40,6 +40,11 @@ typedef struct tc_state_t {
 } tc_state_t;
 
 /**
+ * Literal for tc_state_t
+ */
+#define TCS_LIT { NULL, NULL, NULL, NULL, NULL }
+
+/**
  * Returns true if type is integral, false otherwise
  *
  * @param type The type to check

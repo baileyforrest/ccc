@@ -701,7 +701,7 @@ status_t pp_directive_endif(preprocessor_t *pp) {
     }
 
     file->if_count--;
-    pp_cond_inst_t *cond_inst = sl_head(&file->cond_insts);
+    pp_cond_inst_t *cond_inst = sl_pop_front(&file->cond_insts);
     assert(cond_inst != NULL);
     free(cond_inst);
 
