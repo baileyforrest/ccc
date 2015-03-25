@@ -327,7 +327,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             status = lex_number(lexer, cur, result);
             // Skip whitespace
             break;
-        case '\n': case ' ': case '\t':
+        case '\n': case ' ': case '\t': case '\\':
             done = false;
             break;
         default:

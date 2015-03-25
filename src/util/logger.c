@@ -84,13 +84,13 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
         break;
     }
 
-    printf("%s:%d:%d %s", mark->file->str, mark->line, mark->col, header);
+    printf("%s:%d:%d %s ", mark->file->str, mark->line, mark->col, header);
     vprintf(fmt, ap);
     printf("\n");
     logger_log_line(mark);
 
     for (fmark_t *cur = mark->last; cur != NULL; cur = cur->last) {
-        printf("%s:%d:%d note: %s\n", mark->file->str, mark->line, mark->col,
+        printf("%s:%d:%d note: %s\n", cur->file->str, cur->line, cur->col,
                "In expansion of macro");
         logger_log_line(cur);
     }

@@ -88,6 +88,7 @@ void pp_directives_destroy(preprocessor_t *pp) {
     (void)pp;
 }
 
+/*
 status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
                       const char *directive) {
     status_t status = CCC_OK;
@@ -109,6 +110,7 @@ status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
 fail:
     return status;
 }
+*/
 
 /**
  * Warning: This is not reentrant!
@@ -518,6 +520,7 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
     }
 
     if (NULL == (cond_inst = malloc(sizeof(*cond_inst)))) {
+        logger_log(&stream->mark, LOG_ERR, "Out of memory in %s", directive);
         status = CCC_NOMEM;
         goto fail;
     }
@@ -544,8 +547,8 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
         return CCC_OK;
     }
     cond_inst->if_taken = false;
-
-    status = pp_skip_cond(pp, stream, directive);
+    pp->ignore = true;
+    //status = pp_skip_cond(pp, stream, directive); TODO remove
 
     return status;
 
@@ -601,19 +604,28 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
 
     manager_t manager;
     if (CCC_OK != (status = man_init(&manager, &pp->macros))) {
+        logger_log(&stream->mark, LOG_ERR,
+                   "Failed to initialize parser in #%s", directive);
         goto fail0;
     }
     if (CCC_OK != (status = pp_map_stream(&manager.pp, &lookahead))) {
+        logger_log(&stream->mark, LOG_ERR,
+                   "Failed to map stream in #%s", directive);
         goto fail1;
     }
 
     expr_t *expr = NULL;
     if (CCC_OK != (status = man_parse_expr(&manager, &expr))) {
+        logger_log(&stream->mark, LOG_ERR,
+                   "Failed to parse expression in #%s", directive);
         goto fail1;
     }
 
     long long value;
     if (!typecheck_const_expr(expr, &value)) {
+        logger_log(&stream->mark, LOG_ERR,
+                   "Failed to typecheck and parse conditional in #%s",
+                   directive);
         goto fail2;
     }
 
@@ -621,9 +633,12 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
     if (is_if) {
         file->start_if_count = file->if_count;
         if (NULL == (head = malloc(sizeof(*head)))) {
+            logger_log(&stream->mark, LOG_ERR, "Out of memory in #%s",
+                       directive);
             status = CCC_NOMEM;
             goto fail2;
         }
+        sl_prepend(&file->cond_insts, &head->link);
     } else {
         head = sl_head(&file->cond_insts);
     }
@@ -633,9 +648,12 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
         pp->ignore = false; // stop skipping
     } else {
         head->if_taken = false;
+        pp->ignore = true;
+        /* TODO: remove
         if (!pp->ignore) { // Only skip if we're not already skipping
             status = pp_skip_cond(pp, stream, directive);
         }
+        */
     }
 
     ast_expr_destroy(expr);

@@ -980,7 +980,7 @@ void ast_decl_destroy(decl_t *decl) {
     if (decl == NULL) {
         return;
     }
-    bool is_typedef = decl->type->type == TYPE_MOD &&
+    bool is_typedef = decl->type != NULL && decl->type->type == TYPE_MOD &&
         decl->type->mod.type_mod & TMOD_TYPEDEF;
 
     if (is_typedef) {

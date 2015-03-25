@@ -199,7 +199,21 @@ int pp_search_string_concat(preprocessor_t *pp, tstream_t *stream) {
 }
 
 int pp_nextchar(preprocessor_t *pp) {
-    return pp_nextchar_helper(pp, false);
+    if (!pp->ignore) {
+        return pp_nextchar_helper(pp, false);
+    }
+
+    int result = PP_EOF;
+    while (pp->ignore) {
+        // Fetch characters until another directive is run to tell us to stop
+        // ignoring
+        result = pp_nextchar_helper(pp, false);
+        if (result == PP_EOF) { // Only go to end of current file
+            logger_log(&pp->last_mark, LOG_ERR, "Unexpected EOF");
+            return -(int)CCC_ESYNTAX;
+        }
+    }
+    return result;
 }
 
 status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,

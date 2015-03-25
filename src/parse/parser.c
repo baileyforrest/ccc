@@ -187,7 +187,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     }
 
     decl_node_t *decl_node = sl_tail(&gdecl->decl->decls);
-    if (decl_node->type->type == TYPE_FUNC) {
+    if (decl_node->type != NULL && decl_node->type->type == TYPE_FUNC) {
         if (CCC_OK != (status = par_function_definition(lex, gdecl))) {
             goto fail;
         }
@@ -754,7 +754,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     }
     sl_append(&decl->decls, &decl_node->link);
 
-    bool is_typedef = decl->type->type == TYPE_MOD &&
+    bool is_typedef = decl->type != NULL && decl->type->type == TYPE_MOD &&
         (decl->type->mod.type_mod & TMOD_TYPEDEF);
 
     // Add typedefs to the typetable on the top of the stack
@@ -1882,7 +1882,7 @@ status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl, bool partial) {
     }
     decl_node_t *decl_node = sl_tail(&decl->decls);
 
-    bool is_typedef = decl->type->type == TYPE_MOD &&
+    bool is_typedef = decl->type != NULL && decl->type->type == TYPE_MOD &&
         (decl->type->mod.type_mod & TMOD_TYPEDEF);
     if (LEX_CUR(lex).type == ASSIGN) {
         if (is_typedef) {
