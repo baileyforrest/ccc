@@ -49,6 +49,7 @@ typedef struct pp_directive_t {
  * Registers preprocessor directives in a preprocessor
  *
  * @param pp preprocessor to operate on
+ * @return CCC_OK on success, error code on error
  */
 status_t pp_directives_init(preprocessor_t *pp);
 
@@ -60,10 +61,15 @@ status_t pp_directives_init(preprocessor_t *pp);
 void pp_directives_destroy(preprocessor_t *pp);
 
 /**
- * Directive for #define
- * @param pp The preprocessor to define for
+ * Skips input into the preprocessor until another directive tells it to stop
+ *
+ * @param pp preprocessor to operate on
+ * @param stream Stream to skip on
+ * @param directive Name of the directive causing the skip
+ * @return CCC_OK on success, error code on error
  */
-status_t pp_directive_define(preprocessor_t *pp);
+status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
+                      const char *directive);
 
 /**
  * Directive for #include
@@ -71,25 +77,94 @@ status_t pp_directive_define(preprocessor_t *pp);
  * Warning: Current version uses static memory so is not reentrant
  *
  * @param pp The preprocessor to include for
+ * @return CCC_OK on success, error code on error
  */
 status_t pp_directive_include(preprocessor_t *pp);
 
 /**
- * Directive for #ifndef
+ * Directive for #define
+ *
+ * @param pp The preprocessor to define for
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_define(preprocessor_t *pp);
+
+/**
+ * Directive for #undef
+ *
  * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_undef(preprocessor_t *pp);
+
+/**
+ * Directive for #ifdef
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_ifdef(preprocessor_t *pp);
+
+/**
+ * Directive for #ifndef
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
  */
 status_t pp_directive_ifndef(preprocessor_t *pp);
 
 /**
- * Directive for #endif
+ * Helper function for #ifndef and #ifdef
+ *
  * @param pp The preprocessor act on
+ * @param directive Name of the directive
+ * @param ifdef. If true, process as ifdef, else processess as ifndef
+ * @return CCC_OK on success, error code on error
  */
-status_t pp_directive_endif(preprocessor_t *pp);
+status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
+                                   bool ifdef);
 
 /**
- * Directive for #undef
+ * Directive for #if
+ *
  * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
  */
-status_t pp_directive_undef(preprocessor_t *pp);
+status_t pp_directive_if(preprocessor_t *pp);
+
+/**
+ * Directive for #elif
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_elif(preprocessor_t *pp);
+
+/**
+ * Helper function for #elif and #if
+ *
+ * @param pp The preprocessor act on
+ * @param directive Name of the directive
+ * @param is_if true if #if directive, false if #elif directive
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
+                                bool is_if);
+
+/**
+ * Directive for #else
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_else(preprocessor_t *pp);
+
+/**
+ * Directive for #endif
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_endif(preprocessor_t *pp);
 
 #endif /* _PP_DIRECTIVE_H_ */

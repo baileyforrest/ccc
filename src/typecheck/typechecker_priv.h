@@ -48,6 +48,16 @@ typedef struct tc_state_t {
 bool typecheck_type_integral(type_t *type);
 
 /**
+ * Evaluates a given constant expression expression.
+ *
+ * Assumes that the expression typechecks
+ *
+ * @param expr The expression to evaluate
+ * @param result Location to store the result
+ */
+void typecheck_const_expr_eval(expr_t *expr, long long *result);
+
+/**
  * Returns true if type can be in a conditional, false otherwise
  *
  * @param type The type to check

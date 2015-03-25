@@ -27,13 +27,20 @@
 #include "util/util.h"
 #include "util/logger.h"
 
+typedef struct pp_cond_inst_t {
+    sl_link_t link;     /**< List link */
+    bool if_taken;      /**< Branch taken on current if */
+} pp_cond_inst_t;
+
 /**
  * An instance of an open file on the preprocessor
  */
 typedef struct pp_file_t {
-    sl_link_t link;   /**< List link */
-    tstream_t stream; /**< Text stream */
-    int if_count;     /**< Number of instances of active if directive */
+    sl_link_t link;     /**< List link */
+    slist_t cond_insts; /**< Instances of conditional preprocessor directive */
+    tstream_t stream;   /**< Text stream */
+    int start_if_count; /**< Instances of if at start of current conditional */
+    int if_count; /**< Instances of if at start of current conditional */
 } pp_file_t;
 
 /**
@@ -66,9 +73,21 @@ typedef struct pp_macro_inst_t {
 } pp_macro_inst_t;
 
 /**
+ * Helper function to initialize a preprocessor.
+ *
+ * This allows us to create a preprocessor for processing of expressions for
+ * the preprocessor
+ *
+ * @param pp The preprocessor to initialize
+ * @param macros The macros to preload into the preprocessor. NULL if none.
+ * @return CCC_OK on success, error code on error.
+ */
+status_t pp_init_helper(preprocessor_t *pp, htable_t *macros);
+
+/**
  * Helper function to fetch characters with macro substitution
  *
- * @param pp The preprocessor te fetch characters from
+ * @param pp The preprocessor to fetch characters from
  * @param ignore_directive if true, directives are not processed
  */
 int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
@@ -82,8 +101,18 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
  * @param last_file The file which included one being mapped. NULL if none.
  * @return CCC_OK on success, error code otherwise
  */
-status_t pp_file_map(const char *filename, size_t len, pp_file_t *last_file,
+status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
                      pp_file_t **result);
+
+/**
+ * Maps a stream into a preprocessor as if it were a file, placing it on top of
+ * the file stack
+ *
+ * @param pp The preprocessor to map a stream for
+ * @param stream The stream to map
+ * @return CCC_OK on success, error code on error.
+ */
+status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream);
 
 /**
  * Unmaps and given pp_file_t. Does free pp_file.

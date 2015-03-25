@@ -451,7 +451,6 @@ typedef struct gdecl_t {
 typedef struct trans_unit_t {
     sl_link_t link;     /**< Storage link */
     fmark_t mark;       /**< File mark */
-    len_str_t *path;    /**< Path of compilation unit */
     slist_t gdecls;     /**< List of gdecl in compilation unit */
     typetab_t typetab;  /**< Types defined at top level */
 } trans_unit_t;

@@ -74,6 +74,16 @@ typedef struct htable_t {
 status_t ht_init(htable_t *ht, const ht_params_t *params);
 
 /**
+ * Create a handle to a read only hashtable. Any mutation of dest or src during
+ * existance of dest may result in data corruption. Dest does not need to be
+ * destructed.
+ *
+ * @param dest Location of handle
+ * @param src Hashtable to create handle of.
+ */
+void ht_create_handle(htable_t *dest, htable_t *src);
+
+/**
  * Destroys an hash table
  * Does not free ht itself. Does not free elements, only backing store
  *

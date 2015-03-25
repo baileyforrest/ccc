@@ -35,4 +35,14 @@
  */
 bool typecheck_ast(trans_unit_t *ast);
 
+/**
+ * Typecheck an expression and evaluate it as a constant expression. Error and
+ * warnings will be sent to the logger.
+ *
+ * @param ast The AST to typecheck
+ * @param result Location to store the result
+ * @return true if the tranlation unit typechecks, false otherwise
+ */
+bool typecheck_const_expr(expr_t *expr, long long *result);
+
 #endif /* _TYPECHECKER_H_ */

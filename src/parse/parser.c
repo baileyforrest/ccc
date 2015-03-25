@@ -46,11 +46,11 @@
 #include "util/logger.h"
 #include "util/util.h"
 
-status_t parser_parse(lexer_t *lexer, len_str_t *file, trans_unit_t **result) {
+status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
     assert(lexer != NULL);
-    assert(file != NULL);
     assert(result != NULL);
     status_t status = CCC_OK;
+
     lex_wrap_t lex;
     lex.lexer = lexer;
     for (int i = 0; i < LEX_LOOKAHEAD; ++i) {
@@ -59,7 +59,28 @@ status_t parser_parse(lexer_t *lexer, len_str_t *file, trans_unit_t **result) {
         }
     }
     lex.lex_idx = 0;
-    status = par_translation_unit(&lex, file, result);
+
+    status = par_translation_unit(&lex, result);
+
+fail:
+    return status;
+}
+
+status_t parser_parse_expr(lexer_t *lexer, expr_t **result) {
+    assert(lexer != NULL);
+    assert(result != NULL);
+    status_t status = CCC_OK;
+    lex_wrap_t lex;
+
+    lex.lexer = lexer;
+    for (int i = 0; i < LEX_LOOKAHEAD; ++i) {
+        if (CCC_OK != (status = lexer_next_token(lex.lexer, &lex.lexemes[i]))) {
+            goto fail;
+        }
+    }
+    lex.lex_idx = 0;
+
+    status = par_expression(&lex, NULL, result);
 
 fail:
     return status;
@@ -99,12 +120,10 @@ int par_get_binary_prec(oper_t op) {
     return -1;
 }
 
-status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
-                              trans_unit_t **result) {
+status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result) {
     status_t status = CCC_OK;
     trans_unit_t *tunit = NULL;
     ALLOC_NODE(lex, tunit, trans_unit_t);
-    tunit->path = file;
     sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
     if (CCC_OK != (status = tt_init(&tunit->typetab, NULL))) {
         goto fail;

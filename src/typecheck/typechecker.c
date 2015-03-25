@@ -33,6 +33,22 @@ bool typecheck_ast(trans_unit_t *ast) {
     return typecheck_trans_unit(&tcs, ast);
 }
 
+bool typecheck_const_expr(expr_t *expr, long long *result) {
+    tc_state_t tcs = { NULL, NULL, NULL, NULL, NULL };
+    if (!typecheck_expr(&tcs, expr, TC_CONST)) {
+        return false;
+    }
+
+    typecheck_const_expr_eval(expr, result);
+    return true;
+}
+
+void typecheck_const_expr_eval(expr_t *expr, long long *result) {
+    // TODO: This
+    (void)expr;
+    (void)result;
+}
+
 bool typecheck_type_integral(type_t *type) {
     switch (type->type) {
     case TYPE_CHAR:
@@ -103,7 +119,6 @@ bool typecheck_type_conditional(type_t *type) {
 
     return false;
 }
-
 
 bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
     bool retval = typecheck_expr(tcs, expr, TC_NOCONST);
@@ -311,8 +326,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         }
         return retval;
     case STMT_RETURN:
-        retval &= typecheck_expr(tcs, stmt->return_params.expr,
-                                 TC_NOCONST);
+        retval &= typecheck_expr(tcs, stmt->return_params.expr, TC_NOCONST);
         // TODO: Need to make sure compatible type with return value
         return retval;
 
@@ -377,6 +391,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = expr->paren_base->etype;
         return retval;
     case EXPR_VAR: {
+        if (constant == TC_CONST) {
+            logger_log(&expr->mark, "Expected constant value", LOG_ERR);
+            return false;
+        }
         tt_key_t lookup = { expr->var_id, TT_VAR };
         typetab_entry_t *entry = tt_lookup(tcs->typetab, &lookup);
         if (entry == NULL) {

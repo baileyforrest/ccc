@@ -62,6 +62,10 @@ void ht_destroy(htable_t *ht) {
     free(ht->buckets);
 }
 
+void ht_create_handle(htable_t *dest, htable_t *src) {
+    memcpy(dest, src, sizeof(*src));
+}
+
 /**
  * Grows the specified hashtable
  *

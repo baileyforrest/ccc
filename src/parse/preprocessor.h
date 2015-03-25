@@ -35,22 +35,22 @@
  * Object for preprocessor
  */
 typedef struct preprocessor_t {
-    slist_t file_insts;        /**< Stack of instances of open files */
-    slist_t macro_insts;       /**< Stack of paramaters and strings mappings */
-    slist_t search_path;       /**< #include search path */
-    htable_t macros;           /**< Macro table */
-    htable_t directives;       /**< Preprocessor directives */
+    slist_t file_insts;   /**< Stack of instances of open files */
+    slist_t macro_insts;  /**< Stack of paramaters and strings mappings */
+    slist_t search_path;  /**< #include search path */
+    htable_t macros;      /**< Macro table */
+    htable_t directives;  /**< Preprocessor directives */
 
-    fmark_t last_mark;         /**< Mark of last returned token */
-    tstream_t cur_param;       /**< Current macro parameter's stream */
-    bool param_stringify;      /**< Whether or not we are stringifying */
+    fmark_t last_mark;    /**< Mark of last returned token */
+    tstream_t cur_param;  /**< Current macro parameter's stream */
+    bool param_stringify; /**< Whether or not we are stringifying */
 
     // Paramaters for reading preprocessor commands
-    bool block_comment;        /**< true if in a block comment */
-    bool line_comment;         /**< true if in a line comment */
-    bool string;               /**< true if in string */
-    bool char_line;            /**< true if non whitespace on current line */
-    bool ignore;               /**< Conditional compilation - ignore output */
+    bool block_comment;   /**< true if in a block comment */
+    bool line_comment;    /**< true if in a line comment */
+    bool string;          /**< true if in string */
+    bool char_line;       /**< true if non whitespace on current line */
+    bool ignore;          /**< Conditional compilation - ignore output */
 } preprocessor_t;
 
 
@@ -58,8 +58,12 @@ typedef struct preprocessor_t {
  * Initializes preprocessor
  *
  * @param pp The preprocessor to initalize
+ * @param macros If non NULL, manager's preprocessor is initialized with
+ *     given macros. It is then used under the assumption that macros will not
+ *     change during use, and that manager will not change macros
+ * @return CCC_OK on success, error code on error.
  */
-status_t pp_init(preprocessor_t *pp);
+status_t pp_init(preprocessor_t *pp, htable_t *macros);
 
 /**
  * Destroys preprocessor. Closes file if open
@@ -73,6 +77,7 @@ void pp_destroy(preprocessor_t *pp);
  *
  * @param pp The preprocessor to open file with
  * @param filename The name of the file to process
+ * @return CCC_OK on success, error code on error.
  */
 status_t pp_open(preprocessor_t *pp, const char *filename);
 

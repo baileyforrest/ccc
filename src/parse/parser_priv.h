@@ -125,13 +125,11 @@ int par_get_binary_prec(oper_t op);
  * Parses a tranlation unit
  *
  * @param lex Current lexer state
- * @param file Filename of translation unit
  * @param result Location to store resulting translation unit. This function
  *     will allocate one.
  * @return CCC_OK on success, error code on error
  */
-status_t par_translation_unit(lex_wrap_t *lex, len_str_t *file,
-                              trans_unit_t **result);
+status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result);
 /**
  * Parses an external declaration (declaration or function definition)
  *

@@ -26,37 +26,26 @@
 
 #include "util/file_directory.h"
 
-static preprocessor_t pp;
-static symtab_t symtab;
-static symtab_t string_tab;
-static lexer_t lexer;
+#include "manager.h"
+
+static manager_t manager;
 
 int main(int argc, char **argv) {
+    status_t status = CCC_OK;
     if (argc < 2) {
         return -1;
     }
-
-    status_t status;
 
     if (CCC_OK != (status = fdir_init())) {
         goto fail0;
     }
 
-    if (CCC_OK != (status = pp_init(&pp))) {
+    if (CCC_OK != (status = man_init(&manager, NULL))) {
         goto fail1;
     }
-    if (CCC_OK != (status = st_init(&symtab, IS_SYM))) {
-        goto fail2;
-    }
-    if (CCC_OK != (status = st_init(&string_tab, NOT_SYM))) {
-        goto fail3;
-    }
-    if (CCC_OK != (status = lexer_init(&lexer, &pp, &symtab, &string_tab))) {
-        goto fail4;
-    }
 
-    if (CCC_OK != (status = pp_open(&pp, argv[1]))) {
-        goto fail5;
+    if (CCC_OK != (status = pp_open(&manager.pp, argv[1]))) {
+        goto fail2;
     }
 
     /*
@@ -69,24 +58,16 @@ int main(int argc, char **argv) {
     } while(cur_token.type != TOKEN_EOF);
     */
     ///*
-    fdir_entry_t *fdir_entry = fdir_lookup(argv[1], strlen(argv[1]));
     trans_unit_t *ast;
-    if (CCC_OK !=
-        (status = parser_parse(&lexer, &fdir_entry->filename, &ast))) {
-        goto fail5;
+    if (CCC_OK != (status = man_parse(&manager, &ast))) {
+        goto fail2;
     }
     ast_print(ast);
     ast_destroy(ast);
     //*/
 
-fail5:
-    lexer_destroy(&lexer);
-fail4:
-    st_destroy(&string_tab);
-fail3:
-    st_destroy(&symtab);
 fail2:
-    pp_destroy(&pp);
+    man_destroy(&manager);
 fail1:
     fdir_destroy();
 fail0:

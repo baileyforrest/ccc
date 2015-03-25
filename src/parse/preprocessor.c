@@ -55,7 +55,7 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1") // Standard libraries available
 };
 
-status_t pp_init(preprocessor_t *pp) {
+status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     static ht_params_t params = {
         0,                                // No Size estimate
         offsetof(pp_macro_t, name),       // Offset of key
@@ -69,26 +69,42 @@ status_t pp_init(preprocessor_t *pp) {
     sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link));
     sl_init(&pp->search_path, offsetof(len_str_node_t, link));
 
-    if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
-        goto fail1;
-    }
+    if (macros == NULL) {
+        if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
+            goto fail1;
+        }
 
-    // Register directive handlers
-    if (CCC_OK != (status = pp_directives_init(pp))) {
-        goto fail2;
-    }
-
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
-        if (CCC_OK != (status = ht_insert(&pp->macros,
-                                          &s_predef_macros[i].link))) {
+        // Register directive handlers
+        if (CCC_OK != (status = pp_directives_init(pp))) {
             goto fail2;
         }
+
+        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
+            if (CCC_OK != (status = ht_insert(&pp->macros,
+                                              &s_predef_macros[i].link))) {
+                goto fail2;
+            }
+        }
+    } else {
+        ht_create_handle(&pp->macros, macros);
     }
+
+    // Initialize state
+    pp->cur_param.cur = NULL;
+    pp->param_stringify = false;
+
+    pp->block_comment = false;
+    pp->line_comment = false;
+    pp->string = false;
+    pp->char_line = false;
+    pp->ignore = false;
 
     return status;
 
 fail2:
-    ht_destroy(&pp->macros);
+    if (macros != NULL) {
+        ht_destroy(&pp->macros);
+    }
 fail1:
     sl_destroy(&pp->search_path);
     sl_destroy(&pp->macro_insts);
@@ -124,23 +140,14 @@ status_t pp_open(preprocessor_t *pp, const char *filename) {
     size_t len = strlen(filename);
     pp_file_t *pp_file;
     if (CCC_OK !=
-        (status = pp_file_map(filename, len, NULL, &pp_file))) {
+        (status = pp_map_file(filename, len, NULL, &pp_file))) {
         goto fail;
     }
 
     sl_prepend(&pp->file_insts, &pp_file->link);
 
     fdir_entry_t *file = fdir_lookup(filename, len);
-    assert(file != NULL); // pp_file_map should add the file to the directory
-
-    pp->cur_param.cur = NULL;
-    pp->param_stringify = false;
-
-    pp->block_comment = false;
-    pp->line_comment = false;
-    pp->string = false;
-    pp->char_line = false;
-    pp->ignore = false;
+    assert(file != NULL); // pp_map_file should add the file to the directory
 
 fail:
     return status;
@@ -174,7 +181,7 @@ int pp_nextchar(preprocessor_t *pp) {
     return pp_nextchar_helper(pp, false);
 }
 
-status_t pp_file_map(const char *filename, size_t len, pp_file_t *last_file,
+status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
                      pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = malloc(sizeof(pp_file_t));
@@ -190,6 +197,10 @@ status_t pp_file_map(const char *filename, size_t len, pp_file_t *last_file,
     fmark_t *last_mark = last_file == NULL ? NULL : &last_file->stream.mark;
     ts_init(&pp_file->stream, entry->buf, entry->end, &entry->filename,
             entry->buf, last_mark, 1, 1);
+
+    // TODO: This is duplicated in next function, create a helper function
+    sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
+    pp_file->start_if_count = 0;
     pp_file->if_count = 0;
 
     *result = pp_file;
@@ -199,6 +210,29 @@ fail:
     pp_file_destroy(pp_file);
     return status;
 }
+
+status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream) {
+    status_t status = CCC_OK;
+    pp_file_t *pp_file = malloc(sizeof(pp_file_t));
+    if (NULL == pp_file) {
+        status = CCC_NOMEM;
+        goto fail;
+    }
+
+    ts_copy(&pp_file->stream, stream, TS_COPY_SHALLOW);
+
+    sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
+    pp_file->start_if_count = 0;
+    pp_file->if_count = 0;
+
+    sl_prepend(&pp->file_insts, &pp_file->link);
+    return status;
+
+fail:
+    pp_file_destroy(pp_file);
+    return status;
+}
+
 
 void pp_file_destroy(pp_file_t *pp_file) {
     free(pp_file);
