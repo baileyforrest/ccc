@@ -83,10 +83,9 @@ typedef struct lex_wrap_t {
     do {                                                                \
         token_t cur = LEX_CUR(wrap).type;                               \
         if (cur != (token)) {                                           \
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,                  \
-                     "Parse Error: Expected %s. Found: %s.",            \
-                     token_str(token), token_str(cur));                 \
-            logger_log(&LEX_CUR(wrap).mark, logger_fmt_buf, LOG_ERR);   \
+            logger_log(&LEX_CUR(wrap).mark, LOG_ERR,                    \
+                       "Parse Error: Expected %s. Found: %s.",          \
+                       token_str(token), token_str(cur));               \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \
@@ -104,12 +103,12 @@ typedef struct lex_wrap_t {
     do {                                                            \
         loc = malloc(sizeof(type));                                 \
         if (loc == NULL) {                                          \
-            logger_log(&LEX_CUR(lex).mark, "Out of memory in parser",    \
-                       LOG_ERR);                                    \
+            logger_log(&LEX_CUR(lex).mark, LOG_ERR,                 \
+                       "Out of memory in parser");                  \
             status = CCC_NOMEM;                                     \
             goto fail;                                              \
         }                                                           \
-        memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));   \
+        memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));  \
     } while (0)
 
 

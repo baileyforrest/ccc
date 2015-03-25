@@ -34,12 +34,6 @@ typedef enum log_type_t {
     LOG_INFO  /**< Information */
 } log_type_t;
 
-// String formatting buffer for logging
-// Usage is obviously nonreentrant
-// Should be formatted then used right away
-#define LOG_FMT_BUF_SIZE 4096
-extern char logger_fmt_buf[LOG_FMT_BUF_SIZE];
-
 /**
  * Initializes logger
  */
@@ -52,8 +46,11 @@ void logger_destroy();
 
 /**
  * Log a message
+ *
+ * @param mark File mark to log from
+ * @param type Type of log
  */
-void logger_log(fmark_t *mark, const char *message, log_type_t type);
+void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...);
 
 /**
  * @return Returns true if an error message has been logged

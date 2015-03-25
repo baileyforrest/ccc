@@ -164,9 +164,8 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
         }
     }
     if (gdecl->decl->type == NULL) {
-        logger_log(&LEX_CUR(lex).mark,
-                   "Data definition has no type or storage class",
-                   LOG_WARN);
+        logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+                   "Data definition has no type or storage class");
     }
 
     if (CCC_OK != (status = par_declarator_base(lex, gdecl->decl))) {
@@ -336,10 +335,9 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
         assert(false);
     }
     if ((*type)->mod.type_mod & tmod) {
-        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                 "Duplicate storage class specifer: %s",
-                 ast_type_mod_str(tmod));
-        logger_log(&LEX_CUR(lex).mark, logger_fmt_buf, LOG_WARN);
+        logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+                   "Duplicate storage class specifer: %s",
+                   ast_type_mod_str(tmod));
     }
 
     (*type)->mod.type_mod |= tmod;
@@ -407,8 +405,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         }
 
         // We found a node that is type, so we cannot have two
-        logger_log(&LEX_CUR(lex).mark, "Multiple type specifers",
-                   LOG_ERR);
+        logger_log(&LEX_CUR(lex).mark, LOG_ERR, "Multiple type specifers");
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -458,10 +455,9 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         }
 
         if (mod_node->mod.type_mod & mod) {
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                     "Duplicate type specifer: %s",
-                     ast_type_mod_str(mod));
-            logger_log(&LEX_CUR(lex).mark, logger_fmt_buf, LOG_ERR);
+            logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                       "Duplicate type specifer: %s",
+                       ast_type_mod_str(mod));
             status = CCC_ESYNTAX;
         }
         mod_node->mod.type_mod |= mod;
@@ -512,11 +508,10 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         // Not a definition
         if (LEX_CUR(lex).type != LBRACE && entry != NULL) {
             if (entry->type->type != btype) {
-                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                         "Incorrect type specifer %s. Expected: %s.",
-                         ast_basic_type_str(entry->type->type),
-                         ast_basic_type_str(btype));
-                logger_log(&LEX_CUR(lex).mark, logger_fmt_buf, LOG_ERR);
+                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                           "Incorrect type specifer %s. Expected: %s.",
+                           ast_basic_type_str(entry->type->type),
+                           ast_basic_type_str(btype));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -571,8 +566,8 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
             *type = typedef_type;
             return CCC_OK;
         } else { // Can't have a compound type without a name or definition
-            logger_log(&LEX_CUR(lex).mark,
-                       "Compound type without name or definition", LOG_ERR);
+            logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                       "Compound type without name or definition");
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -1514,10 +1509,9 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
             LEX_ADVANCE(lex);
 
             if (LEX_CUR(lex).type != ID) { // Not a name
-                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                         "Parse Error: Expected <identifer>, Found: %s.",
-                         token_str(LEX_CUR(lex).type));
-                logger_log(&LEX_CUR(lex).mark, logger_fmt_buf, LOG_ERR);
+                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                           "Parse Error: Expected <identifer>, Found: %s.",
+                           token_str(LEX_CUR(lex).type));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -1892,10 +1886,9 @@ status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl, bool partial) {
         (decl->type->mod.type_mod & TMOD_TYPEDEF);
     if (LEX_CUR(lex).type == ASSIGN) {
         if (is_typedef) {
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                     "Typedef '%s' is initialized",
-                     decl_node->id->str);
-            logger_log(&LEX_CUR(lex).mark, logger_fmt_buf, LOG_WARN);
+            logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+                       "Typedef '%s' is initialized",
+                       decl_node->id->str);
             status = CCC_ESYNTAX;
             goto fail;
         }

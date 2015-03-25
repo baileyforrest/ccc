@@ -25,11 +25,10 @@
 #include "logger.h"
 
 #include <stdio.h>
+#include <stdarg.h>
 
 void logger_log_line(fmark_t *mark);
 
-
-char logger_fmt_buf[LOG_FMT_BUF_SIZE];
 
 typedef struct logger_t {
     bool has_error;
@@ -63,8 +62,11 @@ void logger_log_line(fmark_t *mark) {
     putchar('\n');
 }
 
-void logger_log(fmark_t *mark, const char *message, log_type_t type) {
+void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
     char *header;
+
+    va_list ap;
+    va_start(ap, fmt);
 
     switch (type) {
     case LOG_ERR:
@@ -82,8 +84,9 @@ void logger_log(fmark_t *mark, const char *message, log_type_t type) {
         break;
     }
 
-    printf("%s:%d:%d %s %s\n", mark->file->str, mark->line, mark->col, header,
-           message);
+    printf("%s:%d:%d %s", mark->file->str, mark->line, mark->col, header);
+    vprintf(fmt, ap);
+    printf("\n");
     logger_log_line(mark);
 
     for (fmark_t *cur = mark->last; cur != NULL; cur = cur->last) {

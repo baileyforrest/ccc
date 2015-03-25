@@ -56,10 +56,18 @@ static pp_macro_t s_predef_macros[] = {
 };
 
 status_t pp_init(preprocessor_t *pp, htable_t *macros) {
-    static ht_params_t params = {
+    static const ht_params_t macro_params = {
         0,                                // No Size estimate
         offsetof(pp_macro_t, name),       // Offset of key
         offsetof(pp_macro_t, link),       // Offset of ht link
+        strhash,                          // Hash function
+        vstrcmp,                          // void string compare
+    };
+
+    static const ht_params_t directive_params = {
+        0,                                // No Size estimate
+        offsetof(pp_directive_t, key),    // Offset of key
+        offsetof(pp_directive_t, link),   // Offset of ht link
         strhash,                          // Hash function
         vstrcmp,                          // void string compare
     };
@@ -69,20 +77,26 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link));
     sl_init(&pp->search_path, offsetof(len_str_node_t, link));
 
+    if (CCC_OK != (status = ht_init(&pp->directives, &directive_params))) {
+        goto fail1;
+    }
+
+
     if (macros == NULL) {
-        if (CCC_OK != (status = ht_init(&pp->macros, &params))) {
-            goto fail1;
+        if (CCC_OK != (status = ht_init(&pp->macros, &macro_params))) {
+            goto fail2;
         }
 
         // Register directive handlers
         if (CCC_OK != (status = pp_directives_init(pp))) {
-            goto fail2;
+            goto fail3;
         }
 
+        // Load predefined macros
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
             if (CCC_OK != (status = ht_insert(&pp->macros,
                                               &s_predef_macros[i].link))) {
-                goto fail2;
+                goto fail3;
             }
         }
         pp->pp_if = false;
@@ -103,10 +117,12 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
 
     return status;
 
-fail2:
+fail3:
     if (macros != NULL) {
         ht_destroy(&pp->macros);
     }
+fail2:
+    ht_destroy(&pp->directives);
 fail1:
     sl_destroy(&pp->search_path);
     sl_destroy(&pp->macro_insts);
@@ -121,13 +137,16 @@ void pp_destroy(preprocessor_t *pp) {
     SL_DESTROY_FUNC(&pp->file_insts, pp_file_destroy);
     SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
 
-    // Remove all of the static entries first, because they aren't heap
-    // allocated
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
-        ht_remove(&pp->macros, &s_predef_macros[i].name);
+    if (!pp->pp_if) {
+        // Remove all of the static entries first, because they aren't heap
+        // allocated
+        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
+            ht_remove(&pp->macros, &s_predef_macros[i].name);
+        }
+        HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
     }
-    HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
     pp_directives_destroy(pp);
+    ht_destroy(&pp->directives);
 }
 
 void pp_close(preprocessor_t *pp) {
@@ -237,6 +256,7 @@ fail:
 
 
 void pp_file_destroy(pp_file_t *pp_file) {
+    SL_DESTROY_FUNC(&pp_file->cond_insts, free);
     free(pp_file);
 }
 
@@ -470,7 +490,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     case '#':
         // If we found a character before the #, just ignore it
         if (pp->char_line) {
-            logger_log(&stream->mark, "Stray '#' in program", LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR, "Stray '#' in program");
             ts_advance(stream);
             return -(int)CCC_ESYNTAX;
         }
@@ -478,8 +498,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         // Check for preprocessor directive if we're not in a macro
         if (macro_inst == NULL) {
             if (ignore_directive) {
-                logger_log(&stream->mark, "Unexpected '#' in directive",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Unexpected '#' in directive");
             }
             ts_advance(stream);
             ts_skip_ws_and_comment(stream);
@@ -489,10 +509,9 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
 
             if (directive == NULL) {
-                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                         "Invalid preprocessing directive %.*s", (int)len,
-                         start);
-                logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Invalid preprocessing directive %.*s", (int)len,
+                           start);
                 ts_skip_line(stream); // Skip rest of line
                 return -(int)CCC_ESYNTAX;
             }
@@ -503,7 +522,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             if (status != CCC_OK) {
                 ts_advance(stream);
-                return status;
+                return -(int)status;
             }
             // Return next character after directive
             return pp_nextchar(pp);
@@ -517,8 +536,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
                 ht_lookup(&macro_inst->param_map, &lookup);
 
             if (param == NULL) {
-                logger_log(&stream->mark,
-                           "'#' Is not followed by a macro paramater", LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "'#' Is not followed by a macro paramater");
                 ts_advance(stream);
                 return -(int)CCC_ESYNTAX;
             }
@@ -581,25 +600,25 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
         size_t len = ts_advance_identifier(&lookahead);
         if (len == 0) {
-            logger_log(&stream->mark,
-                       "operator \"defined\" requires an identifier", LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR,
+                       "operator \"defined\" requires an identifier");
             ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-            return -CCC_ESYNTAX;
+            return -(int)CCC_ESYNTAX;
         }
         len_str_t lookup = { lookahead.cur, len };
         pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
         if (paren) {
             if (ts_cur(&lookahead) != ')') {
-                logger_log(&stream->mark, "missing ')' after \"defined\"",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "missing ')' after \"defined\"");
                 ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-                return -CCC_ESYNTAX;
+                return -(int)CCC_ESYNTAX;
             }
             ts_advance(&lookahead);
         }
 
         ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-        return macro != NULL;
+        return macro == NULL ? '0' : '1';
     }
 
     // Look up in the macro table
@@ -622,7 +641,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     int error;
 
     if (CCC_OK != status) {
-        logger_log(&stream->mark, "Failed to create new macro.", LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR, "Failed to create new macro.");
         error = -(int)status;
         goto fail;
     }
@@ -656,9 +675,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             if (ts_end(&lookahead)
                 && (num_params != macro->num_params || !done)) {
-                logger_log(&stream->mark,
-                           "Unexpected EOF while scanning macro paramaters",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Unexpected EOF while scanning macro paramaters");
                 error = -(int)CCC_ESYNTAX;
                 goto fail;
             }
@@ -668,8 +686,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             pp_param_map_elem_t *param_elem =
                 malloc(sizeof(pp_param_map_elem_t));
             if (NULL == param_elem) {
-                logger_log(&stream->mark, "Out of memory while scanning macro",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Out of memory while scanning macro");
                 error = -(int)CCC_NOMEM;
                 goto fail;
             }
@@ -688,8 +706,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             ts_advance(&lookahead);
 
             if (done && num_params != macro->num_params) {
-                logger_log(&stream->mark,
-                           "Incorrect number of macro paramaters", LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Incorrect number of macro paramaters");
                 error = -(int)CCC_ESYNTAX;
                 goto fail;
             }

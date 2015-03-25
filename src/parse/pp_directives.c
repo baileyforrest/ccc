@@ -67,21 +67,12 @@ static len_str_node_t s_default_search_path[] = {
 status_t pp_directives_init(preprocessor_t *pp) {
     status_t status = CCC_OK;
 
-    static ht_params_t params = {
-        STATIC_ARRAY_LEN(s_directives),   // Size estimate
-        offsetof(pp_directive_t, key),    // Offset of key
-        offsetof(pp_directive_t, link),   // Offset of ht link
-        strhash,                          // Hash function
-        vstrcmp,                          // void string compare
-    };
-
-    if (CCC_OK != (status = ht_init(&pp->directives, &params))) {
-        goto done;
-    }
-
     // Add directive handlers
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_directives); ++i) {
-        ht_insert(&pp->directives, &s_directives[i].link);
+        if (CCC_OK !=
+            (status = ht_insert(&pp->directives, &s_directives[i].link))) {
+            goto fail;
+        }
     }
 
     // Add default search path
@@ -89,13 +80,12 @@ status_t pp_directives_init(preprocessor_t *pp) {
         sl_append(&pp->search_path, &s_default_search_path[i].link);
     }
 
-done:
+fail:
     return status;
 }
 
 void pp_directives_destroy(preprocessor_t *pp) {
-    ht_destroy(&pp->directives);
-    sl_destroy(&pp->macro_insts);
+    (void)pp;
 }
 
 status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
@@ -109,9 +99,8 @@ status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
         // ignoring
         pp_nextchar(pp);
         if (ts_end(stream)) { // Only go to end of current file
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                     "Unexpected EOF in #%s directive", directive);
-            logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR,
+                       "Unexpected EOF in #%s directive", directive);
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -141,7 +130,7 @@ status_t pp_directive_include(preprocessor_t *pp) {
 
     ts_skip_ws_and_comment(stream);
     if (ts_end(stream)) {
-        logger_log(&stream->mark, "Unexpected EOF in #include", LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in #include");
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -180,21 +169,21 @@ status_t pp_directive_include(preprocessor_t *pp) {
 
         // Reached end
         if (ts_end(stream)) {
-            logger_log(&stream->mark, "Unexpected EOF in #include", LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in #include");
             status = CCC_ESYNTAX;
             goto fail;
         }
 
         // 0 length
         if (ts_location(stream) == cur) {
-            logger_log(&stream->mark, "0 length include path", LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR, "0 length include path");
             status = CCC_ESYNTAX;
             goto fail;
         }
 
         // Incorrect end symbol
         if (ts_cur(stream) != endsym) {
-            logger_log(&stream->mark, "Unexpected symbol in #include", LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR, "Unexpected symbol in #include");
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -216,8 +205,8 @@ status_t pp_directive_include(preprocessor_t *pp) {
         while (!done) {
             int next = pp_nextchar_helper(pp, true);
             if (next == PP_EOF) {
-                logger_log(&stream->mark, "Unexpected EOF in #include",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Unexpected EOF in #include");
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -233,9 +222,8 @@ status_t pp_directive_include(preprocessor_t *pp) {
             case '\t':
                 continue;
             default:
-                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                        "Unexpected character %c in #include", next);
-                logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Unexpected character %c in #include", next);
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -248,14 +236,14 @@ status_t pp_directive_include(preprocessor_t *pp) {
         while (true) {
             int next = pp_nextchar_helper(pp, true);
             if (offset == MAX_PATH_LEN) {
-                logger_log(&stream->mark, "Include path name too long",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Include path name too long");
                 status = CCC_ESYNTAX;
                 goto fail;
             }
             if (next == PP_EOF) {
-                logger_log(&stream->mark, "Unexpected EOF in #include",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Unexpected EOF in #include");
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -287,9 +275,8 @@ status_t pp_directive_include(preprocessor_t *pp) {
         }
         break;
     default:
-        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                 "Unexpected character %c in #include", *cur);
-        logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR,
+                   "Unexpected character %c in #include", *cur);
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -300,7 +287,7 @@ status_t pp_directive_include(preprocessor_t *pp) {
         len_str_node_t *cur = GET_ELEM(&pp->search_path, link);
 
         if (cur->str.len + suffix.len + 1 > MAX_PATH_LEN) {
-            logger_log(&stream->mark, "Include path name too long", LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR, "Include path name too long");
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -328,9 +315,8 @@ status_t pp_directive_include(preprocessor_t *pp) {
     }
 
 fail:
-    snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-             "Failed to include file: %.*s", (int)suffix.len, suffix.str);
-    logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+    logger_log(&stream->mark, LOG_ERR, "Failed to include file: %.*s",
+               (int)suffix.len, suffix.str);
     status = CCC_ESYNTAX;
 
     return status;
@@ -352,8 +338,8 @@ status_t pp_directive_define(preprocessor_t *pp) {
     // Skip whitespace before name
     ts_skip_ws_and_comment(stream);
     if (ts_end(stream)) {
-        logger_log(&stream->mark, "Unexpected EOF in macro definition",
-                   LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR,
+                   "Unexpected EOF in macro definition");
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -364,7 +350,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
     len_str_t lookup = { cur, name_len };
     pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
     if (cur_macro != NULL) {
-        logger_log(&stream->mark, "Macro redefinition", LOG_WARN);
+        logger_log(&stream->mark, LOG_WARN, "Macro redefinition");
 
         // Remove and cleanup existing macro
         ht_remove(&pp->macros, cur_macro);
@@ -373,7 +359,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
 
     // Allocate new macro object
     if (CCC_OK != (status = pp_macro_create(cur, name_len, &new_macro))) {
-        logger_log(&stream->mark, "Failed to create macro", LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR, "Failed to create macro");
         goto fail;
     }
 
@@ -390,8 +376,8 @@ status_t pp_directive_define(preprocessor_t *pp) {
             size_t param_len = ts_advance_identifier(stream);
 
             if (param_len == 0) {
-                logger_log(&stream->mark, "Macro missing paramater name",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Macro missing paramater name");
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -400,8 +386,8 @@ status_t pp_directive_define(preprocessor_t *pp) {
             len_str_node_t *string =
                 malloc(sizeof(len_str_node_t) + param_len + 1);
             if (string == NULL) {
-                logger_log(&stream->mark, "Out of memory while defining macro",
-                           LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Out of memory while defining macro");
                 status = CCC_NOMEM;
                 goto fail;
             }
@@ -422,16 +408,16 @@ status_t pp_directive_define(preprocessor_t *pp) {
                 ts_advance(stream);
                 break;
             default:
-                logger_log(&stream->mark,
-                           "Unexpected garbage in macro parameters", LOG_ERR);
+                logger_log(&stream->mark, LOG_ERR,
+                           "Unexpected garbage in macro parameters");
                 status = CCC_ESYNTAX;
                 goto fail;
             }
 
         }
         if (!done) {
-            logger_log(&stream->mark, "Unexpected EOF in macro parameters",
-                       LOG_ERR);
+            logger_log(&stream->mark, LOG_ERR,
+                       "Unexpected EOF in macro parameters");
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -484,7 +470,7 @@ status_t pp_directive_undef(preprocessor_t *pp) {
     // Skip whitespace before name
     ts_skip_ws_and_comment(stream);
     if (ts_end(stream)) {
-        logger_log(&stream->mark, "Unexpected EOF inside undef", LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR, "Unexpected EOF inside undef");
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -526,9 +512,7 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
 
     ts_skip_ws_and_comment(stream);
     if (ts_end(stream)) {
-        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE, "Unexpected EOF in %s",
-                 directive);
-        logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in %s", directive);
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -541,9 +525,7 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
     char *cur = ts_location(stream);
     size_t len = ts_advance_identifier(stream);
     if (ts_end(stream)) {
-        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE, "Unexpected EOF in %s",
-                 directive);
-        logger_log(&stream->mark, logger_fmt_buf, LOG_ERR);
+        logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in %s", directive);
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -691,7 +673,7 @@ status_t pp_directive_endif(preprocessor_t *pp) {
 
     pp_file_t *file = sl_head(&pp->file_insts);
     if (file->if_count == 0) {
-        logger_log(&file->stream.mark, "Unexpected #endif", LOG_ERR);
+        logger_log(&file->stream.mark, LOG_ERR, "Unexpected #endif");
         return CCC_ESYNTAX;
     }
 

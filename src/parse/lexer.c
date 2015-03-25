@@ -59,6 +59,7 @@ status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
     lexer->pp = pp;
     lexer->symtab = symtab;
     lexer->string_tab = string_tab;
+    lexer->next_char = 0;
     return CCC_OK;
 }
 
@@ -130,8 +131,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
                 result->type = ELIPSE;
                 break;
             }
-            logger_log(&result->mark,
-                       "Unexpected token: ..", LOG_ERR);
+            logger_log(&result->mark, LOG_ERR, "Unexpected token: ..");
             status = CCC_ESYNTAX;
             break;
         }
@@ -228,7 +228,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             }
 
             if (!done) {
-                logger_log(&result->mark, "Identifer too long!", LOG_ERR);
+                logger_log(&result->mark, LOG_ERR, "Identifer too long!");
                 status = CCC_ESYNTAX;
 
                 // Skip over the rest of the identifier
@@ -250,7 +250,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             if (CCC_OK !=
                 (status = st_lookup(lexer->symtab, lexer->lexbuf, len, ID,
                                     &result->tab_entry))) {
-                logger_log(&result->mark, "Failed to add identifier!", LOG_ERR);
+                logger_log(&result->mark, LOG_ERR, "Failed to add identifier!");
                 status = CCC_ESYNTAX;
                 goto end;
             }
@@ -277,7 +277,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             } while (!done && len < MAX_LEXEME_SIZE);
 
             if (!done) {
-                logger_log(&result->mark, "String too long!", LOG_ERR);
+                logger_log(&result->mark, LOG_ERR, "String too long!");
                 status = CCC_ESYNTAX;
 
                 // Skip over the rest of the String
@@ -293,7 +293,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             if (CCC_OK !=
                 (status = st_lookup(lexer->symtab, lexer->lexbuf, len, STRING,
                                     &result->tab_entry))) {
-                logger_log(&result->mark, "Failed to add String!", LOG_ERR);
+                logger_log(&result->mark, LOG_ERR, "Failed to add String!");
                 status = CCC_ESYNTAX;
                 goto end;
             }
@@ -312,8 +312,8 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             NEXT_CHAR_NOERR(lexer->pp, cur);
 
             if (cur != '\'') {
-                logger_log(&result->mark,
-                           "Unexpected junk in character literal", LOG_ERR);
+                logger_log(&result->mark, LOG_ERR,
+                           "Unexpected junk in character literal");
                 status = CCC_ESYNTAX;
             }
 
@@ -331,9 +331,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             done = false;
             break;
         default:
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                     "Unexpected character: %c", cur);
-            logger_log(&result->mark, logger_fmt_buf, LOG_ERR);
+            logger_log(&result->mark, LOG_ERR, "Unexpected character: %c", cur);
             status = CCC_ESYNTAX;
         } // switch (cur)
     } while (!done);
@@ -492,8 +490,8 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     } while(!done);
 
     if (junk) {
-        logger_log(&result->mark, "Unexpected junk in integer literal",
-                   LOG_ERR);
+        logger_log(&result->mark, LOG_ERR,
+                   "Unexpected junk in integer literal");
         status = CCC_ESYNTAX;
 
         // Skip over junk at end (identifier characters)
@@ -513,8 +511,7 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     }
 
     if (bits && bits > sizeof(long long) * 8) {
-        logger_log(&result->mark, "Integer constant too large",
-                   LOG_WARN);
+        logger_log(&result->mark, LOG_WARN, "Integer constant too large");
     }
 
     lexer->next_char = cur;
@@ -606,8 +603,8 @@ handle_float:
     exp = exp_neg ? -exp : exp;
 
     if (junk) {
-        logger_log(&result->mark,
-                   "Unexpected junk in floating point literal", LOG_ERR);
+        logger_log(&result->mark, LOG_ERR,
+                   "Unexpected junk in floating point literal");
         status = CCC_ESYNTAX;
 
         // Skip over junk at end (identifier characters)

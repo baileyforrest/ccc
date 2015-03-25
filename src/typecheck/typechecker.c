@@ -208,7 +208,7 @@ bool typecheck_type_conditional(type_t *type) {
 bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
     bool retval = typecheck_expr(tcs, expr, TC_NOCONST);
     if (!(retval &= typecheck_type_integral(expr->etype))) {
-        logger_log(&expr->mark, "Integral value required", LOG_ERR);
+        logger_log(&expr->mark, LOG_ERR, "Integral value required");
     }
 
     return retval;
@@ -217,10 +217,9 @@ bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
 bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr) {
     bool retval = typecheck_expr(tcs, expr, TC_NOCONST);
     if (!(retval &= typecheck_type_conditional(expr->etype))) {
-        snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                 "used %s type value where scalar is required",
-                 ast_basic_type_str(expr->etype->type));
-        logger_log(&expr->mark, logger_fmt_buf, LOG_ERR);
+        logger_log(&expr->mark, LOG_ERR,
+                   "used %s type value where scalar is required",
+                   ast_basic_type_str(expr->etype->type));
     }
 
     return retval;
@@ -260,11 +259,10 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
             stmt_t *label = ht_lookup(&tcs->func->fdefn.labels,
                                       goto_stmt->goto_params.label);
             if (label == NULL) {
-                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                         "label %*.s used but not defined",
-                         (int)goto_stmt->goto_params.label->len,
-                         goto_stmt->goto_params.label->str);
-                logger_log(&goto_stmt->mark, logger_fmt_buf, LOG_ERR);
+                logger_log(&goto_stmt->mark, LOG_ERR,
+                           "label %*.s used but not defined",
+                           (int)goto_stmt->goto_params.label->len,
+                           goto_stmt->goto_params.label->str);
                 retval = false;
             }
         }
@@ -299,9 +297,8 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_CASE:
         if (tcs->last_switch == NULL) {
-            logger_log(&stmt->mark,
-                       "'case' label not within a switch statement",
-                       LOG_ERR);
+            logger_log(&stmt->mark, LOG_ERR,
+                       "'case' label not within a switch statement");
             retval = false;
         } else {
             sl_append(&tcs->last_switch->switch_params.cases,
@@ -312,9 +309,8 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_DEFAULT:
         if (tcs->last_switch == NULL) {
-            logger_log(&stmt->mark,
-                       "'default' label not within a switch statement",
-                       LOG_ERR);
+            logger_log(&stmt->mark, LOG_ERR,
+                       "'default' label not within a switch statement");
             retval = false;
         } else {
             tcs->last_switch->switch_params.default_stmt = stmt;
@@ -394,8 +390,8 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_CONTINUE:
         if (tcs->last_loop == NULL) {
-            logger_log(&stmt->mark, "continue statement not within a loop",
-                       LOG_ERR);
+            logger_log(&stmt->mark, LOG_ERR,
+                       "continue statement not within a loop");
             retval = false;
         } else {
             stmt->continue_params.parent = tcs->last_loop;
@@ -403,8 +399,8 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_BREAK:
         if (tcs->last_break == NULL) {
-            logger_log(&stmt->mark, "break statement not within loop or switch",
-                       LOG_ERR);
+            logger_log(&stmt->mark, LOG_ERR,
+                       "break statement not within loop or switch");
             retval = false;
         } else {
             stmt->break_params.parent = tcs->last_loop;
@@ -477,15 +473,14 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         return retval;
     case EXPR_VAR: {
         if (constant == TC_CONST) {
-            logger_log(&expr->mark, "Expected constant value", LOG_ERR);
+            logger_log(&expr->mark, LOG_ERR, "Expected constant value");
             return false;
         }
         tt_key_t lookup = { expr->var_id, TT_VAR };
         typetab_entry_t *entry = tt_lookup(tcs->typetab, &lookup);
         if (entry == NULL) {
-            snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE, "'%.*s' undeclared.",
-                     (int)expr->var_id->len, expr->var_id->str);
-            logger_log(&expr->mark, logger_fmt_buf, LOG_ERR);
+            logger_log(&expr->mark, LOG_ERR, "'%.*s' undeclared.",
+                       (int)expr->var_id->len, expr->var_id->str);
             retval = false;
         }
         expr->etype = entry->type;
@@ -539,9 +534,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST);
         type_t *func_sig = expr->call.func->etype;
         if (func_sig->type != TYPE_FUNC) {
-            logger_log(&expr->mark,
-                       "Called object is not a function or function pointer",
-                       LOG_ERR);
+            logger_log(&expr->mark, LOG_ERR,
+                       "Called object is not a function or function pointer");
             return false;
         }
         int arg_num = 1;
@@ -557,10 +551,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             // TODO: Make sure expr->etype and param->type are compatible
             (void)param;
             if (false) {
-                snprintf(logger_fmt_buf, LOG_FMT_BUF_SIZE,
-                         "incompatible type for argument %d of function",
-                         arg_num);
-                logger_log(&expr->mark, logger_fmt_buf, LOG_ERR);
+                logger_log(&expr->mark, LOG_ERR,
+                           "incompatible type for argument %d of function",
+                           arg_num);
                 // TODO: Print note with expected types and function sig
             }
 
@@ -569,11 +562,11 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             cur_expr = cur_expr->next;
         }
         if (cur_sig != NULL) {
-            logger_log(&expr->mark, "too few arguments to function", LOG_ERR);
+            logger_log(&expr->mark, LOG_ERR, "too few arguments to function");
             // TODO: print type
         }
         if (cur_expr != NULL) {
-            logger_log(&expr->mark, "too many arguments to function", LOG_ERR);
+            logger_log(&expr->mark, LOG_ERR, "too many arguments to function");
             // TODO: print type
         }
         expr->etype = func_sig->func.type;
@@ -667,9 +660,8 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         retval &= typecheck_type(tcs, type->mod.base);
         if (type->mod.type_mod & TMOD_SIGNED &&
             type->mod.type_mod & TMOD_UNSIGNED) {
-            logger_log(&type->mark,
-                       "both ‘signed’ and ‘unsigned’ in declaration specifiers",
-                       LOG_ERR);
+            logger_log(&type->mark, LOG_ERR,
+                       "both ‘signed’ and ‘unsigned’ in declaration specifiers");
             retval = false;
         }
         switch (type->mod.type_mod &
@@ -681,9 +673,8 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         case TMOD_EXTERN:
             break;
         default:
-            logger_log(&type->mark,
-                       "multiple storage classes in declaration specifiers",
-                       LOG_ERR);
+            logger_log(&type->mark, LOG_ERR,
+                       "multiple storage classes in declaration specifiers");
             retval = false;
         }
         return retval;
