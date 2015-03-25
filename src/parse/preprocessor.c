@@ -85,8 +85,10 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
                 goto fail2;
             }
         }
+        pp->pp_if = false;
     } else {
         ht_create_handle(&pp->macros, macros);
+        pp->pp_if = true;
     }
 
     // Initialize state
@@ -568,11 +570,51 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         }
     }
 
+    // Check if macro is defined
+    if (pp->pp_if && strncmp("defined", lookup.str, lookup.len) == 0) {
+        ts_skip_ws_and_comment(&lookahead);
+        bool paren = false;
+        if (ts_cur(&lookahead) == '(') {
+            ts_advance(&lookahead);
+            paren = true;
+        }
+
+        size_t len = ts_advance_identifier(&lookahead);
+        if (len == 0) {
+            logger_log(&stream->mark,
+                       "operator \"defined\" requires an identifier", LOG_ERR);
+            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+            return -CCC_ESYNTAX;
+        }
+        len_str_t lookup = { lookahead.cur, len };
+        pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
+        if (paren) {
+            if (ts_cur(&lookahead) != ')') {
+                logger_log(&stream->mark, "missing ')' after \"defined\"",
+                           LOG_ERR);
+                ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+                return -CCC_ESYNTAX;
+            }
+            ts_advance(&lookahead);
+        }
+
+        ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+        return macro != NULL;
+    }
+
     // Look up in the macro table
     pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
 
     if (macro == NULL) { // No macro found
-        return ts_advance(stream);
+        if (pp->pp_if) { // In preprecessor conditional
+            // Skip past end of parameter
+            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+
+            // Replace undefined macros with 0
+            return '0';
+        } else {
+            return ts_advance(stream);
+        }
     }
 
     pp_macro_inst_t *new_macro_inst;

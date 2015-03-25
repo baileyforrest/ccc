@@ -51,6 +51,7 @@ typedef struct preprocessor_t {
     bool string;          /**< true if in string */
     bool char_line;       /**< true if non whitespace on current line */
     bool ignore;          /**< Conditional compilation - ignore output */
+    bool pp_if;           /**< if true, we're processing a preprocessor if */
 } preprocessor_t;
 
 
