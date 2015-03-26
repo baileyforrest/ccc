@@ -990,6 +990,7 @@ fail:
 status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
                                    expr_t **result) {
     status_t status = CCC_OK;
+    expr_t *expr = NULL;
 
     bool primary = false;
     bool unary = false;
@@ -1066,7 +1067,6 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             // FALL THROUGH
         }
         default: { // Paren expression
-            expr_t *expr;
             ALLOC_NODE(lex, expr, expr_t);
             expr->type = EXPR_PAREN;
             expr->paren_base = NULL;
@@ -1111,7 +1111,10 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
     if (is_unary != NULL) {
         *is_unary = unary;
     }
+    return status;
+
 fail:
+    ast_expr_destroy(expr);
     return status;
 }
 

@@ -439,7 +439,7 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     bool hasL = false;
     bool hasLL = false;
     bool junk = false;
-    bool done = true;
+    bool done = false;
     int offset = 0;
     // Scan characters at end
     do {

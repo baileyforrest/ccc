@@ -481,7 +481,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (entry == NULL) {
             logger_log(&expr->mark, LOG_ERR, "'%.*s' undeclared.",
                        (int)expr->var_id->len, expr->var_id->str);
-            retval = false;
+            return false;
         }
         expr->etype = entry->type;
         return retval;
@@ -531,7 +531,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         return retval;
     }
     case EXPR_CALL: {
-        retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST);
+        if (!(retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST))) {
+            return false;
+        }
         type_t *func_sig = expr->call.func->etype;
         if (func_sig->type != TYPE_FUNC) {
             logger_log(&expr->mark, LOG_ERR,

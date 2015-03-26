@@ -61,25 +61,31 @@ status_t pp_directives_init(preprocessor_t *pp);
 void pp_directives_destroy(preprocessor_t *pp);
 
 /**
- * Skips input into the preprocessor until another directive tells it to stop
- *
- * @param pp preprocessor to operate on
- * @param stream Stream to skip on
- * @param directive Name of the directive causing the skip
- * @return CCC_OK on success, error code on error
- */
-status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
-                      const char *directive);
-
-/**
  * Directive for #include
- *
- * Warning: Current version uses static memory so is not reentrant
  *
  * @param pp The preprocessor to include for
  * @return CCC_OK on success, error code on error
  */
 status_t pp_directive_include(preprocessor_t *pp);
+
+/**
+ * Directive for #include_next
+ *
+ * @param pp The preprocessor to include for
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_include_next(preprocessor_t *pp);
+
+/**
+ * Helper function for include and include next
+ *
+ * Warning: Current version uses static memory so is not reentrant
+ *
+ * @param pp The preprocessor to include for
+ * @param next. If true, treats the call as include next
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_include_helper(preprocessor_t *pp, bool next);
 
 /**
  * Directive for #define
@@ -166,5 +172,30 @@ status_t pp_directive_else(preprocessor_t *pp);
  * @return CCC_OK on success, error code on error
  */
 status_t pp_directive_endif(preprocessor_t *pp);
+
+/**
+ * Directive for #error
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_error(preprocessor_t *pp);
+
+/**
+ * Directive for #warning
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_warning(preprocessor_t *pp);
+
+/**
+ * Helper function for error and warning
+ *
+ * @param pp The preprocessor act on
+ * @param is_err if true, is error, else warning
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err);
 
 #endif /* _PP_DIRECTIVE_H_ */

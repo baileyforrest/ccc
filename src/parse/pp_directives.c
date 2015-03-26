@@ -42,17 +42,18 @@
     { SL_LINK_LIT, LEN_STR_LIT(#name), pp_directive_ ## name  }
 
 static pp_directive_t s_directives[] = {
-    DIRECTIVE_LIT(include),
-    DIRECTIVE_LIT(define ),
-    DIRECTIVE_LIT(undef  ),
-    DIRECTIVE_LIT(ifdef  ),
-    DIRECTIVE_LIT(ifndef ),
-    DIRECTIVE_LIT(if     ),
-    DIRECTIVE_LIT(elif   ),
-    DIRECTIVE_LIT(else   ),
-    DIRECTIVE_LIT(endif  )
-    //DIRECTIVE_LIT(error   )   // TODO: This
-    //DIRECTIVE_LIT(warning   )   // TODO: This
+    DIRECTIVE_LIT(include     ),
+    DIRECTIVE_LIT(include_next),
+    DIRECTIVE_LIT(define      ),
+    DIRECTIVE_LIT(undef       ),
+    DIRECTIVE_LIT(ifdef       ),
+    DIRECTIVE_LIT(ifndef      ),
+    DIRECTIVE_LIT(if          ),
+    DIRECTIVE_LIT(elif        ),
+    DIRECTIVE_LIT(else        ),
+    DIRECTIVE_LIT(endif       ),
+    DIRECTIVE_LIT(error       ),
+    DIRECTIVE_LIT(warning     )
     //DIRECTIVE_LIT(line   )   // TODO: This
     //DIRECTIVE_LIT(pragma   )   // TODO: This
 };
@@ -88,44 +89,31 @@ void pp_directives_destroy(preprocessor_t *pp) {
     (void)pp;
 }
 
-/*
-status_t pp_skip_cond(preprocessor_t *pp, tstream_t *stream,
-                      const char *directive) {
-    status_t status = CCC_OK;
-
-    // Need to skip over contents
-    pp->ignore = true;
-    while (pp->ignore) {
-        // Fetch characters until another directive is run to tell us to stop
-        // ignoring
-        pp_nextchar(pp);
-        if (ts_end(stream)) { // Only go to end of current file
-            logger_log(&stream->mark, LOG_ERR,
-                       "Unexpected EOF in #%s directive", directive);
-            status = CCC_ESYNTAX;
-            goto fail;
-        }
-    }
-
-fail:
-    return status;
+status_t pp_directive_include(preprocessor_t *pp) {
+    return pp_directive_include_helper(pp, false);
 }
-*/
+
+status_t pp_directive_include_next(preprocessor_t *pp) {
+    return pp_directive_include_helper(pp, true);
+}
 
 /**
  * Warning: This is not reentrant!
  */
-status_t pp_directive_include(preprocessor_t *pp) {
+status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     static char s_path_buf[MAX_PATH_LEN];
     static char s_suffix_buf[MAX_PATH_LEN];
 
     assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
+    status_t status = CCC_OK;
 
     if (pp->ignore) { // If we're ignoring, just skip
-        return CCC_OK;
+        return status;
     }
 
-    status_t status = CCC_OK;
+    // Initialize to safe state
+    len_str_t suffix = { s_suffix_buf, 0 };
+
 
     pp_file_t *file = sl_head(&pp->file_insts);
     tstream_t *stream = &file->stream;
@@ -136,8 +124,6 @@ status_t pp_directive_include(preprocessor_t *pp) {
         status = CCC_ESYNTAX;
         goto fail;
     }
-
-    len_str_t suffix;
 
     char *cur = NULL;
 
@@ -162,6 +148,7 @@ status_t pp_directive_include(preprocessor_t *pp) {
             case '_':
             case '-':
             case '.':
+            case '/':
                 ts_advance(stream);
                 break;
             default: /* Found end */
@@ -283,10 +270,35 @@ status_t pp_directive_include(preprocessor_t *pp) {
         goto fail;
     }
 
+    len_str_t cur_path = { file->stream.mark.file->str,
+                           file->stream.mark.file->len };
+    if (next) {
+        while (cur_path.len > 0 && cur_path.str[cur_path.len - 1] != '/') {
+            cur_path.len--;
+        }
+
+        // If no current path, set it to current directory
+        if (cur_path.len == 0) {
+            cur_path.str = "./";
+            cur_path.len = 2;
+        }
+    }
+
+    bool found_cur_path = false;
+
     // Search for the string in all of the search paths
     sl_link_t *link;
     SL_FOREACH(link, &pp->search_path) {
         len_str_node_t *cur = GET_ELEM(&pp->search_path, link);
+
+        // If we're processing include next, look for the current path and
+        // mark it when we find it.
+        if (next && !found_cur_path && cur->str.len == cur_path.len) {
+            if (strncmp(cur->str.str, cur_path.str, cur_path.len) == 0) {
+                found_cur_path = true;
+                continue;
+            }
+        }
 
         if (cur->str.len + suffix.len + 1 > MAX_PATH_LEN) {
             logger_log(&stream->mark, LOG_ERR, "Include path name too long");
@@ -535,7 +547,6 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
 
     len_str_t lookup = { cur, len };
     pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
-    ts_skip_line(stream);
 
     // Put the conditional instance on the stack, and mark if we used it or not
     sl_prepend(&file->cond_insts, &cond_inst->link);
@@ -548,7 +559,6 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
     }
     cond_inst->if_taken = false;
     pp->ignore = true;
-    //status = pp_skip_cond(pp, stream, directive); TODO remove
 
     return status;
 
@@ -649,11 +659,6 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
     } else {
         head->if_taken = false;
         pp->ignore = true;
-        /* TODO: remove
-        if (!pp->ignore) { // Only skip if we're not already skipping
-            status = pp_skip_cond(pp, stream, directive);
-        }
-        */
     }
 
     ast_expr_destroy(expr);
@@ -695,15 +700,47 @@ status_t pp_directive_endif(preprocessor_t *pp) {
         return CCC_ESYNTAX;
     }
 
-    // Stop ignoring input if we reached the if causing us to skip
-    if (pp->ignore && file->if_count == file->start_if_count) {
-        pp->ignore = false;
+    if (file->if_count == file->start_if_count) {
+        // Stop ignoring input if we reached the if causing us to skip
+        if (pp->ignore) {
+            pp->ignore = false;
+        }
+        // Remove the conditional instance
+        pp_cond_inst_t *cond_inst = sl_pop_front(&file->cond_insts);
+        assert(cond_inst != NULL);
+        free(cond_inst);
     }
 
     file->if_count--;
-    pp_cond_inst_t *cond_inst = sl_pop_front(&file->cond_insts);
-    assert(cond_inst != NULL);
-    free(cond_inst);
 
     return CCC_OK;
+}
+
+status_t pp_directive_error(preprocessor_t *pp) {
+    return pp_directive_error_helper(pp, true);
+}
+
+status_t pp_directive_warning(preprocessor_t *pp) {
+    return pp_directive_error_helper(pp, false);
+}
+
+status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err) {
+    assert(sl_head(&pp->macro_insts) == NULL);
+    status_t status = CCC_OK;
+    if (pp->ignore) { // Don't report if we're ignoring
+        return status;
+    }
+
+    pp_file_t *file = sl_head(&pp->file_insts);
+    tstream_t *stream = &file->stream;
+    tstream_t lookahead;
+
+    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+    size_t len = ts_skip_line(&lookahead);
+
+    log_type_t log_type = is_err ? LOG_ERR : LOG_WARN;
+
+    logger_log(&stream->mark, log_type, "%*.s", (int)len, stream->cur);
+
+    return status;
 }

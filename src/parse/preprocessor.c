@@ -210,7 +210,7 @@ int pp_nextchar(preprocessor_t *pp) {
         result = pp_nextchar_helper(pp, false);
         if (result == PP_EOF) { // Only go to end of current file
             logger_log(&pp->last_mark, LOG_ERR, "Unexpected EOF");
-            return -(int)CCC_ESYNTAX;
+            return PP_EOF;
         }
     }
     return result;
@@ -660,6 +660,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         goto fail;
     }
 
+    ts_skip_ws_and_comment(&lookahead);
     if (macro->num_params != 0 && ts_cur(&lookahead) != '(') {
         // If macro requires params, but none are provided, this is just
         // treated as identifier

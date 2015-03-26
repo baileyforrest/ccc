@@ -87,7 +87,7 @@ static status_t grow_ht(htable_t *ht) {
             uint32_t bucket = GET_HASH(ht, key) % new_nbuckets;
 
             sl_link_t **new_cur = &new_buckets[bucket];
-            for(; *new_cur != NULL; cur = (*new_cur)->next)
+            for(; *new_cur != NULL; new_cur = &(*new_cur)->next)
                 continue;
 
             cur->next = NULL;
