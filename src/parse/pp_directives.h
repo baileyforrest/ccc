@@ -198,4 +198,33 @@ status_t pp_directive_warning(preprocessor_t *pp);
  */
 status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err);
 
+/**
+ * Directive for #pragma
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_pragma(preprocessor_t *pp);
+
+#define PRAGMA_POUND 0 /* #pragma */
+#define PRAGMA_UNDER 1 /* _Pragma */
+
+/**
+ * Helper function for pragmas
+ *
+ * @param pp The preprocessor act on
+ * @param pragma type, the type of pragma to process.
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_pragma_helper(preprocessor_t *pp, int pragma_type);
+
+/**
+ * Directive for #line
+ *
+ * @param pp The preprocessor act on
+ * @return CCC_OK on success, error code on error
+ */
+status_t pp_directive_line(preprocessor_t *pp);
+
+
 #endif /* _PP_DIRECTIVE_H_ */

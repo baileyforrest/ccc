@@ -53,9 +53,9 @@ static pp_directive_t s_directives[] = {
     DIRECTIVE_LIT(else        ),
     DIRECTIVE_LIT(endif       ),
     DIRECTIVE_LIT(error       ),
-    DIRECTIVE_LIT(warning     )
-    //DIRECTIVE_LIT(line   )   // TODO: This
-    //DIRECTIVE_LIT(pragma   )   // TODO: This
+    DIRECTIVE_LIT(warning     ),
+    DIRECTIVE_LIT(pragma      ),
+    DIRECTIVE_LIT(line        )
 };
 
 // Default search path for #include files. Ordering is important
@@ -364,7 +364,8 @@ status_t pp_directive_define(preprocessor_t *pp) {
     len_str_t lookup = { cur, name_len };
     pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
     if (cur_macro != NULL) {
-        logger_log(&stream->mark, LOG_WARN, "Macro redefinition");
+        logger_log(&stream->mark, LOG_WARN, "\"%*.s\" redefined",
+                   (int)lookup.len, lookup.str);
 
         // Remove and cleanup existing macro
         ht_remove(&pp->macros, cur_macro);
@@ -742,5 +743,25 @@ status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err) {
 
     logger_log(&stream->mark, log_type, "%*.s", (int)len, stream->cur);
 
+    return status;
+}
+
+status_t pp_directive_pragma(preprocessor_t *pp) {
+    return pp_directive_pragma_helper(pp, PRAGMA_POUND);
+}
+
+status_t pp_directive_pragma_helper(preprocessor_t *pp, int pragma_type) {
+    status_t status = CCC_OK;
+    // Right now no pragmas are implemented
+    // For PRAGMA_UNDER, do string substitution with backslash
+    (void)pp;
+    (void)pragma_type;
+    return status;
+}
+
+status_t pp_directive_line(preprocessor_t *pp) {
+    status_t status = CCC_OK;
+    // TODO: Implement this
+    (void)pp;
     return status;
 }

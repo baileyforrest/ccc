@@ -30,6 +30,13 @@
 #include "util/util.h"
 
 /**
+ * Destroy a symbol table entry
+ *
+ * @param entry The entry to destroy
+ */
+void st_entry_destroy(symtab_entry_t *entry);
+
+/**
  * Symbol table entries for reserved keywords
  */
 static symtab_entry_t s_reserved[] = {
@@ -128,16 +135,18 @@ fail:
     return status;
 }
 
-void st_destroy(symtab_t *table) {
-    if (table->is_sym) {
-        // Remove all of the static entries first, because they aren't heap
-        // allocated
-        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); ++i) {
-            ht_remove(&table->hashtab, &s_reserved[i].key);
-        }
+void st_entry_destroy(symtab_entry_t *entry) {
+    // Ignore static entries
+    if (entry >= s_reserved && entry <
+        s_reserved + STATIC_ARRAY_LEN(s_reserved)) {
+        return;
     }
 
-    HT_DESTROY_FUNC(&table->hashtab, free);
+    free(entry);
+}
+
+void st_destroy(symtab_t *table) {
+    HT_DESTROY_FUNC(&table->hashtab, st_entry_destroy);
 }
 
 status_t st_lookup(symtab_t *table, char *str, size_t len, token_t type,

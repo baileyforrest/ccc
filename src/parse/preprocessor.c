@@ -50,6 +50,8 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__LINE__", "", MACRO_LINE),
     PREDEF_MACRO_LIT("__DATE__", "", MACRO_DATE),
     PREDEF_MACRO_LIT("__TIME__", "", MACRO_TIME),
+    PREDEF_MACRO_LIT("defined", "",  MACRO_DEFINED),
+    PREDEF_MACRO_LIT("_Pragma", "",  MACRO_PRAGMA),
     PREDEF_MACRO_LIT("__STDC__", "1", MACRO_BASIC), // ISO C
     PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC) // stdlib available
@@ -138,11 +140,6 @@ void pp_destroy(preprocessor_t *pp) {
     SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
 
     if (!pp->pp_if) {
-        // Remove all of the static entries first, because they aren't heap
-        // allocated
-        for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
-            ht_remove(&pp->macros, &s_predef_macros[i].name);
-        }
         HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
     }
     pp_directives_destroy(pp);
@@ -286,6 +283,11 @@ fail:
 }
 
 void pp_macro_destroy(pp_macro_t *macro) {
+    if (macro >= s_predef_macros &&
+        macro < s_predef_macros + STATIC_ARRAY_LEN(s_predef_macros)) {
+        // Don't do anything when destroying predefined macros
+        return;
+    }
     SL_DESTROY_FUNC(&macro->params, free);
     ts_destroy((tstream_t *)&macro->stream);
     free(macro);
@@ -332,22 +334,11 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     free(macro_inst);
 }
 
-int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
-    if (pp->cur_param.cur != NULL) {
-        // We are in a macro paramater, just copy the string
-        int result = ts_advance(&pp->cur_param);
-        if (result != EOF) {
-            return result;
-        }
-        // Record if we reached end of the paramater
-        pp->cur_param.cur = NULL;
-
-    }
-
+tstream_t *pp_get_stream(preprocessor_t *pp) {
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
     pp_file_t *file = sl_head(&pp->file_insts);
 
-    tstream_t *stream; // Stream to work on
+    tstream_t *stream = NULL; // Stream to work on
 
     // Try to find an incomplete macro on the stack
     while (macro_inst != NULL) {
@@ -377,8 +368,31 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         }
     }
 
-    // Finished processing all files
     if (file == NULL) {
+        stream = NULL;
+    }
+
+    return stream;
+}
+
+int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
+    if (pp->cur_param.cur != NULL) {
+        // We are in a macro paramater, just copy the string
+        int result = ts_advance(&pp->cur_param);
+        if (result != EOF) {
+            return result;
+        }
+        // Record if we reached end of the paramater
+        pp->cur_param.cur = NULL;
+
+    }
+
+    pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
+
+    tstream_t *stream = pp_get_stream(pp);
+
+    // Finished processing all files
+    if (stream == NULL) {
         return PP_EOF;
     }
 
@@ -587,38 +601,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         }
     }
 
-    // Check defined operator for macros inside of conditionals
-    if (pp->pp_if && strncmp("defined", lookup.str, lookup.len) == 0) {
-        ts_skip_ws_and_comment(&lookahead);
-        bool paren = false;
-        if (ts_cur(&lookahead) == '(') {
-            ts_advance(&lookahead);
-            paren = true;
-        }
-
-        size_t len = ts_advance_identifier(&lookahead);
-        if (len == 0) {
-            logger_log(&stream->mark, LOG_ERR,
-                       "operator \"defined\" requires an identifier");
-            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-            return -(int)CCC_ESYNTAX;
-        }
-        len_str_t lookup = { lookahead.cur, len };
-        pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
-        if (paren) {
-            if (ts_cur(&lookahead) != ')') {
-                logger_log(&stream->mark, LOG_ERR,
-                           "missing ')' after \"defined\"");
-                ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-                return -(int)CCC_ESYNTAX;
-            }
-            ts_advance(&lookahead);
-        }
-
-        ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-        return macro == NULL ? '0' : '1';
-    }
-
     // Look up in the macro table
     pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
 
@@ -644,6 +626,10 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     case MACRO_TIME:
         ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
         return pp_handle_special_macro(pp, stream, macro->type);
+    case MACRO_DEFINED:
+        return pp_handle_defined(pp, &lookahead, stream);
+    case MACRO_PRAGMA:
+        return pp_directive_pragma_helper(pp, PRAGMA_UNDER);
     default:
         assert(false);
     }
@@ -811,4 +797,36 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
         // Tell caller to fetch another character
         return -(int)CCC_RETRY;
     }
+}
+
+status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
+                           tstream_t *stream) {
+    ts_skip_ws_and_comment(lookahead);
+    bool paren = false;
+    if (ts_cur(lookahead) == '(') {
+        ts_advance(lookahead);
+        paren = true;
+    }
+
+    size_t len = ts_advance_identifier(lookahead);
+    if (len == 0) {
+        logger_log(&stream->mark, LOG_ERR,
+                   "operator \"defined\" requires an identifier");
+        ts_copy(stream, lookahead, TS_COPY_SHALLOW);
+        return -(int)CCC_ESYNTAX;
+    }
+    len_str_t lookup = { lookahead->cur, len };
+    pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
+    if (paren) {
+        if (ts_cur(lookahead) != ')') {
+            logger_log(&stream->mark, LOG_ERR,
+                       "missing ')' after \"defined\"");
+            ts_copy(stream, lookahead, TS_COPY_SHALLOW);
+            return -(int)CCC_ESYNTAX;
+        }
+        ts_advance(lookahead);
+    }
+
+    ts_copy(stream, lookahead, TS_COPY_SHALLOW);
+    return macro == NULL ? '0' : '1';
 }

@@ -44,11 +44,13 @@ typedef struct pp_file_t {
 } pp_file_t;
 
 typedef enum pp_macro_type_t {
-    MACRO_BASIC, /**< Regular macro */
-    MACRO_FILE,  /**< __FILE__ */
-    MACRO_LINE,  /**< __LINE__ */
-    MACRO_DATE,  /**< __DATE__ */
-    MACRO_TIME,  /**< __TIME__ */
+    MACRO_BASIC,   /**< Regular macro */
+    MACRO_FILE,    /**< __FILE__ */
+    MACRO_LINE,    /**< __LINE__ */
+    MACRO_DATE,    /**< __DATE__ */
+    MACRO_TIME,    /**< __TIME__ */
+    MACRO_DEFINED, /**< defined operator */
+    MACRO_PRAGMA,  /**< _Pragma operator */
 } pp_macro_type_t;
 
 /**
@@ -143,6 +145,14 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result);
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
 
 /**
+ * Fetches the next unfinished stream from a preprocessor
+ *
+ * @param pp The preprocessor to fetch characters from
+ * @return The next stream in the preprocessor, NULL if none
+ */
+tstream_t *pp_get_stream(preprocessor_t *pp);
+
+/**
  * Helper function to fetch characters with macro substitution
  *
  * @param pp The preprocessor to fetch characters from
@@ -161,5 +171,15 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
  */
 int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
                             pp_macro_type_t type);
+/**
+ * Handle the defined operator
+ *
+ * @param pp The preprocessor to handle special macros for
+ * @param lookahead The lookahead stream being used
+ * @param stream The stream at the current special macro
+ * @return Returns the return value for pp_nextchar
+ */
+status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
+                           tstream_t *stream);
 
 #endif /* _PREPROCESSOR_PRIV_H_ */
