@@ -385,15 +385,13 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     // Get copy of current location, the last mark
     memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
 
-    int cur_char;
-    int next_char;
-    if (pp->param_stringify) { // Handle closing quote of stringification
-        cur_char = '"';
-        next_char = ts_cur(stream);
-    } else {
-        cur_char = ts_cur(stream);
-        next_char = ts_next(stream);
+    // Handle closing quote of stringification
+    if (pp->param_stringify) {
+        ts_putchar(stream, '"');
     }
+
+    int cur_char = ts_cur(stream);
+    int next_char = ts_next(stream);
 
     bool new_block_comment = false;
     // Handle comments
@@ -435,12 +433,11 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     // Handle strings
-    if (!pp->param_stringify && !pp->string && cur_char == '"') {
-        pp->string = true;
-        return ts_advance(stream);
-    }
     if (pp->param_stringify) {
         pp->param_stringify = false;
+    } else if (!pp->string && cur_char == '"') {
+        pp->string = true;
+        return ts_advance(stream);
     }
 
     if (pp->string && cur_char == '"') {
@@ -567,9 +564,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         ts_advance(&lookahead); // Skip cur char
         break;
     default:
-        if (cur_char != ts_cur(stream)) {
-            return cur_char;
-        }
         return ts_advance(stream);
     }
 
