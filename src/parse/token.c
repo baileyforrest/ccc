@@ -76,7 +76,7 @@ const char *token_str(token_t token) {
     case LPAREN:        return "(";
     case RPAREN:        return ")";
     case SEMI:          return ";";
-    case COMMA:         return ":";
+    case COMMA:         return ",";
     case LBRACK:        return "[";
     case RBRACK:        return "]";
     case DEREF:         return "->";

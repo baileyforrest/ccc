@@ -449,8 +449,14 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
     case EXPR_CALL:
         ast_expr_print(expr->call.func, dest, remain);
         ast_directed_print(dest, remain, "(");
+        bool first = true;
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->call.params) {
+            if (first) {
+                first = false;
+            } else {
+                ast_directed_print(dest, remain, ", ");
+            }
             ast_expr_print(GET_ELEM(&expr->call.params, cur), dest, remain);
         }
         ast_directed_print(dest, remain, ")");

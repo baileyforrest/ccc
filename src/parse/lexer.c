@@ -270,7 +270,24 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
                 // Reached the end, an unescaped quote
                 if (cur == '"' &&
                     (len == 0 || lexer->lexbuf[len - 1] != '\\')) {
-                    done = true;
+
+                    // Concatenate strings. Skip until non whitespace character,
+                    // then if we find another quote, skip that quote
+                    do {
+                        NEXT_CHAR_NOERR(lexer->pp, cur);
+                        switch (cur) {
+                        case ' ':
+                        case '\t':
+                            break;
+                        default:
+                            done = true;
+                        }
+                    } while(!done);
+                    if (cur == '"') {
+                        done = false;
+                    } else {
+                        lexer->next_char = cur;
+                    }
                 } else {
                     lexer->lexbuf[len++] = cur;
                 }
@@ -283,6 +300,12 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
                 // Skip over the rest of the String
                 while (!done) {
                     NEXT_CHAR_NOERR(lexer->pp, cur);
+                    if (cur == PP_EOF) {
+                        logger_log(&result->mark, LOG_ERR,
+                                   "Unterminated String!");
+                        status = CCC_ESYNTAX;
+                        break;
+                    }
                     if (cur == '"' &&
                         (len == 0 || lexer->lexbuf[len - 1] != '\\')) {
                         done = true;

@@ -179,34 +179,15 @@ void pp_last_mark(preprocessor_t *pp, fmark_t *result) {
     memcpy(result, &pp->last_mark, sizeof(fmark_t));
 }
 
-int pp_search_string_concat(preprocessor_t *pp, tstream_t *stream) {
-    tstream_t lookahead;
-    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
-
-    ts_skip_ws_and_comment(&lookahead);
-
-    // Concatenate strings
-    if (ts_cur(&lookahead) == '"') {
-        ts_advance(&lookahead);
-
-        // Copy lookahead back into stream
-        ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-        return -CCC_RETRY; // Tell caller to fetch another character
-    }
-
-    pp->string = false;
-    return '"';
-}
-
 int pp_nextchar(preprocessor_t *pp) {
     int result = PP_EOF;
     while (!pp->ignore) {
-        if (CCC_RETRY != (result = pp_nextchar_helper(pp, false))) {
+        if (-(int)CCC_RETRY != (result = pp_nextchar_helper(pp, false))) {
             return result;
         }
     }
 
-    while (pp->ignore || result == CCC_RETRY) {
+    while (pp->ignore || result == -(int)CCC_RETRY) {
         // Fetch characters until another directive is run to tell us to stop
         // ignoring
         result = pp_nextchar_helper(pp, false);
@@ -366,13 +347,6 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
     pp_file_t *file = sl_head(&pp->file_insts);
 
-    // Handle closing quote of stringification
-    if (pp->param_stringify) {
-        assert(macro_inst != NULL);
-        pp->param_stringify = false;
-        return pp_search_string_concat(pp, &macro_inst->stream);
-    }
-
     tstream_t *stream; // Stream to work on
 
     // Try to find an incomplete macro on the stack
@@ -411,8 +385,15 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     // Get copy of current location, the last mark
     memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
 
-    int cur_char = ts_cur(stream);
-    int next_char = ts_next(stream);
+    int cur_char;
+    int next_char;
+    if (pp->param_stringify) { // Handle closing quote of stringification
+        cur_char = '"';
+        next_char = ts_cur(stream);
+    } else {
+        cur_char = ts_cur(stream);
+        next_char = ts_next(stream);
+    }
 
     bool new_block_comment = false;
     // Handle comments
@@ -454,14 +435,16 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
     }
 
     // Handle strings
-    if (!pp->string && cur_char == '"') {
+    if (!pp->param_stringify && !pp->string && cur_char == '"') {
         pp->string = true;
         return ts_advance(stream);
     }
+    if (pp->param_stringify) {
+        pp->param_stringify = false;
+    }
 
     if (pp->string && cur_char == '"') {
-        ts_advance(stream);
-        return pp_search_string_concat(pp, stream);
+        pp->string = false;
     }
 
     if (cur_char == '\n') {
@@ -506,15 +489,15 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         break;
 
     case '#':
-        // If we found a character before the #, just ignore it
-        if (pp->char_line) {
-            logger_log(&stream->mark, LOG_ERR, "Stray '#' in program");
-            ts_advance(stream);
-            return -(int)CCC_ESYNTAX;
-        }
-
         // Check for preprocessor directive if we're not in a macro
         if (macro_inst == NULL) {
+            // If we found a character before the #, just ignore it
+            if (pp->char_line) {
+                logger_log(&stream->mark, LOG_ERR, "Stray '#' in program");
+                ts_advance(stream);
+                return -(int)CCC_ESYNTAX;
+            }
+
             if (ignore_directive) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Unexpected '#' in directive");
@@ -543,7 +526,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
                 return -(int)status;
             }
             // Tell caller to fetch another character
-            return -CCC_RETRY;
+            return -(int)CCC_RETRY;
         } else {
             // In macro, must be stringification, concatenation handled abave
             ts_advance(stream);
@@ -584,6 +567,9 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         ts_advance(&lookahead); // Skip cur char
         break;
     default:
+        if (cur_char != ts_cur(stream)) {
+            return cur_char;
+        }
         return ts_advance(stream);
     }
 
@@ -678,12 +664,15 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         goto fail;
     }
 
-    ts_skip_ws_and_comment(&lookahead);
-    if (macro->num_params != 0 && ts_cur(&lookahead) != '(') {
-        // If macro requires params, but none are provided, this is just
-        // treated as identifier
-        return ts_advance(stream);
-    } else if (macro->num_params != 0) {
+    if (macro->num_params != 0) {
+        ts_skip_ws_and_comment(&lookahead);
+
+        if (ts_cur(&lookahead) != '(') {
+            // If macro requires params, but none are provided, this is just
+            // treated as identifier
+            return ts_advance(stream);
+        }
+
         ts_advance(&lookahead); // Skip the paren
         // Need to create param map
 
@@ -769,9 +758,9 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     time_t t;
     struct tm *tm;
 
-    pp->macro_buf[0] = '"';
-    char *buf = pp->macro_buf + 1;
-    size_t buf_size = sizeof(pp->macro_buf) - 1;
+    char *buf = pp->macro_buf;
+    size_t buf_size = sizeof(pp->macro_buf);
+    bool quotes = true;
 
     size_t len = 0;
     switch (type) {
@@ -780,6 +769,7 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
         len = stream->mark.file->len;
         break;
     case MACRO_LINE:
+        quotes = false; // Line number is an integer
         len = snprintf(buf, buf_size, "%d", stream->mark.line);
         break;
     case MACRO_DATE: {
@@ -811,14 +801,20 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     default:
         assert(false);
     }
-    len = MIN(len, buf_size - 2); // -2, one for null, one for quote
-    buf[len] = '"';
-    buf[len + 1] = '\0';
+    len = MIN(len, buf_size - 1);
+    buf[len] = '\0';
 
     ts_copy(&pp->cur_param, stream, TS_COPY_SHALLOW);
     pp->cur_param.cur = pp->macro_buf;
-    pp->cur_param.end = pp->macro_buf + len + 2; // +2 for quotes
+    pp->cur_param.end = pp->macro_buf + len;
 
-    // Tell caller to fetch another character
-    return -CCC_RETRY;
+    if (quotes) {
+        // Act like we're stringifying, so a quote will be added at the end
+        // and the pp will look for concatenation
+        pp->param_stringify = true;
+        return '"';
+    } else {
+        // Tell caller to fetch another character
+        return -(int)CCC_RETRY;
+    }
 }
