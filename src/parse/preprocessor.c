@@ -179,7 +179,7 @@ void pp_last_mark(preprocessor_t *pp, fmark_t *result) {
 int pp_nextchar(preprocessor_t *pp) {
     int result = PP_EOF;
     while (!pp->ignore) {
-        if (-(int)CCC_RETRY != (result = pp_nextchar_helper(pp, false))) {
+        if (-(int)CCC_RETRY != (result = pp_nextchar_helper(pp))) {
             return result;
         }
     }
@@ -187,7 +187,7 @@ int pp_nextchar(preprocessor_t *pp) {
     while (pp->ignore || result == -(int)CCC_RETRY) {
         // Fetch characters until another directive is run to tell us to stop
         // ignoring
-        result = pp_nextchar_helper(pp, false);
+        result = pp_nextchar_helper(pp);
         if (pp->ignore && result == PP_EOF) { // Only go to end of current file
             logger_log(&pp->last_mark, LOG_ERR, "Unexpected EOF");
             return PP_EOF;
@@ -217,6 +217,7 @@ status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
     sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
     pp_file->start_if_count = 0;
     pp_file->if_count = 0;
+    pp_file->owns_file = false;
 
     *result = pp_file;
     return status;
@@ -239,6 +240,7 @@ status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream) {
     sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
     pp_file->start_if_count = 0;
     pp_file->if_count = 0;
+    pp_file->owns_file = false;
 
     sl_prepend(&pp->file_insts, &pp_file->link);
     return status;
@@ -250,6 +252,9 @@ fail:
 
 
 void pp_file_destroy(pp_file_t *pp_file) {
+    if (pp_file->owns_file) {
+        free(pp_file->stream.mark.file);
+    }
     SL_DESTROY_FUNC(&pp_file->cond_insts, free);
     free(pp_file);
 }
@@ -375,7 +380,7 @@ tstream_t *pp_get_stream(preprocessor_t *pp) {
     return stream;
 }
 
-int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
+int pp_nextchar_helper(preprocessor_t *pp) {
     if (pp->cur_param.cur != NULL) {
         // We are in a macro paramater, just copy the string
         int result = ts_advance(&pp->cur_param);
@@ -509,7 +514,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
                 return -(int)CCC_ESYNTAX;
             }
 
-            if (ignore_directive) {
+            if (pp->in_directive) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Unexpected '#' in directive");
             }
@@ -529,11 +534,12 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
             }
 
             // Perform directive action
+            pp->in_directive = true;
             status_t status = directive->action(pp);
+            pp->in_directive = false;
             ts_skip_line(stream); // Skip rest of line
 
             if (status != CCC_OK) {
-                ts_advance(stream);
                 return -(int)status;
             }
             // Tell caller to fetch another character

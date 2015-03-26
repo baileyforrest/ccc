@@ -40,7 +40,8 @@ typedef struct pp_file_t {
     slist_t cond_insts; /**< Instances of conditional preprocessor directive */
     tstream_t stream;   /**< Text stream */
     int start_if_count; /**< Instances of if at start of current conditional */
-    int if_count; /**< Instances of if at start of current conditional */
+    int if_count;       /**< Instances of if at start of current conditional */
+    bool owns_file;
 } pp_file_t;
 
 typedef enum pp_macro_type_t {
@@ -156,10 +157,9 @@ tstream_t *pp_get_stream(preprocessor_t *pp);
  * Helper function to fetch characters with macro substitution
  *
  * @param pp The preprocessor to fetch characters from
- * @param ignore_directive if true, directives are not processed
  * @return Returns the return value for pp_nextchar
  */
-int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
+int pp_nextchar_helper(preprocessor_t *pp);
 
 /**
  * Handle special macros (e.g. __FILE__)

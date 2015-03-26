@@ -37,6 +37,7 @@
 #include "typecheck/typechecker.h"
 
 #define MAX_PATH_LEN 4096 /**< Max include path len */
+#define MAX_LINE 512 /**< Max length for line pragma */
 
 #define DIRECTIVE_LIT(name) \
     { SL_LINK_LIT, LEN_STR_LIT(#name), pp_directive_ ## name  }
@@ -192,7 +193,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
         done = false;
         // Find the starting character
         while (!done) {
-            int next = pp_nextchar_helper(pp, true);
+            int next = pp_nextchar(pp);
             if (next == PP_EOF) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Unexpected EOF in #include");
@@ -223,7 +224,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
         // Find the end of the include string
         while (true) {
-            int next = pp_nextchar_helper(pp, true);
+            int next = pp_nextchar(pp);
             if (offset == MAX_PATH_LEN) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Include path name too long");
@@ -252,7 +253,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
         done = false;
         int last = -1;
         while (!done) {
-            int next = pp_nextchar_helper(pp, true);
+            int next = pp_nextchar(pp);
             if (PP_EOF == next) {
                 done = true;
             }
@@ -761,7 +762,84 @@ status_t pp_directive_pragma_helper(preprocessor_t *pp, int pragma_type) {
 
 status_t pp_directive_line(preprocessor_t *pp) {
     status_t status = CCC_OK;
-    // TODO: Implement this
-    (void)pp;
+    tstream_t *stream = pp_get_stream(pp);
+    pp_file_t *file = sl_tail(&pp->file_insts);
+
+    char linebuf[MAX_LINE];
+    char filename[MAX_LINE];
+    size_t offset = 0;
+    int last = -1;
+    int cur = pp_nextchar(pp);
+
+    bool done = false;
+
+    // Read until end of line. Use pp_nextchar so macros are expanded
+    while (offset < sizeof(linebuf)) {
+        cur = pp_nextchar(pp);
+        if ((done = (cur == '\n' && last != '\\'))) {
+            break;
+        }
+        last = cur;
+        linebuf[offset++] = cur;
+    }
+    linebuf[offset] = '\0';
+
+    char after;
+    int line_num = -1;
+    int matched = sscanf(linebuf, " %d %s %c", &line_num, filename, &after);
+
+    switch (matched) {
+    case EOF:
+    case 0:
+        logger_log(&stream->mark, LOG_ERR,
+                   "unexpected end of file after #line");
+        status = CCC_ESYNTAX;
+        goto fail;
+    case 1:
+        file->stream.mark.line = line_num;
+        break;
+    case 2: {
+        size_t len = strlen(filename);
+        if (filename[0] != '"' ||
+            !(filename[len] == '"' && filename[len - 1] != '\\')) {
+            logger_log(&stream->mark, LOG_ERR,
+                       "\"%s\" is not a valid filename", filename);
+            status = CCC_ESYNTAX;
+            goto fail;
+        }
+        len_str_t *new_filename = malloc(sizeof(len_str_t) + len + 1);
+        if (new_filename == NULL) {
+            logger_log(&stream->mark, LOG_ERR, "Out of memory");
+            status = CCC_NOMEM;
+            goto fail;
+        }
+        new_filename->str = (char *)new_filename + sizeof(*new_filename);
+        new_filename->len = len;
+        strcpy(new_filename->str, filename);
+
+        if (file->owns_file) { // Free the old new_filename if it owns it
+            free(file->stream.mark.file);
+        } else {
+            file->owns_file = true;
+        }
+        file->stream.mark.file = new_filename;
+        file->stream.mark.line = line_num;
+        break;
+    }
+    case 3:
+        logger_log(&stream->mark, LOG_ERR,
+                   "extra tokens at end of #line directive");
+        status = CCC_ESYNTAX;
+        goto fail;
+    default:
+        assert(false);
+    }
+
+    if (done) {
+        // We read the whole line, we don't want the caller to skip the next
+        // line, so put the newline back
+        ts_putchar(stream, '\n');
+    }
+fail:
     return status;
 }

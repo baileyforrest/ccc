@@ -53,6 +53,7 @@ typedef struct preprocessor_t {
     bool char_line;       /**< true if non whitespace on current line */
     bool ignore;          /**< Conditional compilation - ignore output */
     bool pp_if;           /**< if true, we're processing a preprocessor if */
+    bool in_directive;    /**< if true, we're processing a directive */
 
     char macro_buf[PP_BUF_SIZE]; /**< Buffer for built in macros (e.g. FILE) */
 } preprocessor_t;
