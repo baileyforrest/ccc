@@ -34,7 +34,8 @@ typedef enum {
     CCC_FILEERR,   /**< File Error */
     CCC_ESYNTAX,   /**< Syntax Error */
     CCC_BACKTRACK, /**< Backtrack required */
-    CCC_DUPLICATE  /**< Already Exists */
+    CCC_DUPLICATE, /**< Already Exists */
+    CCC_RETRY,     /**< Retry last operation */
 } status_t;
 
 #endif /* _STATUS_H_ */

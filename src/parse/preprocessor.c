@@ -46,7 +46,6 @@ static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
       SLIST_LIT(offsetof(len_str_node_t, link)), 0, type }
 
 static pp_macro_t s_predef_macros[] = {
-    // TODO: Handle file, line, date, time
     PREDEF_MACRO_LIT("__FILE__", "", MACRO_FILE),
     PREDEF_MACRO_LIT("__LINE__", "", MACRO_LINE),
     PREDEF_MACRO_LIT("__DATE__", "", MACRO_DATE),
@@ -192,7 +191,7 @@ int pp_search_string_concat(preprocessor_t *pp, tstream_t *stream) {
 
         // Copy lookahead back into stream
         ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-        return pp_nextchar(pp);
+        return -CCC_RETRY; // Tell caller to fetch another character
     }
 
     pp->string = false;
@@ -200,16 +199,18 @@ int pp_search_string_concat(preprocessor_t *pp, tstream_t *stream) {
 }
 
 int pp_nextchar(preprocessor_t *pp) {
-    if (!pp->ignore) {
-        return pp_nextchar_helper(pp, false);
+    int result = PP_EOF;
+    while (!pp->ignore) {
+        if (CCC_RETRY != (result = pp_nextchar_helper(pp, false))) {
+            return result;
+        }
     }
 
-    int result = PP_EOF;
-    while (pp->ignore) {
+    while (pp->ignore || result == CCC_RETRY) {
         // Fetch characters until another directive is run to tell us to stop
         // ignoring
         result = pp_nextchar_helper(pp, false);
-        if (result == PP_EOF) { // Only go to end of current file
+        if (pp->ignore && result == PP_EOF) { // Only go to end of current file
             logger_log(&pp->last_mark, LOG_ERR, "Unexpected EOF");
             return PP_EOF;
         }
@@ -541,8 +542,8 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
                 ts_advance(stream);
                 return -(int)status;
             }
-            // Return next character after directive
-            return pp_nextchar(pp);
+            // Tell caller to fetch another character
+            return -CCC_RETRY;
         } else {
             // In macro, must be stringification, concatenation handled abave
             ts_advance(stream);
@@ -818,5 +819,6 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     pp->cur_param.cur = pp->macro_buf;
     pp->cur_param.end = pp->macro_buf + len + 2; // +2 for quotes
 
-    return pp_nextchar(pp);
+    // Tell caller to fetch another character
+    return -CCC_RETRY;
 }
