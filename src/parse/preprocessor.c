@@ -24,10 +24,11 @@
 #include "preprocessor_priv.h"
 
 #include <stddef.h>
-#include <string.h>
 
 #include <assert.h>
 #include <ctype.h>
+#include <string.h>
+#include <time.h>
 
 #include "parse/pp_directives.h"
 
@@ -39,20 +40,20 @@
 //static const char s_built_in_filename[] = BUILT_IN_FILENAME;
 static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
 
-#define PREDEF_MACRO_LIT(name, word)                                    \
+#define PREDEF_MACRO_LIT(name, word, type)                              \
     { SL_LINK_LIT, LEN_STR_LIT(name),                                   \
       TSTREAM_LIT(word, NULL, &s_built_in_file, BUILT_IN_FILENAME, 0, 0), \
-      SLIST_LIT(offsetof(len_str_node_t, link)), 0 }
+      SLIST_LIT(offsetof(len_str_node_t, link)), 0, type }
 
 static pp_macro_t s_predef_macros[] = {
     // TODO: Handle file, line, date, time
-    PREDEF_MACRO_LIT("__FILE__", "TODO"),
-    PREDEF_MACRO_LIT("__LINE__", "TODO"),
-    PREDEF_MACRO_LIT("__DATE__", "TODO"),
-    PREDEF_MACRO_LIT("__TIME__", "TODO"),
-    PREDEF_MACRO_LIT("__STDC__", "1"), // ISO C
-    PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L"), // C11
-    PREDEF_MACRO_LIT("__STDC_HOSTED__", "1") // Standard libraries available
+    PREDEF_MACRO_LIT("__FILE__", "", MACRO_FILE),
+    PREDEF_MACRO_LIT("__LINE__", "", MACRO_LINE),
+    PREDEF_MACRO_LIT("__DATE__", "", MACRO_DATE),
+    PREDEF_MACRO_LIT("__TIME__", "", MACRO_TIME),
+    PREDEF_MACRO_LIT("__STDC__", "1", MACRO_BASIC), // ISO C
+    PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
+    PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC) // stdlib available
 };
 
 status_t pp_init(preprocessor_t *pp, htable_t *macros) {
@@ -291,6 +292,8 @@ status_t pp_macro_create(char *name, size_t len, pp_macro_t **result) {
     macro->name.len = len;
     strncpy(macro->name.str, name, len);
     macro->name.str[len] = '\0';
+
+    macro->type = MACRO_BASIC;
 
     *result = macro;
     return status;
@@ -603,7 +606,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         }
     }
 
-    // Check if macro is defined
+    // Check defined operator for macros inside of conditionals
     if (pp->pp_if && strncmp("defined", lookup.str, lookup.len) == 0) {
         ts_skip_ws_and_comment(&lookahead);
         bool paren = false;
@@ -648,6 +651,20 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
         } else {
             return ts_advance(stream);
         }
+    }
+
+    switch (macro->type) {
+        // For basic macros, just keep going
+    case MACRO_BASIC:
+        break;
+    case MACRO_FILE:
+    case MACRO_LINE:
+    case MACRO_DATE:
+    case MACRO_TIME:
+        ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+        return pp_handle_special_macro(pp, stream, macro->type);
+    default:
+        assert(false);
     }
 
     pp_macro_inst_t *new_macro_inst;
@@ -741,4 +758,65 @@ fail:
     ts_advance(stream); // Skip character to prevent infinite loop
     pp_macro_inst_destroy(new_macro_inst);
     return error;
+}
+
+int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
+                            pp_macro_type_t type) {
+    static bool date_err = false;
+    static bool time_err = false;
+
+    time_t t;
+    struct tm *tm;
+
+    pp->macro_buf[0] = '"';
+    char *buf = pp->macro_buf + 1;
+    size_t buf_size = sizeof(pp->macro_buf) - 1;
+
+    size_t len = 0;
+    switch (type) {
+    case MACRO_FILE:
+        strncpy(buf, stream->mark.file->str, buf_size);
+        len = stream->mark.file->len;
+        break;
+    case MACRO_LINE:
+        len = snprintf(buf, buf_size, "%d", stream->mark.line);
+        break;
+    case MACRO_DATE: {
+        if (-1 == (t = time(NULL)) ||
+            NULL == (tm = localtime(&t))) {
+            if (!date_err) {
+                date_err = true;
+                logger_log(&stream->mark, LOG_WARN, "Failed to get Date!");
+            }
+            len = snprintf(buf, buf_size, "??? ?? ????");
+        } else {
+            len = strftime(buf, buf_size, "%b %d %Y", tm);
+        }
+        break;
+    }
+    case MACRO_TIME: {
+        if (-1 == (t = time(NULL)) ||
+            NULL == (tm = localtime(&t))) {
+            if (!time_err) {
+                time_err = true;
+                logger_log(&stream->mark, LOG_WARN, "Failed to get Time!");
+            }
+            len = snprintf(buf, buf_size, "??:??:??");
+        } else {
+            len = strftime(buf, buf_size, "%T", tm);
+        }
+        break;
+    }
+    default:
+        assert(false);
+    }
+    len = MIN(len, buf_size - 2); // -2, one for null, one for quote
+    buf[len] = '"';
+    buf[len + 1] = '\0';
+
+    ts_copy(&pp->cur_param, stream, TS_COPY_SHALLOW);
+    pp->cur_param.cur = pp->macro_buf;
+    pp->cur_param.end = pp->macro_buf + len + 2; // +2 for quotes
+
+    return pp_nextchar(pp);
 }

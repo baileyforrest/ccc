@@ -403,7 +403,8 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
         }
         break;
     case EXPR_CONST_STR:
-        ast_directed_print(dest, remain, "%s", expr->const_val.str_val->str);
+        ast_directed_print(dest, remain, "\"%s\"",
+                           expr->const_val.str_val->str);
         break;
     case EXPR_BIN:
         if (expr->bin.op == OP_ARR_ACC) {

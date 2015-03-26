@@ -43,6 +43,14 @@ typedef struct pp_file_t {
     int if_count; /**< Instances of if at start of current conditional */
 } pp_file_t;
 
+typedef enum pp_macro_type_t {
+    MACRO_BASIC, /**< Regular macro */
+    MACRO_FILE,  /**< __FILE__ */
+    MACRO_LINE,  /**< __LINE__ */
+    MACRO_DATE,  /**< __DATE__ */
+    MACRO_TIME,  /**< __TIME__ */
+} pp_macro_type_t;
+
 /**
  * Struct for macro definition
  */
@@ -52,6 +60,7 @@ typedef struct pp_macro_t {
     const tstream_t stream; /**< Text stream template */
     slist_t params;         /**< Macro paramaters, list of len_str */
     int num_params;         /**< Number of paramaters */
+    pp_macro_type_t type;   /**< Type of macro */
 } pp_macro_t;
 
 /**
@@ -71,26 +80,6 @@ typedef struct pp_macro_inst_t {
     htable_t param_map; /**< Mapping of strings to paramater values */
     tstream_t stream;   /**< Text stream of macro instance */
 } pp_macro_inst_t;
-
-/**
- * Helper function to initialize a preprocessor.
- *
- * This allows us to create a preprocessor for processing of expressions for
- * the preprocessor
- *
- * @param pp The preprocessor to initialize
- * @param macros The macros to preload into the preprocessor. NULL if none.
- * @return CCC_OK on success, error code on error.
- */
-status_t pp_init_helper(preprocessor_t *pp, htable_t *macros);
-
-/**
- * Helper function to fetch characters with macro substitution
- *
- * @param pp The preprocessor to fetch characters from
- * @param ignore_directive if true, directives are not processed
- */
-int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
 
 /**
  * Maps the specified file. Gives result as a pp_file_t
@@ -152,5 +141,25 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result);
  * @param macro intance to destroy
  */
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
+
+/**
+ * Helper function to fetch characters with macro substitution
+ *
+ * @param pp The preprocessor to fetch characters from
+ * @param ignore_directive if true, directives are not processed
+ * @return Returns the return value for pp_nextchar
+ */
+int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive);
+
+/**
+ * Handle special macros (e.g. __FILE__)
+ *
+ * @param pp The preprocessor to handle special macros for
+ * @param stream The stream at the current special macro
+ * @param type The type of special macro
+ * @return Returns the return value for pp_nextchar
+ */
+int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
+                            pp_macro_type_t type);
 
 #endif /* _PREPROCESSOR_PRIV_H_ */

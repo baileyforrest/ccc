@@ -30,6 +30,7 @@
 #include "util/slist.h"
 #include "util/text_stream.h"
 
+#define PP_BUF_SIZE 1024
 
 /**
  * Object for preprocessor
@@ -52,6 +53,8 @@ typedef struct preprocessor_t {
     bool char_line;       /**< true if non whitespace on current line */
     bool ignore;          /**< Conditional compilation - ignore output */
     bool pp_if;           /**< if true, we're processing a preprocessor if */
+
+    char macro_buf[PP_BUF_SIZE]; /**< Buffer for built in macros (e.g. FILE) */
 } preprocessor_t;
 
 
@@ -106,7 +109,7 @@ void pp_last_mark(preprocessor_t *pp, fmark_t *mark);
  *
  * @param pp The preprocessor to get characters from
  * @return the next character. PP_EOF on end of input. Negative value on error.
- * It is a negated status_t
+ *     It is a negated status_t
  */
 int pp_nextchar(preprocessor_t *pp);
 

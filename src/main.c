@@ -51,9 +51,8 @@ int main(int argc, char **argv) {
     /*
     // Print tokens
     lexeme_t cur_token;
-
     do {
-        lexer_next_token(&lexer, &cur_token);
+        lexer_next_token(&manager.lexer, &cur_token);
         token_print(&cur_token);
     } while(cur_token.type != TOKEN_EOF);
     */
