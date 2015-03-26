@@ -154,7 +154,7 @@ static sl_link_t **ht_lookup_helper(htable_t *ht, const void *key) {
 
 void *ht_remove(htable_t *ht, const void *key) {
     sl_link_t **pp_link = ht_lookup_helper(ht, key);
-    if (NULL == pp_link) {
+    if (pp_link == NULL) {
         return NULL;
     }
 
@@ -166,7 +166,7 @@ void *ht_remove(htable_t *ht, const void *key) {
 
 void *ht_lookup(const htable_t *ht, const void *key) {
     sl_link_t **pp_link = ht_lookup_helper((htable_t *)ht, key);
-    if (NULL == pp_link) {
+    if (pp_link == NULL) {
         return NULL;
     }
 

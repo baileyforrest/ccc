@@ -222,7 +222,7 @@ status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
                      pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = malloc(sizeof(pp_file_t));
-    if (NULL == pp_file) {
+    if (pp_file == NULL) {
         status = CCC_NOMEM;
         goto fail;
     }
@@ -251,7 +251,7 @@ fail:
 status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = malloc(sizeof(pp_file_t));
-    if (NULL == pp_file) {
+    if (pp_file == NULL) {
         status = CCC_NOMEM;
         goto fail;
     }
@@ -718,7 +718,7 @@ int pp_nextchar_helper(preprocessor_t *pp, bool ignore_directive) {
 
             pp_param_map_elem_t *param_elem =
                 malloc(sizeof(pp_param_map_elem_t));
-            if (NULL == param_elem) {
+            if (param_elem == NULL) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Out of memory while scanning macro");
                 error = -(int)CCC_NOMEM;

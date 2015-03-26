@@ -147,7 +147,7 @@ status_t st_lookup(symtab_t *table, char *str, size_t len, token_t type,
     len_str_t tmp = { str, len };
 
     symtab_entry_t *cur_entry = ht_lookup(&table->hashtab, &tmp);
-    if (NULL != cur_entry) {
+    if (cur_entry != NULL) {
         *entry = cur_entry;
         return status;
     }
@@ -155,7 +155,7 @@ status_t st_lookup(symtab_t *table, char *str, size_t len, token_t type,
     // Doesn't exist. Need to allocate memory for the string and entry
     // We allocate them together so they are freed together
     cur_entry = malloc(sizeof(*cur_entry) + len + 1);
-    if (NULL == cur_entry) {
+    if (cur_entry == NULL) {
         status = CCC_NOMEM;
         goto fail;
     }

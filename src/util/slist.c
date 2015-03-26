@@ -45,7 +45,7 @@ void sl_destroy(slist_t *slist) {
 }
 
 void sl_append(slist_t *slist, sl_link_t *link) {
-    if (NULL == slist->tail) {
+    if (slist->tail == NULL) {
         slist->head = link;
         slist->tail = link;
         link->next = NULL;
@@ -58,7 +58,7 @@ void sl_append(slist_t *slist, sl_link_t *link) {
 }
 
 void sl_prepend(slist_t *slist, sl_link_t *link) {
-    if (NULL == slist->tail) {
+    if (slist->tail == NULL) {
         slist->head = link;
         slist->tail = link;
         link->next = NULL;
@@ -81,14 +81,14 @@ void *sl_pop_front(slist_t *slist) {
 }
 
 bool sl_remove(slist_t *slist, sl_link_t *link) {
-    if (NULL == link) {
+    if (link == NULL) {
         return false;
     }
 
     for (sl_link_t **cur = &slist->head; *cur != NULL; cur = &(*cur)->next) {
         if (*cur == link) {
             *cur = link->next;
-            if (NULL == slist->head) {
+            if (slist->head == NULL) {
                 slist->tail = NULL;
             }
             return true;

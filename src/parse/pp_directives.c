@@ -104,7 +104,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     static char s_path_buf[MAX_PATH_LEN];
     static char s_suffix_buf[MAX_PATH_LEN];
 
-    assert(NULL == sl_head(&pp->macro_insts) && "include inside macro!");
+    assert(sl_head(&pp->macro_insts) == NULL && "include inside macro!");
     status_t status = CCC_OK;
 
     if (pp->ignore) { // If we're ignoring, just skip
@@ -257,7 +257,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
                 done = true;
             }
 
-            if ('\n' == next && '\\' != last) {
+            if (next == '\n' && last != '\\') {
                 done = true;
             }
             last = next;
@@ -510,7 +510,7 @@ status_t pp_directive_ifndef(preprocessor_t *pp) {
 
 status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
                                    bool ifdef) {
-    assert(NULL == sl_head(&pp->macro_insts) && "Directive inside macro!");
+    assert(sl_head(&pp->macro_insts) == NULL && "Directive inside macro!");
     status_t status = CCC_OK;
 
     pp_file_t *file = sl_head(&pp->file_insts);
@@ -692,7 +692,7 @@ status_t pp_directive_else(preprocessor_t *pp) {
 }
 
 status_t pp_directive_endif(preprocessor_t *pp) {
-    assert(NULL == sl_head(&pp->macro_insts) && "#endif inside macro!");
+    assert(sl_head(&pp->macro_insts) == NULL && "#endif inside macro!");
 
     pp_file_t *file = sl_head(&pp->file_insts);
     if (file->if_count == 0) {

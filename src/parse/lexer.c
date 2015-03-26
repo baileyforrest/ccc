@@ -51,10 +51,10 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result);
 
 status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
                     symtab_t *string_tab) {
-    assert(NULL != lexer);
-    assert(NULL != pp);
-    assert(NULL != symtab);
-    assert(NULL != string_tab);
+    assert(lexer != NULL);
+    assert(pp != NULL);
+    assert(symtab != NULL);
+    assert(string_tab != NULL);
 
     lexer->pp = pp;
     lexer->symtab = symtab;
@@ -64,7 +64,7 @@ status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
 }
 
 void lexer_destroy(lexer_t *lexer) {
-    assert(NULL != lexer);
+    assert(lexer != NULL);
     // noop
     (void)lexer;
 }
@@ -81,8 +81,8 @@ void lexer_destroy(lexer_t *lexer) {
     } while (0)
 
 status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
-    assert(NULL != lexer);
-    assert(NULL != result);
+    assert(lexer != NULL);
+    assert(result != NULL);
     status_t status = CCC_OK;
 
     int cur;

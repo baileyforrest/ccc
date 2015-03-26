@@ -179,7 +179,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     new_entry->key.type = tt_type;
     new_entry->key.name = name;
 
-    if (NULL != tt_lookup(tt, &new_entry->key)) {
+    if (tt_lookup(tt, &new_entry->key) != NULL) {
         status = CCC_DUPLICATE;
         goto fail1;
     }
