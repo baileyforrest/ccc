@@ -801,12 +801,13 @@ status_t pp_directive_line(preprocessor_t *pp) {
     case 2: {
         size_t len = strlen(filename);
         if (filename[0] != '"' ||
-            !(filename[len] == '"' && filename[len - 1] != '\\')) {
+            !(filename[len - 1] == '"' && filename[len - 2] != '\\')) {
             logger_log(&stream->mark, LOG_ERR,
                        "\"%s\" is not a valid filename", filename);
             status = CCC_ESYNTAX;
             goto fail;
         }
+        len -= 2; // -2 for quotes
         len_str_t *new_filename = malloc(sizeof(len_str_t) + len + 1);
         if (new_filename == NULL) {
             logger_log(&stream->mark, LOG_ERR, "Out of memory");
@@ -815,7 +816,9 @@ status_t pp_directive_line(preprocessor_t *pp) {
         }
         new_filename->str = (char *)new_filename + sizeof(*new_filename);
         new_filename->len = len;
-        strcpy(new_filename->str, filename);
+        // Copy filename + 1 so we don't copy the quote
+        strncpy(new_filename->str, filename + 1, len);
+        new_filename->str[len] = '\0';
 
         if (file->owns_file) { // Free the old new_filename if it owns it
             free(file->stream.mark.file);
@@ -835,11 +838,11 @@ status_t pp_directive_line(preprocessor_t *pp) {
         assert(false);
     }
 
+fail:
     if (done) {
         // We read the whole line, we don't want the caller to skip the next
         // line, so put the newline back
         ts_putchar(stream, '\n');
     }
-fail:
     return status;
 }
