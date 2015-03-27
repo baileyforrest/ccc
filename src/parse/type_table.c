@@ -32,7 +32,7 @@
 static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
 
 #define TYPE_LITERAL(typename, type) \
-    { { NULL }, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, \
+    { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, \
        sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
 
 static len_str_t void_str      = LEN_STR_LIT("void");
@@ -63,7 +63,7 @@ type_t * const tt_float = &stt_float;
 type_t * const tt_double = &stt_double;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
-    { { NULL }, { &type##_str, TT_PRIM }, &stt_ ## type }
+    { SL_LINK_LIT, { &type##_str, TT_PRIM }, &stt_ ## type }
 
 /**
  * Table of primative types

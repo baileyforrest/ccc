@@ -61,9 +61,9 @@ static pp_directive_t s_directives[] = {
 
 // Default search path for #include files. Ordering is important
 static len_str_node_t s_default_search_path[] = {
-    { { NULL }, LEN_STR_LIT("./") }, // Current directory
-    { { NULL }, LEN_STR_LIT("/usr/local/include/") },
-    { { NULL }, LEN_STR_LIT("/usr/include/") }
+    { SL_LINK_LIT, LEN_STR_LIT("./") }, // Current directory
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include/") },
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/include/") }
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {

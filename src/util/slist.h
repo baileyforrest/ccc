@@ -58,8 +58,6 @@ typedef struct slist_t {
 
 /**
  * sl_link_t literal
- *
- * TODO: Replace { NULL } in code with this
  */
 #define SL_LINK_LIT { NULL }
 
