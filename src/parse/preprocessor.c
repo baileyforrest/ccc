@@ -396,9 +396,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     }
 
-    pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
-
     tstream_t *stream = pp_get_stream(pp);
+    pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
 
     // Finished processing all files
     if (stream == NULL) {
