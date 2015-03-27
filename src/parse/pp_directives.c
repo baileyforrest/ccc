@@ -651,8 +651,9 @@ status_t pp_directive_elif(preprocessor_t *pp) {
     pp_cond_inst_t *head = sl_head(&file->cond_insts);
 
     // Skip if this is a nested elif, or if on the current branch, if was taken
-    if (pp->ignore &&
-        (file->if_count > file->start_if_count || head->if_taken)) {
+    if ((pp->ignore && file->if_count > file->start_if_count) ||
+        (head->if_taken && file->if_count == file->start_if_count)) {
+        pp->ignore = true;
         return CCC_OK;
     }
 
@@ -746,9 +747,10 @@ status_t pp_directive_else(preprocessor_t *pp) {
     assert(sl_head(&file->cond_insts) != NULL);
     pp_cond_inst_t *head = sl_head(&file->cond_insts);
 
-    // Skip if this is a nested else, or if on the current branch, if was taken
-    if (pp->ignore &&
-        (file->if_count > file->start_if_count || head->if_taken)) {
+    // Skip if this is a nested elif, or if on the current branch, if was taken
+    if ((pp->ignore && file->if_count > file->start_if_count) ||
+        (head->if_taken && file->if_count == file->start_if_count)) {
+        pp->ignore = true;
         return CCC_OK;
     }
 
