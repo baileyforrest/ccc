@@ -61,7 +61,7 @@ typedef struct pp_macro_t {
     sl_link_t link;         /**< List link */
     len_str_t name;         /**< Macro name, hashtable key */
     const tstream_t stream; /**< Text stream template */
-    slist_t params;         /**< Macro paramaters, list of len_str */
+    slist_t params;         /**< Macro paramaters, list of len_str_node_t */
     int num_params;         /**< Number of paramaters */
     pp_macro_type_t type;   /**< Type of macro */
 } pp_macro_t;

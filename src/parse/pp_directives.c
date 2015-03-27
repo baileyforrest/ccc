@@ -364,14 +364,6 @@ status_t pp_directive_define(preprocessor_t *pp) {
     size_t name_len = ts_advance_identifier(stream);
     len_str_t lookup = { cur, name_len };
     pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
-    if (cur_macro != NULL) {
-        logger_log(&stream->mark, LOG_WARN, "\"%*.s\" redefined",
-                   (int)lookup.len, lookup.str);
-
-        // Remove and cleanup existing macro
-        ht_remove(&pp->macros, &cur_macro->name);
-        pp_macro_destroy(cur_macro);
-    }
 
     // Allocate new macro object
     if (CCC_OK != (status = pp_macro_create(cur, name_len, &new_macro))) {
@@ -460,6 +452,76 @@ status_t pp_directive_define(preprocessor_t *pp) {
 
     // Set end
     ((tstream_t *)&new_macro->stream)->end = ts_location(stream);
+
+    // Check for macro redefinition
+    if (cur_macro != NULL) {
+        bool redefined = false;
+
+        if (cur_macro->stream.cur == new_macro->stream.cur) {
+            // If they point to same file location, we know they are the same
+            redefined = false;
+        } else if (cur_macro->num_params != new_macro->num_params) {
+            // If they have different # params, they are different
+            redefined = true;
+        } else {
+            // Slow path, need to check if the two are "effectively the same"
+            // https://gcc.gnu.org/onlinedocs/cpp/Undefining-and-Redefining-Macros.html#Undefining-and-Redefining-Macros
+
+            // Check if params are the same:
+            sl_link_t *cur = cur_macro->params.head;
+            sl_link_t *new = new_macro->params.head;
+            for (;cur != NULL; cur = cur->next, new = new->next) {
+                len_str_node_t *cur_param = GET_ELEM(&cur_macro->params, cur);
+                len_str_node_t *new_param = GET_ELEM(&new_macro->params, new);
+
+                if (!vstrcmp(&cur_param->str, &new_param->str)) {
+                    redefined = true;
+                    break;
+                }
+            }
+
+            // Now check macro bodies
+            if (!redefined) {
+                tstream_t cur_stream;
+                tstream_t new_stream;
+                ts_copy(&cur_stream, &cur_macro->stream, TS_COPY_SHALLOW);
+                ts_copy(&new_stream, &new_macro->stream, TS_COPY_SHALLOW);
+
+                while (ts_cur(&cur_stream) != EOF) {
+                    bool is_space_cur = (ts_cur(&cur_stream) == '\\' &&
+                                         ts_next(&cur_stream) == '\n') ||
+                        isspace(ts_cur(&cur_stream));
+                    bool is_space_new = (ts_cur(&new_stream) == '\\' &&
+                                         ts_next(&new_stream) == '\n') ||
+                        isspace(ts_cur(&new_stream));
+                    if (is_space_cur) {
+                        if (!is_space_new) {
+                            redefined = true;
+                            break;
+                        }
+                        ts_skip_ws_and_comment(&cur_stream);
+                        ts_skip_ws_and_comment(&new_stream);
+                    }
+
+                    if (ts_advance(&cur_stream) != ts_advance(&new_stream)) {
+                        redefined = true;
+                        break;
+                    }
+                }
+                if (ts_cur(&new_stream) != EOF) {
+                    redefined = true;
+                }
+            }
+        }
+        if (redefined) {
+            logger_log(&stream->mark, LOG_WARN, "\"%*.s\" redefined",
+                       (int)lookup.len, lookup.str);
+        }
+
+        // Remove and cleanup existing macro
+        ht_remove(&pp->macros, &cur_macro->name);
+        pp_macro_destroy(cur_macro);
+    }
 
     // Add it to the hashtable
     if (CCC_OK != (status = ht_insert(&pp->macros, &new_macro->link))) {
