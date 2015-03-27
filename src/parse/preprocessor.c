@@ -196,8 +196,7 @@ int pp_nextchar(preprocessor_t *pp) {
     return result;
 }
 
-status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
-                     pp_file_t **result) {
+status_t pp_file_create(pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = malloc(sizeof(pp_file_t));
     if (pp_file == NULL) {
@@ -205,19 +204,40 @@ status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
         goto fail;
     }
 
-    fdir_entry_t *entry;
-    if (CCC_OK != (status = fdir_insert(filename, len, &entry))) {
-        goto fail;
-    }
-    fmark_t *last_mark = last_file == NULL ? NULL : &last_file->stream.mark;
-    ts_init(&pp_file->stream, entry->buf, entry->end, &entry->filename,
-            entry->buf, last_mark, 1, 1);
-
-    // TODO: This is duplicated in next function, create a helper function
     sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
     pp_file->start_if_count = 0;
     pp_file->if_count = 0;
     pp_file->owns_file = false;
+
+    *result = pp_file;
+fail:
+    return status;
+}
+
+void pp_file_destroy(pp_file_t *pp_file) {
+    if (pp_file->owns_file) {
+        free(pp_file->stream.mark.file);
+    }
+    SL_DESTROY_FUNC(&pp_file->cond_insts, free);
+    free(pp_file);
+}
+
+status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
+                     pp_file_t **result) {
+    status_t status = CCC_OK;
+    pp_file_t *pp_file;
+    if (CCC_OK != (status = pp_file_create(&pp_file))) {
+        goto fail;
+    }
+
+    fdir_entry_t *entry;
+    if (CCC_OK != (status = fdir_insert(filename, len, &entry))) {
+        goto fail;
+    }
+
+    fmark_t *last_mark = last_file == NULL ? NULL : &last_file->stream.mark;
+    ts_init(&pp_file->stream, entry->buf, entry->end, &entry->filename,
+            entry->buf, last_mark, 1, 1);
 
     *result = pp_file;
     return status;
@@ -229,34 +249,18 @@ fail:
 
 status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream) {
     status_t status = CCC_OK;
-    pp_file_t *pp_file = malloc(sizeof(pp_file_t));
-    if (pp_file == NULL) {
-        status = CCC_NOMEM;
+    pp_file_t *pp_file;
+    if (CCC_OK != (status = pp_file_create(&pp_file))) {
         goto fail;
     }
 
     ts_copy(&pp_file->stream, stream, TS_COPY_SHALLOW);
-
-    sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
-    pp_file->start_if_count = 0;
-    pp_file->if_count = 0;
-    pp_file->owns_file = false;
-
     sl_prepend(&pp->file_insts, &pp_file->link);
     return status;
 
 fail:
     pp_file_destroy(pp_file);
     return status;
-}
-
-
-void pp_file_destroy(pp_file_t *pp_file) {
-    if (pp_file->owns_file) {
-        free(pp_file->stream.mark.file);
-    }
-    SL_DESTROY_FUNC(&pp_file->cond_insts, free);
-    free(pp_file);
 }
 
 status_t pp_macro_create(char *name, size_t len, pp_macro_t **result) {
