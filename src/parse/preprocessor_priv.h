@@ -175,9 +175,9 @@ int pp_nextchar_helper(preprocessor_t *pp);
  * @param pp The preprocessor to handle special macros for
  * @param stream The stream at the current special macro
  * @param type The type of special macro
- * @return Returns the return value for pp_nextchar
+ * @return CCC_OK on success, error code on error
  */
-int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
+status_t pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
                             pp_macro_type_t type);
 /**
  * Handle the defined operator
@@ -185,7 +185,7 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
  * @param pp The preprocessor to handle special macros for
  * @param lookahead The lookahead stream being used
  * @param stream The stream at the current special macro
- * @return Returns the return value for pp_nextchar
+ * @return CCC_OK on success, error code on error
  */
 status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
                            tstream_t *stream);

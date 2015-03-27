@@ -6,5 +6,6 @@
 int main() {
     printf("%d %s\n", __LINE__, __FILE__ __DATE__ __TIME__);
     printf("%s\n", "hello"STR STRIFY(bob));
+    EOF;
     return 0;
 }

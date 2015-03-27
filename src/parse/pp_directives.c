@@ -369,7 +369,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
                    (int)lookup.len, lookup.str);
 
         // Remove and cleanup existing macro
-        ht_remove(&pp->macros, cur_macro);
+        ht_remove(&pp->macros, &cur_macro->name);
         pp_macro_destroy(cur_macro);
     }
 
@@ -495,7 +495,8 @@ status_t pp_directive_undef(preprocessor_t *pp) {
     char *cur = ts_location(stream);
     size_t name_len = ts_advance_identifier(stream);
     len_str_t lookup = { cur, name_len };
-    ht_remove(&pp->macros, &lookup);
+    pp_macro_t *removed = ht_remove(&pp->macros, &lookup);
+    pp_macro_destroy(removed);
 
 fail:
     return status;
@@ -552,10 +553,10 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
 
     // Put the conditional instance on the stack, and mark if we used it or not
     sl_prepend(&file->cond_insts, &cond_inst->link);
+    file->start_if_count = file->if_count;
 
     if ((ifdef && macro != NULL) ||  // ifdef and macro found
         (!ifdef && macro == NULL)) { // ifndef and macro not found
-        file->start_if_count = file->if_count;
         cond_inst->if_taken = true;
         return CCC_OK;
     }

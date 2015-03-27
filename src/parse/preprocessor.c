@@ -292,8 +292,9 @@ fail:
 }
 
 void pp_macro_destroy(pp_macro_t *macro) {
-    if (macro >= s_predef_macros &&
-        macro < s_predef_macros + STATIC_ARRAY_LEN(s_predef_macros)) {
+    if (macro == NULL ||
+        (macro >= s_predef_macros &&
+         macro < s_predef_macros + STATIC_ARRAY_LEN(s_predef_macros))) {
         // Don't do anything when destroying predefined macros
         return;
     }
@@ -385,6 +386,8 @@ tstream_t *pp_get_stream(preprocessor_t *pp) {
 }
 
 int pp_nextchar_helper(preprocessor_t *pp) {
+    status_t status = CCC_OK;
+
     if (pp->cur_param.cur != NULL) {
         // We are in a macro paramater, just copy the string
         int result = ts_advance(&pp->cur_param);
@@ -625,6 +628,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
     }
 
+    bool special_next = false;
+
     switch (macro->type) {
         // For basic macros, just keep going
     case MACRO_BASIC:
@@ -633,21 +638,33 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     case MACRO_LINE:
     case MACRO_DATE:
     case MACRO_TIME:
+        special_next = true;
         ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-        return pp_handle_special_macro(pp, stream, macro->type);
+        status = pp_handle_special_macro(pp, stream, macro->type);
+        break;
     case MACRO_DEFINED:
-        return pp_handle_defined(pp, &lookahead, stream);
+        special_next = true;
+        status = pp_handle_defined(pp, &lookahead, stream);
+        break;
     case MACRO_PRAGMA:
-        return pp_directive_pragma_helper(pp, PRAGMA_UNDER);
+        special_next = true;
+        status = pp_directive_pragma_helper(pp, PRAGMA_UNDER);
+        break;
     default:
         assert(false);
     }
 
+    if (special_next) {
+        if (status != CCC_OK) {
+            return status;
+        }
+        return cur_char;
+    }
+
     pp_macro_inst_t *new_macro_inst;
-    status_t status = pp_macro_inst_create(macro, &new_macro_inst);
     int error;
 
-    if (CCC_OK != status) {
+    if (CCC_OK != (status = pp_macro_inst_create(macro, &new_macro_inst))) {
         logger_log(&stream->mark, LOG_ERR, "Failed to create new macro.");
         error = -(int)status;
         goto fail;
@@ -739,16 +756,20 @@ fail:
     return error;
 }
 
-int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
+status_t pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
                             pp_macro_type_t type) {
+    status_t status = CCC_OK;
+
     static bool date_err = false;
     static bool time_err = false;
 
     time_t t;
     struct tm *tm;
 
-    char *buf = pp->macro_buf;
-    size_t buf_size = sizeof(pp->macro_buf);
+    // Leave space for the leading quote
+    pp->macro_buf[0] = '"';
+    char *buf = pp->macro_buf + 1;
+    size_t buf_size = sizeof(pp->macro_buf) - 1;
     bool quotes = true;
 
     size_t len = 0;
@@ -794,22 +815,20 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     buf[len] = '\0';
 
     ts_copy(&pp->cur_param, stream, TS_COPY_SHALLOW);
-    pp->cur_param.cur = pp->macro_buf;
-    pp->cur_param.end = pp->macro_buf + len;
-
     if (quotes) {
-        // Act like we're stringifying, so a quote will be added at the end
-        // and the pp will look for concatenation
-        pp->param_stringify = true;
-        return '"';
+        pp->param_stringify = true; // Add a quote at end
+        pp->cur_param.cur = pp->macro_buf;
     } else {
-        // Tell caller to fetch another character
-        return -(int)CCC_RETRY;
+        pp->cur_param.cur = pp->macro_buf + 1; // Skip the quote
     }
+    pp->cur_param.end = pp->macro_buf + len + 1;
+
+    return status;
 }
 
 status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
                            tstream_t *stream) {
+    status_t status = CCC_OK;
     ts_skip_ws_and_comment(lookahead);
     bool paren = false;
     if (ts_cur(lookahead) == '(') {
@@ -837,5 +856,7 @@ status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
     }
 
     ts_copy(stream, lookahead, TS_COPY_SHALLOW);
-    return macro == NULL ? '0' : '1';
+    ts_putchar(stream, macro == NULL ? '0' : '1');
+
+    return status;
 }
