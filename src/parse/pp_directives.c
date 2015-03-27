@@ -791,7 +791,7 @@ status_t pp_directive_line(preprocessor_t *pp) {
     switch (matched) {
     case EOF:
     case 0:
-        logger_log(&stream->mark, LOG_ERR,
+        logger_log(&pp->last_mark, LOG_ERR,
                    "unexpected end of file after #line");
         status = CCC_ESYNTAX;
         goto fail;
@@ -802,7 +802,7 @@ status_t pp_directive_line(preprocessor_t *pp) {
         size_t len = strlen(filename);
         if (filename[0] != '"' ||
             !(filename[len - 1] == '"' && filename[len - 2] != '\\')) {
-            logger_log(&stream->mark, LOG_ERR,
+            logger_log(&pp->last_mark, LOG_ERR,
                        "\"%s\" is not a valid filename", filename);
             status = CCC_ESYNTAX;
             goto fail;
@@ -810,7 +810,7 @@ status_t pp_directive_line(preprocessor_t *pp) {
         len -= 2; // -2 for quotes
         len_str_t *new_filename = malloc(sizeof(len_str_t) + len + 1);
         if (new_filename == NULL) {
-            logger_log(&stream->mark, LOG_ERR, "Out of memory");
+            logger_log(&pp->last_mark, LOG_ERR, "Out of memory");
             status = CCC_NOMEM;
             goto fail;
         }
@@ -830,7 +830,7 @@ status_t pp_directive_line(preprocessor_t *pp) {
         break;
     }
     case 3:
-        logger_log(&stream->mark, LOG_ERR,
+        logger_log(&pp->last_mark, LOG_ERR,
                    "extra tokens at end of #line directive");
         status = CCC_ESYNTAX;
         goto fail;
