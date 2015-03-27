@@ -59,11 +59,16 @@ static pp_directive_t s_directives[] = {
     DIRECTIVE_LIT(line        )
 };
 
-// Default search path for #include files. Ordering is important
+/**
+ * Default search path for #include files. Ordering is important
+ * Must have trailing backslash
+ */
 static len_str_node_t s_default_search_path[] = {
     { SL_LINK_LIT, LEN_STR_LIT("./") }, // Current directory
     { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include/") },
-    { SL_LINK_LIT, LEN_STR_LIT("/usr/include/") }
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/include/") },
+    // TODO: conditionally compile this for linux systems
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/include/linux/") }
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {
@@ -180,9 +185,6 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
         suffix.str = cur;
         suffix.len = ts_location(stream) - cur;
-
-        // skip the rest of the line
-        ts_skip_line(stream);
         break;
 
         // Identifier, expand macros

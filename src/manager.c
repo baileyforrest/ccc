@@ -38,7 +38,11 @@ status_t man_init(manager_t *manager, htable_t *macros) {
         goto fail0;
     }
 
-    if (CCC_OK != (status = st_init(&manager->symtab, IS_SYM))) {
+    // If macros != NULL, then this is for evaluating preprocessor if, so then
+    // don't initialize with symbols. This is important because the static
+    // entries can only be in one table at a time
+    bool sym = macros == NULL ? IS_SYM : NOT_SYM;
+    if (CCC_OK != (status = st_init(&manager->symtab, sym))) {
         goto fail1;
     }
     if (CCC_OK != (status = st_init(&manager->string_tab, NOT_SYM))) {
