@@ -831,7 +831,6 @@ status_t pp_directive_pragma_helper(preprocessor_t *pp, int pragma_type) {
 
 status_t pp_directive_line(preprocessor_t *pp) {
     status_t status = CCC_OK;
-    tstream_t *stream = pp_get_stream(pp);
     pp_file_t *file = sl_tail(&pp->file_insts);
 
     char linebuf[MAX_LINE];
@@ -908,10 +907,5 @@ status_t pp_directive_line(preprocessor_t *pp) {
     }
 
 fail:
-    if (done) {
-        // We read the whole line, we don't want the caller to skip the next
-        // line, so put the newline back
-        ts_putchar(stream, '\n');
-    }
     return status;
 }

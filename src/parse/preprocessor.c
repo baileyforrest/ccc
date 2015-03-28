@@ -407,6 +407,12 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     }
 
+    // Handle closing quote of stringification
+    if (pp->param_stringify) {
+        pp->param_stringify = false;
+        return '"';
+    }
+
     tstream_t *stream = pp_get_stream(pp);
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
 
@@ -417,11 +423,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Get copy of current location, the last mark
     memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
-
-    // Handle closing quote of stringification
-    if (pp->param_stringify) {
-        ts_putchar(stream, '"');
-    }
 
     int cur_char = ts_cur(stream);
     int next_char = ts_next(stream);
@@ -460,9 +461,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
 
     // Handle strings
-    if (pp->param_stringify) {
-        pp->param_stringify = false;
-    } else if (!pp->string && cur_char == '"') {
+    if (!pp->string && cur_char == '"') {
         pp->string = true;
         return ts_advance(stream);
     }
@@ -631,8 +630,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
     }
 
-    bool special_next = false;
-
     switch (macro->type) {
         // For basic macros, just keep going
     case MACRO_BASIC:
@@ -641,27 +638,14 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     case MACRO_LINE:
     case MACRO_DATE:
     case MACRO_TIME:
-        special_next = true;
         ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-        status = pp_handle_special_macro(pp, stream, macro->type);
-        break;
+        return pp_handle_special_macro(pp, stream, macro->type);
     case MACRO_DEFINED:
-        special_next = true;
-        status = pp_handle_defined(pp, &lookahead, stream);
-        break;
+        return pp_handle_defined(pp, &lookahead, stream);
     case MACRO_PRAGMA:
-        special_next = true;
-        status = pp_directive_pragma_helper(pp, PRAGMA_UNDER);
-        break;
+        return pp_directive_pragma_helper(pp, PRAGMA_UNDER);
     default:
         assert(false);
-    }
-
-    if (special_next) {
-        if (status != CCC_OK) {
-            return status;
-        }
-        return -(int)CCC_RETRY;
     }
 
     pp_macro_inst_t *new_macro_inst;
@@ -769,20 +753,16 @@ fail:
     return error;
 }
 
-status_t pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
+int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
                             pp_macro_type_t type) {
-    status_t status = CCC_OK;
-
     static bool date_err = false;
     static bool time_err = false;
 
     time_t t;
     struct tm *tm;
 
-    // Leave space for the leading quote
-    pp->macro_buf[0] = '"';
-    char *buf = pp->macro_buf + 1;
-    size_t buf_size = sizeof(pp->macro_buf) - 1;
+    char *buf = pp->macro_buf;
+    size_t buf_size = sizeof(pp->macro_buf);
     bool quotes = true;
 
     size_t len = 0;
@@ -796,8 +776,7 @@ status_t pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
         len = snprintf(buf, buf_size, "%d", stream->mark.line);
         break;
     case MACRO_DATE: {
-        if (-1 == (t = time(NULL)) ||
-            NULL == (tm = localtime(&t))) {
+        if (-1 == (t = time(NULL)) || NULL == (tm = localtime(&t))) {
             if (!date_err) {
                 date_err = true;
                 logger_log(&stream->mark, LOG_WARN, "Failed to get Date!");
@@ -809,8 +788,7 @@ status_t pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
         break;
     }
     case MACRO_TIME: {
-        if (-1 == (t = time(NULL)) ||
-            NULL == (tm = localtime(&t))) {
+        if (-1 == (t = time(NULL)) || NULL == (tm = localtime(&t))) {
             if (!time_err) {
                 time_err = true;
                 logger_log(&stream->mark, LOG_WARN, "Failed to get Time!");
@@ -828,20 +806,19 @@ status_t pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     buf[len] = '\0';
 
     ts_copy(&pp->cur_param, stream, TS_COPY_SHALLOW);
+    pp->cur_param.cur = pp->macro_buf;
+    pp->cur_param.end = pp->macro_buf + len;
+
     if (quotes) {
         pp->param_stringify = true; // Add a quote at end
-        pp->cur_param.cur = pp->macro_buf;
+        return '"';
     } else {
-        pp->cur_param.cur = pp->macro_buf + 1; // Skip the quote
+        return -(int)CCC_RETRY;
     }
-    pp->cur_param.end = pp->macro_buf + len + 1;
-
-    return status;
 }
 
-status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
-                           tstream_t *stream) {
-    status_t status = CCC_OK;
+int pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
+                      tstream_t *stream) {
     ts_skip_ws_and_comment(lookahead);
     bool paren = false;
     if (ts_cur(lookahead) == '(') {
@@ -870,7 +847,6 @@ status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
     }
 
     ts_copy(stream, lookahead, TS_COPY_SHALLOW);
-    ts_putchar(stream, macro == NULL ? '0' : '1');
 
-    return status;
+    return macro == NULL ? '0' : '1';
 }

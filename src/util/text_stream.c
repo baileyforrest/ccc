@@ -30,7 +30,6 @@ extern inline int ts_cur(tstream_t *ts);
 extern inline bool ts_end(tstream_t *ts);
 extern inline int ts_next(tstream_t *ts);
 extern inline int ts_last(tstream_t *ts);
-extern inline void ts_putchar(tstream_t *ts, int next);
 
 void ts_init(tstream_t *ts, char *start, char *end,
              len_str_t *file, char *line_start, fmark_t *last,
@@ -38,7 +37,6 @@ void ts_init(tstream_t *ts, char *start, char *end,
     assert(ts != NULL);
     ts->cur = start;
     ts->end = end;
-    ts->next = 0;
     ts->last = 0;
     ts->mark.file = file;
     ts->mark.line_start = line_start;
@@ -63,12 +61,6 @@ void ts_destroy(tstream_t *ts) {
 
 int ts_advance(tstream_t *ts) {
     ts->last = ts_cur(ts);
-
-    if (ts->next) {
-        int ret_val = ts->next;
-        ts->next = 0;
-        return ret_val;
-    }
     if (ts->cur == ts->end) {
         return EOF;
     }

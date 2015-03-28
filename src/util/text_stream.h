@@ -38,9 +38,6 @@
 typedef struct tstream_t {
     char *cur;    /**< Current location in the stream */
     char *end;    /**< Character after the last character in the stream */
-
-    /** Next character for pushing characters into the stream. 0 for none */
-    int next;
     int last;     /**< Last character in the stream. 0 for none */
     fmark_t mark; /**< Mark of current location in the stream */
 } tstream_t;
@@ -56,7 +53,7 @@ typedef struct tstream_t {
  * @param col Current column number
  */
 #define TSTREAM_LIT(word, last, file, line_start, line, col)    \
-    { word, word + (sizeof(word) - 1), 0, 0,                    \
+    { word, word + (sizeof(word) - 1), 0,                       \
             FMARK_LIT(last, file, line_start, line, col) }
 
 /**
@@ -113,9 +110,6 @@ inline char *ts_location(tstream_t *ts) {
  * @return The current character
  */
 inline int ts_cur(tstream_t *ts) {
-    if (ts->next) {
-        return ts->next;
-    }
     if (ts->cur == ts->end) {
         return EOF;
     }
@@ -129,9 +123,6 @@ inline int ts_cur(tstream_t *ts) {
  * @return The next character
  */
 inline int ts_next(tstream_t *ts) {
-    if (ts->next) {
-        return ts_cur(ts);
-    }
     if (ts->cur == ts->end || ts->cur + 1 == ts->end) {
         return EOF;
     }
@@ -156,18 +147,7 @@ inline int ts_last(tstream_t *ts) {
  * @return true if text stream is at end, false otherwise
  */
 inline bool ts_end(tstream_t *ts) {
-    return ts->next == 0 && ts->cur == ts->end;
-}
-
-/**
- * Puts a single character onto the stream, so it is the front of the stream.
- * Note that only one character can be put onto the stream at a time
- *
- * @param ts Text stream to use
- * @param next The character to put onto the stream.
- */
-inline void ts_putchar(tstream_t *ts, int next) {
-    ts->next = next;
+    return ts->cur == ts->end;
 }
 
 /**
