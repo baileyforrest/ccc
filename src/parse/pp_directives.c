@@ -70,10 +70,6 @@ static len_str_node_t s_default_search_path[] = {
 
     // TODO: conditionally compile these
     { SL_LINK_LIT, LEN_STR_LIT("/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/") },
-
-    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/include/linux/") },
-    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/include/c++/4.9.2/tr1/") },
-    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/include/c++/4.9.2/") }
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {

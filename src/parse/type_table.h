@@ -26,7 +26,9 @@
 #include "util/htable.h"
 #include "util/util.h"
 
-struct type_t type;
+struct type_t;
+struct decl_t;
+struct decl_node_t;
 
 typedef struct typetab_t {
     struct typetab_t *last;
@@ -95,7 +97,24 @@ void tt_destroy(typetab_t *tt);
 typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key);
 
 /**
- * Inserts a type into the type table
+ * Inserts a typedef into the type table.
+ *
+ * The correctness of this function depends on new decl_nodes being added onto
+ * the end of decl.
+ *
+ * @param tt Type table to insert into
+ * @param decl The decl of the typedef
+ * @param decl_node The decl node of the typedef
+ * @return CCC_OK on success, error code on error
+ */
+status_t tt_insert_typedef(typetab_t *tt, struct decl_t *decl,
+                           struct decl_node_t *decl_node);
+
+/**
+ * Inserts a type into the type table.
+ *
+ * It is incorrect to use this function for inserting typedefs, instead
+ * tt_insert_typedef should be used.
  *
  * @param tt Type table to insert into
  * @param type The type to insert

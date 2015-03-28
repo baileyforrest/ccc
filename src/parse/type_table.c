@@ -136,6 +136,12 @@ fail:
     return status;
 }
 
+static void typetab_typedef_destroy(typetab_entry_t *entry) {
+    assert(entry->key.type == TT_TYPEDEF);
+    ast_decl_node_type_destroy(entry->type);
+    free(entry);
+}
+
 static void typetab_entry_destroy(typetab_entry_t *entry) {
     switch (entry->key.type) {
     case TT_PRIM:
@@ -157,8 +163,58 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
 void tt_destroy(typetab_t *tt) {
     assert(tt != NULL);
     // Must destroy typedefs first, because they may point to types in typetab
-    HT_DESTROY_FUNC(&tt->typedefs, typetab_entry_destroy);
+    HT_DESTROY_FUNC(&tt->typedefs, typetab_typedef_destroy);
     HT_DESTROY_FUNC(&tt->hashtab, typetab_entry_destroy);
+}
+
+/**
+ * For typedefs, multiple typedefs may share the same base type. So we
+ * store the base type in a different hash table which is freed after
+ * the typedef hashtable
+ */
+status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
+                           decl_node_t *decl_node) {
+    status_t status = CCC_OK;
+    typetab_entry_t *new_entry = malloc(sizeof(typetab_entry_t));
+    typetab_entry_t *new_entry2 = NULL;
+    if (new_entry == NULL) {
+        status = CCC_NOMEM;
+        goto fail;
+    }
+
+    new_entry->type = decl_node->type;
+    new_entry->key.type = TT_TYPEDEF;
+    new_entry->key.name = decl_node->id;
+
+    // Only create an entry in the second table if its the first decl, to make
+    // sure it is only removed once
+    if (decl_node == sl_head(&decl->decls)) {
+        new_entry2 = malloc(sizeof(typetab_entry_t));
+        if (new_entry2 == NULL) {
+            status = CCC_NOMEM;
+            goto fail;
+        }
+        new_entry2->type = decl->type;
+        new_entry2->key.type = TT_TYPEDEF;
+        new_entry2->key.name = decl_node->id;
+    }
+
+    if (CCC_OK != (status = ht_insert(&tt->typedefs, &new_entry->link))) {
+        goto fail;
+    }
+    if (new_entry2 != NULL &&
+        CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry2->link))) {
+        goto fail1;
+    }
+
+    return status;
+
+fail1:
+    ht_remove(&tt->typedefs, &new_entry->key);
+fail:
+    free(new_entry);
+    free(new_entry2);
+    return status;
 }
 
 status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
@@ -166,6 +222,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     assert(tt != NULL);
     assert(type != NULL);
     assert(name != NULL);
+    assert(tt_type != TT_TYPEDEF && "Use tt_insert_typedef");
 
     status_t status = CCC_OK;
     typetab_entry_t *new_entry = malloc(sizeof(typetab_entry_t));
@@ -178,14 +235,8 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     new_entry->key.type = tt_type;
     new_entry->key.name = name;
 
-    if (tt_type == TT_TYPEDEF) {
-        if (CCC_OK != (status = ht_insert(&tt->typedefs, &new_entry->link))) {
-            goto fail1;
-        }
-    } else {
-        if (CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry->link))) {
-            goto fail1;
-        }
+    if (CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry->link))) {
+        goto fail;
     }
 
     if (entry) {
@@ -193,9 +244,8 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     }
     return status;
 
-fail1:
-    free(new_entry);
 fail:
+    free(new_entry);
     return status;
 }
 
