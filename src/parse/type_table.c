@@ -179,10 +179,6 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     new_entry->key.type = tt_type;
     new_entry->key.name = name;
 
-    if (tt_lookup(tt, &new_entry->key) != NULL) {
-        status = CCC_DUPLICATE;
-        goto fail1;
-    }
     if (CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry->link))) {
         goto fail1;
     }

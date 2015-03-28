@@ -46,6 +46,7 @@ static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
       SLIST_LIT(offsetof(len_str_node_t, link)), 0, type }
 
 static pp_macro_t s_predef_macros[] = {
+    // Standard C required macros
     PREDEF_MACRO_LIT("__FILE__", "", MACRO_FILE),
     PREDEF_MACRO_LIT("__LINE__", "", MACRO_LINE),
     PREDEF_MACRO_LIT("__DATE__", "", MACRO_DATE),
@@ -54,7 +55,12 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("_Pragma", "",  MACRO_PRAGMA),
     PREDEF_MACRO_LIT("__STDC__", "1", MACRO_BASIC), // ISO C
     PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
-    PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC) // stdlib available
+    PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC), // stdlib available
+
+    // TODO: Possibly conditionally compile these
+    // Macros to get GCC headers to work
+    PREDEF_MACRO_LIT("__x86_64__", "", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__extension__", "", MACRO_BASIC)
 };
 
 status_t pp_init(preprocessor_t *pp, htable_t *macros) {
@@ -417,8 +423,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     int cur_char = ts_cur(stream);
     int next_char = ts_next(stream);
+    int last_char = ts_last(stream);
 
-    bool new_block_comment = false;
     // Handle comments
     if (cur_char == '/' && !pp->line_comment && !pp->block_comment &&
         !pp->string) {
@@ -426,7 +432,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             pp->line_comment = true;
         } else if (next_char == '*') {
             pp->block_comment = true;
-            new_block_comment = true;
         }
     }
 
@@ -440,13 +445,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
 
     if (pp->block_comment) {
-        if (!new_block_comment) {
-            // If we're in a comment, this must be safe
-            // (must have been a last char)
-            int last_char = *(ts_location(stream) - 1);
-            if (last_char == '*' && cur_char == '/') {
-                pp->block_comment = false;
-            }
+        if (last_char == '*' && cur_char == '/') {
+            pp->block_comment = false;
         }
         ts_advance(stream);
         return ' ';
@@ -497,20 +497,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
         next_char = ts_cur(&lookahead);
     }
+    (void)concat; // TODO: Do something with this or remove it
 
-    switch (cur_char) {
-        // Cases which cannot be before a macro. Macros are identifiers, so if
-        // we are already in an identifier, next char cannot be a macro
-    case ASCII_LOWER:
-    case ASCII_UPPER:
-    case ASCII_DIGIT:
-    case '_':
-        if (!concat) {
-            return ts_advance(stream);
-        }
-        break;
-
-    case '#':
+    if (cur_char == '#') {
         // Check for preprocessor directive if we're not in a macro
         if (macro_inst == NULL) {
             // If we found a character before the #, just ignore it
@@ -535,7 +524,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Invalid preprocessing directive %.*s", (int)len,
                            start);
-                ts_skip_line(stream); // Skip rest of line
+                bool in_comment;
+                ts_skip_line(stream, &in_comment); // Skip rest of line
+                pp->block_comment = in_comment;
                 return -(int)CCC_ESYNTAX;
             }
 
@@ -543,7 +534,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             pp->in_directive = true;
             status_t status = directive->action(pp);
             pp->in_directive = false;
-            ts_skip_line(stream); // Skip rest of line
+            bool in_comment;
+            ts_skip_line(stream, &in_comment); // Skip rest of line
+            pp->block_comment = in_comment;
 
             if (status != CCC_OK) {
                 return -(int)status;
@@ -575,19 +568,27 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             // We are stringifying, so return a double quote
             return '"';
         }
-        break;
+    }
+
+    switch (last_char) {
+        // Cases which cannot be before a macro. Macros are identifiers, so if
+        // we are already in an identifier, cur char cannot be a macro
+    case ASCII_LOWER:
+    case ASCII_UPPER:
+    case ASCII_DIGIT:
+    case '_':
+        return ts_advance(stream);
     default:
         break;
         // Fall through, need to look for macros parameters
     }
 
-    // if next character cannot start an identifier, we know not to check for
+    // if cur character cannot start an identifier, we know not to check for
     // a macro
-    switch (next_char) {
+    switch (cur_char) {
     case ASCII_LOWER:
     case ASCII_UPPER:
     case '_':
-        ts_advance(&lookahead); // Skip cur char
         break;
     default:
         return ts_advance(stream);
@@ -609,7 +610,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             ts_copy(&pp->cur_param, &lookahead, TS_COPY_SHALLOW);
             pp->cur_param.cur = param->val.str;
             pp->cur_param.end = param->val.str + param->val.len;
-            return cur_char;
+            return -(int)CCC_RETRY;
         }
     }
 
@@ -658,7 +659,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         if (status != CCC_OK) {
             return status;
         }
-        return cur_char;
+        return -(int)CCC_RETRY;
     }
 
     pp_macro_inst_t *new_macro_inst;
@@ -748,7 +749,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Set current to the end of the macro and params
     ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-    return cur_char;
+    return -(int)CCC_RETRY;
 
 fail:
     ts_advance(stream); // Skip character to prevent infinite loop
@@ -836,6 +837,7 @@ status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
         paren = true;
     }
 
+    char *start = ts_location(lookahead);
     size_t len = ts_advance_identifier(lookahead);
     if (len == 0) {
         logger_log(&stream->mark, LOG_ERR,
@@ -843,7 +845,7 @@ status_t pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
         ts_copy(stream, lookahead, TS_COPY_SHALLOW);
         return -(int)CCC_ESYNTAX;
     }
-    len_str_t lookup = { lookahead->cur, len };
+    len_str_t lookup = { start, len };
     pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
     if (paren) {
         if (ts_cur(lookahead) != ')') {

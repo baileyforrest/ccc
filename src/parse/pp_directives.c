@@ -67,8 +67,13 @@ static len_str_node_t s_default_search_path[] = {
     { SL_LINK_LIT, LEN_STR_LIT("./") }, // Current directory
     { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include/") },
     { SL_LINK_LIT, LEN_STR_LIT("/usr/include/") },
-    // TODO: conditionally compile this for linux systems
-    { SL_LINK_LIT, LEN_STR_LIT("/usr/include/linux/") }
+
+    // TODO: conditionally compile these
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/") },
+
+    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/include/linux/") },
+    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/include/c++/4.9.2/tr1/") },
+    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/include/c++/4.9.2/") }
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {
@@ -674,11 +679,12 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
 
     // Find the end of the line
     ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
-    ts_skip_line(&lookahead);
+    ts_skip_line(&lookahead, NULL);
     char *end = lookahead.cur;
 
     ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
     lookahead.end = end;
+    lookahead.last = 0;
 
     manager_t manager;
     if (CCC_OK != (status = man_init(&manager, &pp->macros))) {
@@ -805,7 +811,7 @@ status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err) {
     tstream_t lookahead;
 
     ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
-    size_t len = ts_skip_line(&lookahead);
+    size_t len = ts_skip_line(&lookahead, NULL);
 
     log_type_t log_type = is_err ? LOG_ERR : LOG_WARN;
 

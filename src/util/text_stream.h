@@ -41,6 +41,7 @@ typedef struct tstream_t {
 
     /** Next character for pushing characters into the stream. 0 for none */
     int next;
+    int last;     /**< Last character in the stream. 0 for none */
     fmark_t mark; /**< Mark of current location in the stream */
 } tstream_t;
 
@@ -55,7 +56,7 @@ typedef struct tstream_t {
  * @param col Current column number
  */
 #define TSTREAM_LIT(word, last, file, line_start, line, col)    \
-    { word, word + (sizeof(word) - 1), 0,                       \
+    { word, word + (sizeof(word) - 1), 0, 0,                    \
             FMARK_LIT(last, file, line_start, line, col) }
 
 /**
@@ -138,6 +139,17 @@ inline int ts_next(tstream_t *ts) {
 }
 
 /**
+ * Returns the last character in the text stream
+ *
+ * @param ts Text stream to use
+ * @return The last character
+ */
+inline int ts_last(tstream_t *ts) {
+    return ts->last;
+}
+
+
+/**
  * Tells whether a text stream is at the end
  *
  * @param ts Text stream to use
@@ -183,11 +195,13 @@ size_t ts_skip_ws_and_comment(tstream_t *ts);
 size_t ts_advance_identifier(tstream_t *ts);
 
 /**
- * Skip until the start of the next line.
+ * Skip until the start of the next line. Does not skip the newline character
  *
  * @param ts Text stream to use
+ * @param in_comment If not NULL, then is true if the line finished in a block
+ *     comment.
  * @return The number of characters skipped
  */
-size_t ts_skip_line(tstream_t *ts);
+size_t ts_skip_line(tstream_t *ts, bool *in_comment);
 
 #endif /* _TEXT_STREAM_H_ */

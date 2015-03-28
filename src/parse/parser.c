@@ -370,30 +370,49 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         bool okay = false;
         switch ((*end_node)->type) {
         case TYPE_INT:
-            // Just have int overwritten with the correct type
-            if (LEX_CUR(lex).type == SHORT) {
+            switch (LEX_CUR(lex).type) {
+                // Just have int overwritten with the correct type
+            case SHORT:
                 *end_node = tt_short;
                 okay = true;
-            }
-            if (LEX_CUR(lex).type == LONG) {
+                break;
+            case LONG:
                 *end_node = tt_long;
                 okay = true;
+                break;
+            case UNSIGNED:
+            case SIGNED:
+                okay = true;
+                break;
+            default:
+                break;
             }
             break;
         case TYPE_SHORT:
-            // Skip the int on the short
-            if (LEX_CUR(lex).type == INT) {
+            switch (LEX_CUR(lex).type) {
+            case INT:
+            case UNSIGNED:
+            case SIGNED:
                 okay = true;
+                break;
+            default:
+                break;
             }
             break;
         case TYPE_LONG:
-            // Skip the int on the long
-            if (LEX_CUR(lex).type == INT) {
+            switch (LEX_CUR(lex).type) {
+            case INT:
+            case UNSIGNED:
+            case SIGNED:
                 okay = true;
-            }
-            if (LEX_CUR(lex).type == LONG) { // Create long long int
+                break;
+            case LONG:
+                // Create long long int
                 *end_node = tt_long_long;
                 okay = true;
+                break;
+            default:
+                break;
             }
             break;
         default:
@@ -498,6 +517,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     LEX_ADVANCE(lex);
 
     typetab_entry_t *entry = NULL;
+    type_t *entry_type;
     if (LEX_CUR(lex).type == ID) {
         name = &LEX_CUR(lex).tab_entry->key;
         tt_key_t key = { name, TT_COMPOUND };
@@ -543,24 +563,30 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
             sl_init(&new_type->struct_params.decls,
                     offsetof(decl_t, link));
         }
+        entry_type = new_type;
+    } else {
+        entry_type = entry->type;
+    }
+
+    bool inserted = true;
+    // Create a new declaration in the table
+    if (entry == NULL && name != NULL) {
+        if (CCC_OK != (status = tt_insert(lex->typetab, new_type,
+                                          TT_COMPOUND, name, &entry))) {
+            goto fail;
+        }
+        inserted = true;
     }
 
     if (LEX_CUR(lex).type != LBRACE) {
-        if (name != NULL) { // Create a new declaration in the table
-            if (entry == NULL) {
-                if (CCC_OK != (status = tt_insert(lex->typetab, new_type,
-                                                  TT_COMPOUND, name, &entry))) {
-                    goto fail;
-                }
-            }
-
+        if (name != NULL) {
             type_t *typedef_type;
             ALLOC_NODE(lex, typedef_type, type_t);
             typedef_type->type = TYPE_TYPEDEF;
             typedef_type->size = 0; // Mark as uninitialized
             typedef_type->align = 0;
             typedef_type->typedef_params.name = name;
-            typedef_type->typedef_params.base = new_type;
+            typedef_type->typedef_params.base = entry_type;
             typedef_type->typedef_params.type = btype;
 
             *type = typedef_type;
@@ -576,16 +602,16 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     LEX_MATCH(lex, LBRACE);
 
     if (btype == TYPE_ENUM) {
-        if (CCC_OK != (status = par_enumerator_list(lex, new_type))) {
+        if (CCC_OK != (status = par_enumerator_list(lex, entry_type))) {
             goto fail;
         }
     } else { // struct/union
         // Must match at least one struct declaration
-        if (CCC_OK != (status = par_struct_declaration(lex, new_type))) {
+        if (CCC_OK != (status = par_struct_declaration(lex, entry_type))) {
             goto fail;
         }
         while (CCC_BACKTRACK !=
-               (status = par_struct_declaration(lex, new_type))) {
+               (status = par_struct_declaration(lex, entry_type))) {
             if (status != CCC_OK) {
                 goto fail;
             }
@@ -594,22 +620,13 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     status = CCC_OK;
     LEX_MATCH(lex, RBRACE);
 
-    // Add a new named compound type into the type table
-    if (name != NULL && entry == NULL) {
-        if (CCC_OK !=
-            (status =
-             tt_insert(lex->typetab, new_type, TT_COMPOUND, name, &entry))) {
-            goto fail;
-        }
-    }
-
-    *type = new_type;
+    *type = entry_type;
     return status;
 
 fail:
     if (name == NULL) {
         ast_type_destroy(new_type);
-    } else {
+    } else if (!inserted) {
         ast_type_protected_destroy(new_type);
     }
     return status;
@@ -1072,7 +1089,6 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             expr->paren_base = NULL;
             if (CCC_OK !=
                 (status = par_expression(lex, NULL, &expr->paren_base))) {
-                ast_expr_destroy(expr);
                 goto fail;
             }
             primary = true;
@@ -1433,7 +1449,19 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
     decl_t *type = NULL;
     expr_t *expr = NULL;
     if (CCC_OK != (status = par_type_name(lex, &type))) {
-        goto fail;
+        if (status != CCC_BACKTRACK) {
+            goto fail;
+        }
+
+        // Try to parse as paren expression
+        ALLOC_NODE(lex, expr, expr_t);
+        expr->type = EXPR_PAREN;
+        expr->paren_base = NULL;
+        if (CCC_OK !=
+            (status = par_expression(lex, NULL, &expr->paren_base))) {
+            goto fail;
+        }
+        goto done;
     }
     LEX_MATCH(lex, RPAREN);
 
@@ -1445,6 +1473,8 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
         (status = par_cast_expression(lex, false, &expr->cast.base))) {
         goto fail;
     }
+
+done:
     *result = expr;
     return status;
 
@@ -1807,8 +1837,11 @@ status_t par_enumerator_list(lex_wrap_t *lex, type_t *type) {
 
     // Trailing comma on last entry is allowed
     while (LEX_CUR(lex).type == COMMA) {
+        LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_enumerator(lex, type))) {
-            if (status != CCC_BACKTRACK) {
+            if (status == CCC_BACKTRACK) {
+                break;
+            } else {
                 goto fail;
             }
         }

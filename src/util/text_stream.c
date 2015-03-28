@@ -29,6 +29,7 @@ extern inline char *ts_location(tstream_t *ts);
 extern inline int ts_cur(tstream_t *ts);
 extern inline bool ts_end(tstream_t *ts);
 extern inline int ts_next(tstream_t *ts);
+extern inline int ts_last(tstream_t *ts);
 extern inline void ts_putchar(tstream_t *ts, int next);
 
 void ts_init(tstream_t *ts, char *start, char *end,
@@ -38,6 +39,7 @@ void ts_init(tstream_t *ts, char *start, char *end,
     ts->cur = start;
     ts->end = end;
     ts->next = 0;
+    ts->last = 0;
     ts->mark.file = file;
     ts->mark.line_start = line_start;
     ts->mark.last = last;
@@ -60,6 +62,8 @@ void ts_destroy(tstream_t *ts) {
 }
 
 int ts_advance(tstream_t *ts) {
+    ts->last = ts_cur(ts);
+
     if (ts->next) {
         int ret_val = ts->next;
         ts->next = 0;
@@ -166,18 +170,24 @@ size_t ts_advance_identifier(tstream_t *ts) {
     return num_chars;
 }
 
-size_t ts_skip_line(tstream_t *ts) {
+size_t ts_skip_line(tstream_t *ts, bool *in_comment) {
     size_t num_chars = 0;
     int last = -1;
+    bool comment = false;
     while (!ts_end(ts)) {
-        /* Skip until we reach an unescaped newline */
-        if (ts_cur(ts) == '\n' && last != '\\') {
-            ts_advance(ts);
+        if (ts_cur(ts) == '/' && ts_next(ts) == '*') {
+            comment = true;
+        } else if (last == '*' && ts_cur(ts) == '/') {
+            comment = false;
+        } else if (ts_cur(ts) == '\n' && last != '\\') {
             break;
         }
         num_chars++;
         last = ts_advance(ts);
     }
 
+    if (in_comment != NULL) {
+        *in_comment = comment;
+    }
     return num_chars;
 }
