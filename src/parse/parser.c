@@ -810,10 +810,7 @@ status_t par_declarator(lex_wrap_t *lex, decl_node_t *decl_node,
         *patch = lpatch;
     }
 
-    return status;
-
 fail:
-    ast_decl_node_destroy(decl_node);
     return status;
 }
 
@@ -1784,6 +1781,9 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
             goto fail;
         }
         func->func.num_params++;
+        if (LEX_CUR(lex).type == COMMA) {
+            LEX_ADVANCE(lex);
+        }
     }
     status = CCC_OK;
 fail:

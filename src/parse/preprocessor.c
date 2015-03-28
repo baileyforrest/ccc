@@ -60,7 +60,9 @@ static pp_macro_t s_predef_macros[] = {
     // TODO: Possibly conditionally compile these
     // Macros to get GCC headers to work
     PREDEF_MACRO_LIT("__x86_64__", "", MACRO_BASIC),
-    PREDEF_MACRO_LIT("__extension__", "", MACRO_BASIC)
+
+    // TODO: Need to actually implement this
+    PREDEF_MACRO_LIT("__builtin_va_list", "int", MACRO_BASIC)
 };
 
 status_t pp_init(preprocessor_t *pp, htable_t *macros) {
@@ -691,13 +693,20 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         SL_FOREACH(cur_link, &macro->params) {
             num_params++;
             char *cur_param = ts_location(&lookahead);
+            int num_parens = 0;
             while (!ts_end(&lookahead)) {
-                if (ts_cur(&lookahead) == ',') { // end of current param
-                    break;
-                }
-                if (ts_cur(&lookahead) == ')') { // end of all params
-                    done = true;
-                    break;
+                if (ts_cur(&lookahead) == '(') {
+                    num_parens++;
+                } else if (num_parens > 0 && ts_cur(&lookahead) == ')') {
+                    num_parens--;
+                } else if (num_parens == 0) {
+                    if (ts_cur(&lookahead) == ',') { // end of current param
+                        break;
+                    }
+                    if (ts_cur(&lookahead) == ')') { // end of all params
+                        done = true;
+                        break;
+                    }
                 }
                 ts_advance(&lookahead); // Blindly copy param data
             }
@@ -734,14 +743,17 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
             ts_advance(&lookahead);
 
-            if (done && num_params != macro->num_params) {
-                logger_log(&stream->mark, LOG_ERR,
-                           "Incorrect number of macro paramaters");
-                error = -(int)CCC_ESYNTAX;
-                goto fail;
+            if (done) {
+                break;
             }
         }
 
+        if ((done && num_params != macro->num_params) || !done) {
+            logger_log(&stream->mark, LOG_ERR,
+                       "Incorrect number of macro paramaters");
+            error = -(int)CCC_ESYNTAX;
+            goto fail;
+        }
     }
 
     // Add new macro instance to the stack

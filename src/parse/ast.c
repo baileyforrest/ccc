@@ -317,7 +317,9 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
         }
         case TYPE_ARR:
             PUT_CUR('[');
-            ast_expr_print(type->arr.len, &cur, &remain);
+            if (type->arr.len != NULL) {
+                ast_expr_print(type->arr.len, &cur, &remain);
+            }
             if (remain > 0) {
                 PUT_CUR(']');
             }
