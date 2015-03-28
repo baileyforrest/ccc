@@ -56,7 +56,7 @@ void ast_stmt_print(stmt_t *stmt, int indent);
  * @param type if TYPE_STRUCT or TYPE_UNION will print decl_node expression as
  *     bit fields
  */
-void ast_decl_print(decl_t *decl, basic_type_t type, char **dest,
+void ast_decl_print(decl_t *decl, basic_type_t type, int indent, char **dest,
                     size_t *remain);
 
 /**
@@ -86,7 +86,7 @@ void ast_oper_print(oper_t op, char **dest, size_t *remain);
  *
  * @param type type_t to print
  */
-void ast_type_print(type_t *type, char **dest, size_t *remain);
+void ast_type_print(type_t *type, int indent, char **dest, size_t *remain);
 
 /**
  * Prints a type modifier mask

@@ -114,6 +114,10 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
         goto fail;
     }
 
+    if (CCC_OK != (status = ht_init(&tt->typedefs, &params))) {
+        goto fail;
+    }
+
     // Initialize top level table with primitive types
     if (last == NULL) {
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
@@ -127,6 +131,7 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
 
 fail1:
     ht_destroy(&tt->hashtab);
+    ht_destroy(&tt->typedefs);
 fail:
     return status;
 }
@@ -140,15 +145,7 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
         ast_type_protected_destroy(entry->type);
         break;
     case TT_TYPEDEF:
-        switch (entry->type->type) {
-        case TYPE_STRUCT:
-        case TYPE_UNION:
-        case TYPE_ENUM:
-            ast_type_protected_destroy(entry->type);
-            break;
-        default:
-            ast_type_destroy(entry->type);
-        }
+        ast_type_destroy(entry->type);
         break;
     case TT_VAR:
         // Ignore variables, the type is in the decl node
@@ -159,6 +156,8 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
 
 void tt_destroy(typetab_t *tt) {
     assert(tt != NULL);
+    // Must destroy typedefs first, because they may point to types in typetab
+    HT_DESTROY_FUNC(&tt->typedefs, typetab_entry_destroy);
     HT_DESTROY_FUNC(&tt->hashtab, typetab_entry_destroy);
 }
 
@@ -179,8 +178,14 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     new_entry->key.type = tt_type;
     new_entry->key.name = name;
 
-    if (CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry->link))) {
-        goto fail1;
+    if (tt_type == TT_TYPEDEF) {
+        if (CCC_OK != (status = ht_insert(&tt->typedefs, &new_entry->link))) {
+            goto fail1;
+        }
+    } else {
+        if (CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry->link))) {
+            goto fail1;
+        }
     }
 
     if (entry) {
@@ -196,7 +201,12 @@ fail:
 
 typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key) {
     for (;tt != NULL; tt = tt->last) {
-        typetab_entry_t *result = ht_lookup(&tt->hashtab, key);
+        typetab_entry_t *result;
+        if (key->type == TT_TYPEDEF) {
+            result = ht_lookup(&tt->typedefs, key);
+        } else {
+            result = ht_lookup(&tt->hashtab, key);
+        }
         if (result != NULL) {
             return result;
         }

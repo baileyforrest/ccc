@@ -31,6 +31,7 @@ struct type_t type;
 typedef struct typetab_t {
     struct typetab_t *last;
     htable_t hashtab;
+    htable_t typedefs;
 } typetab_t;
 
 typedef enum tt_type_t {
