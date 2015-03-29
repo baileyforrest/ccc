@@ -54,7 +54,7 @@ void token_print(lexeme_t *token) {
         }
         break;
     case FLOATLIT:
-        printf("%f", token->float_params.float_val);
+        printf("%Lf", token->float_params.float_val);
         if (token->float_params.hasF) {
             printf("F");
         }

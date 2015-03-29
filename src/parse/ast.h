@@ -19,6 +19,7 @@
 /**
  * AST Interface
  */
+// TODO: Add support for long double
 
 #ifndef _AST_H_
 #define _AST_H_
@@ -221,7 +222,7 @@ typedef struct expr_t {
             type_t *type;           /**< The type of the constant */
             union {                 /**< Constant value */
                 long long int_val;  /**< Int constant */
-                double float_val;   /**< Float constant */
+                long double float_val; /**< Float constant */
                 len_str_t *str_val; /**< String constant */
             };
         } const_val;

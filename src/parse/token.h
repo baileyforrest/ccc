@@ -164,8 +164,9 @@ typedef struct lexeme_t {
             bool hasLL;            /**< Has LL suffix */
         } int_params;
         struct {
-            double float_val;      /**< For floating point types */
+            long double float_val; /**< For floating point types */
             bool hasF;             /**< Has F suffix */
+            bool hasL;             /**< Has L suffix */
         } float_params;
     };
 } lexeme_t;

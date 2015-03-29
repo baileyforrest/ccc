@@ -89,14 +89,4 @@ status_t man_parse_expr(manager_t *manager, expr_t **expr);
  */
 status_t man_dump_tokens(manager_t *manager);
 
-/**
- * Print the ast from a compilation manager
- *
- * The manager's preprocessor must be set up first
- *
- * @param manager The compilation mananger to use
- * @return CCC_OK on success, error code on error.
- */
-status_t man_dump_ast(manager_t *manager);
-
 #endif /* _MANAGER_H_ */

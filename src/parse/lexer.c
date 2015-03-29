@@ -25,6 +25,8 @@
 #include <stdio.h>
 
 #include <assert.h>
+#include <errno.h>
+#include <limits.h>
 #include <math.h>
 
 #include "util/logger.h"
@@ -152,6 +154,10 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             case '-': result->type = DEC; break;
             case '=': result->type = MINUSEQ; break;
             case '>': result->type = DEREF; break;
+            case ASCII_DIGIT: // Negative number
+                lexer->next_char = next;
+                status = lex_number(lexer, cur, result);
+                break;
             default:
                 result->type = MINUS;
                 lexer->next_char = next;
@@ -363,272 +369,114 @@ end:
     return status;
 }
 
-// TODO: Change this to use strtoll, strtod family of functions
 status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     status_t status = CCC_OK;
 
-    // Unsigned so modular overflow is defined
-    unsigned long long accum = 0;
-    unsigned bits = 0;
+    bool has_e = false;
+    bool has_dot = false;
+    bool has_f = false;
+    bool has_u = false;
+    bool has_l = false;
+    bool has_ll = false;
+    bool is_hex = false;
 
-    // 0 is handled separately for hex/octal
-    switch (cur) {
-    case '0': {
-        NEXT_CHAR_NOERR(lexer->pp, cur);
-        switch(cur) {
-        case 'x':
-        case 'X': { // Hexidecmal
-            bool done = false;
-            do {
-                NEXT_CHAR_NOERR(lexer->pp, cur);
-                switch (cur) {
-                case ASCII_DIGIT:
-                    accum = accum << 4 | (cur - '0');
-                    break;
-                case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
-                    accum = accum << 4 | (cur - 'a' + 10);
-                    break;
-                case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
-                    accum = accum << 4 | (cur - 'A' + 10);
-                    break;
-                default:
-                    done = true;
-                }
-                if (!done) {
-                    bits += 4;
-                }
-            } while (!done);
-            break;
-        }
-        case '0': case '1': case '2': case '3': case '4': case '5':
-        case '6': case '7': { // Octal
-            bool done = false;
-            do {
-                switch (cur) {
-                case '0': case '1': case '2': case '3': case '4': case '5':
-                case '6': case '7':
-                    accum = accum << 3 | (cur - '0');
-                    break;
-                case '8': case '9': case '.': case 'e': case 'E':
-                    goto handle_float;
-                default:
-                    done = true;
-                }
-                if (!done) {
-                    bits += 3;
-                    NEXT_CHAR_NOERR(lexer->pp, cur);
-                }
-            } while (!done);
-            break;
-        }
-            // Floats can have a leading 0
-        case '8': case '9': case '.': case 'e': case 'E':
-            goto handle_float;
-        } // switch (cur)
-    }
-        // Try to parse as a decimal number
-    case '1': case '2': case '3': case '4': case '5': case '6': case '7':
-    case '8': case '9': {
-        bool done = false;
-        do {
-            switch (cur) {
-            case ASCII_DIGIT: {
-                unsigned long long last = accum;
-                accum = accum * 10 + (cur - '0');
-                if (accum < last) {
-                    // Overflow, just add bits to mark it
-                    bits += sizeof(long long) * 8;
-                }
-                break;
-            }
-            case '.': case 'e': case 'E':
-                goto handle_float;
-            default:
-                done = true;
-            }
-            if (!done) {
-                NEXT_CHAR_NOERR(lexer->pp, cur);
-            }
-        } while(!done);
-        break;
-    }
-    default:
-        // Can't end up here
-        assert(false);
-    } // case (cur)
+    size_t offset = 0;
 
-    // Finished parsing body of int
-
-    bool hasU = false;
-    bool hasL = false;
-    bool hasLL = false;
-    bool junk = false;
-    bool done = false;
-    int offset = 0;
-    // Scan characters at end
-    do {
+    if (cur == '-') {
         lexer->lexbuf[offset++] = cur;
+        cur = lexer->next_char;
+    }
+
+    int last = -1;
+    bool done = false;
+    bool err = false;
+    while (!done && !err && offset < sizeof(lexer->lexbuf)) {
         switch (cur) {
-        case 'U':
-        case 'u':
-            if (hasU) { // Can't repeat suffix
-                junk = true;
-                break;
-            }
-            hasU = true;
-            break;
-        case 'L':
-        case 'l':
-            if (hasL) {
-                // Don't need to check 0 because if hasL is true, offset
-                // must be greater than 1
-                if (lexer->lexbuf[offset - 2] != cur) {
-                    junk = true;
-                } else {
-                    hasLL = true;
-                }
-                break;
-            }
-            hasL = true;
-            break;
-            // _ and all letters other than U, L, E
-        case 'a': case 'b': case 'c': case 'd': case 'f':
-        case 'g': case 'h': case 'i': case 'j': case 'k': case 'm':
-        case 'n': case 'o': case 'p': case 'q': case 'r': case 's':
-        case 't': case 'v': case 'w': case 'x': case 'y': case 'z':
-        case 'A': case 'B': case 'C': case 'D': case 'F':
-        case 'G': case 'H': case 'I': case 'J': case 'K': case 'M':
-        case 'N': case 'O': case 'P': case 'Q': case 'R': case 'S':
-        case 'T': case 'V': case 'W': case 'X': case 'Y': case 'Z':
-        case '_':
-            junk = true;
-            done = true;
-            break;
-        default:
-            done = true;
-        } // switch (cur)
-
-        if (!done) {
-            NEXT_CHAR_NOERR(lexer->pp, cur);
-        }
-    } while(!done);
-
-    if (junk) {
-        logger_log(&result->mark, LOG_ERR,
-                   "Unexpected junk in integer literal");
-        status = CCC_ESYNTAX;
-
-        // Skip over junk at end (identifier characters)
-        done = false;
-        do {
-            NEXT_CHAR_NOERR(lexer->pp, cur);
-            switch (cur) {
-            case ASCII_DIGIT:
-            case ASCII_LOWER:
-            case ASCII_UPPER:
-            case '_':
-                break;
-            default:
-                done = true;
-            }
-        } while(!done);
-    }
-
-    if (bits && bits > sizeof(long long) * 8) {
-        logger_log(&result->mark, LOG_WARN, "Integer constant too large");
-    }
-
-    lexer->next_char = cur;
-
-    result->type = INTLIT;
-    result->int_params.hasU = hasU;
-    result->int_params.hasL = hasL;
-    result->int_params.hasLL = hasLL;
-    result->int_params.int_val = accum;
-    return status;
-
-handle_float:
-    ; // Empty statement to allow compilation
-
-    double double_accum = (double)accum;
-    double frac_val = 0.1;
-    bool decimal_point = false;
-
-    bool has_exp = false;
-    bool exp_neg = false;
-    int exp = 0;
-
-    bool hasF = false;
-
-    do {
-        switch(cur) {
-        case '.':
-            if (decimal_point || exp != 0) {
-                junk = true;
-                done = true;
-                break;
-            }
-            decimal_point = true;
-            break;
-        case 'E':
         case 'e':
-            if (has_exp) {
-                junk = true;
-                done = true;
-                break;
+        case 'E':
+            if (has_e) {
+                err = true;
+            }
+            has_e = true;
+            break;
+        case '.':
+            if (has_dot) {
+                err = true;
+            }
+            has_dot = true;
+            break;
+        case 'f':
+        case 'F':
+            if (has_f || has_u || has_ll) {
+                err = true;
+            }
+            has_f = true;
+            break;
+        case 'u':
+        case 'U':
+            if (has_f || has_u) {
+                err = true;
+            }
+            has_u = true;
+            break;
+        case 'l':
+        case 'L':
+            if (has_f || has_u || has_ll || (has_l && cur != last)) {
+                err = true;
+            }
+            if (has_l) {
+                has_ll = true;
+            }
+            has_l = true;
+            break;
+        case 'x':
+        case 'X':
+            if (last == '0' &&
+                (offset == 1 || (offset == 2 && lexer->lexbuf[0] == '-'))) {
+                is_hex = true;
+            } else {
+                err = true;
             }
             break;
-        case '-': { // Negative exponent
-            if (!has_exp || exp != 0) {
-                junk = true;
-                done = true;
-                break;
+        case ASCII_DIGIT:
+            if (has_f || has_u || has_l || has_ll) {
+                err = true;
             }
-            exp_neg = true;
             break;
-        }
-        case 'F': // F suffix
-        case 'f': {
-            hasF = true;
-            done = true;
-            break;
-        }
-        case ASCII_DIGIT: {
-            if (!decimal_point) { // Accum integral part
-                double_accum = double_accum * 10 + (cur - '0');
-            } else if (!exp) { // Accum fractional part
-                double_accum = double_accum + (cur - '0') * frac_val;
-                frac_val = frac_val / 10.0;
-            } else { // Accumulate exponent
-                exp = exp * 10 + (cur - '0');
-            }
-        }
-            // _ and any letter other than E or F
+
+            // _ and all letters other than X, U, L, E, F
         case 'a': case 'b': case 'c': case 'd': case 'g': case 'h':
-        case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
-        case 'o': case 'p': case 'q': case 'r': case 's': case 't':
-        case 'u': case 'v': case 'w': case 'x': case 'y': case 'z':
+        case 'i': case 'j': case 'k': case 'm': case 'n': case 'o': case 'p':
+        case 'q': case 'r': case 's': case 't': case 'v': case 'w': case 'y':
+        case 'z':
         case 'A': case 'B': case 'C': case 'D': case 'G': case 'H':
-        case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
-        case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T':
-        case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
+        case 'I': case 'J': case 'K': case 'M': case 'N': case 'O': case 'P':
+        case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W': case 'Y':
+        case 'Z':
         case '_':
-            junk = true;
-            done = true;
+            err = true;
             break;
         default:
             done = true;
-        } // switch (cur)
-        if (!done) {
-            NEXT_CHAR_NOERR(lexer->pp, cur);
         }
-    } while(!done);
+        if (!done) {
+            last = cur;
+            lexer->lexbuf[offset++] = cur;
+            NEXT_CHAR_NOERR(lexer->pp, cur);
+        } else {
+            lexer->lexbuf[offset] = '\0';
+        }
+    }
 
-    exp = exp_neg ? -exp : exp;
+    bool is_float = has_e || has_dot || has_f;
 
-    if (junk) {
-        logger_log(&result->mark, LOG_ERR,
-                   "Unexpected junk in floating point literal");
+    if (!err && is_float && (has_u || has_ll || is_hex)) {
+        err = true;
+    }
+
+    if (err || !done) {
+        err = true;
+        logger_log(&result->mark, LOG_ERR, "Invalid numeric literal");
         status = CCC_ESYNTAX;
 
         // Skip over junk at end (identifier characters)
@@ -648,10 +496,56 @@ handle_float:
     }
 
     lexer->next_char = cur;
+    if (err) {
+        return status;
+    }
 
-    result->type = FLOATLIT;
-    result->float_params.hasF = hasF;
-    result->float_params.float_val = double_accum * pow(10.0, exp);
+    errno = 0;
+    if (is_float) {
+        result->type = FLOATLIT;
+        result->float_params.hasF = has_f;
+        result->float_params.hasL = has_l;
+        if (has_f) {
+            result->float_params.float_val = strtof(lexer->lexbuf, NULL);
+        } else if (has_l) {
+            result->float_params.float_val = strtold(lexer->lexbuf, NULL);
+        } else {
+            result->float_params.float_val = strtod(lexer->lexbuf, NULL);
+        }
+    } else {
+        result->type = INTLIT;
+        result->int_params.hasU = has_u;
+        result->int_params.hasL = has_l;
+        result->int_params.hasLL = has_ll;
+        if (has_u) {
+            if (has_l) {
+                result->int_params.int_val = strtoul(lexer->lexbuf, NULL, 0);
+            } else if (has_ll) {
+                result->int_params.int_val = strtoull(lexer->lexbuf, NULL, 0);
+            } else {
+                result->int_params.int_val = strtoul(lexer->lexbuf, NULL, 0);
+                if (result->int_params.int_val > UINT_MAX) {
+                    errno = ERANGE;
+                }
+            }
+        } else {
+            if (has_l) {
+                result->int_params.int_val = strtol(lexer->lexbuf, NULL, 0);
+            } else if (has_ll) {
+                result->int_params.int_val = strtoll(lexer->lexbuf, NULL, 0);
+            } else {
+                result->int_params.int_val = strtol(lexer->lexbuf, NULL, 0);
+                if (result->int_params.int_val < INT_MIN ||
+                    result->int_params.int_val > INT_MAX) {
+                    errno = ERANGE;
+                }
+            }
+        }
+    }
+    if (errno == ERANGE) {
+        logger_log(&result->mark, LOG_ERR, "Overflow in numeric literal", cur);
+        status = CCC_ESYNTAX;
+    }
 
     return status;
 }

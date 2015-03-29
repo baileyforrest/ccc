@@ -21,13 +21,9 @@
  */
 
 #include "parse/ast.h"
-#include "parse/lexer.h"
-#include "parse/parser.h"
-#include "parse/preprocessor.h"
-#include "parse/symtab.h"
-#include "parse/token.h"
 
 #include "util/file_directory.h"
+#include "util/logger.h"
 
 #include "manager.h"
 #include "optman.h"
@@ -60,15 +56,27 @@ int main(int argc, char **argv) {
         if (optman.dump_opts & DUMP_TOKENS) {
             printf("@@@ Tokens %s\n", node->str.str);
             man_dump_tokens(&manager);
-        } else if (optman.dump_opts & DUMP_AST) {
-            printf("@@@ AST %s\n", node->str.str);
-            man_dump_ast(&manager);
         } else {
-            // TODO: do the compilation
+            trans_unit_t *ast;
+            if (optman.dump_opts & DUMP_AST) {
+                printf("@@@ AST %s\n", node->str.str);
+            }
+
+            if (CCC_OK != (status = man_parse(&manager, &ast))) {
+                logger_log(NULL, LOG_ERR, "Failed to parse %s", node->str.str);
+                goto src_fail0;
+            }
+            if (optman.dump_opts & DUMP_AST) {
+                ast_print(ast);
+            }
+
+            ast_destroy(ast);
         }
 
+    src_fail0:
         man_destroy(&manager);
     }
+
 fail1:
     fdir_destroy();
 fail0:

@@ -100,16 +100,3 @@ status_t man_dump_tokens(manager_t *manager) {
 
     return status;
 }
-
-status_t man_dump_ast(manager_t *manager) {
-    status_t status = CCC_OK;
-    trans_unit_t *ast;
-
-    if (CCC_OK != (status = man_parse(manager, &ast))) {
-        goto fail;
-    }
-    ast_print(ast);
-    ast_destroy(ast);
-fail:
-    return status;
-}
