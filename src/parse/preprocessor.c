@@ -124,6 +124,7 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     pp->string = false;
     pp->char_line = false;
     pp->ignore = false;
+    pp->in_directive = false;
 
     return status;
 
@@ -525,9 +526,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Invalid preprocessing directive %.*s", (int)len,
                            start);
-                bool in_comment;
-                ts_skip_line(stream, &in_comment); // Skip rest of line
-                pp->block_comment = in_comment;
+                ts_skip_line(stream, &pp->block_comment); // Skip rest of line
                 return -(int)CCC_ESYNTAX;
             }
 
@@ -535,9 +534,11 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             pp->in_directive = true;
             status_t status = directive->action(pp);
             pp->in_directive = false;
-            bool in_comment;
-            ts_skip_line(stream, &in_comment); // Skip rest of line
-            pp->block_comment = in_comment;
+
+            if (directive->action != pp_directive_line) {
+                // Don't skip for line directive
+                ts_skip_line(stream, &pp->block_comment); // Skip rest of line
+            }
 
             if (status != CCC_OK) {
                 return -(int)status;

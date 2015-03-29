@@ -87,12 +87,12 @@ typedef struct fdir_entry_t {
  *
  * @return CCC_OK on success, error code on failure
  */
-status_t fdir_init();
+status_t fdir_init(void);
 
 /**
  * Destroys the file directory, freeing its memory
  */
-void fdir_destroy();
+void fdir_destroy(void);
 
 /**
  * Add a file to the file directory. Returns the current entry if it exists.

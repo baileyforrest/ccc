@@ -92,6 +92,14 @@ typedef struct len_str_node_t {
 } len_str_node_t;
 
 /**
+ * Structure for storage of len_str_node_t
+ */
+typedef struct len_str_node_node_t {
+    sl_link_t link;
+    len_str_node_t node;
+} len_str_node_node_t;
+
+/**
  * djb2 String hash function for len_str_t.
  * Must be void * for hashtable interface
  *

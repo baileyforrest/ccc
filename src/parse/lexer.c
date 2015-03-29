@@ -363,6 +363,7 @@ end:
     return status;
 }
 
+// TODO: Change this to use strtoll, strtod family of functions
 status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     status_t status = CCC_OK;
 

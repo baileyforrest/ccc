@@ -27,6 +27,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "optman.h"
+
 void logger_log_line(fmark_t *mark);
 
 
@@ -82,6 +84,13 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
     default:
         header = "info:";
         break;
+    }
+
+    if (mark == NULL) {
+        printf("%s: %s ", optman.exec_name, header);
+        vprintf(fmt, ap);
+        printf("\n");
+        return;
     }
 
     printf("%s:%d:%d %s ", mark->file->str, mark->line, mark->col, header);

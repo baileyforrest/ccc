@@ -87,7 +87,7 @@ typedef struct fdir_t {
 
 static fdir_t s_fdir;
 
-status_t fdir_init() {
+status_t fdir_init(void) {
     static const ht_params_t s_params = {
         0,                                // No Size estimate
         offsetof(fdir_entry_t, filename), // Offset of key
@@ -118,7 +118,7 @@ static status_t fdir_entry_destroy(fdir_entry_t *entry) {
     return status;
 }
 
-void fdir_destroy() {
+void fdir_destroy(void) {
     HT_DESTROY_FUNC(&s_fdir.table, fdir_entry_destroy);
 }
 

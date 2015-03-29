@@ -47,12 +47,12 @@ typedef struct preprocessor_t {
     bool param_stringify; /**< Whether or not we are stringifying */
 
     // Paramaters for reading preprocessor commands
+    bool pp_if;           /**< if true, we're processing a preprocessor if */
     bool block_comment;   /**< true if in a block comment */
     bool line_comment;    /**< true if in a line comment */
     bool string;          /**< true if in string */
     bool char_line;       /**< true if non whitespace on current line */
     bool ignore;          /**< Conditional compilation - ignore output */
-    bool pp_if;           /**< if true, we're processing a preprocessor if */
     bool in_directive;    /**< if true, we're processing a directive */
 
     char macro_buf[PP_BUF_SIZE]; /**< Buffer for built in macros (e.g. FILE) */
