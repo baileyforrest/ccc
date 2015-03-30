@@ -44,7 +44,8 @@
 
 #include "util/htable.h"
 #include "util/logger.h"
-#include "util/util.h"
+
+#include "optman.h"
 
 status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
     assert(lexer != NULL);
@@ -905,14 +906,17 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         }
         LEX_MATCH(lex, RPAREN);
 
-        type_t *paren_type;
-        ALLOC_NODE(lex, paren_type, type_t);
-        paren_type->type = TYPE_PAREN;
-        paren_type->paren_base = *lpatch;
-        *lpatch = paren_type;
-        lpatch = &paren_type->paren_base;
-        paren_type->size = paren_type->paren_base->size;
-        paren_type->align = paren_type->paren_base->align;
+        if (optman.dump_opts & DUMP_AST) {
+            // Only create paren node if we're printing AST
+            type_t *paren_type;
+            ALLOC_NODE(lex, paren_type, type_t);
+            paren_type->type = TYPE_PAREN;
+            paren_type->paren_base = *lpatch;
+            *lpatch = paren_type;
+            lpatch = &paren_type->paren_base;
+            paren_type->size = paren_type->paren_base->size;
+            paren_type->align = paren_type->paren_base->align;
+        }
         break;
     }
 
@@ -1085,12 +1089,20 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             // FALL THROUGH
         }
         default: { // Paren expression
-            ALLOC_NODE(lex, expr, expr_t);
-            expr->type = EXPR_PAREN;
-            expr->paren_base = NULL;
-            if (CCC_OK !=
-                (status = par_expression(lex, NULL, &expr->paren_base))) {
-                goto fail;
+            if (optman.dump_opts & DUMP_AST) {
+                // Only create paren node if we're printing AST
+                ALLOC_NODE(lex, expr, expr_t);
+                expr->type = EXPR_PAREN;
+                expr->paren_base = NULL;
+                if (CCC_OK !=
+                    (status = par_expression(lex, NULL, &expr->paren_base))) {
+                    goto fail;
+                }
+            } else {
+                if (CCC_OK !=
+                    (status = par_expression(lex, NULL, &expr))) {
+                    goto fail;
+                }
             }
             primary = true;
             unary = true;
@@ -1455,12 +1467,20 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
         }
 
         // Try to parse as paren expression
-        ALLOC_NODE(lex, expr, expr_t);
-        expr->type = EXPR_PAREN;
-        expr->paren_base = NULL;
-        if (CCC_OK !=
-            (status = par_expression(lex, NULL, &expr->paren_base))) {
-            goto fail;
+        if (optman.dump_opts & DUMP_AST) {
+            // Only create the paren node if we're printing ast
+            ALLOC_NODE(lex, expr, expr_t);
+            expr->type = EXPR_PAREN;
+            expr->paren_base = NULL;
+            if (CCC_OK !=
+                (status = par_expression(lex, NULL, &expr->paren_base))) {
+                goto fail;
+            }
+        } else {
+            if (CCC_OK !=
+                (status = par_expression(lex, NULL, &expr))) {
+                goto fail;
+            }
         }
         goto done;
     }
