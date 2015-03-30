@@ -476,9 +476,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             logger_log(&expr->mark, LOG_ERR, "Expected constant value");
             return false;
         }
-        tt_key_t lookup = { expr->var_id, TT_VAR };
-        typetab_entry_t *entry = tt_lookup(tcs->typetab, &lookup);
-        if (entry == NULL) {
+        typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
+        if (entry == NULL || entry->entry_type != TT_VAR) {
             logger_log(&expr->mark, LOG_ERR, "'%.*s' undeclared.",
                        (int)expr->var_id->len, expr->var_id->str);
             return false;

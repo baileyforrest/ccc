@@ -27,6 +27,7 @@
 
 #include "parse/ast.h"
 
+#include "util/logger.h"
 #include "util/util.h"
 
 static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
@@ -63,7 +64,7 @@ type_t * const tt_float = &stt_float;
 type_t * const tt_double = &stt_double;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
-    { SL_LINK_LIT, { &type##_str, TT_PRIM }, &stt_ ## type }
+    { SL_LINK_LIT, &type##_str, TT_PRIM , &stt_ ## type }
 
 /**
  * Table of primative types
@@ -79,49 +80,33 @@ static typetab_entry_t s_prim_types[] = {
     TYPE_TAB_LITERAL_ENTRY(double)
 };
 
-uint32_t typetab_key_hash(const void *void_key) {
-    const tt_key_t *key = (tt_key_t *)void_key;
-    uint32_t hash = strhash(key->name);
-
-    return hash * 33 + (int)key->type;
-}
-
-bool typetab_key_cmp(const void *void_key1, const void *void_key2) {
-    const tt_key_t *key1 = (tt_key_t *)void_key1;
-    const tt_key_t *key2 = (tt_key_t *)void_key2;
-
-    if (key1->type != key2->type) {
-        return false;
-    }
-
-    return vstrcmp(key1->name, key2->name);
-}
-
 status_t tt_init(typetab_t *tt, typetab_t *last) {
     assert(tt != NULL);
     status_t status = CCC_OK;
     tt->last = last;
 
-    static ht_params_t params = {
+    sl_init(&tt->typedef_bases, offsetof(typedef_base_t, link));
+
+    static const ht_params_t params = {
         0,                               // Size estimate
         offsetof(typetab_entry_t, key),  // Offset of key
         offsetof(typetab_entry_t, link), // Offset of ht link
-        typetab_key_hash,                // Hash function
-        typetab_key_cmp,                 // void string compare
+        ind_strhash,                     // Hash function
+        ind_vstrcmp,                     // void string compare
     };
 
-    if (CCC_OK != (status = ht_init(&tt->hashtab, &params))) {
+    if (CCC_OK != (status = ht_init(&tt->types, &params))) {
         goto fail;
     }
 
-    if (CCC_OK != (status = ht_init(&tt->typedefs, &params))) {
+    if (CCC_OK != (status = ht_init(&tt->compound_types, &params))) {
         goto fail;
     }
 
     // Initialize top level table with primitive types
     if (last == NULL) {
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
-            if (CCC_OK != (status = ht_insert(&tt->hashtab,
+            if (CCC_OK != (status = ht_insert(&tt->types,
                                               &s_prim_types[i].link))) {
                 goto fail1;
             }
@@ -130,20 +115,19 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
     return status;
 
 fail1:
-    ht_destroy(&tt->hashtab);
-    ht_destroy(&tt->typedefs);
+    ht_destroy(&tt->types);
+    ht_destroy(&tt->compound_types);
 fail:
     return status;
 }
 
-static void typetab_typedef_destroy(typetab_entry_t *entry) {
-    assert(entry->key.type == TT_TYPEDEF);
-    ast_decl_node_type_destroy(entry->type);
+static void typetab_typedef_base_destroy(typedef_base_t *entry) {
+    ast_type_destroy(entry->type);
     free(entry);
 }
 
 static void typetab_entry_destroy(typetab_entry_t *entry) {
-    switch (entry->key.type) {
+    switch (entry->entry_type) {
     case TT_PRIM:
         // Ignore primitive types, they are in static memory
         return;
@@ -151,7 +135,7 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
         ast_type_protected_destroy(entry->type);
         break;
     case TT_TYPEDEF:
-        ast_type_destroy(entry->type);
+        ast_decl_node_type_destroy(entry->type);
         break;
     case TT_VAR:
         // Ignore variables, the type is in the decl node
@@ -162,9 +146,9 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
 
 void tt_destroy(typetab_t *tt) {
     assert(tt != NULL);
-    // Must destroy typedefs first, because they may point to types in typetab
-    HT_DESTROY_FUNC(&tt->typedefs, typetab_typedef_destroy);
-    HT_DESTROY_FUNC(&tt->hashtab, typetab_entry_destroy);
+    HT_DESTROY_FUNC(&tt->types, typetab_entry_destroy);
+    HT_DESTROY_FUNC(&tt->compound_types, typetab_entry_destroy);
+    SL_DESTROY_FUNC(&tt->typedef_bases, typetab_typedef_base_destroy);
 }
 
 /**
@@ -176,44 +160,45 @@ status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
                            decl_node_t *decl_node) {
     status_t status = CCC_OK;
     typetab_entry_t *new_entry = malloc(sizeof(typetab_entry_t));
-    typetab_entry_t *new_entry2 = NULL;
+    typedef_base_t *base = NULL;
     if (new_entry == NULL) {
         status = CCC_NOMEM;
         goto fail;
     }
 
     new_entry->type = decl_node->type;
-    new_entry->key.type = TT_TYPEDEF;
-    new_entry->key.name = decl_node->id;
+    new_entry->entry_type = TT_TYPEDEF;
+    new_entry->key = decl_node->id;
 
     // Only create an entry in the second table if its the first decl, to make
     // sure it is only removed once
     if (decl_node == sl_head(&decl->decls)) {
-        new_entry2 = malloc(sizeof(typetab_entry_t));
-        if (new_entry2 == NULL) {
+        base = malloc(sizeof(typedef_base_t));
+        if (base == NULL) {
             status = CCC_NOMEM;
             goto fail;
         }
-        new_entry2->type = decl->type;
-        new_entry2->key.type = TT_TYPEDEF;
-        new_entry2->key.name = decl_node->id;
+        base->type = decl->type;
     }
 
-    if (CCC_OK != (status = ht_insert(&tt->typedefs, &new_entry->link))) {
+    if (CCC_OK != (status = ht_insert(&tt->types, &new_entry->link))) {
+        if (status == CCC_DUPLICATE) {
+            logger_log(&decl_node->mark, LOG_ERR,
+                       "conflicting types for '%*.s'",
+                       decl_node->id->len, decl_node->id->str);
+        }
         goto fail;
     }
-    if (new_entry2 != NULL &&
-        CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry2->link))) {
-        goto fail1;
+
+    if (base != NULL) {
+        sl_append(&tt->typedef_bases, &base->link);
     }
 
     return status;
 
-fail1:
-    ht_remove(&tt->typedefs, &new_entry->key);
 fail:
     free(new_entry);
-    free(new_entry2);
+    free(base);
     return status;
 }
 
@@ -232,10 +217,19 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     }
 
     new_entry->type = type;
-    new_entry->key.type = tt_type;
-    new_entry->key.name = name;
+    new_entry->entry_type = tt_type;
+    new_entry->key = name;
 
-    if (CCC_OK != (status = ht_insert(&tt->hashtab, &new_entry->link))) {
+    if (tt_type == TT_COMPOUND) {
+        status = ht_insert(&tt->compound_types, &new_entry->link);
+    } else {
+        status = ht_insert(&tt->types, &new_entry->link);
+    }
+    if (status != CCC_OK) {
+        if (status == CCC_DUPLICATE) {
+            logger_log(&type->mark, LOG_ERR, "conflicting types for '%*.s'",
+                       name->len, name->str);
+        }
         goto fail;
     }
 
@@ -249,15 +243,21 @@ fail:
     return status;
 }
 
-typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key) {
+typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key) {
     for (;tt != NULL; tt = tt->last) {
         typetab_entry_t *result;
-        if (key->type == TT_TYPEDEF) {
-            result = ht_lookup(&tt->typedefs, key);
-        } else {
-            result = ht_lookup(&tt->hashtab, key);
+        if (NULL != (result = ht_lookup(&tt->types, &key))) {
+            return result;
         }
-        if (result != NULL) {
+    }
+
+    return NULL;
+}
+
+typetab_entry_t *tt_lookup_compound(typetab_t *tt, len_str_t *key) {
+    for (;tt != NULL; tt = tt->last) {
+        typetab_entry_t *result;
+        if (NULL != (result = ht_lookup(&tt->compound_types, &key))) {
             return result;
         }
     }

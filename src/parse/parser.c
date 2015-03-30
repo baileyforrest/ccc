@@ -268,8 +268,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
             // Type specifiers:
         case ID: {
             // Type specifier only if its a typedef name
-            tt_key_t key = { &LEX_CUR(lex).tab_entry->key, TT_TYPEDEF };
-            if (tt_lookup(lex->typetab, &key) == NULL) {
+            if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key) == NULL) {
                 return CCC_BACKTRACK;
             }
         }
@@ -432,8 +431,8 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     switch (LEX_CUR(lex).type) {
     case ID: { // typedef name
         // Type specifier only if its a typedef name
-        tt_key_t key = { &LEX_CUR(lex).tab_entry->key , TT_TYPEDEF };
-        typetab_entry_t *entry = tt_lookup(lex->typetab, &key);
+        typetab_entry_t *entry =
+            tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key);
         assert(entry != NULL); // Must be checked before calling
         ALLOC_NODE(lex, new_node, type_t);
         new_node->type = TYPE_TYPEDEF;
@@ -520,8 +519,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     type_t *entry_type;
     if (LEX_CUR(lex).type == ID) {
         name = &LEX_CUR(lex).tab_entry->key;
-        tt_key_t key = { name, TT_COMPOUND };
-        entry = tt_lookup(lex->typetab, &key);
+        entry = tt_lookup_compound(lex->typetab, name);
 
         LEX_ADVANCE(lex);
 
@@ -658,8 +656,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type) {
             // Type specifiers:
         case ID: {
             // Type specifier only if its a typedef name
-            tt_key_t key = { &LEX_CUR(lex).tab_entry->key , TT_TYPEDEF };
-            if (tt_lookup(lex->typetab, &key) == NULL) {
+            if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key) == NULL) {
                 return CCC_BACKTRACK;
             }
         }
@@ -1069,8 +1066,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             // Parens
         case ID: {
             // Type specifier only if its a typedef name
-            tt_key_t key = { &LEX_CUR(lex).tab_entry->key, TT_TYPEDEF };
-            if (tt_lookup(lex->typetab, &key) != NULL) {
+            if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key) != NULL) {
                 if (CCC_OK !=
                     (status = par_cast_expression(lex, true, &expr))) {
                     goto fail;
@@ -2030,8 +2026,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     case ID: {
         if (LEX_NEXT(lex).type != COLON) {
             // Type specifier only if its a typedef name
-            tt_key_t key = { &LEX_CUR(lex).tab_entry->key, TT_TYPEDEF };
-            if (tt_lookup(lex->typetab, &key) != NULL) {
+            if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key) != NULL) {
                 ALLOC_NODE(lex, stmt, stmt_t);
                 stmt->type = STMT_DECL;
                 stmt->decl = NULL;

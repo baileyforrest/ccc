@@ -32,8 +32,9 @@ struct decl_node_t;
 
 typedef struct typetab_t {
     struct typetab_t *last;
-    htable_t hashtab;
-    htable_t typedefs;
+    slist_t typedef_bases;
+    htable_t types;
+    htable_t compound_types;
 } typetab_t;
 
 typedef enum tt_type_t {
@@ -43,16 +44,17 @@ typedef enum tt_type_t {
     TT_VAR,      /* Variable */
 } tt_type_t;
 
-typedef struct tt_key_t {
-    len_str_t *name;
-    tt_type_t type;
-} tt_key_t;
-
 typedef struct typetab_entry_t {
     sl_link_t link;
-    tt_key_t key;
+    len_str_t *key;
+    tt_type_t entry_type;
     struct type_t *type;
 } typetab_entry_t;
+
+typedef struct typedef_base_t {
+    sl_link_t link;
+    struct type_t *type;
+} typedef_base_t;
 
 extern struct type_t * const tt_void;
 extern struct type_t * const tt_char;
@@ -62,9 +64,6 @@ extern struct type_t * const tt_long;
 extern struct type_t * const tt_long_long;
 extern struct type_t * const tt_float;
 extern struct type_t * const tt_double;
-
-uint32_t typetab_key_hash(const void *key);
-bool typetab_key_cmp(const void *key1, const void *key2);
 
 /**
  * Initalizes a type table
@@ -94,7 +93,16 @@ void tt_destroy(typetab_t *tt);
  * @param key Key to lookup with
  * @return Returns pointer to type table entry, or NULL if it doesn't exist
  */
-typetab_entry_t *tt_lookup(typetab_t *tt, tt_key_t *key);
+typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key);
+
+/**
+ * Looks up a compound type in the type table
+ *
+ * @param tt Type table to lookup in
+ * @param key Key to lookup with
+ * @return Returns pointer to type table entry, or NULL if it doesn't exist
+ */
+typetab_entry_t *tt_lookup_compound(typetab_t *tt, len_str_t *key);
 
 /**
  * Inserts a typedef into the type table.
