@@ -37,7 +37,7 @@
 #define MAX_LOAD(ht) (((ht->nbuckets) >> 1) + ((ht->nbuckets) >> 2))
 
 /** 1.5 growth rate */
-#define NEW_SIZE(ht) ((ht->nbuckets) + (ht->nbuckets >> 2))
+#define NEW_SIZE(ht) ((ht->nbuckets) + (ht->nbuckets >> 1))
 
 /** Minimum number of hash buckets */
 #define MIN_BUCKETS ((size_t)16)

@@ -43,8 +43,6 @@ typedef struct preprocessor_t {
     htable_t directives;  /**< Preprocessor directives */
 
     fmark_t last_mark;    /**< Mark of last returned token */
-    tstream_t cur_param;  /**< Current macro parameter's stream */
-    bool param_stringify; /**< Whether or not we are stringifying */
 
     // Paramaters for reading preprocessor commands
     bool pp_if;           /**< if true, we're processing a preprocessor if */

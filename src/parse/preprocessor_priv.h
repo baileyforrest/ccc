@@ -57,9 +57,11 @@ typedef struct pp_param_map_elem_t {
  * Represents the macro invocation
  */
 typedef struct pp_macro_inst_t {
-    sl_link_t link;     /**< List link */
-    htable_t param_map; /**< Mapping of strings to paramater values */
-    tstream_t stream;   /**< Text stream of macro instance */
+    sl_link_t link;       /**< List link */
+    htable_t param_map;   /**< Mapping of strings to paramater values */
+    tstream_t stream;     /**< Text stream of macro instance */
+    tstream_t cur_param;  /**< Current macro parameter's stream */
+    bool param_stringify; /**< Whether or not we are stringifying */
 } pp_macro_inst_t;
 
 /**
@@ -128,9 +130,11 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
  * Fetches the next unfinished stream from a preprocessor
  *
  * @param pp The preprocessor to fetch characters from
+ * @param stringify Set to true if the closing quote of a stringification
+ *     occured. Ignored if NULL.
  * @return The next stream in the preprocessor, NULL if none
  */
-tstream_t *pp_get_stream(preprocessor_t *pp);
+tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify);
 
 /**
  * Helper function to fetch characters with macro substitution
