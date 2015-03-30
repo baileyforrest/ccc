@@ -19,7 +19,6 @@
 /**
  * AST Interface
  */
-// TODO: Add support for long double
 
 #ifndef _AST_H_
 #define _AST_H_
@@ -67,6 +66,7 @@ typedef enum basic_type_t {
     TYPE_LONG_LONG,
     TYPE_FLOAT,
     TYPE_DOUBLE,
+    TYPE_LONG_DOUBLE,
 
     // User defined types
     TYPE_STRUCT,

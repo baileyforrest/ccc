@@ -61,8 +61,7 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__x86_64__", "", MACRO_BASIC),
 #endif
 
-    // TODO: Need to actually implement this
-    PREDEF_MACRO_LIT("__builtin_va_list", "int", MACRO_BASIC)
+    PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC)
 };
 
 status_t pp_init(preprocessor_t *pp, htable_t *macros) {

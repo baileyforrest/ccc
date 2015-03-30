@@ -143,6 +143,7 @@ bool typecheck_type_integral(type_t *type) {
     case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
     case TYPE_ENUM:
         return true;
 
@@ -179,6 +180,7 @@ bool typecheck_type_conditional(type_t *type) {
     case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
 
     case TYPE_ENUM:
     case TYPE_FUNC:
@@ -631,6 +633,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
     case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
         return retval;
 
     case TYPE_STRUCT:

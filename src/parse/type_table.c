@@ -36,23 +36,25 @@ static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
     { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, \
        sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
 
-static len_str_t void_str      = LEN_STR_LIT("void");
-static len_str_t char_str      = LEN_STR_LIT("char");
-static len_str_t short_str     = LEN_STR_LIT("short");
-static len_str_t int_str       = LEN_STR_LIT("int");
-static len_str_t long_str      = LEN_STR_LIT("long");
-static len_str_t long_long_str = LEN_STR_LIT("long long");
-static len_str_t float_str     = LEN_STR_LIT("float");
-static len_str_t double_str    = LEN_STR_LIT("double");
+static len_str_t void_str        = LEN_STR_LIT("void");
+static len_str_t char_str        = LEN_STR_LIT("char");
+static len_str_t short_str       = LEN_STR_LIT("short");
+static len_str_t int_str         = LEN_STR_LIT("int");
+static len_str_t long_str        = LEN_STR_LIT("long");
+static len_str_t long_long_str   = LEN_STR_LIT("long long");
+static len_str_t float_str       = LEN_STR_LIT("float");
+static len_str_t double_str      = LEN_STR_LIT("double");
+static len_str_t long_double_str = LEN_STR_LIT("long double");
 
-static type_t stt_void      = TYPE_LITERAL(TYPE_VOID  , void     );
-static type_t stt_char      = TYPE_LITERAL(TYPE_CHAR  , char     );
-static type_t stt_short     = TYPE_LITERAL(TYPE_SHORT , short    );
-static type_t stt_int       = TYPE_LITERAL(TYPE_INT   , int      );
-static type_t stt_long      = TYPE_LITERAL(TYPE_LONG  , long     );
-static type_t stt_long_long = TYPE_LITERAL(TYPE_LONG  , long long);
-static type_t stt_float     = TYPE_LITERAL(TYPE_FLOAT , float    );
-static type_t stt_double    = TYPE_LITERAL(TYPE_DOUBLE, double   );
+static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
+static type_t stt_char        = TYPE_LITERAL(TYPE_CHAR       , char       );
+static type_t stt_short       = TYPE_LITERAL(TYPE_SHORT      , short      );
+static type_t stt_int         = TYPE_LITERAL(TYPE_INT        , int        );
+static type_t stt_long        = TYPE_LITERAL(TYPE_LONG       , long       );
+static type_t stt_long_long   = TYPE_LITERAL(TYPE_LONG_LONG  , long long  );
+static type_t stt_float       = TYPE_LITERAL(TYPE_FLOAT      , float      );
+static type_t stt_double      = TYPE_LITERAL(TYPE_DOUBLE     , double     );
+static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 
 type_t * const tt_void = &stt_void;
 type_t * const tt_char = &stt_char;
@@ -62,6 +64,7 @@ type_t * const tt_long = &stt_long;
 type_t * const tt_long_long = &stt_long_long;
 type_t * const tt_float = &stt_float;
 type_t * const tt_double = &stt_double;
+type_t * const tt_long_double = &stt_long_double;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
     { SL_LINK_LIT, &type##_str, TT_PRIM , &stt_ ## type }
@@ -77,7 +80,8 @@ static typetab_entry_t s_prim_types[] = {
     TYPE_TAB_LITERAL_ENTRY(long),
     TYPE_TAB_LITERAL_ENTRY(long_long),
     TYPE_TAB_LITERAL_ENTRY(float),
-    TYPE_TAB_LITERAL_ENTRY(double)
+    TYPE_TAB_LITERAL_ENTRY(double),
+    TYPE_TAB_LITERAL_ENTRY(long_double)
 };
 
 status_t tt_init(typetab_t *tt, typetab_t *last) {

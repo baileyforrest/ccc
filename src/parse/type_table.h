@@ -64,6 +64,7 @@ extern struct type_t * const tt_long;
 extern struct type_t * const tt_long_long;
 extern struct type_t * const tt_float;
 extern struct type_t * const tt_double;
+extern struct type_t * const tt_long_double;
 
 /**
  * Initalizes a type table

@@ -405,13 +405,22 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             case SIGNED:
                 okay = true;
                 break;
-            case LONG:
-                // Create long long int
+            case LONG: // Create long long int
                 *end_node = tt_long_long;
+                okay = true;
+                break;
+            case DOUBLE: // Create long double
+                *end_node = tt_long_double;
                 okay = true;
                 break;
             default:
                 break;
+            }
+            break;
+        case TYPE_DOUBLE:
+            if (LEX_CUR(lex).type == LONG) {
+                okay = true;
+                *end_node = tt_long_double;
             }
             break;
         default:
@@ -1701,8 +1710,13 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     case FLOATLIT: {
         base->type = EXPR_CONST_FLOAT;
         base->const_val.float_val = LEX_CUR(lex).float_params.float_val;
-        base->const_val.type =
-            LEX_CUR(lex).float_params.hasF ? tt_float : tt_double;
+        if (LEX_CUR(lex).float_params.hasF) {
+            base->const_val.type = tt_float;
+        } else if (LEX_CUR(lex).float_params.hasL) {
+            base->const_val.type = tt_long_double;
+        } else {
+            base->const_val.type = tt_double;
+        }
         LEX_ADVANCE(lex);
         break;
     }

@@ -393,11 +393,11 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
     case EXPR_CONST_INT:
         ast_directed_print(dest, remain, "%lld", expr->const_val.int_val);
         switch (expr->const_val.type->type) {
-        case TYPE_LONG_LONG:
-            ast_directed_print(dest, remain, "LL");
-            break;
         case TYPE_LONG:
             ast_directed_print(dest, remain, "L");
+            break;
+        case TYPE_LONG_LONG:
+            ast_directed_print(dest, remain, "LL");
             break;
         case TYPE_MOD:
             ast_directed_print(dest, remain, "U");
@@ -613,18 +613,19 @@ void ast_oper_print(oper_t op, char **dest, size_t *remain) {
 
 const char *ast_basic_type_str(basic_type_t type) {
     switch (type) {
-    case TYPE_VOID:      return "void";      break;
-    case TYPE_CHAR:      return "char";      break;
-    case TYPE_SHORT:     return "short";     break;
-    case TYPE_INT:       return "int";       break;
-    case TYPE_LONG:      return "long";      break;
-    case TYPE_LONG_LONG: return "long long"; break;
-    case TYPE_FLOAT:     return "float";     break;
-    case TYPE_DOUBLE:    return "double";    break;
+    case TYPE_VOID:        return "void";        break;
+    case TYPE_CHAR:        return "char";        break;
+    case TYPE_SHORT:       return "short";       break;
+    case TYPE_INT:         return "int";         break;
+    case TYPE_LONG:        return "long";        break;
+    case TYPE_LONG_LONG:   return "long long";   break;
+    case TYPE_FLOAT:       return "float";       break;
+    case TYPE_DOUBLE:      return "double";      break;
+    case TYPE_LONG_DOUBLE: return "long double"; break;
 
-    case TYPE_STRUCT:    return "struct";    break;
-    case TYPE_UNION:     return "union";     break;
-    case TYPE_ENUM:      return "enum";      break;
+    case TYPE_STRUCT:      return "struct";      break;
+    case TYPE_UNION:       return "union";       break;
+    case TYPE_ENUM:        return "enum";        break;
     default:
         assert(false);
     }
@@ -642,6 +643,7 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
     case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
         ast_directed_print(dest, remain, ast_basic_type_str(type->type));
         break;
 
@@ -810,6 +812,7 @@ void ast_type_protected_destroy(type_t *type) {
     case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
         return; // These are statically allocated
 
     case TYPE_STRUCT:
@@ -873,6 +876,7 @@ void ast_type_destroy(type_t *type) {
     case TYPE_LONG_LONG:
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
         return; // These are statically allocated
 
     case TYPE_STRUCT:

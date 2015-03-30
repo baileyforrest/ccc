@@ -27,12 +27,6 @@
 #include "parse/token.h"
 #include "parse/symtab.h"
 
-#define CHAR_BITS (sizeof(char) * 8);
-#define SHORT_BITS (sizeof(short) * 8);
-#define INT_BITS (sizeof(int) * 8);
-#define LONG_BITS (sizeof(long) * 8);
-#define LONG_LONG_BITS (sizeof(long long) * 8);
-
 /** Size of lexer internal buffer */
 #define MAX_LEXEME_SIZE 4096
 
