@@ -260,7 +260,7 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
                                       goto_stmt->goto_params.label);
             if (label == NULL) {
                 logger_log(&goto_stmt->mark, LOG_ERR,
-                           "label %*.s used but not defined",
+                           "label %.*s used but not defined",
                            (int)goto_stmt->goto_params.label->len,
                            goto_stmt->goto_params.label->str);
                 retval = false;

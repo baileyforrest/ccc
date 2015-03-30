@@ -184,7 +184,7 @@ status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
     if (CCC_OK != (status = ht_insert(&tt->types, &new_entry->link))) {
         if (status == CCC_DUPLICATE) {
             logger_log(&decl_node->mark, LOG_ERR,
-                       "conflicting types for '%*.s'",
+                       "conflicting types for '%.*s'",
                        decl_node->id->len, decl_node->id->str);
         }
         goto fail;
@@ -227,7 +227,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     }
     if (status != CCC_OK) {
         if (status == CCC_DUPLICATE) {
-            logger_log(&type->mark, LOG_ERR, "conflicting types for '%*.s'",
+            logger_log(&type->mark, LOG_ERR, "conflicting types for '%.*s'",
                        name->len, name->str);
         }
         goto fail;

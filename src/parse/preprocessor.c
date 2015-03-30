@@ -57,9 +57,9 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC), // stdlib available
 
-    // TODO: Possibly conditionally compile these
-    // Macros to get GCC headers to work
+#ifdef __x86_64__
     PREDEF_MACRO_LIT("__x86_64__", "", MACRO_BASIC),
+#endif
 
     // TODO: Need to actually implement this
     PREDEF_MACRO_LIT("__builtin_va_list", "int", MACRO_BASIC)
@@ -475,31 +475,38 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         pp->char_line = false;
     }
 
-    bool concat = false;
     tstream_t lookahead;
     ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
 
+    bool concat = false;
     // Handle concatenation
-    if (macro_inst != NULL && (cur_char != ' ' && cur_char != '\t') &&
-        (next_char == ' ' || next_char == '\t' || next_char == '#')) {
-        ts_advance(&lookahead);
+    if (macro_inst != NULL && !isspace(last_char) &&
+        (cur_char == ' ' || cur_char == '\t' || cur_char == '\\' ||
+         cur_char == '#')) {
+        ts_skip_ws_and_comment(&lookahead);
 
         // Skip multiple ## with only white space around them
         while (!ts_end(&lookahead)) {
-            ts_skip_ws_and_comment(&lookahead);
-
             if (ts_cur(&lookahead) == '#' && ts_next(&lookahead) == '#') {
                 concat = true;
-            }
-
-            ts_skip_ws_and_comment(&lookahead);
-            if (!(ts_cur(&lookahead) == '#' && ts_next(&lookahead) == '#')) {
+                ts_advance(&lookahead);
+                ts_advance(&lookahead);
+            } else {
                 break;
             }
+            ts_skip_ws_and_comment(&lookahead);
         }
-        next_char = ts_cur(&lookahead);
+        if (concat) {
+            // Set stream to new location
+            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+            cur_char = ts_cur(stream);
+            last_char = ts_last(stream);
+            next_char = ts_next(stream);
+        } else {
+            // Need to reset lookahad
+            ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+        }
     }
-    (void)concat; // TODO: Do something with this or remove it
 
     if (cur_char == '#') {
         // Check for preprocessor directive if we're not in a macro
@@ -616,6 +623,11 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
     }
 
+    // Don't expand macros if we're concatenating
+    if (concat) {
+        return ts_advance(stream);
+    }
+
     // Look up in the macro table
     pp_macro_t *macro = ht_lookup(&pp->macros, &lookup);
 
@@ -676,6 +688,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
         sl_link_t *cur_link;
         SL_FOREACH(cur_link, &macro->params) {
+            ts_skip_ws_and_comment(&lookahead);
             num_params++;
             char *cur_param = ts_location(&lookahead);
             int num_parens = 0;

@@ -517,7 +517,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
             }
         }
         if (redefined) {
-            logger_log(&stream->mark, LOG_WARN, "\"%*.s\" redefined",
+            logger_log(&stream->mark, LOG_WARN, "\"%.*s\" redefined",
                        (int)lookup.len, lookup.str);
         }
 
@@ -811,7 +811,7 @@ status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err) {
 
     log_type_t log_type = is_err ? LOG_ERR : LOG_WARN;
 
-    logger_log(&stream->mark, log_type, "%*.s", (int)len, stream->cur);
+    logger_log(&stream->mark, log_type, "%.*s", (int)len, stream->cur);
 
     return status;
 }
