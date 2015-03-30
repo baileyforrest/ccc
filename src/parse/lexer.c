@@ -46,9 +46,11 @@
  * Lex a number value
  *
  * @param lexer Lexer to use
+ * @param neg Whether or not the number has a leading hypthen
  * @param cur First input character
+ * @param result Location to store the result
  */
-static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result);
+static status_t lex_number(lexer_t *lexer, bool neg, int cur, lexeme_t *result);
 
 
 status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
@@ -155,8 +157,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             case '=': result->type = MINUSEQ; break;
             case '>': result->type = DEREF; break;
             case ASCII_DIGIT: // Negative number
-                lexer->next_char = next;
-                status = lex_number(lexer, cur, result);
+                status = lex_number(lexer, true, next, result);
                 break;
             default:
                 result->type = MINUS;
@@ -353,7 +354,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             break;
         }
         case ASCII_DIGIT:
-            status = lex_number(lexer, cur, result);
+            status = lex_number(lexer, false, cur, result);
             // Skip whitespace
             break;
         case '\n': case ' ': case '\t': case '\\':
@@ -369,7 +370,8 @@ end:
     return status;
 }
 
-status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
+static status_t lex_number(lexer_t *lexer, bool neg, int cur,
+                           lexeme_t *result) {
     status_t status = CCC_OK;
 
     bool has_e = false;
@@ -382,9 +384,8 @@ status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
 
     size_t offset = 0;
 
-    if (cur == '-') {
-        lexer->lexbuf[offset++] = cur;
-        cur = lexer->next_char;
+    if (neg) {
+        lexer->lexbuf[offset++] = '-';
     }
 
     int last = -1;

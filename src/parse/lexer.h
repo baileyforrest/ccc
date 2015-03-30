@@ -70,6 +70,7 @@ void lexer_destroy(lexer_t *lexer);
  * Fetches the next lexeme
  *
  * @param lexer The lexer to fetch from
+ * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t lexer_next_token(lexer_t *lexer, lexeme_t *result);

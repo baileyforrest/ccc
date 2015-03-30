@@ -128,7 +128,11 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
 
     case STMT_DO:
         printf("do\n");
-        ast_stmt_print(stmt->do_params.stmt, indent + 1);
+        if (stmt->do_params.stmt->type == STMT_COMPOUND) {
+            ast_stmt_print(stmt->do_params.stmt, indent);
+        } else {
+            ast_stmt_print(stmt->do_params.stmt, indent + 1);
+        }
         printf("while (");
         ast_expr_print(stmt->do_params.expr, NULL, NULL);
         printf(")\n");
@@ -137,7 +141,11 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         printf("while (");
         ast_expr_print(stmt->while_params.expr, NULL, NULL);
         printf(")\n");
-        ast_stmt_print(stmt->while_params.stmt, indent + 1);
+        if (stmt->while_params.stmt->type == STMT_COMPOUND) {
+            ast_stmt_print(stmt->while_params.stmt, indent);
+        } else {
+            ast_stmt_print(stmt->while_params.stmt, indent + 1);
+        }
         break;
     case STMT_FOR:
         printf("for (");
@@ -153,7 +161,11 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
             ast_expr_print(stmt->for_params.expr3, NULL, NULL);
         }
         printf(")\n");
-        ast_stmt_print(stmt->for_params.stmt, indent + 1);
+        if (stmt->for_params.stmt->type == STMT_COMPOUND) {
+            ast_stmt_print(stmt->for_params.stmt, indent);
+        } else {
+            ast_stmt_print(stmt->for_params.stmt, indent + 1);
+        }
         break;
 
     case STMT_GOTO:
