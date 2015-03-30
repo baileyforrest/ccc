@@ -30,9 +30,8 @@
 
 int main(int argc, char **argv) {
     status_t status = CCC_OK;
-    optman_init();
 
-    if (CCC_OK != (status = optman_parse(argc, argv))) {
+    if (CCC_OK != (status = optman_init(argc, argv))) {
         goto fail0;
     }
 

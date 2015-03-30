@@ -44,28 +44,6 @@ typedef struct pp_file_t {
     bool owns_file;
 } pp_file_t;
 
-typedef enum pp_macro_type_t {
-    MACRO_BASIC,   /**< Regular macro */
-    MACRO_FILE,    /**< __FILE__ */
-    MACRO_LINE,    /**< __LINE__ */
-    MACRO_DATE,    /**< __DATE__ */
-    MACRO_TIME,    /**< __TIME__ */
-    MACRO_DEFINED, /**< defined operator */
-    MACRO_PRAGMA,  /**< _Pragma operator */
-} pp_macro_type_t;
-
-/**
- * Struct for macro definition
- */
-typedef struct pp_macro_t {
-    sl_link_t link;         /**< List link */
-    len_str_t name;         /**< Macro name, hashtable key */
-    const tstream_t stream; /**< Text stream template */
-    slist_t params;         /**< Macro paramaters, list of len_str_node_t */
-    int num_params;         /**< Number of paramaters */
-    pp_macro_type_t type;   /**< Type of macro */
-} pp_macro_t;
-
 /**
  * Mapping from macro paramater to value
  */
@@ -129,13 +107,6 @@ status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream);
  * @return CCC_OK on success, error code otherwise
  */
 status_t pp_macro_create(char *name, size_t len, pp_macro_t **result);
-
-/**
- * Destroys a macro definition. Does free macro
- *
- * @param macro definition to destroy
- */
-void pp_macro_destroy(pp_macro_t *macro);
 
 /**
  * Creates a macro instance

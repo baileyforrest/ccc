@@ -58,6 +58,32 @@ typedef struct preprocessor_t {
     char macro_buf[PP_BUF_SIZE]; /**< Buffer for built in macros (e.g. FILE) */
 } preprocessor_t;
 
+/**
+ * Types of macros
+ */
+typedef enum pp_macro_type_t {
+    MACRO_BASIC,   /**< Regular macro */
+    MACRO_FILE,    /**< __FILE__ */
+    MACRO_LINE,    /**< __LINE__ */
+    MACRO_DATE,    /**< __DATE__ */
+    MACRO_TIME,    /**< __TIME__ */
+    MACRO_DEFINED, /**< defined operator */
+    MACRO_PRAGMA,  /**< _Pragma operator */
+    MACRO_CLI_OPT, /**< Command line option */
+} pp_macro_type_t;
+
+
+/**
+ * Struct for macro definition
+ */
+typedef struct pp_macro_t {
+    sl_link_t link;         /**< List link */
+    len_str_t name;         /**< Macro name, hashtable key */
+    const tstream_t stream; /**< Text stream template */
+    slist_t params;         /**< Macro paramaters, list of len_str_node_t */
+    int num_params;         /**< Number of paramaters */
+    pp_macro_type_t type;   /**< Type of macro */
+} pp_macro_t;
 
 /**
  * Initializes preprocessor
@@ -76,6 +102,13 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros);
  * @param pp The preprocessor to destroy
  */
 void pp_destroy(preprocessor_t *pp);
+
+/**
+ * Destroys a macro definition. Does free macro
+ *
+ * @param macro definition to destroy
+ */
+void pp_macro_destroy(pp_macro_t *macro);
 
 /**
  * Initializes preprocessor for reading specified file

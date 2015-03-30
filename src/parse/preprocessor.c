@@ -30,6 +30,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "optman.h"
+
 #include "parse/pp_directives.h"
 
 #include "util/htable.h"
@@ -108,6 +110,17 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
                 goto fail3;
             }
         }
+
+        // Load command line parameter macros
+        sl_link_t *cur;
+        SL_FOREACH(cur, &optman.macros) {
+            macro_node_t *macro_node = GET_ELEM(&optman.macros, cur);
+            if (CCC_OK != (status = ht_insert(&pp->macros,
+                                              &macro_node->macro->link))) {
+                goto fail3;
+            }
+        }
+
         pp->pp_if = false;
     } else {
         ht_create_handle(&pp->macros, macros);
@@ -301,6 +314,7 @@ fail:
 
 void pp_macro_destroy(pp_macro_t *macro) {
     if (macro == NULL ||
+        macro->type == MACRO_CLI_OPT || // Don't destroy CLI option macros
         (macro >= s_predef_macros &&
          macro < s_predef_macros + STATIC_ARRAY_LEN(s_predef_macros))) {
         // Don't do anything when destroying predefined macros
@@ -645,6 +659,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     switch (macro->type) {
         // For basic macros, just keep going
     case MACRO_BASIC:
+    case MACRO_CLI_OPT:
         break;
     case MACRO_FILE:
     case MACRO_LINE:

@@ -42,6 +42,11 @@ typedef struct fmark_t {
 #define BUILT_IN_FILENAME "<built in>"
 
 /**
+ * Name of "file" for command line
+ */
+#define COMMAND_LINE_FILENAME "<command-line>"
+
+/**
  * File mark literal
  *
  * @param file Filename

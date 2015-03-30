@@ -30,14 +30,15 @@
 #include <unistd.h>
 
 #include "manager.h"
+#include "optman.h"
 
 #include "util/htable.h"
 #include "util/util.h"
 
 #include "typecheck/typechecker.h"
 
-#define MAX_PATH_LEN 4096 /**< Max include path len */
-#define MAX_LINE 512 /**< Max length for line pragma */
+#define MAX_PATH_LEN 2048 /**< Max include path len */
+#define MAX_LINE 512      /**< Max length for line pragma */
 
 #define DIRECTIVE_LIT(name) \
     { SL_LINK_LIT, LEN_STR_LIT(#name), pp_directive_ ## name  }
@@ -64,12 +65,13 @@ static pp_directive_t s_directives[] = {
  * Must have trailing backslash
  */
 static len_str_node_t s_default_search_path[] = {
-    { SL_LINK_LIT, LEN_STR_LIT("./") }, // Current directory
-    { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include/") },
-    { SL_LINK_LIT, LEN_STR_LIT("/usr/include/") },
+    { SL_LINK_LIT, LEN_STR_LIT(".") }, // Current directory
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include") },
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/include") },
 
     // TODO: conditionally compile these
-    { SL_LINK_LIT, LEN_STR_LIT("/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/") },
+    { SL_LINK_LIT, LEN_STR_LIT("/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include") },
+    //{ SL_LINK_LIT, LEN_STR_LIT("/usr/lib/clang/3.6.0/include") },
 };
 
 status_t pp_directives_init(preprocessor_t *pp) {
@@ -83,6 +85,13 @@ status_t pp_directives_init(preprocessor_t *pp) {
         }
     }
 
+    // Add to search path with -I option
+    sl_link_t *cur;
+    SL_FOREACH(cur, &optman.include_paths) {
+        len_str_node_node_t *node = GET_ELEM(&optman.include_paths, cur);
+        sl_append(&pp->search_path, &node->node.link);
+    }
+
     // Add default search path
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_default_search_path); ++i) {
         sl_append(&pp->search_path, &s_default_search_path[i].link);
@@ -93,7 +102,15 @@ fail:
 }
 
 void pp_directives_destroy(preprocessor_t *pp) {
-    (void)pp;
+
+    // Remove search path -I options
+    // This should be fast because the -I options are at the front
+    sl_link_t *cur;
+    SL_FOREACH(cur, &optman.include_paths) {
+        len_str_node_node_t *node = GET_ELEM(&optman.include_paths, cur);
+        sl_remove(&pp->search_path, &node->node.link);
+    }
+
 }
 
 status_t pp_directive_include(preprocessor_t *pp) {
@@ -104,12 +121,9 @@ status_t pp_directive_include_next(preprocessor_t *pp) {
     return pp_directive_include_helper(pp, true);
 }
 
-/**
- * Warning: This is not reentrant!
- */
 status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
-    static char s_path_buf[MAX_PATH_LEN];
-    static char s_suffix_buf[MAX_PATH_LEN];
+    char path_buf[MAX_PATH_LEN];
+    char suffix_buf[MAX_PATH_LEN];
 
     assert(sl_head(&pp->macro_insts) == NULL && "include inside macro!");
     status_t status = CCC_OK;
@@ -119,7 +133,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     }
 
     // Initialize to safe state
-    len_str_t suffix = { s_suffix_buf, 0 };
+    len_str_t suffix = { suffix_buf, 0 };
 
 
     pp_file_t *file = sl_head(&pp->file_insts);
@@ -244,12 +258,12 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
             if (next == endsym) {
                 break;
             }
-            s_suffix_buf[offset++] = next;
+            suffix_buf[offset++] = next;
         }
 
-        s_suffix_buf[offset] = '\0';
+        suffix_buf[offset] = '\0';
 
-        suffix.str = s_suffix_buf;
+        suffix.str = suffix_buf;
         suffix.len = offset;
 
         // Skip until next line
@@ -304,25 +318,27 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
             }
         }
 
-        if (cur->str.len + suffix.len + 1 > MAX_PATH_LEN) {
+        // 1 for /, one for \0
+        if (cur->str.len + suffix.len + 2 > MAX_PATH_LEN) {
             logger_log(&stream->mark, LOG_ERR, "Include path name too long");
             status = CCC_ESYNTAX;
             goto fail;
         }
 
-        strncpy(s_path_buf, cur->str.str, cur->str.len);
-        strncpy(s_path_buf + cur->str.len, suffix.str, suffix.len);
-        size_t len = cur->str.len + suffix.len;
-        s_path_buf[len] = '\0';
+        strncpy(path_buf, cur->str.str, cur->str.len);
+        path_buf[cur->str.len] = '/';
+        strncpy(path_buf + cur->str.len + 1, suffix.str, suffix.len);
+        size_t len = cur->str.len + suffix.len + 1;
+        path_buf[len] = '\0';
 
         // File isn't accessible
-        if(-1 == access(s_path_buf, R_OK)) {
+        if(-1 == access(path_buf, R_OK)) {
             continue;
         }
 
         // File accessible
         pp_file_t *pp_file;
-        status_t status = pp_map_file(s_path_buf, len, file, &pp_file);
+        status_t status = pp_map_file(path_buf, len, file, &pp_file);
         if (CCC_OK != status) {
             goto fail;
         }
@@ -342,15 +358,109 @@ fail:
 
 status_t pp_directive_define(preprocessor_t *pp) {
     assert(sl_head(&pp->macro_insts) == NULL && "Define inside macro!");
+    status_t status = CCC_OK;
 
     if (pp->ignore) { // If we're ignoring, just skip
-        return CCC_OK;
+        return status;
     }
 
-    status_t status = CCC_OK;
     pp_file_t *file = sl_head(&pp->file_insts);
     tstream_t *stream = &file->stream;
 
+    pp_macro_t *new_macro = NULL;
+    if (CCC_OK !=
+        (status = pp_directive_define_helper(stream, &new_macro, false))) {
+        goto fail;
+    }
+
+    pp_macro_t *cur_macro = ht_lookup(&pp->macros, &new_macro->name);
+
+    // Check for macro redefinition
+    if (cur_macro != NULL) {
+        bool redefined = false;
+
+        if (cur_macro->stream.cur == new_macro->stream.cur) {
+            // If they point to same file location, we know they are the same
+            redefined = false;
+        } else if (cur_macro->num_params != new_macro->num_params) {
+            // If they have different # params, they are different
+            redefined = true;
+        } else {
+            // Slow path, need to check if the two are "effectively the same"
+            // https://gcc.gnu.org/onlinedocs/cpp/Undefining-and-Redefining-Macros.html#Undefining-and-Redefining-Macros
+
+            // Check if params are the same:
+            sl_link_t *cur = cur_macro->params.head;
+            sl_link_t *new = new_macro->params.head;
+            for (;cur != NULL; cur = cur->next, new = new->next) {
+                len_str_node_t *cur_param = GET_ELEM(&cur_macro->params, cur);
+                len_str_node_t *new_param = GET_ELEM(&new_macro->params, new);
+
+                if (!vstrcmp(&cur_param->str, &new_param->str)) {
+                    redefined = true;
+                    break;
+                }
+            }
+
+            // Now check macro bodies
+            if (!redefined) {
+                tstream_t cur_stream;
+                tstream_t new_stream;
+                ts_copy(&cur_stream, &cur_macro->stream, TS_COPY_SHALLOW);
+                ts_copy(&new_stream, &new_macro->stream, TS_COPY_SHALLOW);
+
+                while (ts_cur(&cur_stream) != EOF) {
+                    bool is_space_cur = (ts_cur(&cur_stream) == '\\' &&
+                                         ts_next(&cur_stream) == '\n') ||
+                        isspace(ts_cur(&cur_stream));
+                    bool is_space_new = (ts_cur(&new_stream) == '\\' &&
+                                         ts_next(&new_stream) == '\n') ||
+                        isspace(ts_cur(&new_stream));
+                    if (is_space_cur) {
+                        if (!is_space_new) {
+                            redefined = true;
+                            break;
+                        }
+                        ts_skip_ws_and_comment(&cur_stream);
+                        ts_skip_ws_and_comment(&new_stream);
+                    }
+
+                    if (ts_advance(&cur_stream) != ts_advance(&new_stream)) {
+                        redefined = true;
+                        break;
+                    }
+                }
+                if (ts_cur(&new_stream) != EOF) {
+                    redefined = true;
+                }
+            }
+        }
+        if (redefined) {
+            logger_log(&stream->mark, LOG_WARN, "\"%.*s\" redefined",
+                       (int)new_macro->name.len, new_macro->name.str);
+        }
+
+        // Remove and cleanup existing macro
+        ht_remove(&pp->macros, &cur_macro->name);
+        pp_macro_destroy(cur_macro);
+    }
+
+    // Add it to the hashtable
+    if (CCC_OK != (status = ht_insert(&pp->macros, &new_macro->link))) {
+        goto fail;
+    }
+
+    return status;
+
+fail:
+    pp_macro_destroy(new_macro);
+    return status;
+}
+
+
+status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
+                                    bool is_cli_param) {
+    status_t status = CCC_OK;
     pp_macro_t *new_macro = NULL;
 
     // Skip whitespace before name
@@ -365,8 +475,6 @@ status_t pp_directive_define(preprocessor_t *pp) {
     // Read the name of the macro
     char *cur = ts_location(stream);
     size_t name_len = ts_advance_identifier(stream);
-    len_str_t lookup = { cur, name_len };
-    pp_macro_t *cur_macro = ht_lookup(&pp->macros, &lookup);
 
     // Allocate new macro object
     if (CCC_OK != (status = pp_macro_create(cur, name_len, &new_macro))) {
@@ -434,6 +542,13 @@ status_t pp_directive_define(preprocessor_t *pp) {
         }
     }
 
+    // CLI parameter requires that there is an equal sign between params and
+    // body
+    if (is_cli_param) {
+        while (!ts_end(stream) && ts_advance(stream) != '=')
+            continue;
+    }
+
     // Skip whitespace after parameters
     ts_skip_ws_and_comment(stream);
     cur = ts_location(stream);
@@ -456,80 +571,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
     // Set end
     ((tstream_t *)&new_macro->stream)->end = ts_location(stream);
 
-    // Check for macro redefinition
-    if (cur_macro != NULL) {
-        bool redefined = false;
-
-        if (cur_macro->stream.cur == new_macro->stream.cur) {
-            // If they point to same file location, we know they are the same
-            redefined = false;
-        } else if (cur_macro->num_params != new_macro->num_params) {
-            // If they have different # params, they are different
-            redefined = true;
-        } else {
-            // Slow path, need to check if the two are "effectively the same"
-            // https://gcc.gnu.org/onlinedocs/cpp/Undefining-and-Redefining-Macros.html#Undefining-and-Redefining-Macros
-
-            // Check if params are the same:
-            sl_link_t *cur = cur_macro->params.head;
-            sl_link_t *new = new_macro->params.head;
-            for (;cur != NULL; cur = cur->next, new = new->next) {
-                len_str_node_t *cur_param = GET_ELEM(&cur_macro->params, cur);
-                len_str_node_t *new_param = GET_ELEM(&new_macro->params, new);
-
-                if (!vstrcmp(&cur_param->str, &new_param->str)) {
-                    redefined = true;
-                    break;
-                }
-            }
-
-            // Now check macro bodies
-            if (!redefined) {
-                tstream_t cur_stream;
-                tstream_t new_stream;
-                ts_copy(&cur_stream, &cur_macro->stream, TS_COPY_SHALLOW);
-                ts_copy(&new_stream, &new_macro->stream, TS_COPY_SHALLOW);
-
-                while (ts_cur(&cur_stream) != EOF) {
-                    bool is_space_cur = (ts_cur(&cur_stream) == '\\' &&
-                                         ts_next(&cur_stream) == '\n') ||
-                        isspace(ts_cur(&cur_stream));
-                    bool is_space_new = (ts_cur(&new_stream) == '\\' &&
-                                         ts_next(&new_stream) == '\n') ||
-                        isspace(ts_cur(&new_stream));
-                    if (is_space_cur) {
-                        if (!is_space_new) {
-                            redefined = true;
-                            break;
-                        }
-                        ts_skip_ws_and_comment(&cur_stream);
-                        ts_skip_ws_and_comment(&new_stream);
-                    }
-
-                    if (ts_advance(&cur_stream) != ts_advance(&new_stream)) {
-                        redefined = true;
-                        break;
-                    }
-                }
-                if (ts_cur(&new_stream) != EOF) {
-                    redefined = true;
-                }
-            }
-        }
-        if (redefined) {
-            logger_log(&stream->mark, LOG_WARN, "\"%.*s\" redefined",
-                       (int)lookup.len, lookup.str);
-        }
-
-        // Remove and cleanup existing macro
-        ht_remove(&pp->macros, &cur_macro->name);
-        pp_macro_destroy(cur_macro);
-    }
-
-    // Add it to the hashtable
-    if (CCC_OK != (status = ht_insert(&pp->macros, &new_macro->link))) {
-        goto fail;
-    }
+    *result = new_macro;
     return status;
 
 fail:

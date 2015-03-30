@@ -18,8 +18,10 @@
  */
 /**
  * Option manager interface
+ *
+ * Not all options may actually do anything, but enough are supported so that
+ * the project's Makefile can use ccc.
  */
-// TODO: Finalize and doc this
 
 #ifndef _OPTMAN_H_
 #define _OPTMAN_H_
@@ -28,17 +30,28 @@
 #include "util/util.h"
 #include "util/status.h"
 
+#include "parse/preprocessor.h"
+
+/**
+ * Options for dumping at various stages of the compilation
+ */
 typedef enum dump_opts_t {
-    DUMP_TOKENS = 1 << 0,
-    DUMP_AST    = 1 << 1,
+    DUMP_TOKENS = 1 << 0, // Dump tokens from lexer
+    DUMP_AST    = 1 << 1, // Dump the AST after parsing
 } dump_opts_t;
 
+/**
+ * Warning options
+ */
 typedef enum warn_opts_t {
-    WARN_ALL   = 1 << 0,
-    WARN_EXTRA = 1 << 1,
-    WARN_ERROR = 1 << 2,
+    WARN_ALL   = 1 << 0, // -Wall
+    WARN_EXTRA = 1 << 1, // -Wextra
+    WARN_ERROR = 1 << 2, // -Werror
 } warn_opts_t;
 
+/**
+ * Optimization level
+ */
 typedef enum olevel_t {
     O0 = 0,
     O1 = 1,
@@ -46,23 +59,73 @@ typedef enum olevel_t {
     O3 = 3,
 } olevel_t;
 
+/**
+ * Standard types
+ */
+typedef enum std_t {
+    STD_C11,
+} std_t;
+
+/**
+ * Misc flags
+ */
+typedef enum misc_flags_t {
+    MISC_STOP_ASM = 1 << 0, // -S Stop after asm generated
+    MISC_STOP_OBJ = 1 << 1, // -c Stop after object files generated
+    MISC_DBG_SYM  = 1 << 2, // -g Generate debug symbols
+} misc_flags_t;
+
+/**
+ * Preprocessor dependency options
+ */
+typedef enum pp_dep_opts_t {
+    PP_DEP_MP  = 1 << 0, // -MP Generate phony targets for header files
+    PP_DEP_MMD = 1 << 1, // -MMD Generate dependencies for non system headers
+} pp_dep_opts_t;
+
+typedef struct macro_node_t {
+    sl_link_t link;
+    pp_macro_t *macro;
+} macro_node_t;
+
+/**
+ * The Option manager. Contains flags/lists from the command line parameters.
+ */
 typedef struct optman_t {
-    char *exec_name;
-    char *output;
-    slist_t include_paths;
-    slist_t link_opts;
-    slist_t src_files;
-    slist_t obj_files;
-    dump_opts_t dump_opts;
-    warn_opts_t warn_opts;
-    olevel_t olevel;
+    char *exec_name;       /**< Name of the executable */
+    char *output;          /**< Name of the output file */
+    slist_t include_paths; /**< Search path additions with -I flag */
+    slist_t link_opts;     /**< Linker libraries */
+    slist_t src_files;     /**< C files */
+    slist_t asm_files;     /**< Assember files */
+    slist_t obj_files;     /**< All other files assumed for linker */
+    slist_t macros;        /**< Parameter defined macros */
+    dump_opts_t dump_opts; /**< Dump options */
+    warn_opts_t warn_opts; /**< Warn options */
+    olevel_t olevel;       /**< Optimization level */
+    std_t std;             /**< Standard used */
+    misc_flags_t misc;     /**< Misc flags */
+    pp_dep_opts_t pp_deps; /**< Preprocessor dependency ops */
 } optman_t;
 
+/**
+ * The single option manager. Its members are are assumed to be read only unless
+ * otherwise noted.
+ */
 extern optman_t optman;
 
-void optman_init(void);
-void optman_destroy(void);
+/**
+ * Initialize the option manager
+ *
+ * @param argc Argument count passed into main
+ * @param argv Argument vector passed into main
+ * @return CCC_OK on success, error code on error
+ */
+status_t optman_init(int argc, char **argv);
 
-status_t optman_parse(int argc, char **argv);
+/**
+ * Destroy the option manager. Destroying after a failed initialization is safe.
+ */
+void optman_destroy(void);
 
 #endif /* _OPTMAN_H_ */

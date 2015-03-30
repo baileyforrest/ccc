@@ -24,6 +24,8 @@
 #define _PP_DIRECTIVE_H_
 
 #include "parse/preprocessor.h"
+#include "parse/preprocessor_priv.h"
+
 #include "util/htable.h"
 #include "util/slist.h"
 #include "util/status.h"
@@ -79,8 +81,6 @@ status_t pp_directive_include_next(preprocessor_t *pp);
 /**
  * Helper function for include and include next
  *
- * Warning: Current version uses static memory so is not reentrant
- *
  * @param pp The preprocessor to include for
  * @param next. If true, treats the call as include next
  * @return CCC_OK on success, error code on error
@@ -94,6 +94,16 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next);
  * @return CCC_OK on success, error code on error
  */
 status_t pp_directive_define(preprocessor_t *pp);
+
+/**
+ * Helper function to create a macro
+ *
+ * @param stream Stream to use
+ * @param new_macro Location to store new macro
+ * @param is_cli_param If true, its a macro defined with the -D flag
+ */
+status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **new_macro,
+                                    bool is_cli_param);
 
 /**
  * Directive for #undef
