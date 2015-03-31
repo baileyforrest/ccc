@@ -765,6 +765,7 @@ const char *ast_type_mod_str(type_mod_t type_mod) {
     case TMOD_TYPEDEF:  return "typedef";
     case TMOD_CONST:    return "const";
     case TMOD_VOLATILE: return "volatile";
+    case TMOD_INLINE:   return "inline";
     default:
         assert(false);
     }
@@ -774,6 +775,9 @@ const char *ast_type_mod_str(type_mod_t type_mod) {
 void ast_type_mod_print(type_mod_t type_mod, char **dest, size_t *remain) {
     if (type_mod & TMOD_TYPEDEF) {
         ast_directed_print(dest, remain, "%s ", ast_type_mod_str(TMOD_TYPEDEF));
+    }
+    if (type_mod & TMOD_INLINE) {
+        ast_directed_print(dest, remain, "%s ", ast_type_mod_str(TMOD_INLINE));
     }
     if (type_mod & TMOD_SIGNED) {
         ast_directed_print(dest, remain, "%s ", ast_type_mod_str(TMOD_SIGNED));

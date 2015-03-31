@@ -261,6 +261,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
         case STATIC:
         case EXTERN:
         case TYPEDEF:
+        case INLINE:
             if(CCC_OK != (status = par_storage_class_specifier(lex, type))) {
                 goto fail;
             }
@@ -335,6 +336,7 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
     case STATIC:   tmod = TMOD_STATIC;   break;
     case EXTERN:   tmod = TMOD_EXTERN;   break;
     case TYPEDEF:  tmod = TMOD_TYPEDEF;  break;
+    case INLINE:   tmod = TMOD_INLINE;  break;
     default:
         assert(false);
     }
@@ -1018,6 +1020,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         }
     }
 
+fail:
     if (lpatch == NULL) {
         node->type = base;
     } else if (last_node != &base) {
@@ -1032,7 +1035,6 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         }
     }
 
-fail:
     return status;
 }
 

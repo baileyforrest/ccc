@@ -51,6 +51,7 @@ typedef enum type_mod_t {
     TMOD_TYPEDEF  = 1 << 6,
     TMOD_CONST    = 1 << 7,
     TMOD_VOLATILE = 1 << 8,
+    TMOD_INLINE   = 1 << 9,
 } type_mod_t;
 
 /**
