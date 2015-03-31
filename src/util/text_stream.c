@@ -165,7 +165,7 @@ size_t ts_advance_identifier(tstream_t *ts) {
 size_t ts_skip_line(tstream_t *ts, bool *in_comment) {
     size_t num_chars = 0;
     int last = -1;
-    bool comment = false;
+    bool comment = in_comment == NULL ? false : *in_comment;
     while (!ts_end(ts)) {
         if (ts_cur(ts) == '/' && ts_next(ts) == '*') {
             comment = true;

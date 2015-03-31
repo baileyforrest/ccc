@@ -218,7 +218,8 @@ static status_t optman_parse(int argc, char **argv) {
 
             if (CCC_OK !=
                 (status =
-                 pp_directive_define_helper(&stream, &node->macro, true))) {
+                 pp_directive_define_helper(&stream, &node->macro, true,
+                                            NULL))) {
                 goto fail;
             }
             node->macro->type = MACRO_CLI_OPT;

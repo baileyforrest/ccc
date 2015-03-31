@@ -104,7 +104,7 @@ status_t pp_directive_define(preprocessor_t *pp);
  * @param is_cli_param If true, its a macro defined with the -D flag
  */
 status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **new_macro,
-                                    bool is_cli_param);
+                                    bool is_cli_param, bool *in_comment);
 
 /**
  * Directive for #undef

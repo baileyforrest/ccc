@@ -57,7 +57,7 @@ static pp_directive_t s_directives[] = {
     DIRECTIVE_LIT(error       , true ),
     DIRECTIVE_LIT(warning     , true ),
     DIRECTIVE_LIT(pragma      , true ),
-    DIRECTIVE_LIT(line        , false )
+    DIRECTIVE_LIT(line        , false)
 };
 
 /**
@@ -369,7 +369,9 @@ status_t pp_directive_define(preprocessor_t *pp) {
 
     pp_macro_t *new_macro = NULL;
     if (CCC_OK !=
-        (status = pp_directive_define_helper(stream, &new_macro, false))) {
+        (status =
+         pp_directive_define_helper(stream, &new_macro, false,
+                                    &pp->block_comment))) {
         goto fail;
     }
 
@@ -459,9 +461,13 @@ fail:
 
 
 status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
-                                    bool is_cli_param) {
+                                    bool is_cli_param, bool *in_comment) {
     status_t status = CCC_OK;
     pp_macro_t *new_macro = NULL;
+
+    if (in_comment != NULL) {
+        *in_comment = false;
+    }
 
     // Skip whitespace before name
     ts_skip_ws_and_comment(stream);
@@ -560,7 +566,6 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     }
 
     char *macro_end = NULL;
-    bool newline = false;
 
     // Keep processing macro until we find a newline
     // If we're in a comment when the newline occurs, just continue until the
@@ -569,17 +574,16 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
         if (ts_cur(stream) == '/' && ts_next(stream) == '*') {
             macro_end = ts_location(stream);
         } else if (ts_last(stream) == '*' && ts_cur(stream) == '/') {
-            if (newline) {
-                ts_advance(stream);
-                break;
-            }
             macro_end = NULL;
         } else if (ts_cur(stream) == '\n' && ts_last(stream) != '\\') {
-            newline = true;
             if (macro_end == NULL) {
                 macro_end = ts_location(stream);
-                break;
+            } else {
+                if (in_comment != NULL) {
+                    *in_comment = true;
+                }
             }
+            break;
         }
         ts_advance(stream);
     }
