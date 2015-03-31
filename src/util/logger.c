@@ -50,6 +50,9 @@ void logger_destroy() {
 }
 
 void logger_log_line(fmark_t *mark) {
+    if (mark->line_start == NULL) {
+        return;
+    }
     // Print the line
     for (const char *c = mark->line_start; *c != '\n'; ++c) {
         putchar(*c);

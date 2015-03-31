@@ -4,6 +4,12 @@ typedef struct {
     int foo;
 } cats, dogs;
 
+struct foo {
+    int e:4,f:5;
+    int g,h,i;
+    int :6;
+};
+
 
 int main(int argc) {
     struct nested {

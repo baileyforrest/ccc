@@ -39,7 +39,6 @@
 #include "util/text_stream.h"
 #include "util/util.h"
 
-//static const char s_built_in_filename[] = BUILT_IN_FILENAME;
 static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
 
 #define PREDEF_MACRO_LIT(name, word, type)                              \

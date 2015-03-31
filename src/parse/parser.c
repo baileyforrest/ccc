@@ -721,6 +721,7 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
         goto fail;
     }
     while (LEX_CUR(lex).type == COMMA) {
+        LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_struct_declarator(lex, base, decl))) {
             goto fail;
         }
@@ -737,11 +738,20 @@ fail:
 status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
                                decl_t *decl) {
     status_t status = CCC_OK;
+    decl_node_t *dnode = NULL;
 
-    if (CCC_OK != (status = par_declarator_base(lex, decl))) {
-        goto fail;
+    if (LEX_CUR(lex).type != COLON) {
+        if (CCC_OK != (status = par_declarator_base(lex, decl))) {
+            goto fail;
+        }
+        dnode = sl_tail(&decl->decls);
+    } else {
+        ALLOC_NODE(lex, dnode, decl_node_t);
+        dnode->type = decl->type;
+        dnode->id = NULL;
+        dnode->expr = NULL;
+        sl_append(&decl->decls, &dnode->link);
     }
-    decl_node_t *dnode = sl_tail(&decl->decls);
 
     if (LEX_CUR(lex).type == COLON) {
         LEX_ADVANCE(lex);
@@ -1487,6 +1497,7 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren,
                 goto fail;
             }
         }
+        LEX_MATCH(lex, RPAREN); // left paren matched before this
         goto done;
     }
     LEX_MATCH(lex, RPAREN);

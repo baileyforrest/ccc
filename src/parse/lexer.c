@@ -601,10 +601,12 @@ static status_t lex_number(lexer_t *lexer, bool neg, int cur,
         switch (cur) {
         case 'e':
         case 'E':
-            if (has_e) {
-                err = true;
+            if (!is_hex) {
+                if (has_e) {
+                    err = true;
+                }
+                has_e = true;
             }
-            has_e = true;
             break;
         case '.':
             if (has_dot) {
@@ -614,10 +616,12 @@ static status_t lex_number(lexer_t *lexer, bool neg, int cur,
             break;
         case 'f':
         case 'F':
-            if (has_f || has_u || has_ll) {
-                err = true;
+            if (!is_hex) {
+                if (has_f || has_u || has_ll) {
+                    err = true;
+                }
+                has_f = true;
             }
-            has_f = true;
             break;
         case 'u':
         case 'U':
@@ -628,7 +632,7 @@ static status_t lex_number(lexer_t *lexer, bool neg, int cur,
             break;
         case 'l':
         case 'L':
-            if (has_f || has_u || has_ll || (has_l && cur != last)) {
+            if (has_f || has_ll || (has_l && cur != last)) {
                 err = true;
             }
             if (has_l) {
@@ -742,6 +746,13 @@ static status_t lex_number(lexer_t *lexer, bool neg, int cur,
                 result->int_params.int_val = strtoll(lexer->lexbuf, NULL, 0);
             } else {
                 result->int_params.int_val = strtol(lexer->lexbuf, NULL, 0);
+
+                // Sign extend literal if necessary
+                if (result->int_params.int_val &
+                    (1 << (sizeof(int) * CHAR_BIT - 1))) {
+                    result->int_params.int_val |=
+                        ~0LL << (sizeof(int) * CHAR_BIT - 1);
+                }
                 if (result->int_params.int_val < INT_MIN ||
                     result->int_params.int_val > INT_MAX) {
                     errno = ERANGE;

@@ -232,9 +232,9 @@ void ast_decl_print(decl_t *decl, basic_type_t type, int indent, char **dest,
             }
             ast_expr_print(node->expr, dest, remain);
         }
-        if (type == TYPE_STRUCT || type == TYPE_UNION) {
-            ast_directed_print(dest, remain, ";\n");
-        }
+    }
+    if (type == TYPE_STRUCT || type == TYPE_UNION) {
+        ast_directed_print(dest, remain, ";\n");
     }
 }
 
@@ -247,9 +247,11 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
     case TYPE_PAREN:
         break;
     default:
-        // No special decl node modifiers, just print
-        ast_directed_print(dest, remain, "%.*s", (int)decl_node->id->len,
-                           decl_node->id->str);
+        if (decl_node->id != NULL) {
+            // No special decl node modifiers, just print
+            ast_directed_print(dest, remain, "%.*s", (int)decl_node->id->len,
+                               decl_node->id->str);
+        }
         return;
     }
     char print_buf[PRINT_BUF_SIZE];
