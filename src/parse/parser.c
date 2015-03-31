@@ -733,13 +733,15 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
     decl->type = decl_type;
     sl_init(&decl->decls, offsetof(decl_node_t, link));
 
-    if (CCC_OK != (status = par_struct_declarator(lex, base, decl))) {
-        goto fail;
-    }
-    while (LEX_CUR(lex).type == COMMA) {
-        LEX_ADVANCE(lex);
+    if (LEX_CUR(lex).type != SEMI) {
         if (CCC_OK != (status = par_struct_declarator(lex, base, decl))) {
             goto fail;
+        }
+        while (LEX_CUR(lex).type == COMMA) {
+            LEX_ADVANCE(lex);
+            if (CCC_OK != (status = par_struct_declarator(lex, base, decl))) {
+                goto fail;
+            }
         }
     }
 

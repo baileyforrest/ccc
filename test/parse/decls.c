@@ -10,6 +10,12 @@ struct foo {
     int :6;
 };
 
+struct outer {
+    struct {
+        int inner_elem;
+    };
+};
+
 _Bool bool_test = 1;
 
 int main(int argc) {
