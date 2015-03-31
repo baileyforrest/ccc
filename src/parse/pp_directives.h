@@ -44,6 +44,7 @@ typedef struct pp_directive_t {
     sl_link_t link;     /**< Hash table link */
     len_str_t key;      /**< Directive name */
     pp_action_t action; /**< Preprocessor action */
+    bool skip_line;     /**< If true skip the line after the directive */
 } pp_directive_t;
 
 

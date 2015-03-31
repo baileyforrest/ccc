@@ -557,8 +557,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             status_t status = directive->action(pp);
             pp->in_directive = false;
 
-            if (directive->action != pp_directive_line) {
-                // Don't skip for line directive
+            if (directive->skip_line) {
                 ts_skip_line(stream, &pp->block_comment); // Skip rest of line
             }
 

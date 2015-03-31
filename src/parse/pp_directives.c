@@ -40,24 +40,24 @@
 #define MAX_PATH_LEN 2048 /**< Max include path len */
 #define MAX_LINE 512      /**< Max length for line pragma */
 
-#define DIRECTIVE_LIT(name) \
-    { SL_LINK_LIT, LEN_STR_LIT(#name), pp_directive_ ## name  }
+#define DIRECTIVE_LIT(name, skip)                               \
+    { SL_LINK_LIT, LEN_STR_LIT(#name), pp_directive_ ## name, skip }
 
 static pp_directive_t s_directives[] = {
-    DIRECTIVE_LIT(include     ),
-    DIRECTIVE_LIT(include_next),
-    DIRECTIVE_LIT(define      ),
-    DIRECTIVE_LIT(undef       ),
-    DIRECTIVE_LIT(ifdef       ),
-    DIRECTIVE_LIT(ifndef      ),
-    DIRECTIVE_LIT(if          ),
-    DIRECTIVE_LIT(elif        ),
-    DIRECTIVE_LIT(else        ),
-    DIRECTIVE_LIT(endif       ),
-    DIRECTIVE_LIT(error       ),
-    DIRECTIVE_LIT(warning     ),
-    DIRECTIVE_LIT(pragma      ),
-    DIRECTIVE_LIT(line        )
+    DIRECTIVE_LIT(include     , true ),
+    DIRECTIVE_LIT(include_next, true ),
+    DIRECTIVE_LIT(define      , true ),
+    DIRECTIVE_LIT(undef       , true ),
+    DIRECTIVE_LIT(ifdef       , true ),
+    DIRECTIVE_LIT(ifndef      , true ),
+    DIRECTIVE_LIT(if          , true ),
+    DIRECTIVE_LIT(elif        , true ),
+    DIRECTIVE_LIT(else        , true ),
+    DIRECTIVE_LIT(endif       , true ),
+    DIRECTIVE_LIT(error       , true ),
+    DIRECTIVE_LIT(warning     , true ),
+    DIRECTIVE_LIT(pragma      , true ),
+    DIRECTIVE_LIT(line        , false )
 };
 
 /**
@@ -559,17 +559,33 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
         goto fail;
     }
 
+    char *macro_end = NULL;
+    bool newline = false;
+
     // Keep processing macro until we find a newline
+    // If we're in a comment when the newline occurs, just continue until the
+    // comment is done
     while (!ts_end(stream)) {
-        int last = *(ts_location(stream) - 1);
-        if (ts_cur(stream) == '\n' && last != '\\') {
-            break;
+        if (ts_cur(stream) == '/' && ts_next(stream) == '*') {
+            macro_end = ts_location(stream);
+        } else if (ts_last(stream) == '*' && ts_cur(stream) == '/') {
+            if (newline) {
+                ts_advance(stream);
+                break;
+            }
+            macro_end = NULL;
+        } else if (ts_cur(stream) == '\n' && ts_last(stream) != '\\') {
+            newline = true;
+            if (macro_end == NULL) {
+                macro_end = ts_location(stream);
+                break;
+            }
         }
         ts_advance(stream);
     }
 
     // Set end
-    ((tstream_t *)&new_macro->stream)->end = ts_location(stream);
+    ((tstream_t *)&new_macro->stream)->end = macro_end;
 
     *result = new_macro;
     return status;
