@@ -136,6 +136,7 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
 
 bool typecheck_type_integral(type_t *type) {
     switch (type->type) {
+    case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
     case TYPE_INT:
@@ -173,6 +174,7 @@ bool typecheck_type_integral(type_t *type) {
 bool typecheck_type_conditional(type_t *type) {
     switch (type->type) {
     // Primitive types
+    case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
     case TYPE_INT:
@@ -626,6 +628,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
 
     switch(type->type) {
     case TYPE_VOID:
+    case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
     case TYPE_INT:

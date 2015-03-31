@@ -57,6 +57,7 @@ typedef struct typedef_base_t {
 } typedef_base_t;
 
 extern struct type_t * const tt_void;
+extern struct type_t * const tt_bool;
 extern struct type_t * const tt_char;
 extern struct type_t * const tt_short;
 extern struct type_t * const tt_int;

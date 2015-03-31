@@ -275,6 +275,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
             }
         }
         case VOID:
+        case BOOL:
         case CHAR:
         case SHORT:
         case INT:
@@ -471,6 +472,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     }
         // Primitive types
     case VOID:   *end_node = tt_void;   break;
+    case BOOL:   *end_node = tt_bool;   break;
     case CHAR:   *end_node = tt_char;   break;
     case SHORT:  *end_node = tt_short;  break;
     case INT:    *end_node = tt_int;    break;
@@ -689,6 +691,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type) {
             }
         }
         case VOID:
+        case BOOL:
         case CHAR:
         case SHORT:
         case INT:

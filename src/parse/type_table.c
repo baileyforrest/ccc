@@ -37,6 +37,7 @@ static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
        sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
 
 static len_str_t void_str        = LEN_STR_LIT("void");
+static len_str_t bool_str        = LEN_STR_LIT("_Bool");
 static len_str_t char_str        = LEN_STR_LIT("char");
 static len_str_t short_str       = LEN_STR_LIT("short");
 static len_str_t int_str         = LEN_STR_LIT("int");
@@ -47,6 +48,7 @@ static len_str_t double_str      = LEN_STR_LIT("double");
 static len_str_t long_double_str = LEN_STR_LIT("long double");
 
 static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
+static type_t stt_bool        = TYPE_LITERAL(TYPE_BOOL       , _Bool      );
 static type_t stt_char        = TYPE_LITERAL(TYPE_CHAR       , char       );
 static type_t stt_short       = TYPE_LITERAL(TYPE_SHORT      , short      );
 static type_t stt_int         = TYPE_LITERAL(TYPE_INT        , int        );
@@ -57,6 +59,7 @@ static type_t stt_double      = TYPE_LITERAL(TYPE_DOUBLE     , double     );
 static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 
 type_t * const tt_void = &stt_void;
+type_t * const tt_bool = &stt_bool;
 type_t * const tt_char = &stt_char;
 type_t * const tt_short = &stt_short;
 type_t * const tt_int = &stt_int;
@@ -74,6 +77,7 @@ type_t * const tt_long_double = &stt_long_double;
  */
 static typetab_entry_t s_prim_types[] = {
     TYPE_TAB_LITERAL_ENTRY(void),
+    TYPE_TAB_LITERAL_ENTRY(bool),
     TYPE_TAB_LITERAL_ENTRY(char),
     TYPE_TAB_LITERAL_ENTRY(short),
     TYPE_TAB_LITERAL_ENTRY(int),

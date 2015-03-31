@@ -60,6 +60,7 @@ typedef enum type_mod_t {
 typedef enum basic_type_t {
     // Primitive types
     TYPE_VOID,
+    TYPE_BOOL,
     TYPE_CHAR,
     TYPE_SHORT,
     TYPE_INT,

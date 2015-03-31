@@ -621,7 +621,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     len_str_t lookup = { start, len };
 
     // Macro paramaters take precidence, look them up first
-    if (macro_inst != NULL) {
+    if (macro_inst != NULL && stream == &macro_inst->stream) {
         pp_param_map_elem_t *param = ht_lookup(&macro_inst->param_map, &lookup);
 
         // Found a parameter

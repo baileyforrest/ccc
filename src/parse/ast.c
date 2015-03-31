@@ -616,6 +616,7 @@ void ast_oper_print(oper_t op, char **dest, size_t *remain) {
 const char *ast_basic_type_str(basic_type_t type) {
     switch (type) {
     case TYPE_VOID:        return "void";        break;
+    case TYPE_BOOL:        return "_Bool";       break;
     case TYPE_CHAR:        return "char";        break;
     case TYPE_SHORT:       return "short";       break;
     case TYPE_INT:         return "int";         break;
@@ -638,6 +639,7 @@ const char *ast_basic_type_str(basic_type_t type) {
 void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
     switch (type->type) {
     case TYPE_VOID:
+    case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
     case TYPE_INT:
@@ -811,6 +813,7 @@ void ast_type_mod_print(type_mod_t type_mod, char **dest, size_t *remain) {
 void ast_type_protected_destroy(type_t *type) {
     switch (type->type) {
     case TYPE_VOID:
+    case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
     case TYPE_INT:
@@ -875,6 +878,7 @@ void ast_type_destroy(type_t *type) {
 
     switch (type->type) {
     case TYPE_VOID:
+    case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
     case TYPE_INT:

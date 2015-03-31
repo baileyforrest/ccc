@@ -10,6 +10,7 @@ struct foo {
     int :6;
 };
 
+_Bool bool_test = 1;
 
 int main(int argc) {
     struct nested {
