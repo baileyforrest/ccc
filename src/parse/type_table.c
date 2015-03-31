@@ -150,9 +150,11 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
 
 void tt_destroy(typetab_t *tt) {
     assert(tt != NULL);
+    // This order is important. types may point to typedef_bases,
+    // typedef_bases may point to compound types
     HT_DESTROY_FUNC(&tt->types, typetab_entry_destroy);
-    HT_DESTROY_FUNC(&tt->compound_types, typetab_entry_destroy);
     SL_DESTROY_FUNC(&tt->typedef_bases, typetab_typedef_base_destroy);
+    HT_DESTROY_FUNC(&tt->compound_types, typetab_entry_destroy);
 }
 
 /**
