@@ -302,7 +302,11 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
         }
     }
 
+    return status;
+
 fail:
+    ast_type_destroy(*type);
+    *type = NULL;
     return status;
 }
 

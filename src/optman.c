@@ -109,7 +109,6 @@ static status_t optman_parse(int argc, char **argv) {
         }
 
         bool opt_err = false;
-        slist_t *append_list = NULL;
 
 #ifdef DEBUG_PARAMS
         if (c != 0 && c != '?') {
@@ -169,13 +168,29 @@ static status_t optman_parse(int argc, char **argv) {
             }
             break;
 
-        case 'l': // Link options
-            append_list = &optman.link_opts;
+        case 'l': { // Link options
+            len_str_node_t *node = malloc(sizeof(len_str_node_t));
+            if (node == NULL) {
+                status = CCC_NOMEM;
+                goto fail;
+            }
+            node->str.str = optarg;
+            node->str.len = strlen(optarg);
+            sl_append(&optman.link_opts, &node->link);
             break;
+        }
 
-        case 'I': // Search path additions
-            append_list = &optman.include_paths;
+        case 'I': { // Search path additions
+            len_str_node_node_t *node = malloc(sizeof(len_str_node_node_t));
+            if (node == NULL) {
+                status = CCC_NOMEM;
+                goto fail;
+            }
+            node->node.str.str = optarg;
+            node->node.str.len = strlen(optarg);
+            sl_append(&optman.include_paths, &node->link);
             break;
+        }
 
         case 'o': // Output location
             optman.output = optarg;
@@ -234,17 +249,6 @@ static status_t optman_parse(int argc, char **argv) {
             logger_log(NULL, LOG_ERR,
                        "unrecognized command line option '%s'",
                        argv[optind - 1]);
-        }
-
-        if (append_list != NULL) {
-            len_str_node_t *node = malloc(sizeof(len_str_node_t));
-            if (node == NULL) {
-                status = CCC_NOMEM;
-                goto fail;
-            }
-            node->str.str = optarg;
-            node->str.len = strlen(optarg);
-            sl_append(append_list, &node->link);
         }
 
     }
