@@ -422,6 +422,17 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
                 break;
             }
             break;
+        case TYPE_LONG_LONG:
+            switch (LEX_CUR(lex).type) {
+            case INT:
+            case UNSIGNED:
+            case SIGNED:
+                okay = true;
+                break;
+            default:
+                break;
+            }
+            break;
         case TYPE_DOUBLE:
             if (LEX_CUR(lex).type == LONG) {
                 okay = true;
