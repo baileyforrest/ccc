@@ -25,9 +25,11 @@
 #include <stdio.h>
 
 #include <assert.h>
+#include <uchar.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <wchar.h>
 
 #include "util/logger.h"
 
@@ -56,6 +58,8 @@ typedef enum lex_str_type_t {
 } lex_str_type_t;
 
 static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result);
+
+static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type);
 
 static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
                          lex_str_type_t type);
@@ -366,20 +370,121 @@ fail:
     return status;
 }
 
+static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
+    if (cur != '\\') {
+        return cur;
+    }
+    bool is_oct = false;
+    NEXT_CHAR_NOERR(lexer, cur);
+    switch (cur) {
+    case 'a':  return '\a';
+    case 'b':  return '\b';
+    case 'f':  return '\f';
+    case 'n':  return '\n';
+    case 'r':  return '\r';
+    case 't':  return '\t';
+    case 'v':  return '\v';
+    case '\\': return '\\';
+    case '\'': return '\'';
+    case '"':  return '\"';
+    case '?':  return '\?';
+
+        // Hex /oct digit
+    case OCT_DIGIT:
+        is_oct = true;
+        // FALL THROUGH
+    case 'x': {
+        size_t offset = 0;
+        lexer->lexbuf[offset++] = '0';
+        if (!is_oct) {
+            lexer->lexbuf[offset++] = 'x';
+        }
+
+        bool overflow = false;
+        bool done = false;
+        do {
+            NEXT_CHAR_NOERR(lexer, cur);
+            switch (cur) {
+            case '8': case '9':
+            case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+            case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+                if (!is_oct) {
+                    lexer->next_char = cur;
+                    done = true;
+                    break;
+                }
+            case OCT_DIGIT:
+                if (offset < sizeof(lexer->lexbuf) - 1) {
+                    lexer->lexbuf[offset++] = cur;
+                } else if (!overflow) {
+                    overflow = true;
+                }
+                break;
+            default:
+                lexer->next_char = cur;
+                done = true;
+            }
+        } while(!done);
+        lexer->lexbuf[offset] = '\0';
+
+        errno = 0;
+
+        long long hexnum = strtol(lexer->lexbuf, NULL, 0);
+        if (errno == ERANGE) {
+            overflow = true;
+        }
+        switch (type) {
+        case LEX_STR_CHAR:
+            overflow = hexnum > UCHAR_MAX;
+            break;
+        case LEX_STR_LCHAR:
+            overflow = hexnum > (long long)WCHAR_MAX - (long long)WCHAR_MIN;
+            break;
+        case LEX_STR_U8:
+            overflow = hexnum > UINT8_MAX;
+            break;
+        case LEX_STR_U16:
+            overflow = hexnum > UINT16_MAX;
+            break;
+        case LEX_STR_U32:
+            overflow = hexnum > UINT32_MAX;
+            break;
+        }
+
+        if (overflow) {
+            if (is_oct) {
+                logger_log(&lexer->pp->last_mark, LOG_WARN,
+                           "Overflow in character constant '\\%s'",
+                           lexer->lexbuf + 1);
+            } else {
+                logger_log(&lexer->pp->last_mark, LOG_WARN,
+                           "Overflow in character constant '\\x%s'",
+                           lexer->lexbuf + 2);
+            }
+        }
+        return hexnum;
+    }
+
+    default:
+        logger_log(&lexer->pp->last_mark, LOG_WARN,
+                   "Unknown escape sequence: '\\%c'", cur);
+        return cur;
+    }
+}
+
 static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
                          lex_str_type_t type) {
-    (void)type;
     status_t status = CCC_OK;
     result->type = INTLIT;
 
     NEXT_CHAR_NOERR(lexer, cur);
-    result->int_params.int_val = cur;
     result->int_params.hasU = false;
     result->int_params.hasL = false;
     result->int_params.hasLL = false;
 
-    NEXT_CHAR_NOERR(lexer, cur);
+    result->int_params.int_val = lex_single_char(lexer, cur, type);
 
+    NEXT_CHAR_NOERR(lexer, cur);
     if (cur != '\'') {
         logger_log(&result->mark, LOG_ERR,
                    "Unexpected junk in character literal");
@@ -396,6 +501,7 @@ static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
 
 static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
                            lex_str_type_t type) {
+    // TODO: Make sure wide character literals take up more space
     (void)type;
     status_t status = CCC_OK;
     result->type = STRING;
