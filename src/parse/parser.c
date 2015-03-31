@@ -270,7 +270,18 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
             // Type specifiers:
         case ID: {
             // Type specifier only if its a typedef name
-            if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key) == NULL) {
+            typetab_entry_t *entry =
+                tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key);
+            if (entry == NULL) {
+                return CCC_BACKTRACK;
+            }
+
+            // Allow repeat typedefs
+            // Repeat typedef if this is a typedef, an entry exists, and the
+            // next character is a semicolon or comma
+            if (*type != NULL && (*type)->type == TYPE_MOD &&
+                ((*type)->mod.type_mod & TMOD_TYPEDEF) &&
+                (LEX_NEXT(lex).type == SEMI || LEX_NEXT(lex).type == COMMA)) {
                 return CCC_BACKTRACK;
             }
         }
@@ -445,6 +456,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         default:
             break;
         }
+
         if (okay) {
             LEX_ADVANCE(lex);
             return CCC_OK;
@@ -818,7 +830,15 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     if (is_typedef) {
         if (CCC_OK !=
             (status = tt_insert_typedef(lex->typetab, decl, decl_node))) {
-            goto fail;
+            if (status != CCC_DUPLICATE) {
+                goto fail;
+            } else {
+                // TODO: Check the types are equal, if so don't print error
+                logger_log(&decl_node->mark, LOG_ERR,
+                           "conflicting types for '%.*s'",
+                           decl_node->id->len, decl_node->id->str);
+                status = CCC_OK;
+            }
         }
     }
 

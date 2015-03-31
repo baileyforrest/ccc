@@ -16,6 +16,9 @@ struct outer {
     };
 };
 
+typedef int foo_t;
+typedef int foo_t;
+
 _Bool bool_test = 1;
 
 int main(int argc) {

@@ -191,24 +191,21 @@ status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
         base->type = decl->type;
     }
 
-    if (CCC_OK != (status = ht_insert(&tt->types, &new_entry->link))) {
-        if (status == CCC_DUPLICATE) {
-            logger_log(&decl_node->mark, LOG_ERR,
-                       "conflicting types for '%.*s'",
-                       decl_node->id->len, decl_node->id->str);
-        }
-        goto fail;
-    }
-
+    // Add base, and don't free on failure because the typedef may fail because
+    // of a duplicate typedef. We do this because multiple typedefs may share
+    // same base, with only one of them failing
     if (base != NULL) {
         sl_append(&tt->typedef_bases, &base->link);
+    }
+
+    if (CCC_OK != (status = ht_insert(&tt->types, &new_entry->link))) {
+        goto fail;
     }
 
     return status;
 
 fail:
     free(new_entry);
-    free(base);
     return status;
 }
 
