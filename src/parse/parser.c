@@ -2365,7 +2365,6 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
                 goto fail;
             }
         }
-        LEX_MATCH(lex, SEMI);
         LEX_MATCH(lex, RPAREN);
 
         if (CCC_OK != (status = par_statement(lex, &stmt->for_params.stmt))) {

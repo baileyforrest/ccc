@@ -81,6 +81,16 @@ void ast_gdecl_print(gdecl_t *gdecl) {
     printf("\n\n");
 }
 
+#define PRINT_CMPD_CUR_INDENT(stmt, ident)                      \
+    do {                                                        \
+        if ((stmt)->type == STMT_COMPOUND) {                    \
+            ast_stmt_print(stmt, indent);                       \
+        } else {                                                \
+            ast_stmt_print(stmt, indent + 1);                   \
+        }                                                       \
+    } while (0)
+
+
 void ast_stmt_print(stmt_t *stmt, int indent) {
     PRINT_INDENT(indent);
 
@@ -113,10 +123,11 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         printf("if (");
         ast_expr_print(stmt->if_params.expr, NULL, NULL);
         printf(")\n");
-        ast_stmt_print(stmt->if_params.true_stmt, indent + 1);
+        PRINT_CMPD_CUR_INDENT(stmt->if_params.true_stmt, indent);
         if (stmt->if_params.false_stmt) {
-            printf("else");
-            ast_stmt_print(stmt->if_params.false_stmt, indent + 1);
+            PRINT_INDENT(indent);
+            printf("else\n");
+            PRINT_CMPD_CUR_INDENT(stmt->if_params.false_stmt, indent);
         }
         break;
     case STMT_SWITCH:
@@ -128,11 +139,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
 
     case STMT_DO:
         printf("do\n");
-        if (stmt->do_params.stmt->type == STMT_COMPOUND) {
-            ast_stmt_print(stmt->do_params.stmt, indent);
-        } else {
-            ast_stmt_print(stmt->do_params.stmt, indent + 1);
-        }
+        PRINT_CMPD_CUR_INDENT(stmt->do_params.stmt, indent);
         printf("while (");
         ast_expr_print(stmt->do_params.expr, NULL, NULL);
         printf(")\n");
@@ -141,11 +148,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         printf("while (");
         ast_expr_print(stmt->while_params.expr, NULL, NULL);
         printf(")\n");
-        if (stmt->while_params.stmt->type == STMT_COMPOUND) {
-            ast_stmt_print(stmt->while_params.stmt, indent);
-        } else {
-            ast_stmt_print(stmt->while_params.stmt, indent + 1);
-        }
+        PRINT_CMPD_CUR_INDENT(stmt->while_params.stmt, indent);
         break;
     case STMT_FOR:
         printf("for (");
@@ -161,11 +164,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
             ast_expr_print(stmt->for_params.expr3, NULL, NULL);
         }
         printf(")\n");
-        if (stmt->for_params.stmt->type == STMT_COMPOUND) {
-            ast_stmt_print(stmt->for_params.stmt, indent);
-        } else {
-            ast_stmt_print(stmt->for_params.stmt, indent + 1);
-        }
+        PRINT_CMPD_CUR_INDENT(stmt->for_params.stmt, indent);
         break;
 
     case STMT_GOTO:
@@ -587,6 +586,12 @@ void ast_oper_print(oper_t op, char **dest, size_t *remain) {
         break;
     case OP_LOGICNOT:
         ast_directed_print(dest, remain, "!");
+        break;
+    case OP_LOGICAND:
+        ast_directed_print(dest, remain, "&&");
+        break;
+    case OP_LOGICOR:
+        ast_directed_print(dest, remain, "||");
         break;
     case OP_BITNOT:
         ast_directed_print(dest, remain, "~");
