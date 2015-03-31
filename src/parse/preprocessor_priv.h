@@ -29,6 +29,7 @@
 
 typedef struct pp_cond_inst_t {
     sl_link_t link;     /**< List link */
+    int start_if_count; /**< Instances of if at start of current conditional */
     bool if_taken;      /**< Branch taken on current if */
 } pp_cond_inst_t;
 
@@ -39,9 +40,8 @@ typedef struct pp_file_t {
     sl_link_t link;     /**< List link */
     slist_t cond_insts; /**< Instances of conditional preprocessor directive */
     tstream_t stream;   /**< Text stream */
-    int start_if_count; /**< Instances of if at start of current conditional */
     int if_count;       /**< Instances of if at start of current conditional */
-    bool owns_file;
+    bool owns_name;     /**< True if pp_file owns filename, false otherwise */
 } pp_file_t;
 
 /**

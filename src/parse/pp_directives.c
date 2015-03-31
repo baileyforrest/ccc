@@ -660,7 +660,7 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
 
     // Put the conditional instance on the stack, and mark if we used it or not
     sl_prepend(&file->cond_insts, &cond_inst->link);
-    file->start_if_count = file->if_count;
+    cond_inst->start_if_count = file->if_count;
 
     if ((ifdef && macro != NULL) ||  // ifdef and macro found
         (!ifdef && macro == NULL)) { // ifndef and macro not found
@@ -696,8 +696,8 @@ status_t pp_directive_elif(preprocessor_t *pp) {
     pp_cond_inst_t *head = sl_head(&file->cond_insts);
 
     // Skip if this is a nested elif, or if on the current branch, if was taken
-    if ((pp->ignore && file->if_count > file->start_if_count) ||
-        (head->if_taken && file->if_count == file->start_if_count)) {
+    if ((pp->ignore && file->if_count > head->start_if_count) ||
+        (head->if_taken && file->if_count == head->start_if_count)) {
         pp->ignore = true;
         return CCC_OK;
     }
@@ -753,13 +753,13 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
 
     pp_cond_inst_t *head;
     if (is_if) {
-        file->start_if_count = file->if_count;
         if (NULL == (head = malloc(sizeof(*head)))) {
             logger_log(&stream->mark, LOG_ERR, "Out of memory in #%s",
                        directive);
             status = CCC_NOMEM;
             goto fail2;
         }
+        head->start_if_count = file->if_count;
         sl_prepend(&file->cond_insts, &head->link);
     } else {
         head = sl_head(&file->cond_insts);
@@ -794,8 +794,8 @@ status_t pp_directive_else(preprocessor_t *pp) {
     pp_cond_inst_t *head = sl_head(&file->cond_insts);
 
     // Skip if this is a nested elif, or if on the current branch, if was taken
-    if ((pp->ignore && file->if_count > file->start_if_count) ||
-        (head->if_taken && file->if_count == file->start_if_count)) {
+    if ((pp->ignore && file->if_count > head->start_if_count) ||
+        (head->if_taken && file->if_count == head->start_if_count)) {
         pp->ignore = true;
         return CCC_OK;
     }
@@ -808,12 +808,13 @@ status_t pp_directive_endif(preprocessor_t *pp) {
     assert(sl_head(&pp->macro_insts) == NULL && "#endif inside macro!");
 
     pp_file_t *file = sl_head(&pp->file_insts);
+    pp_cond_inst_t *head = sl_head(&file->cond_insts);
     if (file->if_count == 0) {
         logger_log(&file->stream.mark, LOG_ERR, "Unexpected #endif");
         return CCC_ESYNTAX;
     }
 
-    if (file->if_count == file->start_if_count) {
+    if (file->if_count == head->start_if_count) {
         // Stop ignoring input if we reached the if causing us to skip
         if (pp->ignore) {
             pp->ignore = false;
@@ -930,10 +931,10 @@ status_t pp_directive_line(preprocessor_t *pp) {
         strncpy(new_filename->str, filename + 1, len);
         new_filename->str[len] = '\0';
 
-        if (file->owns_file) { // Free the old new_filename if it owns it
+        if (file->owns_name) { // Free the old new_filename if it owns it
             free(file->stream.mark.file);
         } else {
-            file->owns_file = true;
+            file->owns_name = true;
         }
         file->stream.mark.file = new_filename;
         file->stream.mark.line = line_num;

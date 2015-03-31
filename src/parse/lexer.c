@@ -465,6 +465,11 @@ static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
         return hexnum;
     }
 
+    case 'u':
+        // TODO: Handle utf8
+    case 'U':
+        // TODO: Handle utf16
+
     default:
         logger_log(&lexer->pp->last_mark, LOG_WARN,
                    "Unknown escape sequence: '\\%c'", cur);

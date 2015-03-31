@@ -60,7 +60,7 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC), // stdlib available
 
 #ifdef __x86_64__
-    PREDEF_MACRO_LIT("__x86_64__", "", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__x86_64__", "1", MACRO_BASIC),
 #endif
 
     PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC)
@@ -223,9 +223,8 @@ status_t pp_file_create(pp_file_t **result) {
     }
 
     sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
-    pp_file->start_if_count = 0;
     pp_file->if_count = 0;
-    pp_file->owns_file = false;
+    pp_file->owns_name = false;
 
     *result = pp_file;
 fail:
@@ -233,7 +232,7 @@ fail:
 }
 
 void pp_file_destroy(pp_file_t *pp_file) {
-    if (pp_file->owns_file) {
+    if (pp_file->owns_name) {
         free(pp_file->stream.mark.file);
     }
     SL_DESTROY_FUNC(&pp_file->cond_insts, free);

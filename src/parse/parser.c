@@ -469,7 +469,8 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         // int
     case SIGNED:
     case UNSIGNED: {
-        type_mod_t mod = LEX_CUR(lex).type == SIGNED ? TMOD_SIGNED : TMOD_UNSIGNED;
+        type_mod_t mod = LEX_CUR(lex).type == SIGNED ? TMOD_SIGNED :
+            TMOD_UNSIGNED;
         if (mod_node == NULL) {
             ALLOC_NODE(lex, mod_node, type_t);
             new_node = mod_node;
