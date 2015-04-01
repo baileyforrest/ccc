@@ -92,7 +92,13 @@ void ast_gdecl_print(gdecl_t *gdecl) {
 
 
 void ast_stmt_print(stmt_t *stmt, int indent) {
-    PRINT_INDENT(indent);
+    if (stmt->type == STMT_LABEL) {
+        if (indent > 0) {
+            PRINT_INDENT(indent - 1);
+        }
+    } else {
+        PRINT_INDENT(indent);
+    }
 
     switch(stmt->type) {
     case STMT_NOP:
@@ -155,11 +161,11 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         if (stmt->for_params.expr1) {
             ast_expr_print(stmt->for_params.expr1, NULL, NULL);
         }
-        printf(";");
+        printf("; ");
         if (stmt->for_params.expr2) {
             ast_expr_print(stmt->for_params.expr2, NULL, NULL);
         }
-        printf(";");
+        printf("; ");
         if (stmt->for_params.expr3) {
             ast_expr_print(stmt->for_params.expr3, NULL, NULL);
         }

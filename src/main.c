@@ -53,12 +53,12 @@ int main(int argc, char **argv) {
         }
 
         if (optman.dump_opts & DUMP_TOKENS) {
-            printf("@@@ Tokens %s\n", node->str.str);
+            printf("//@ Tokens %s\n", node->str.str);
             man_dump_tokens(&manager);
         } else {
             trans_unit_t *ast;
             if (optman.dump_opts & DUMP_AST) {
-                printf("@@@ AST %s\n", node->str.str);
+                printf("//@ AST %s\n", node->str.str);
             }
 
             if (CCC_OK != (status = man_parse(&manager, &ast))) {

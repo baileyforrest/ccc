@@ -55,16 +55,16 @@ void logger_log_line(fmark_t *mark) {
     }
     // Print the line
     for (const char *c = mark->line_start; *c != '\n'; ++c) {
-        putchar(*c);
+        fputc(*c, stderr);
     }
-    putchar('\n');
+    fputc('\n', stderr);
 
     // Print the error marker
     for (int i = 0; i < mark->col - 1; ++i) {
-        putchar(' ');
+        fputc(' ', stderr);
     }
-    putchar('^');
-    putchar('\n');
+    fputc('^', stderr);
+    fputc('\n', stderr);
 }
 
 void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
@@ -90,20 +90,21 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
     }
 
     if (mark == NULL) {
-        printf("%s: %s ", optman.exec_name, header);
-        vprintf(fmt, ap);
-        printf("\n");
+        fprintf(stderr, "%s: %s ", optman.exec_name, header);
+        vfprintf(stderr, fmt, ap);
+        fprintf(stderr, "\n");
         return;
     }
 
-    printf("%s:%d:%d %s ", mark->file->str, mark->line, mark->col, header);
-    vprintf(fmt, ap);
-    printf("\n");
+    fprintf(stderr, "%s:%d:%d %s ", mark->file->str, mark->line, mark->col,
+            header);
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
     logger_log_line(mark);
 
     for (fmark_t *cur = mark->last; cur != NULL; cur = cur->last) {
-        printf("%s:%d:%d note: %s\n", cur->file->str, cur->line, cur->col,
-               "In expansion of macro");
+        fprintf(stderr, "%s:%d:%d note: %s\n", cur->file->str, cur->line,
+                cur->col, "In expansion of macro");
         logger_log_line(cur);
     }
 }
