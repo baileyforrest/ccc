@@ -1446,19 +1446,43 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         base->type = EXPR_SIZEOF;
         base->sizeof_params.type = NULL;
         base->sizeof_params.expr = NULL;
-        if (CCC_BACKTRACK !=
-            (status = par_unary_expression(lex, &base->sizeof_params.expr))) {
-            if (status != CCC_OK) {
-                goto fail;
-            }
-        } else { // Parsing unary expression failed, sizeof typename
-            base->sizeof_params.expr = NULL;
-            LEX_MATCH(lex, LPAREN);
+        if (LEX_CUR(lex).type == LPAREN) {
+            LEX_ADVANCE(lex);
             if (CCC_OK !=
                 (status = par_type_name(lex, &base->sizeof_params.type))) {
-                goto fail;
+                if (status != CCC_BACKTRACK) {
+                    goto fail;
+                }
+            }
+            // Failed to parse a typename
+            if (base->sizeof_params.type == NULL) {
+                if (optman.dump_opts & DUMP_AST) {
+                    // Only create paren node if we're printing AST
+                    ALLOC_NODE(lex, base->sizeof_params.expr, expr_t);
+                    base->sizeof_params.expr->type = EXPR_PAREN;
+                    base->sizeof_params.expr->paren_base = NULL;
+                    if (CCC_OK !=
+                        (status = par_expression(
+                            lex, NULL,
+                            &base->sizeof_params.expr->paren_base))) {
+                        goto fail;
+                    }
+                } else {
+                    if (CCC_OK !=
+                        (status = par_expression(lex, NULL,
+                                                 &base->sizeof_params.expr))) {
+                        goto fail;
+                    }
+                }
             }
             LEX_MATCH(lex, RPAREN);
+        } else {
+            if (CCC_OK !=
+                (status =
+                 par_non_binary_expression(lex, NULL,
+                                           &base->sizeof_params.expr))) {
+                goto fail;
+            }
         }
         break;
 
@@ -1491,6 +1515,25 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
 
         break;
     }
+    case LPAREN:
+        LEX_ADVANCE(lex);
+        if (optman.dump_opts & DUMP_AST) {
+            // Only create paren node if we're printing AST
+            ALLOC_NODE(lex, base, expr_t);
+            base->type = EXPR_PAREN;
+            base->paren_base = NULL;
+            if (CCC_OK !=
+                (status = par_expression(lex, NULL, &base->paren_base))) {
+                goto fail;
+            }
+        } else {
+            if (CCC_OK !=
+                (status = par_expression(lex, NULL, &base))) {
+                goto fail;
+            }
+        }
+        LEX_MATCH(lex, RPAREN);
+        break;
     default:
         return CCC_BACKTRACK;
     }

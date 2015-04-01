@@ -508,14 +508,15 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
         break;
     }
     case EXPR_SIZEOF:
-        ast_directed_print(dest, remain, "sizeof (");
+        ast_directed_print(dest, remain, "sizeof");
         if (expr->sizeof_params.type != NULL) {
+            ast_directed_print(dest, remain, "(");
             ast_decl_print(expr->sizeof_params.type, TYPE_VOID, 0, dest,
                            remain);
+            ast_directed_print(dest, remain, ")");
         } else {
             ast_expr_print(expr->sizeof_params.expr, dest, remain);
         }
-        ast_directed_print(dest, remain, ")");
         break;
     case EXPR_MEM_ACC:
         ast_expr_print(expr->mem_acc.base, dest, remain);
