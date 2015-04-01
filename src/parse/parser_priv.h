@@ -371,13 +371,9 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result);
  *
  * @param lex Current lexer state
  * @param result Location to store the result
- * @param has_paren If true, assume the first paren of the cast expression is
- *     already matched. This is necessary due to a subtlety of the grammar -
- *     telling apart casts from paren expressions
  * @return CCC_OK on success, error code on error
  */
-status_t par_primary_expression(lex_wrap_t *lex, bool has_paren,
-                                expr_t **result);
+status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
  * Parses an expression
@@ -389,24 +385,27 @@ status_t par_primary_expression(lex_wrap_t *lex, bool has_paren,
 status_t par_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
- * Parses an assignment expression after the value being assigned to
+ * Parses an assignment expression
  *
  * @param lex Current lexer state
- * @param left lvalue of the assignment
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
-status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
-                                   expr_t **result);
+status_t par_assignment_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
- * Parses a type name
+ * Parses a type name, optionally match parens too.
+ *
+ * If parens are to be matched, but the token in the parens is not a type, then
+ * the paren is not consumed.
  *
  * @param lex Current lexer state
  * @param result Location to store the result
- * @return CCC_OK on success, error code on error
+ * @param If true, try to match parens
+ * @return CCC_OK on success, CCC_BACKTRACK if a type name cannot be parsed,
+ *     error code on error
  */
-status_t par_type_name(lex_wrap_t *lex, decl_t **result);
+status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result);
 
 /**
  * Parses a funtion parameter type list, which may include vaargs
