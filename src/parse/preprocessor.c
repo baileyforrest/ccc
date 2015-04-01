@@ -347,6 +347,7 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
         ts_copy(&macro_inst->stream, &macro->stream, TS_COPY_SHALLOW);
     }
 
+    macro_inst->macro = macro;
     macro_inst->cur_param.cur = NULL;
     macro_inst->param_stringify = false;
 
@@ -655,6 +656,20 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         } else {
             return ts_advance(stream);
         }
+    }
+
+    bool recursive = false;
+    // Protect against recursive macros
+    sl_link_t *cur;
+    SL_FOREACH(cur, &pp->macro_insts) {
+        pp_macro_inst_t *macro_inst = GET_ELEM(&pp->macro_insts, cur);
+        if (macro_inst->macro == macro) {
+            recursive = true;
+            break;
+        }
+    }
+    if (recursive) {
+        return ts_advance(stream);
     }
 
     switch (macro->type) {

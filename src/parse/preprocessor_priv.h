@@ -58,6 +58,7 @@ typedef struct pp_param_map_elem_t {
  */
 typedef struct pp_macro_inst_t {
     sl_link_t link;       /**< List link */
+    pp_macro_t *macro;    /**< The macro this is an instance of */
     htable_t param_map;   /**< Mapping of strings to paramater values */
     tstream_t stream;     /**< Text stream of macro instance */
     tstream_t cur_param;  /**< Current macro parameter's stream */
