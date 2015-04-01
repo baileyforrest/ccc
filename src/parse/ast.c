@@ -146,9 +146,10 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
     case STMT_DO:
         printf("do\n");
         PRINT_CMPD_CUR_INDENT(stmt->do_params.stmt, indent);
+        PRINT_INDENT(indent);
         printf("while (");
         ast_expr_print(stmt->do_params.expr, NULL, NULL);
-        printf(")\n");
+        printf(");\n");
         break;
     case STMT_WHILE:
         printf("while (");
@@ -184,7 +185,9 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
     case STMT_RETURN:
         printf("return ");
-        ast_expr_print(stmt->return_params.expr, NULL, NULL);
+        if (stmt->return_params.expr != NULL) {
+            ast_expr_print(stmt->return_params.expr, NULL, NULL);
+        }
         printf(";");
         break;
 

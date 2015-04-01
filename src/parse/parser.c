@@ -1109,6 +1109,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
             // Cases for casts
 
         case VOID:
+        case BOOL:
         case CHAR:
         case SHORT:
         case INT:
@@ -2087,6 +2088,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
 
         // Type specifiers:
     case VOID:
+    case BOOL:
     case CHAR:
     case SHORT:
     case INT:
@@ -2123,6 +2125,7 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
                     goto fail;
                 }
 
+                LEX_MATCH(lex, SEMI);
                 goto done;
             } else {
                 return par_expression_statement(lex, result);
@@ -2420,7 +2423,8 @@ status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
         stmt->type = STMT_RETURN;
         stmt->return_params.expr = NULL;
 
-        if (CCC_OK !=
+        if (LEX_CUR(lex).type != SEMI
+            && CCC_OK !=
             (status = par_expression(lex, false, &stmt->return_params.expr))) {
             goto fail;
         }
