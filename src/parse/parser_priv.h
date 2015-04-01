@@ -322,7 +322,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
                                    expr_t **result);
 
 /**
- * Parses an expression
+ * Parses a binary expression
  *
  * @param lex Current lexer state
  * @param left Expression to use for the left side of a binary expression. NULL
@@ -330,7 +330,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
  * @param result Location where the parsed expression shourd be stored
  * @return CCC_OK on success, error code on error
  */
-status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result);
+status_t par_oper_expression(lex_wrap_t *lex, expr_t *left, expr_t **result);
 
 /**
  * Parses a unary expression.
@@ -350,13 +350,10 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result);
  * expression.
  *
  * @param lex Current lexer state
- * @param skip_paren If true, assume the first paren of the cast expression is
- *     already matched. This is necessary due to a subtlety of the grammar -
- *     telling apart casts from paren expressions
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
-status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren, expr_t **result);
+status_t par_cast_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
  * Parses a postfix expression after the primary expression part.
@@ -364,42 +361,43 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren, expr_t **result);
  * If no postfix expressions can be parsed, base is unchanged is returned
  *
  * @param lex Current lexer state
- * @param base The primary expression to add on to
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
-status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
+status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result);
+
+/**
+ * Parses a primary expression.
+ *
+ * @param lex Current lexer state
+ * @param result Location to store the result
+ * @param has_paren If true, assume the first paren of the cast expression is
+ *     already matched. This is necessary due to a subtlety of the grammar -
+ *     telling apart casts from paren expressions
+ * @return CCC_OK on success, error code on error
+ */
+status_t par_primary_expression(lex_wrap_t *lex, bool has_paren,
                                 expr_t **result);
 
 /**
- * Parses an assignment operator after the unary expression.
- *
- * This function should only be called if there is known to be an assignment
- * expression next.
+ * Parses an expression
  *
  * @param lex Current lexer state
- * @param left The unary expression being assigned to
+ * @param result Location to store the result
+ * @return CCC_OK on success, error code on error
+ */
+status_t par_expression(lex_wrap_t *lex, expr_t **result);
+
+/**
+ * Parses an assignment expression after the value being assigned to
+ *
+ * @param lex Current lexer state
+ * @param left lvalue of the assignment
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
 status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
                                    expr_t **result);
-
-/**
- * Parses a primary expression.
- *
- * The original grammar included paren expressions, but that is not included
- * here due to ambiguity with casts. Parens are handled in
- * par_non_binary_expression.
- *
- * This function should only be called if there is known to be an primary
- * expression next.
- *
- * @param lex Current lexer state
- * @param result Location to store the result
- * @return CCC_OK on success, error code on error
- */
-status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
  * Parses a type name
