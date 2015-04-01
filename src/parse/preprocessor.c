@@ -841,9 +841,8 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     time_t t;
     struct tm *tm;
 
-    pp->macro_buf[0] = '"';
-    char *buf = pp->macro_buf + 1;
-    size_t buf_size = sizeof(pp->macro_buf) - 1;
+    char *buf = pp->macro_buf;
+    size_t buf_size = sizeof(pp->macro_buf);
     bool quotes = true;
 
     size_t len = 0;
@@ -887,19 +886,17 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     buf[len] = '\0';
 
     ts_copy(&param_inst->stream, stream, TS_COPY_SHALLOW);
-    if (quotes) {
-        param_inst->stringify = true;
-        param_inst->stream.cur = pp->macro_buf;
-    } else {
-        param_inst->stringify = false;
-        param_inst->stream.cur = pp->macro_buf + 1; // Skip the quote
-    }
-    param_inst->stream.end = pp->macro_buf + len + 1;
-
-    // Add new param instance to the stack
+    param_inst->stream.cur = pp->macro_buf;
+    param_inst->stream.end = pp->macro_buf + len;
     sl_prepend(&pp->param_insts, &param_inst->link);
 
-    return -(int)CCC_RETRY;
+    if (quotes) {
+        param_inst->stringify = true;
+        return '"';
+    } else {
+        param_inst->stringify = false;
+        return -(int)CCC_RETRY;
+    }
 
 fail:
     return -(int)status;
