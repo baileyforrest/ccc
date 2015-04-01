@@ -327,6 +327,13 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
                 ast_decl_print(GET_ELEM(&type->func.params, cur_link),
                                TYPE_VOID, 0, &cur, &remain);
             }
+            if (type->func.varargs) {
+                PUT_CUR(',');
+                PUT_CUR(' ');
+                PUT_CUR('.');
+                PUT_CUR('.');
+                PUT_CUR('.');
+            }
             if (remain > 0) {
                 PUT_CUR(')');
             }
@@ -726,40 +733,6 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
     case TYPE_MOD:
         ast_type_mod_print(type->mod.type_mod, dest, remain);
         ast_type_print(type->mod.base, 0, dest, remain);
-        break;
-
-    case TYPE_PAREN:
-        ast_directed_print(dest, remain, "(");
-        ast_type_print(type->paren_base, 0, dest, remain);
-        ast_directed_print(dest, remain, ")");
-        break;
-    case TYPE_FUNC: {
-        ast_type_print(type->func.type, 0, dest, remain);
-        ast_directed_print(dest, remain, "(");
-        bool first = true;
-        sl_link_t *cur;
-        SL_FOREACH(cur, &type->func.params) {
-            if (first) {
-                first = false;
-            } else {
-                ast_directed_print(dest, remain, ", ");
-            }
-            ast_decl_print(GET_ELEM(&type->func.params, cur), TYPE_VOID, 0,
-                           dest, remain);
-        }
-        ast_directed_print(dest, remain, ")");
-        break;
-    }
-    case TYPE_ARR:
-        ast_type_print(type->arr.base, 0, dest, remain);
-        ast_directed_print(dest, remain, "[");
-        ast_expr_print(type->arr.len, dest, remain);
-        ast_directed_print(dest, remain, "]");
-        break;
-    case TYPE_PTR:
-        ast_type_print(type->ptr.base, 0, dest, remain);
-        ast_directed_print(dest, remain, " * ");
-        ast_type_mod_print(type->ptr.type_mod, dest, remain);
         break;
 
     default:
