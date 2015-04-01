@@ -322,7 +322,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
                                    expr_t **result);
 
 /**
- * Parses an expression
+ * Parses a binary expression
  *
  * @param lex Current lexer state
  * @param left Expression to use for the left side of a binary expression. NULL
@@ -330,7 +330,7 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
  * @param result Location where the parsed expression shourd be stored
  * @return CCC_OK on success, error code on error
  */
-status_t par_expression(lex_wrap_t *lex, expr_t *left, expr_t **result);
+status_t par_oper_expression(lex_wrap_t *lex, expr_t *left, expr_t **result);
 
 /**
  * Parses a unary expression.
@@ -350,13 +350,10 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result);
  * expression.
  *
  * @param lex Current lexer state
- * @param skip_paren If true, assume the first paren of the cast expression is
- *     already matched. This is necessary due to a subtlety of the grammar -
- *     telling apart casts from paren expressions
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
-status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren, expr_t **result);
+status_t par_cast_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
  * Parses a postfix expression after the primary expression part.
@@ -364,36 +361,13 @@ status_t par_cast_expression(lex_wrap_t *lex, bool skip_paren, expr_t **result);
  * If no postfix expressions can be parsed, base is unchanged is returned
  *
  * @param lex Current lexer state
- * @param base The primary expression to add on to
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
-status_t par_postfix_expression(lex_wrap_t *lex, expr_t *base,
-                                expr_t **result);
-
-/**
- * Parses an assignment operator after the unary expression.
- *
- * This function should only be called if there is known to be an assignment
- * expression next.
- *
- * @param lex Current lexer state
- * @param left The unary expression being assigned to
- * @param result Location to store the result
- * @return CCC_OK on success, error code on error
- */
-status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
-                                   expr_t **result);
+status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
  * Parses a primary expression.
- *
- * The original grammar included paren expressions, but that is not included
- * here due to ambiguity with casts. Parens are handled in
- * par_non_binary_expression.
- *
- * This function should only be called if there is known to be an primary
- * expression next.
  *
  * @param lex Current lexer state
  * @param result Location to store the result
@@ -402,13 +376,36 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t *left,
 status_t par_primary_expression(lex_wrap_t *lex, expr_t **result);
 
 /**
- * Parses a type name
+ * Parses an expression
  *
  * @param lex Current lexer state
  * @param result Location to store the result
  * @return CCC_OK on success, error code on error
  */
-status_t par_type_name(lex_wrap_t *lex, decl_t **result);
+status_t par_expression(lex_wrap_t *lex, expr_t **result);
+
+/**
+ * Parses an assignment expression
+ *
+ * @param lex Current lexer state
+ * @param result Location to store the result
+ * @return CCC_OK on success, error code on error
+ */
+status_t par_assignment_expression(lex_wrap_t *lex, expr_t **result);
+
+/**
+ * Parses a type name, optionally match parens too.
+ *
+ * If parens are to be matched, but the token in the parens is not a type, then
+ * the paren is not consumed.
+ *
+ * @param lex Current lexer state
+ * @param result Location to store the result
+ * @param If true, try to match parens
+ * @return CCC_OK on success, CCC_BACKTRACK if a type name cannot be parsed,
+ *     error code on error
+ */
+status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result);
 
 /**
  * Parses a funtion parameter type list, which may include vaargs
