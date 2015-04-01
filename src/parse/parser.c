@@ -256,12 +256,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
     while (true) {
         switch (LEX_CUR(lex).type) {
             // Storage class specifiers
-        case AUTO:
-        case REGISTER:
-        case STATIC:
-        case EXTERN:
-        case TYPEDEF:
-        case INLINE:
+        case DECL_SPEC_STORAGE_CLASS:
             if(CCC_OK != (status = par_storage_class_specifier(lex, type))) {
                 goto fail;
             }
@@ -284,28 +279,16 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
                 (LEX_NEXT(lex).type == SEMI || LEX_NEXT(lex).type == COMMA)) {
                 return CCC_BACKTRACK;
             }
+            // FALL THROUGH
         }
-        case VOID:
-        case BOOL:
-        case CHAR:
-        case SHORT:
-        case INT:
-        case LONG:
-        case FLOAT:
-        case DOUBLE:
-        case SIGNED:
-        case UNSIGNED:
-        case STRUCT:
-        case UNION:
-        case ENUM:
+        case DECL_SPEC_TYPE_SPEC_NO_ID:
             if (CCC_OK != (status = par_type_specifier(lex, type))) {
                 goto fail;
             }
             break;
 
             // Type qualitifiers
-        case CONST:
-        case VOLATILE:
+        case DECL_SPEC_TYPE_QUALIFIER:
             if (CCC_OK != (status = par_type_qualifier(lex, type))) {
                 goto fail;
             }
@@ -348,7 +331,7 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
     case STATIC:   tmod = TMOD_STATIC;   break;
     case EXTERN:   tmod = TMOD_EXTERN;   break;
     case TYPEDEF:  tmod = TMOD_TYPEDEF;  break;
-    case INLINE:   tmod = TMOD_INLINE;  break;
+    case INLINE:   tmod = TMOD_INLINE;   break;
     default:
         assert(false);
     }
@@ -383,6 +366,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         end_node = type;
     }
 
+    // TODO: This is nasty, find better solution for this
     // Handle repeat end nodes
     if (*end_node != NULL) {
         bool okay = false;
@@ -696,33 +680,20 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type) {
     while (true) {
         switch (LEX_CUR(lex).type) {
             // Type specifiers:
-        case ID: {
+        case ID:
             // Type specifier only if its a typedef name
             if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key) == NULL) {
                 return CCC_BACKTRACK;
             }
-        }
-        case VOID:
-        case BOOL:
-        case CHAR:
-        case SHORT:
-        case INT:
-        case LONG:
-        case FLOAT:
-        case DOUBLE:
-        case SIGNED:
-        case UNSIGNED:
-        case STRUCT:
-        case UNION:
-        case ENUM:
+            // FALL THROUGH
+        case DECL_SPEC_TYPE_SPEC_NO_ID:
             if (CCC_OK != (status = par_type_specifier(lex, type))) {
                 goto fail;
             }
             break;
 
             // Type qualitifiers
-        case CONST:
-        case VOLATILE:
+        case DECL_SPEC_TYPE_QUALIFIER:
             if (CCC_OK != (status = par_type_qualifier(lex, type))) {
                 goto fail;
             }
@@ -1573,8 +1544,11 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         break;
     }
     default:
-        // TODO: Change this to report error
-        assert(false);
+        logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                   "Unexpected token %s. Expected primary expression.",
+                   token_str(LEX_CUR(lex).type));
+        status = CCC_ESYNTAX;
+        goto fail;
     }
 
     *result = base;
@@ -1686,22 +1660,8 @@ status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result) {
                 return CCC_BACKTRACK;
             }
         }
-        case VOID:
-        case BOOL:
-        case CHAR:
-        case SHORT:
-        case INT:
-        case LONG:
-        case FLOAT:
-        case DOUBLE:
-        case SIGNED:
-        case UNSIGNED:
-        case STRUCT:
-        case UNION:
-        case ENUM:
-
-        case CONST:
-        case VOLATILE:
+        case DECL_SPEC_TYPE_SPEC_NO_ID:
+        case DECL_SPEC_TYPE_QUALIFIER:
             break;
 
         default:
@@ -1980,31 +1940,9 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
 
     switch (LEX_CUR(lex).type) {
         // Cases for declaration specifier
-        // Storage class specifiers
-    case AUTO:
-    case REGISTER:
-    case STATIC:
-    case EXTERN:
-    case TYPEDEF:
-
-        // Type specifiers:
-    case VOID:
-    case BOOL:
-    case CHAR:
-    case SHORT:
-    case INT:
-    case LONG:
-    case FLOAT:
-    case DOUBLE:
-    case SIGNED:
-    case UNSIGNED:
-    case STRUCT:
-    case UNION:
-    case ENUM:
-
-        // Type qualitifiers
-    case CONST:
-    case VOLATILE: {
+    case DECL_SPEC_STORAGE_CLASS:
+    case DECL_SPEC_TYPE_SPEC_NO_ID:
+    case DECL_SPEC_TYPE_QUALIFIER: {
         ALLOC_NODE(lex, stmt, stmt_t);
         stmt->type = STMT_DECL;
         stmt->decl = NULL;
@@ -2259,28 +2197,9 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
                     expr = true;
                     break;
                 }
-            case AUTO:
-            case REGISTER:
-            case STATIC:
-            case EXTERN:
-            case TYPEDEF:
-
-            case VOID:
-            case BOOL:
-            case CHAR:
-            case SHORT:
-            case INT:
-            case LONG:
-            case FLOAT:
-            case DOUBLE:
-            case SIGNED:
-            case UNSIGNED:
-            case STRUCT:
-            case UNION:
-            case ENUM:
-
-            case CONST:
-            case VOLATILE: {
+            case DECL_SPEC_STORAGE_CLASS:
+            case DECL_SPEC_TYPE_SPEC_NO_ID:
+            case DECL_SPEC_TYPE_QUALIFIER: {
                 if (CCC_OK !=
                     (status =
                      par_declaration(lex, &stmt->for_params.decl1, false))) {

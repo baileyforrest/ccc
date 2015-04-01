@@ -139,7 +139,12 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         if (stmt->if_params.false_stmt) {
             PRINT_INDENT(indent);
             printf("else\n");
-            PRINT_CMPD_CUR_INDENT(stmt->if_params.false_stmt, indent);
+            if (stmt->if_params.false_stmt->type == STMT_COMPOUND ||
+                stmt->if_params.false_stmt->type == STMT_IF) {
+                ast_stmt_print(stmt->if_params.false_stmt, indent);
+            } else {
+                ast_stmt_print(stmt->if_params.false_stmt, indent + 1);
+            }
         }
         break;
     case STMT_SWITCH:

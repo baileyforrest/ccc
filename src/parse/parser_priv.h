@@ -111,6 +111,14 @@ typedef struct lex_wrap_t {
         memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));  \
     } while (0)
 
+#define DECL_SPEC_STORAGE_CLASS \
+    AUTO: case REGISTER: case STATIC: case EXTERN: case TYPEDEF: case INLINE
+
+#define DECL_SPEC_TYPE_SPEC_NO_ID \
+    VOID: case BOOL: case CHAR: case SHORT: case INT: case LONG: case FLOAT: \
+case DOUBLE: case SIGNED: case UNSIGNED: case STRUCT: case UNION: case ENUM
+
+#define DECL_SPEC_TYPE_QUALIFIER CONST: case VOLATILE
 
 /**
  * Returns the relative precedence of a binary operator
