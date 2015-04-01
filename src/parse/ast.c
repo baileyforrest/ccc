@@ -81,24 +81,28 @@ void ast_gdecl_print(gdecl_t *gdecl) {
     printf("\n\n");
 }
 
-#define PRINT_CMPD_CUR_INDENT(stmt, ident)                      \
+#define PRINT_CMPD_CUR_INDENT(stmt, indent)                     \
     do {                                                        \
         if ((stmt)->type == STMT_COMPOUND) {                    \
             ast_stmt_print(stmt, indent);                       \
         } else {                                                \
-            ast_stmt_print(stmt, indent + 1);                   \
+            ast_stmt_print(stmt, (indent) + 1);                 \
         }                                                       \
     } while (0)
 
 
 void ast_stmt_print(stmt_t *stmt, int indent) {
-    if (stmt->type == STMT_LABEL) {
-        if (indent > 0) {
-            PRINT_INDENT(indent - 1);
-        }
-    } else {
+    switch (stmt->type) {
+    case STMT_LABEL:
+    case STMT_CASE:
+    case STMT_DEFAULT:
+        PRINT_INDENT(indent - 1);
+        break;
+    default:
         PRINT_INDENT(indent);
     }
+
+    bool print_newline = true;
 
     switch(stmt->type) {
     case STMT_NOP:
@@ -118,11 +122,13 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         printf("case ");
         ast_expr_print(stmt->case_params.val, NULL, NULL);
         printf(":\n");
-        ast_stmt_print(stmt->case_params.stmt, indent + 1);
+        PRINT_CMPD_CUR_INDENT(stmt->case_params.stmt, indent - 1);
+        print_newline = false;
         break;
     case STMT_DEFAULT:
         printf("default:\n");
-        ast_stmt_print(stmt->default_params.stmt, indent + 1);
+        ast_stmt_print(stmt->default_params.stmt, indent);
+        print_newline = false;
         break;
 
     case STMT_IF:
@@ -140,7 +146,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         printf("switch (");
         ast_expr_print(stmt->switch_params.expr, NULL, NULL);
         printf(")\n");
-        ast_stmt_print(stmt->switch_params.stmt, indent + 1);
+        PRINT_CMPD_CUR_INDENT(stmt->switch_params.stmt, indent);
         break;
 
     case STMT_DO:
@@ -159,15 +165,18 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
     case STMT_FOR:
         printf("for (");
-        if (stmt->for_params.expr1) {
+        if (stmt->for_params.expr1 != NULL) {
             ast_expr_print(stmt->for_params.expr1, NULL, NULL);
         }
+        if (stmt->for_params.decl1 != NULL) {
+            ast_decl_print(stmt->for_params.decl1, TYPE_VOID, 0, NULL, NULL);
+        }
         printf("; ");
-        if (stmt->for_params.expr2) {
+        if (stmt->for_params.expr2 != NULL) {
             ast_expr_print(stmt->for_params.expr2, NULL, NULL);
         }
         printf("; ");
-        if (stmt->for_params.expr3) {
+        if (stmt->for_params.expr3 != NULL) {
             ast_expr_print(stmt->for_params.expr3, NULL, NULL);
         }
         printf(")\n");
@@ -210,7 +219,9 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
     default:
         assert(false);
     }
-    printf("\n");
+    if (print_newline) {
+        printf("\n");
+    }
 }
 
 void ast_decl_print(decl_t *decl, basic_type_t type, int indent, char **dest,
@@ -1069,6 +1080,7 @@ void ast_stmt_destroy(stmt_t *stmt) {
         break;
     case STMT_FOR:
         ast_expr_destroy(stmt->for_params.expr1);
+        ast_decl_destroy(stmt->for_params.decl1);
         ast_expr_destroy(stmt->for_params.expr2);
         ast_expr_destroy(stmt->for_params.expr3);
         ast_stmt_destroy(stmt->for_params.stmt);

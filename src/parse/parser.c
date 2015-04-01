@@ -2246,6 +2246,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
 
     case DEFAULT:
         LEX_ADVANCE(lex);
+        LEX_MATCH(lex, COLON);
         stmt->type = STMT_DEFAULT;
         stmt->default_params.stmt = NULL;
 
@@ -2385,12 +2386,53 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_MATCH(lex, LPAREN);
         stmt->type = STMT_FOR;
         stmt->for_params.expr1 = NULL;
+        stmt->for_params.decl1 = NULL;
         stmt->for_params.expr2 = NULL;
         stmt->for_params.expr3 = NULL;
         stmt->for_params.stmt = NULL;
 
         if (LEX_CUR(lex).type != SEMI) {
-            if (CCC_OK !=
+            bool expr = false;
+            switch (LEX_CUR(lex).type) {
+            case ID:
+                if (tt_lookup(lex->typetab, &LEX_CUR(lex).tab_entry->key)
+                    == NULL) {
+                    expr = true;
+                    break;
+                }
+            case AUTO:
+            case REGISTER:
+            case STATIC:
+            case EXTERN:
+            case TYPEDEF:
+
+            case VOID:
+            case BOOL:
+            case CHAR:
+            case SHORT:
+            case INT:
+            case LONG:
+            case FLOAT:
+            case DOUBLE:
+            case SIGNED:
+            case UNSIGNED:
+            case STRUCT:
+            case UNION:
+            case ENUM:
+
+            case CONST:
+            case VOLATILE: {
+                if (CCC_OK !=
+                    (status =
+                     par_declaration(lex, &stmt->for_params.decl1, false))) {
+                    goto fail;
+                }
+                break;
+            }
+            default:
+                expr = true;
+            }
+            if (expr && CCC_OK !=
                 (status = par_expression(lex, NULL, &stmt->for_params.expr1))) {
                 goto fail;
             }

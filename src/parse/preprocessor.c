@@ -622,19 +622,25 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     len_str_t lookup = { start, len };
 
     // Macro paramaters take precidence, look them up first
-    if (macro_inst != NULL && stream == &macro_inst->stream) {
-        pp_param_map_elem_t *param = ht_lookup(&macro_inst->param_map, &lookup);
+    if (macro_inst != NULL &&
+        (stream == &macro_inst->stream || stream == &macro_inst->cur_param)) {
+        // Look up params from inner to outer macros
+        sl_link_t *cur;
+        SL_FOREACH(cur, &pp->macro_insts) {
+            pp_macro_inst_t *macro_inst = GET_ELEM(&pp->macro_insts, cur);
+            pp_param_map_elem_t *param = ht_lookup(&macro_inst->param_map, &lookup);
 
-        // Found a parameter
-        // Advance lookahead to end of param, and set param state in pp
-        if (param != NULL) {
-            // Skip over parameter name
-            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-            ts_copy(&macro_inst->cur_param, &lookahead, TS_COPY_SHALLOW);
-            macro_inst->cur_param.cur = param->val.str;
-            macro_inst->cur_param.end = param->val.str + param->val.len;
-            macro_inst->cur_param.last = ' ';
-            return -(int)CCC_RETRY;
+            // Found a parameter
+            // Advance lookahead to end of param, and set param state in pp
+            if (param != NULL) {
+                // Skip over parameter name
+                ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+                ts_copy(&macro_inst->cur_param, &lookahead, TS_COPY_SHALLOW);
+                macro_inst->cur_param.cur = param->val.str;
+                macro_inst->cur_param.end = param->val.str + param->val.len;
+                macro_inst->cur_param.last = ' ';
+                return -(int)CCC_RETRY;
+            }
         }
     }
 

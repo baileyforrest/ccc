@@ -388,6 +388,7 @@ typedef struct stmt_t {
 
         struct {                       /**< For paramaters */
             expr_t *expr1;             /**< Expression 1 */
+            decl_t *decl1;             /**< Declaration 1 */
             expr_t *expr2;             /**< Expression 2 */
             expr_t *expr3;             /**< Expression 3 */
             struct stmt_t *stmt;       /**< Statement in loop */
