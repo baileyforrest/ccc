@@ -1,9 +1,8 @@
 /**
  * Check paramaters in nested macros
  */
-#define FOO(a, b) (a + b)
-#define BAR(c, d) FOO(c, d)
+#define FOO(a, b) ((a) + (b))
+#define BAR(c, d) FOO(c*d, c*d)
 int main() {
-    BAR(1, 2);
-    return 0;
+    return BAR(1, 2);
 }
