@@ -44,8 +44,8 @@
     { SL_LINK_LIT, LEN_STR_LIT(#name), pp_directive_ ## name, skip }
 
 static pp_directive_t s_directives[] = {
-    DIRECTIVE_LIT(include     , true ),
-    DIRECTIVE_LIT(include_next, true ),
+    DIRECTIVE_LIT(include     , false),
+    DIRECTIVE_LIT(include_next, false),
     DIRECTIVE_LIT(define      , true ),
     DIRECTIVE_LIT(undef       , true ),
     DIRECTIVE_LIT(ifdef       , true ),
@@ -132,160 +132,94 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
         return status;
     }
 
-    // Initialize to safe state
-    len_str_t suffix = { suffix_buf, 0 };
-
-
     pp_file_t *file = sl_head(&pp->file_insts);
-    tstream_t *stream = &file->stream;
 
-    ts_skip_ws_and_comment(stream);
-    if (ts_end(stream)) {
-        logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in #include");
+    int endsym = 0;
+    bool done = false;
+
+    // Find the starting character
+    while (!done) {
+        int next = pp_nextchar(pp);
+        if (next == PP_EOF) {
+            logger_log(&pp->last_mark, LOG_ERR,
+                       "Unexpected EOF in #include");
+            status = CCC_ESYNTAX;
+            goto fail;
+        }
+
+        switch (next) {
+        case '"':
+            endsym = '"';
+            done = true;
+            break;
+        case '<':
+            endsym = '>';
+            done = true;
+            break;
+        case ' ':
+        case '\t':
+            continue;
+        default:
+            logger_log(&pp->last_mark, LOG_ERR,
+                       "Unexpected character %c in #include", next);
+            status = CCC_ESYNTAX;
+            goto fail;
+        }
+    }
+
+    // Find the end of the include string
+    int offset = 0;
+    done = false;
+    while (!done && offset < MAX_PATH_LEN) {
+        int next = pp_nextchar(pp);
+        if (next == PP_EOF) {
+            logger_log(&pp->last_mark, LOG_ERR,
+                       "Unexpected EOF in #include");
+            status = CCC_ESYNTAX;
+            goto fail;
+        }
+
+        if (next == endsym) {
+            done = true;
+            break;
+        }
+        suffix_buf[offset++] = next;
+    }
+
+    if (!done) {
+        logger_log(&pp->last_mark, LOG_ERR,
+                   "Include path name too long");
         status = CCC_ESYNTAX;
         goto fail;
     }
 
-    char *cur = NULL;
+    suffix_buf[offset] = '\0';
 
-    int endsym = 0;
-    switch (ts_cur(stream)) {
-        // quote or ange bracket
-    case '"':
-        endsym = '"';
-    case '<':
-        endsym = endsym ? endsym : '>';
+    len_str_t suffix = { suffix_buf, offset };
 
-        ts_advance(stream);
-        cur = ts_location(stream);
-
-        bool done = false;
-        while (!done && !ts_end(stream)) {
-            /* Charaters allowed to be in path name */
-            switch (ts_cur(stream)) {
-            case ASCII_LOWER:
-            case ASCII_UPPER:
-            case ASCII_DIGIT:
-            case '_':
-            case '-':
-            case '.':
-            case '/':
-                ts_advance(stream);
-                break;
-            default: /* Found end */
+    // Skip until next line
+    done = false;
+    int last = -1;
+    while (!done) {
+        int next = pp_nextchar(pp);
+        switch (next) {
+        case PP_EOF:
+            done = true;
+            break;
+        case '\n':
+            if (last != '\\') {
                 done = true;
             }
+            break;
+        case ' ':
+        case '\t':
+        case '\\':
+            break;
+        default:
+            logger_log(&pp->last_mark, LOG_WARN,
+                       "extra tokens at end of #include directive");
         }
-
-        // Reached end
-        if (ts_end(stream)) {
-            logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in #include");
-            status = CCC_ESYNTAX;
-            goto fail;
-        }
-
-        // 0 length
-        if (ts_location(stream) == cur) {
-            logger_log(&stream->mark, LOG_ERR, "0 length include path");
-            status = CCC_ESYNTAX;
-            goto fail;
-        }
-
-        // Incorrect end symbol
-        if (ts_cur(stream) != endsym) {
-            logger_log(&stream->mark, LOG_ERR, "Unexpected symbol in #include");
-            status = CCC_ESYNTAX;
-            goto fail;
-        }
-
-        suffix.str = cur;
-        suffix.len = ts_location(stream) - cur;
-        break;
-
-        // Identifier, expand macros
-    case ASCII_LOWER:
-    case ASCII_UPPER:
-    case ASCII_DIGIT:
-    case '_':
-        done = false;
-        // Find the starting character
-        while (!done) {
-            int next = pp_nextchar(pp);
-            if (next == PP_EOF) {
-                logger_log(&stream->mark, LOG_ERR,
-                           "Unexpected EOF in #include");
-                status = CCC_ESYNTAX;
-                goto fail;
-            }
-
-            switch (next) {
-            case '"':
-                endsym = '"';
-            case '<':
-                endsym = endsym ? endsym : '>';
-                done = true;
-                break;
-            case ' ':
-            case '\t':
-                continue;
-            default:
-                logger_log(&stream->mark, LOG_ERR,
-                           "Unexpected character %c in #include", next);
-                status = CCC_ESYNTAX;
-                goto fail;
-            }
-        }
-
-        int offset = 0;
-        done = false;
-
-        // Find the end of the include string
-        while (true) {
-            int next = pp_nextchar(pp);
-            if (offset == MAX_PATH_LEN) {
-                logger_log(&stream->mark, LOG_ERR,
-                           "Include path name too long");
-                status = CCC_ESYNTAX;
-                goto fail;
-            }
-            if (next == PP_EOF) {
-                logger_log(&stream->mark, LOG_ERR,
-                           "Unexpected EOF in #include");
-                status = CCC_ESYNTAX;
-                goto fail;
-            }
-
-            if (next == endsym) {
-                break;
-            }
-            suffix_buf[offset++] = next;
-        }
-
-        suffix_buf[offset] = '\0';
-
-        suffix.str = suffix_buf;
-        suffix.len = offset;
-
-        // Skip until next line
-        done = false;
-        int last = -1;
-        while (!done) {
-            int next = pp_nextchar(pp);
-            if (PP_EOF == next) {
-                done = true;
-            }
-
-            if (next == '\n' && last != '\\') {
-                done = true;
-            }
-            last = next;
-        }
-        break;
-    default:
-        logger_log(&stream->mark, LOG_ERR,
-                   "Unexpected character %c in #include", *cur);
-        status = CCC_ESYNTAX;
-        goto fail;
+        last = next;
     }
 
     len_str_t cur_path = { file->stream.mark.file->str,
@@ -330,7 +264,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
         // 1 for /, one for \0
         if (path->len + suffix.len + 2 > MAX_PATH_LEN) {
-            logger_log(&stream->mark, LOG_ERR, "Include path name too long");
+            logger_log(&pp->last_mark, LOG_ERR, "Include path name too long");
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -359,7 +293,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     }
 
 fail:
-    logger_log(&stream->mark, LOG_ERR, "Failed to include file: %.*s",
+    logger_log(&pp->last_mark, LOG_ERR, "Failed to include file: %.*s",
                (int)suffix.len, suffix.str);
     status = CCC_ESYNTAX;
 
