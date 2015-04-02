@@ -761,6 +761,16 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 char *cur_param = ts_location(&lookahead);
                 int num_parens = 0;
                 while (!ts_end(&lookahead)) {
+                    if (ts_cur(&lookahead) == '"' ||
+                        ts_cur(&lookahead) == '\'') {
+                        ts_skip_string(&lookahead);
+                        continue;
+                    }
+                    if (ts_cur(&lookahead) == '/' &&
+                        ts_next(&lookahead) == '*') {
+                        ts_skip_ws_and_comment(&lookahead);
+                        continue;
+                    }
                     if (ts_cur(&lookahead) == '(') {
                         num_parens++;
                     } else if (num_parens > 0 && ts_cur(&lookahead) == ')') {

@@ -133,6 +133,30 @@ size_t ts_skip_ws_and_comment(tstream_t *ts) {
     return num_chars - 1;
 }
 
+size_t ts_skip_string(tstream_t *ts) {
+    int terminator;
+    size_t num_chars = 0;
+    switch (ts_cur(ts)) {
+    case '"':
+    case '\'':
+        terminator = ts_cur(ts);
+        break;
+    default:
+        return num_chars;
+    }
+    ts_advance(ts);
+    ++num_chars;
+
+    while (!ts_end(ts)) {
+        ++num_chars;
+        if (ts_cur(ts) == terminator && ts_last(ts) != '\\') {
+            ts_advance(ts);
+            break;
+        }
+        ts_advance(ts);
+    }
+    return num_chars;
+}
 
 size_t ts_advance_identifier(tstream_t *ts) {
     size_t num_chars = 0;

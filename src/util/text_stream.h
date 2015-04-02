@@ -167,6 +167,17 @@ int ts_advance(tstream_t *ts);
 size_t ts_skip_ws_and_comment(tstream_t *ts);
 
 /**
+ * Skip a "string" bounded by double or single quotes
+ *
+ * The starting character must be on the current location
+ * Handles escape characters
+ *
+ * @param ts Text stream to use
+ * @return The number of characters skipped
+ */
+size_t ts_skip_string(tstream_t *ts);
+
+/**
  * Advance ts past an identifier
  *
  * @param ts Text stream to use
