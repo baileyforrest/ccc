@@ -544,7 +544,9 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     }
 
     // Set end
-    ((tstream_t *)&new_macro->stream)->end = macro_end;
+    if (macro_end != NULL) {
+        ((tstream_t *)&new_macro->stream)->end = macro_end;
+    }
 
     *result = new_macro;
     return status;

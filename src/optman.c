@@ -223,7 +223,6 @@ static status_t optman_parse(int argc, char **argv) {
                 goto fail;
             }
             node->macro->type = MACRO_CLI_OPT;
-
             sl_append(&optman.macros, &node->link);
             break;
         }

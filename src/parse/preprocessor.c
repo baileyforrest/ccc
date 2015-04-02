@@ -65,6 +65,14 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC)
 };
 
+/**
+ * Predefined macros that have parameters. The param parsing logic is too fancy
+ * to have a literal for
+ */
+static len_str_t s_predef_param_macros[] = {
+    LEN_STR_LIT("__attribute__(xyz) /* None */") // Pesky attribute
+};
+
 status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     static const ht_params_t macro_params = {
         0,                                // No Size estimate
@@ -92,7 +100,6 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
         goto fail1;
     }
 
-
     if (macros == NULL) {
         if (CCC_OK != (status = ht_init(&pp->macros, &macro_params))) {
             goto fail2;
@@ -108,6 +115,37 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
             if (CCC_OK != (status = ht_insert(&pp->macros,
                                               &s_predef_macros[i].link))) {
                 goto fail3;
+            }
+        }
+
+        static bool predef_loaded = false;
+        if (!predef_loaded) {
+            // Load these only once
+            // They are stored on the option manager's macros so they persist
+            // between preprocessor instantiations
+            predef_loaded = true;
+
+            for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_param_macros);
+                 ++i) {
+                macro_node_t *node = malloc(sizeof(macro_node_t));
+                if (node == NULL) {
+                    status = CCC_NOMEM;
+                    goto fail3;
+                }
+                len_str_t *str = &s_predef_param_macros[i];
+                tstream_t stream;
+                ts_init(&stream, str->str, str->str + str->len,
+                        &s_built_in_file, BUILT_IN_FILENAME, NULL, 0, 0);
+
+                if (CCC_OK !=
+                    (status =
+                     pp_directive_define_helper(&stream, &node->macro, false,
+                                                NULL))) {
+                    free(node);
+                    goto fail3;
+                }
+                node->macro->type = MACRO_CLI_OPT;
+                sl_append(&optman.macros, &node->link);
             }
         }
 
