@@ -447,6 +447,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
 
             // 0 parameter macro
             if (ts_cur(stream) == ')') {
+                ts_advance(stream); // Skip the paren
                 done = true;
                 break;
             }
