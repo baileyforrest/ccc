@@ -67,10 +67,10 @@ typedef struct pp_macro_inst_t {
  * An instance of a macro paramater
  */
 typedef struct pp_param_inst_t {
-    sl_link_t link;              /**< List link */
-    pp_macro_inst_t *macro_inst; /**< The macro inst this is a parameter for */
-    tstream_t stream;            /**< Current macro parameter's stream */
-    bool stringify;              /**< Whether or not we are stringifying */
+    sl_link_t link;    /**< List link */
+    pp_macro_t *macro; /**< The macro this is a parameter for */
+    tstream_t stream;  /**< Current macro parameter's stream */
+    bool stringify;    /**< Whether or not we are stringifying */
 } pp_param_inst_t;
 
 

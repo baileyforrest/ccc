@@ -62,7 +62,10 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__x86_64__", "1", MACRO_BASIC),
 #endif
 
-    PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC)
+    // TODO: Conditionally compile or handle these better
+    PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC),
+    PREDEF_MACRO_LIT("char16_t", "short", MACRO_BASIC),
+    PREDEF_MACRO_LIT("char32_t", "int", MACRO_BASIC)
 };
 
 /**
@@ -477,8 +480,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
 
     // Get copy of current location, the last mark
-    // TODO: This is temporary, just get the bottom file's mark
-    memcpy(&pp->last_mark, &file_inst->stream.mark, sizeof(fmark_t));
+    memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
 
     int cur_char = ts_cur(stream);
     int next_char = ts_next(stream);
@@ -628,7 +630,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 return -(int)CCC_NOMEM;
             }
             ts_copy(&param_inst->stream, stream, TS_COPY_SHALLOW);
-            param_inst->macro_inst = macro_inst;
+            param_inst->macro = macro_inst->macro;
             param_inst->stream.cur = param->val.str;
             param_inst->stream.end = param->val.str + param->val.len;
             param_inst->stringify = true;
@@ -670,14 +672,21 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     // Macro paramaters take precidence, look them up first
     if (macro_inst != NULL) {
         // Look up params from inner to outer macros
+        bool found_cur_macro = param_inst == NULL;
         sl_link_t *cur;
         SL_FOREACH(cur, &pp->macro_insts) {
             pp_macro_inst_t *macro_inst = GET_ELEM(&pp->macro_insts, cur);
-            // Don't expand the same parameter for the same macro multiple times
-            // to avoid infinite recursion
-            if (param_inst != NULL && param_inst->macro_inst == macro_inst) {
+            // Avoid infinite recursion with parameters.
+            // If we haven't found the macro we're currently in a parameter for,
+            // skip the macro instance. Also skip the macro we're currently in
+            // a parameter for.
+            if (!found_cur_macro) {
+                if (param_inst->macro == macro_inst->macro) {
+                    found_cur_macro = true;
+                }
                 continue;
             }
+
             pp_param_map_elem_t *param =
                 ht_lookup(&macro_inst->param_map, &lookup);
 
@@ -691,7 +700,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
 
                 ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
-                param_inst->macro_inst = macro_inst;
+                param_inst->macro = macro_inst->macro;
                 param_inst->stream.cur = param->val.str;
                 param_inst->stream.end = param->val.str + param->val.len;
                 param_inst->stream.last = ' ';
@@ -764,6 +773,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         goto fail;
     }
 
+    // TODO: Enable this after fixed
+    (void)file_inst;
+    /*
     if (param_inst != NULL) {
         new_macro_inst->stream.mark.last = &param_inst->stream.mark;
     } else if (macro_inst != NULL) {
@@ -771,6 +783,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     } else {
         new_macro_inst->stream.mark.last = &file_inst->stream.mark;
     }
+    */
 
     // -1 means non function style macro
     if (macro->num_params >= 0) {
@@ -903,7 +916,7 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     if (param_inst == NULL) {
         goto fail;
     }
-    param_inst->macro_inst = NULL;
+    param_inst->macro = NULL;
 
     time_t t;
     struct tm *tm;

@@ -667,13 +667,19 @@ static status_t lex_number(lexer_t *lexer, bool neg, int cur,
                 err = true;
             }
             break;
+        case 'a': case 'b': case 'c': case 'd':
+        case 'A': case 'B': case 'C': case 'D':
+            if (!is_hex) {
+                err = true;
+            }
+            break;
 
-            // _ and all letters other than X, U, L, E, F
-        case 'a': case 'b': case 'c': case 'd': case 'g': case 'h':
+            // _ and all letters other than X, U, L, E, F and hex letters
+        case 'g': case 'h':
         case 'i': case 'j': case 'k': case 'm': case 'n': case 'o': case 'p':
         case 'q': case 'r': case 's': case 't': case 'v': case 'w': case 'y':
         case 'z':
-        case 'A': case 'B': case 'C': case 'D': case 'G': case 'H':
+        case 'G': case 'H':
         case 'I': case 'J': case 'K': case 'M': case 'N': case 'O': case 'P':
         case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W': case 'Y':
         case 'Z':
