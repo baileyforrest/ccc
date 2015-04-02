@@ -65,7 +65,7 @@ static pp_directive_t s_directives[] = {
  * Must have trailing backslash
  */
 static len_str_node_t s_default_search_path[] = {
-    { SL_LINK_LIT, LEN_STR_LIT(".") }, // Current directory
+    { SL_LINK_LIT, LEN_STR_LIT("") }, // Empty string denotes current directory
     { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include") },
     { SL_LINK_LIT, LEN_STR_LIT("/usr/include") },
 
@@ -290,16 +290,16 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
     len_str_t cur_path = { file->stream.mark.file->str,
                            file->stream.mark.file->len };
-    if (next) {
-        while (cur_path.len > 0 && cur_path.str[cur_path.len - 1] != '/') {
-            cur_path.len--;
-        }
+    while (cur_path.len > 0 && cur_path.str[cur_path.len - 1] != '/') {
+        cur_path.len--;
+    }
 
-        // If no current path, set it to current directory
-        if (cur_path.len == 0) {
-            cur_path.str = "./";
-            cur_path.len = 2;
-        }
+    // If no current path, set it to current directory
+    if (cur_path.len == 0) {
+        cur_path.str = "./";
+        cur_path.len = 2;
+    } else {
+        cur_path.len--; // Remove trailing '/'
     }
 
     bool found_cur_path = false;
@@ -317,18 +317,28 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
                 continue;
             }
         }
+        len_str_t *path;
+        if (cur->str.len == 0) {
+            // Don't look in current directory for angle bracket includes
+            if (endsym == '>') {
+                continue;
+            }
+            path = &cur_path;
+        } else {
+            path = &cur->str;
+        }
 
         // 1 for /, one for \0
-        if (cur->str.len + suffix.len + 2 > MAX_PATH_LEN) {
+        if (path->len + suffix.len + 2 > MAX_PATH_LEN) {
             logger_log(&stream->mark, LOG_ERR, "Include path name too long");
             status = CCC_ESYNTAX;
             goto fail;
         }
 
-        strncpy(path_buf, cur->str.str, cur->str.len);
-        path_buf[cur->str.len] = '/';
-        strncpy(path_buf + cur->str.len + 1, suffix.str, suffix.len);
-        size_t len = cur->str.len + suffix.len + 1;
+        strncpy(path_buf, path->str, path->len);
+        path_buf[path->len] = '/';
+        strncpy(path_buf + path->len + 1, suffix.str, suffix.len);
+        size_t len = path->len + suffix.len + 1;
         path_buf[len] = '\0';
 
         // File isn't accessible
