@@ -80,7 +80,7 @@ typedef struct pp_macro_t {
     len_str_t name;         /**< Macro name, hashtable key */
     const tstream_t stream; /**< Text stream template */
     slist_t params;         /**< Macro paramaters, list of len_str_node_t */
-    int num_params;         /**< Number of paramaters */
+    int num_params;         /**< Number of paramaters -1 for non func style */
     pp_macro_type_t type;   /**< Type of macro */
 } pp_macro_t;
 

@@ -44,7 +44,7 @@ static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
 #define PREDEF_MACRO_LIT(name, word, type)                              \
     { SL_LINK_LIT, LEN_STR_LIT(name),                                   \
       TSTREAM_LIT(word, NULL, &s_built_in_file, BUILT_IN_FILENAME, 0, 0), \
-      SLIST_LIT(offsetof(len_str_node_t, link)), 0, type }
+      SLIST_LIT(offsetof(len_str_node_t, link)), -1, type }
 
 static pp_macro_t s_predef_macros[] = {
     // Standard C required macros
@@ -727,7 +727,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         goto fail;
     }
 
-    if (macro->num_params != 0) {
+    // -1 means non function style macro
+    if (macro->num_params >= 0) {
         ts_skip_ws_and_comment(&lookahead);
 
         if (ts_cur(&lookahead) != '(') {
@@ -737,77 +738,88 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
 
         ts_advance(&lookahead); // Skip the paren
-        // Need to create param map
 
-        int num_params = 0;
-
-        bool done = false;
-
-        sl_link_t *cur_link;
-        SL_FOREACH(cur_link, &macro->params) {
+        if (macro->num_params == 0) {
             ts_skip_ws_and_comment(&lookahead);
-            num_params++;
-            char *cur_param = ts_location(&lookahead);
-            int num_parens = 0;
-            while (!ts_end(&lookahead)) {
-                if (ts_cur(&lookahead) == '(') {
-                    num_parens++;
-                } else if (num_parens > 0 && ts_cur(&lookahead) == ')') {
-                    num_parens--;
-                } else if (num_parens == 0) {
-                    if (ts_cur(&lookahead) == ',') { // end of current param
-                        break;
-                    }
-                    if (ts_cur(&lookahead) == ')') { // end of all params
-                        done = true;
-                        break;
-                    }
-                }
-                ts_advance(&lookahead); // Blindly copy param data
-            }
-
-            if (ts_end(&lookahead)
-                && (num_params != macro->num_params || !done)) {
+            if (ts_cur(&lookahead) != ')') {
                 logger_log(&stream->mark, LOG_ERR,
-                           "Unexpected EOF while scanning macro paramaters");
+                           "unterminated argument list invoking macro \"%.*s\"",
+                           (int)lookup.len, lookup.str);
                 error = -(int)CCC_ESYNTAX;
                 goto fail;
             }
+            ts_advance(&lookahead); // Skip the rparen
+        } else {// Need to create param map
+            int num_params = 0;
 
-            size_t cur_len = ts_location(&lookahead) - cur_param;
+            bool done = false;
 
-            pp_param_map_elem_t *param_elem =
-                malloc(sizeof(pp_param_map_elem_t));
-            if (param_elem == NULL) {
+            sl_link_t *cur_link;
+            SL_FOREACH(cur_link, &macro->params) {
+                ts_skip_ws_and_comment(&lookahead);
+                num_params++;
+                char *cur_param = ts_location(&lookahead);
+                int num_parens = 0;
+                while (!ts_end(&lookahead)) {
+                    if (ts_cur(&lookahead) == '(') {
+                        num_parens++;
+                    } else if (num_parens > 0 && ts_cur(&lookahead) == ')') {
+                        num_parens--;
+                    } else if (num_parens == 0) {
+                        if (ts_cur(&lookahead) == ',') { // end of current param
+                            break;
+                        }
+                        if (ts_cur(&lookahead) == ')') { // end of all params
+                            done = true;
+                            break;
+                        }
+                    }
+                    ts_advance(&lookahead); // Blindly copy param data
+                }
+
+                if (ts_end(&lookahead)
+                    && (num_params != macro->num_params || !done)) {
+                    logger_log(&stream->mark, LOG_ERR,
+                               "Unexpected EOF while scanning macro paramaters");
+                    error = -(int)CCC_ESYNTAX;
+                    goto fail;
+                }
+
+                size_t cur_len = ts_location(&lookahead) - cur_param;
+
+                pp_param_map_elem_t *param_elem =
+                    malloc(sizeof(pp_param_map_elem_t));
+                if (param_elem == NULL) {
+                    logger_log(&stream->mark, LOG_ERR,
+                               "Out of memory while scanning macro");
+                    error = -(int)CCC_NOMEM;
+                    goto fail;
+                }
+
+                // Get current paramater in macro
+                len_str_node_t *param_str = GET_ELEM(&macro->params, cur_link);
+
+                // Insert the paramater mapping into the instance's hash table
+                param_elem->key.str = param_str->str.str;
+                param_elem->key.len = param_str->str.len;
+                param_elem->val.str = cur_param;
+                param_elem->val.len = cur_len;
+
+                ht_insert(&new_macro_inst->param_map, &param_elem->link);
+
+                ts_advance(&lookahead);
+
+                if (done) {
+                    break;
+                }
+            }
+
+            if ((done && num_params != macro->num_params) || !done) {
                 logger_log(&stream->mark, LOG_ERR,
-                           "Out of memory while scanning macro");
-                error = -(int)CCC_NOMEM;
+                           "Incorrect number of macro paramaters");
+                error = -(int)CCC_ESYNTAX;
                 goto fail;
             }
-
-            // Get current paramater in macro
-            len_str_node_t *param_str = GET_ELEM(&macro->params, cur_link);
-
-            // Insert the paramater mapping into the instance's hash table
-            param_elem->key.str = param_str->str.str;
-            param_elem->key.len = param_str->str.len;
-            param_elem->val.str = cur_param;
-            param_elem->val.len = cur_len;
-
-            ht_insert(&new_macro_inst->param_map, &param_elem->link);
-
-            ts_advance(&lookahead);
-
-            if (done) {
-                break;
-            }
-        }
-
-        if ((done && num_params != macro->num_params) || !done) {
-            logger_log(&stream->mark, LOG_ERR,
-                       "Incorrect number of macro paramaters");
-            error = -(int)CCC_ESYNTAX;
-            goto fail;
         }
     }
 

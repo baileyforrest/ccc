@@ -1348,11 +1348,11 @@ fail:
 status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *base = NULL;
+    expr_t *expr = NULL;
     if (CCC_OK != (status = par_primary_expression(lex, &base))) {
         goto fail;
     }
-
-    expr_t *expr = base;
+    expr = base;
 
     while (base != NULL) {
         switch (LEX_CUR(lex).type) {

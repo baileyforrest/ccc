@@ -433,15 +433,25 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     }
 
     // Process paramaters
-    new_macro->num_params = 0;
-    if (ts_cur(stream) == '(') {
+    if (ts_cur(stream) != '(') {
+        // -1 Means non function style macro
+        new_macro->num_params = -1;
+    } else {
+        new_macro->num_params = 0;
         ts_advance(stream);
 
         bool done = false;
         while (!done && !ts_end(stream)) {
-            new_macro->num_params++;
             ts_skip_ws_and_comment(stream);
             cur = ts_location(stream);
+
+            // 0 parameter macro
+            if (ts_cur(stream) == ')') {
+                done = true;
+                break;
+            }
+
+            new_macro->num_params++;
             size_t param_len = ts_advance_identifier(stream);
 
             if (param_len == 0) {
