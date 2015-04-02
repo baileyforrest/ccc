@@ -95,12 +95,10 @@ void pp_file_destroy(pp_file_t *pp_file);
  * @param filename Filename to open.
  * @param len Length of filename
  * @param result Location to store result. NULL if failed
- * @param last_file The file which included one being mapped. NULL if none.
  * @param result The resulting mapped file
  * @return CCC_OK on success, error code otherwise
  */
-status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
-                     pp_file_t **result);
+status_t pp_map_file(const char *filename, size_t len, pp_file_t **result);
 
 /**
  * Maps a stream into a preprocessor as if it were a file, placing it on top of

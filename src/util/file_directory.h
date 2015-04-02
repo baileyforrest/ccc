@@ -36,6 +36,11 @@ typedef struct fmark_t {
     int col;                /**< Column number */
 } fmark_t;
 
+typedef struct fmark_refcnt_t {
+    fmark_t mark;
+    int refcnt;
+} fmark_refcnt_t;
+
 /**
  * Name of "file" for built in objects
  */

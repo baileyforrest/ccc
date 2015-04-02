@@ -65,6 +65,7 @@ typedef struct lex_wrap_t {
  */
 #define LEX_ADVANCE(wrap)                                               \
     do {                                                                \
+        fmark_chain_free(LEX_CUR(wrap).mark.last);                      \
         if (CCC_OK !=                                                   \
             (status = lexer_next_token((wrap)->lexer,                   \
                                        &LEX_CUR(wrap)))) {              \
@@ -84,8 +85,9 @@ typedef struct lex_wrap_t {
         token_t cur = LEX_CUR(wrap).type;                               \
         if (cur != (token)) {                                           \
             logger_log(&LEX_CUR(wrap).mark, LOG_ERR,                    \
-                       "Parse Error: Expected %s. Found: %s.",          \
+                       "expected '%s' before '%s' token",               \
                        token_str(token), token_str(cur));               \
+            fmark_chain_free(LEX_CUR(wrap).mark.last);                  \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \
@@ -109,6 +111,9 @@ typedef struct lex_wrap_t {
             goto fail;                                              \
         }                                                           \
         memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));  \
+        if ((loc)->mark.last != NULL) {                             \
+            ((fmark_refcnt_t *)(loc)->mark.last)->refcnt++;         \
+        }                                                           \
     } while (0)
 
 #define DECL_SPEC_STORAGE_CLASS \

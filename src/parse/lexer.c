@@ -116,202 +116,215 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     status_t status = CCC_OK;
 
     int cur;
-    bool done;
+    bool done = false;
     do { // Repeat loop until we find a token
-        done = true;
-
         NEXT_CHAR_NOERR(lexer, cur);
-        pp_last_mark(lexer->pp, &result->mark);
-
-        int next;
         switch (cur) {
-        case PP_EOF: result->type = TOKEN_EOF; break;
-        case '{': result->type = LBRACE; break;
-        case '}': result->type = RBRACE; break;
-        case '(': result->type = LPAREN; break;
-        case ')': result->type = RPAREN; break;
-        case ';': result->type = SEMI; break;
-        case ',': result->type = COMMA; break;
-        case '[': result->type = LBRACK; break;
-        case ']': result->type = RBRACK; break;
-        case '?': result->type = COND; break;
-        case ':': result->type = COLON; break;
-        case '~': result->type = BITNOT; break;
-        case '=': CHECK_NEXT_EQ(ASSIGN, EQ); break;
-        case '*': CHECK_NEXT_EQ(STAR, STAREQ); break;
-        case '/': CHECK_NEXT_EQ(DIV, DIVEQ); break;
-        case '%': CHECK_NEXT_EQ(MOD, MODEQ); break;
-        case '!': CHECK_NEXT_EQ(LOGICNOT, NE); break;
-        case '^': CHECK_NEXT_EQ(BITXOR, BITXOREQ); break;
-        case '.': {
-            NEXT_CHAR_NOERR(lexer, next);
-            if (next != '.') {
-                result->type = DOT;
-                lexer->next_char = next;
-                break;
-            }
-            NEXT_CHAR_NOERR(lexer, next);
-            if (next == '.') {
-                result->type = ELIPSE;
-                break;
-            }
-            logger_log(&result->mark, LOG_ERR, "Unexpected token: ..");
-            status = CCC_ESYNTAX;
-            break;
-        }
-        case '+': {
-            NEXT_CHAR_NOERR(lexer, next);
-            switch(next) {
-            case '+': result->type = INC; break;
-            case '=': result->type = PLUSEQ; break;
-            default:
-                result->type = PLUS;
-                lexer->next_char = next;
-            }
-            break;
-        }
-        case '-': {
-            NEXT_CHAR_NOERR(lexer, next);
-            switch(next) {
-            case '-': result->type = DEC; break;
-            case '=': result->type = MINUSEQ; break;
-            case '>': result->type = DEREF; break;
-            case ASCII_DIGIT: // Negative number
-                status = lex_number(lexer, true, next, result);
-                break;
-            default:
-                result->type = MINUS;
-                lexer->next_char = next;
-            }
-            break;
-        }
-        case '|': {
-            NEXT_CHAR_NOERR(lexer, next);
-            switch(next) {
-            case '|': result->type = LOGICOR; break;
-            case '=': result->type = BITOREQ; break;
-            default:
-                result->type = BITOR;
-                lexer->next_char = next;
-                break;
-            }
-            break;
-        }
-        case '&': {
-            NEXT_CHAR_NOERR(lexer, next);
-            switch(next) {
-            case '&': result->type = LOGICAND; break;
-            case '=': result->type = BITANDEQ; break;
-            default:
-                result->type = BITAND;
-                lexer->next_char = next;
-                break;
-            }
-            break;
-        }
-        case '>': {
-            NEXT_CHAR_NOERR(lexer, next);
-            switch (next) {
-            case '=': result->type = GE; break;
-            case '>': CHECK_NEXT_EQ(RSHIFT, RSHIFTEQ); break;
-            default:
-                result->type = GT;
-                lexer->next_char = next;
-            }
-            break;
-        }
-        case '<': {
-            NEXT_CHAR_NOERR(lexer, next);
-            switch (next) {
-            case '=': result->type = LE; break;
-            case '<': CHECK_NEXT_EQ(LSHIFT, LSHIFTEQ); break;
-            default:
-                result->type = LT;
-                lexer->next_char = next;
-            }
-            break;
-        }
-
-        case 'L':
-            NEXT_CHAR_NOERR(lexer, next);
-            switch (next) {
-            case '"':
-                cur = next;
-                status = lex_string(lexer, cur, result, LEX_STR_LCHAR);
-                break;
-            case '\'':
-                cur = next;
-                status = lex_char(lexer, cur, result, LEX_STR_LCHAR);
-                break;
-            default:
-                lexer->next_char = next;
-                status = lex_id(lexer, cur, result);
-            }
-            break;
-        case 'U':
-            /*
-            NEXT_CHAR_NOERR(lexer, next);
-            switch (next) {
-            case '"':
-                break;
-            case '\'':
-                break;
-            default:
-                lexer->next_char = next;
-                status = lex_id(lexer, cur, result);
-            }
-            break;
-            */
-        case 'u':
-            /*
-            NEXT_CHAR_NOERR(lexer, next);
-            switch (next) {
-            case '"':
-                break;
-            case '\'':
-                break;
-            case '8':
-                break;
-            default:
-                lexer->next_char = next;
-                status = lex_id(lexer, cur, result);
-            }
-            break;
-            */
-// Identifiers
-        case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
-        case 'H': case 'I': case 'J': case 'K': case 'M': case 'N': case 'O':
-        case 'P': case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W':
-        case 'X': case 'Y': case 'Z':
-
-        case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
-        case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
-        case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'v':
-        case 'w': case 'x': case 'y': case 'z':
-
-        case '_':
-            status = lex_id(lexer, cur, result);
-            break;
-
-        case '"': // String Literals
-            status = lex_string(lexer, cur, result, LEX_STR_CHAR);
-            break;
-        case '\'': // Character literals
-            status = lex_char(lexer, cur, result, LEX_STR_CHAR);
-            break;
-        case ASCII_DIGIT:
-            status = lex_number(lexer, false, cur, result);
-            // Skip whitespace
-            break;
-        case '\n': case ' ': case '\t': case '\\':
-            done = false;
+        case '\n':
+        case ' ':
+        case '\t':
+        case '\\':
             break;
         default:
-            logger_log(&result->mark, LOG_ERR, "Unexpected character: %c", cur);
-            status = CCC_ESYNTAX;
-        } // switch (cur)
+            done = true;
+        }
     } while (!done);
 
+    pp_last_mark(lexer->pp, &result->mark);
+    if (CCC_OK !=
+        (status =
+         fmark_copy_chain(result->mark.last, &result->mark.last))) {
+        goto fail;
+    }
+
+    int next;
+    switch (cur) {
+    case PP_EOF: result->type = TOKEN_EOF; break;
+    case '{': result->type = LBRACE; break;
+    case '}': result->type = RBRACE; break;
+    case '(': result->type = LPAREN; break;
+    case ')': result->type = RPAREN; break;
+    case ';': result->type = SEMI; break;
+    case ',': result->type = COMMA; break;
+    case '[': result->type = LBRACK; break;
+    case ']': result->type = RBRACK; break;
+    case '?': result->type = COND; break;
+    case ':': result->type = COLON; break;
+    case '~': result->type = BITNOT; break;
+    case '=': CHECK_NEXT_EQ(ASSIGN, EQ); break;
+    case '*': CHECK_NEXT_EQ(STAR, STAREQ); break;
+    case '/': CHECK_NEXT_EQ(DIV, DIVEQ); break;
+    case '%': CHECK_NEXT_EQ(MOD, MODEQ); break;
+    case '!': CHECK_NEXT_EQ(LOGICNOT, NE); break;
+    case '^': CHECK_NEXT_EQ(BITXOR, BITXOREQ); break;
+    case '.': {
+        NEXT_CHAR_NOERR(lexer, next);
+        if (next != '.') {
+            result->type = DOT;
+            lexer->next_char = next;
+            break;
+        }
+        NEXT_CHAR_NOERR(lexer, next);
+        if (next == '.') {
+            result->type = ELIPSE;
+            break;
+        }
+        logger_log(&result->mark, LOG_ERR, "Unexpected token: ..");
+        status = CCC_ESYNTAX;
+        break;
+    }
+    case '+': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch(next) {
+        case '+': result->type = INC; break;
+        case '=': result->type = PLUSEQ; break;
+        default:
+            result->type = PLUS;
+            lexer->next_char = next;
+        }
+        break;
+    }
+    case '-': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch(next) {
+        case '-': result->type = DEC; break;
+        case '=': result->type = MINUSEQ; break;
+        case '>': result->type = DEREF; break;
+        case ASCII_DIGIT: // Negative number
+            status = lex_number(lexer, true, next, result);
+            break;
+        default:
+            result->type = MINUS;
+            lexer->next_char = next;
+        }
+        break;
+    }
+    case '|': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch(next) {
+        case '|': result->type = LOGICOR; break;
+        case '=': result->type = BITOREQ; break;
+        default:
+            result->type = BITOR;
+            lexer->next_char = next;
+            break;
+        }
+        break;
+    }
+    case '&': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch(next) {
+        case '&': result->type = LOGICAND; break;
+        case '=': result->type = BITANDEQ; break;
+        default:
+            result->type = BITAND;
+            lexer->next_char = next;
+            break;
+        }
+        break;
+    }
+    case '>': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch (next) {
+        case '=': result->type = GE; break;
+        case '>': CHECK_NEXT_EQ(RSHIFT, RSHIFTEQ); break;
+        default:
+            result->type = GT;
+            lexer->next_char = next;
+        }
+        break;
+    }
+    case '<': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch (next) {
+        case '=': result->type = LE; break;
+        case '<': CHECK_NEXT_EQ(LSHIFT, LSHIFTEQ); break;
+        default:
+            result->type = LT;
+            lexer->next_char = next;
+        }
+        break;
+    }
+
+    case 'L':
+        NEXT_CHAR_NOERR(lexer, next);
+        switch (next) {
+        case '"':
+            cur = next;
+            status = lex_string(lexer, cur, result, LEX_STR_LCHAR);
+            break;
+        case '\'':
+            cur = next;
+            status = lex_char(lexer, cur, result, LEX_STR_LCHAR);
+            break;
+        default:
+            lexer->next_char = next;
+            status = lex_id(lexer, cur, result);
+        }
+        break;
+    case 'U':
+        /*
+          NEXT_CHAR_NOERR(lexer, next);
+          switch (next) {
+          case '"':
+          break;
+          case '\'':
+          break;
+          default:
+          lexer->next_char = next;
+          status = lex_id(lexer, cur, result);
+          }
+          break;
+        */
+    case 'u':
+        /*
+          NEXT_CHAR_NOERR(lexer, next);
+          switch (next) {
+          case '"':
+          break;
+          case '\'':
+          break;
+          case '8':
+          break;
+          default:
+          lexer->next_char = next;
+          status = lex_id(lexer, cur, result);
+          }
+          break;
+        */
+    // Identifiers
+    case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
+    case 'H': case 'I': case 'J': case 'K': case 'M': case 'N': case 'O':
+    case 'P': case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W':
+    case 'X': case 'Y': case 'Z':
+
+    case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+    case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+    case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'v':
+    case 'w': case 'x': case 'y': case 'z':
+
+    case '_':
+        status = lex_id(lexer, cur, result);
+        break;
+
+    case '"': // String Literals
+        status = lex_string(lexer, cur, result, LEX_STR_CHAR);
+        break;
+    case '\'': // Character literals
+        status = lex_char(lexer, cur, result, LEX_STR_CHAR);
+        break;
+    case ASCII_DIGIT:
+        status = lex_number(lexer, false, cur, result);
+        // Skip whitespace
+        break;
+    default:
+        logger_log(&result->mark, LOG_ERR, "Unexpected character: %c", cur);
+        status = CCC_ESYNTAX;
+    } // switch (cur)
+
+    return status;
+
+fail:
     return status;
 }
 

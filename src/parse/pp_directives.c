@@ -282,7 +282,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
         // File accessible
         pp_file_t *pp_file;
-        status_t status = pp_map_file(path_buf, len, file, &pp_file);
+        status_t status = pp_map_file(path_buf, len, &pp_file);
         if (CCC_OK != status) {
             goto fail;
         }
@@ -516,7 +516,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
 
     // Set macro to start at this location on the stream
     if (CCC_OK != (status = ts_copy((tstream_t *)&new_macro->stream, stream,
-                                    TS_COPY_DEEP))) {
+                                    TS_COPY_SHALLOW))) {
         goto fail;
     }
 

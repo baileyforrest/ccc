@@ -96,6 +96,7 @@ status_t man_dump_tokens(manager_t *manager) {
     do {
         lexer_next_token(&manager->lexer, &cur_token);
         token_print(&cur_token);
+        fmark_chain_free(cur_token.mark.last);
     } while(cur_token.type != TOKEN_EOF);
 
     return status;

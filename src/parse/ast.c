@@ -842,6 +842,7 @@ void ast_type_protected_destroy(type_t *type) {
     default:
         assert(false);
     }
+    fmark_chain_free(type->mark.last);
     free(type);
 }
 
@@ -872,6 +873,7 @@ void ast_decl_node_type_destroy(type_t *type) {
     }
 
     ast_decl_node_type_destroy(declarator_type);
+    fmark_chain_free(type->mark.last);
     free(type);
 }
 
@@ -928,6 +930,7 @@ void ast_type_destroy(type_t *type) {
         assert(false);
     }
 
+    fmark_chain_free(type->mark.last);
     free(type);
 }
 
@@ -948,6 +951,7 @@ void ast_gdecl_destroy(gdecl_t *gdecl) {
     default:
         assert(false);
     }
+    fmark_chain_free(gdecl->mark.last);
     free(gdecl);
 }
 
@@ -1009,6 +1013,7 @@ void ast_expr_destroy(expr_t *expr) {
     default:
         assert(false);
     }
+    fmark_chain_free(expr->mark.last);
     free(expr);
 }
 
@@ -1018,6 +1023,7 @@ void ast_decl_node_destroy(decl_node_t *decl_node) {
     }
     ast_decl_node_type_destroy(decl_node->type);
     ast_expr_destroy(decl_node->expr);
+    fmark_chain_free(decl_node->mark.last);
     free(decl_node);
 }
 
@@ -1037,6 +1043,7 @@ void ast_decl_destroy(decl_t *decl) {
         SL_DESTROY_FUNC(&decl->decls, ast_decl_node_destroy);
         ast_type_destroy(decl->type);
     }
+    fmark_chain_free(decl->mark.last);
     free(decl);
 }
 
@@ -1113,6 +1120,7 @@ void ast_stmt_destroy(stmt_t *stmt) {
     default:
         assert(false);
     }
+    fmark_chain_free(stmt->mark.last);
     free(stmt);
 }
 
@@ -1122,5 +1130,6 @@ void ast_trans_unit_destroy(trans_unit_t *trans_unit) {
     }
     SL_DESTROY_FUNC(&trans_unit->gdecls, ast_gdecl_destroy);
     tt_destroy(&trans_unit->typetab); // Must free after trans units
+    fmark_chain_free(trans_unit->mark.last);
     free(trans_unit);
 }

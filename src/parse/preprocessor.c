@@ -215,7 +215,7 @@ status_t pp_open(preprocessor_t *pp, const char *filename) {
     size_t len = strlen(filename);
     pp_file_t *pp_file;
     if (CCC_OK !=
-        (status = pp_map_file(filename, len, NULL, &pp_file))) {
+        (status = pp_map_file(filename, len, &pp_file))) {
         goto fail;
     }
 
@@ -278,8 +278,7 @@ void pp_file_destroy(pp_file_t *pp_file) {
     free(pp_file);
 }
 
-status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
-                     pp_file_t **result) {
+status_t pp_map_file(const char *filename, size_t len, pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file;
     if (CCC_OK != (status = pp_file_create(&pp_file))) {
@@ -291,9 +290,8 @@ status_t pp_map_file(const char *filename, size_t len, pp_file_t *last_file,
         goto fail;
     }
 
-    fmark_t *last_mark = last_file == NULL ? NULL : &last_file->stream.mark;
     ts_init(&pp_file->stream, entry->buf, entry->end, &entry->filename,
-            entry->buf, last_mark, 1, 1);
+            entry->buf, NULL, 1, 1);
 
     *result = pp_file;
     return status;
@@ -356,7 +354,6 @@ void pp_macro_destroy(pp_macro_t *macro) {
         return;
     }
     SL_DESTROY_FUNC(&macro->params, free);
-    ts_destroy((tstream_t *)&macro->stream);
     free(macro);
 }
 
@@ -470,6 +467,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     if (stringify) {
         return '"';
     }
+    pp_file_t *file_inst = sl_tail(&pp->file_insts);
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
     pp_param_inst_t *param_inst = sl_head(&pp->param_insts);
 
@@ -479,7 +477,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
 
     // Get copy of current location, the last mark
-    memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
+    // TODO: This is temporary, just get the bottom file's mark
+    memcpy(&pp->last_mark, &file_inst->stream.mark, sizeof(fmark_t));
 
     int cur_char = ts_cur(stream);
     int next_char = ts_next(stream);
@@ -763,6 +762,14 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         logger_log(&stream->mark, LOG_ERR, "Failed to create new macro.");
         error = -(int)status;
         goto fail;
+    }
+
+    if (param_inst != NULL) {
+        new_macro_inst->stream.mark.last = &param_inst->stream.mark;
+    } else if (macro_inst != NULL) {
+        new_macro_inst->stream.mark.last = &macro_inst->stream.mark;
+    } else {
+        new_macro_inst->stream.mark.last = &file_inst->stream.mark;
     }
 
     // -1 means non function style macro
