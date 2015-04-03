@@ -866,13 +866,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 cur_param.end = ts_location(&lookahead);
 
                 size_t buf_len = cur_len + 1;
-                if (CCC_OK != (status = pp_map_stream(pp, &cur_param))) {
-                    logger_log(&stream->mark, LOG_ERR,
-                               "Failed to create new macro.");
-                    error = -(int)status;
-                    goto fail;
-                }
-
                 pp_param_map_elem_t *param_elem =
                     malloc(sizeof(pp_param_map_elem_t) + buf_len);
                 if (param_elem == NULL) {
@@ -886,6 +879,13 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 if (cur_len == 0) {
                     *((char *)param_elem + sizeof(*param_elem)) = '\0';
                 } else {
+                    if (CCC_OK != (status = pp_map_stream(pp, &cur_param))) {
+                        logger_log(&stream->mark, LOG_ERR,
+                                   "Failed to create new macro.");
+                        error = -(int)status;
+                        goto fail;
+                    }
+
                     while (true) {
                         char *loc =
                             (char *)param_elem + sizeof(*param_elem) + offset;
