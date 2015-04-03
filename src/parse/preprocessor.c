@@ -689,6 +689,11 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 }
                 continue;
             }
+            // If we're currently in one of this macro's parameters, don't check
+            // this macro's parameter
+            if (sl_head(&cur_macro_inst->param_insts) != NULL) {
+                continue;
+            }
 
             pp_param_map_elem_t *param =
                 ht_lookup(&cur_macro_inst->param_map, &lookup);
