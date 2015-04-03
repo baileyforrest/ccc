@@ -69,11 +69,9 @@ typedef struct pp_macro_inst_t {
  */
 typedef struct pp_param_inst_t {
     sl_link_t link;    /**< List link */
-    pp_macro_t *macro; /**< The macro this is a parameter for */
     tstream_t stream;  /**< Current macro parameter's stream */
     bool stringify;    /**< Whether or not we are stringifying */
 } pp_param_inst_t;
-
 
 /**
  * Creates a pp_file
@@ -141,9 +139,12 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
  * @param pp The preprocessor to fetch characters from
  * @param stringify Set to true if the closing quote of a stringification
  *     occured. Ignored if NULL.
+ * @param macro_param Set to true if returned stream is a macro parameter.
+ *     Ignored if NULL.
  * @return The next stream in the preprocessor, NULL if none
  */
-tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify);
+tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
+                         bool *macro_param);
 
 /**
  * Helper function to fetch characters with macro substitution
@@ -158,11 +159,11 @@ int pp_nextchar_helper(preprocessor_t *pp);
  *
  * @param pp The preprocessor to handle special macros for
  * @param stream The stream at the current special macro
- * @param type The type of special macro
+ * @param macro The special macro
  * @return Returns the return value for pp_nextchar
  */
 int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
-                            pp_macro_type_t type);
+                            pp_macro_t *macro);
 /**
  * Handle the defined operator
  *
