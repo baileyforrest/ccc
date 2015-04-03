@@ -57,10 +57,11 @@ typedef struct pp_param_map_elem_t {
  * Represents the macro invocation
  */
 typedef struct pp_macro_inst_t {
-    sl_link_t link;     /**< List link */
-    pp_macro_t *macro;  /**< The macro this is an instance of */
-    htable_t param_map; /**< Mapping of strings to paramater values */
-    tstream_t stream;   /**< Text stream of macro instance */
+    sl_link_t link;      /**< List link */
+    pp_macro_t *macro;   /**< The macro this is an instance of */
+    slist_t param_insts; /**< Stack of macro parameters */
+    htable_t param_map;  /**< Mapping of strings to paramater values */
+    tstream_t stream;    /**< Text stream of macro instance */
 } pp_macro_inst_t;
 
 /**

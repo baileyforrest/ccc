@@ -2,7 +2,10 @@
  * Check predefined macro values
  */
 
+#define FOO(a) a
+#define BAR(a) FOO(a)
+
 int main() {
-    __x86_64__;
+    BAR(a);
     return 0;
 }

@@ -96,7 +96,6 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     status_t status = CCC_OK;
     sl_init(&pp->file_insts, offsetof(pp_file_t, link));
     sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link));
-    sl_init(&pp->param_insts, offsetof(pp_param_inst_t, link));
     sl_init(&pp->search_path, offsetof(len_str_node_t, link));
 
     if (CCC_OK != (status = ht_init(&pp->directives, &directive_params))) {
@@ -197,7 +196,6 @@ fail1:
 void pp_destroy(preprocessor_t *pp) {
     SL_DESTROY_FUNC(&pp->file_insts, pp_file_destroy);
     SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
-    SL_DESTROY_FUNC(&pp->param_insts, free);
 
     if (!pp->pp_if) {
         HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
@@ -369,6 +367,8 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
         goto fail;
     }
 
+    sl_init(&macro_inst->param_insts, offsetof(pp_param_inst_t, link));
+
     static const ht_params_t pp_param_map_params = {
         0,                                   // No size hint
         offsetof(pp_param_map_elem_t, key),  // Key offset
@@ -401,6 +401,7 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     if (macro_inst == NULL) {
         return;
     }
+    SL_DESTROY_FUNC(&macro_inst->param_insts, free);
     HT_DESTROY_FUNC(&macro_inst->param_map, free);
     free(macro_inst);
 }
@@ -411,27 +412,28 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify) {
         *stringify = false;
     }
 
-    // Try to find in complete macro parameter
-    pp_param_inst_t *param_inst = sl_head(&pp->param_insts);
-    while (param_inst != NULL) {
-        stream = &param_inst->stream;
-
-        if (!ts_end(stream)) {
-            return stream;
-        }
-
-        // Mark stringification of paramaters
-        if (stringify != NULL && param_inst->stringify) {
-            *stringify = true;
-        }
-        param_inst = sl_pop_front(&pp->param_insts);
-        free(param_inst);
-        param_inst = sl_head(&pp->param_insts);
-    }
-
     // Try to find an incomplete macro on the stack
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
     while (macro_inst != NULL) {
+
+        // Try to find in complete macro parameter
+        pp_param_inst_t *param_inst = sl_head(&macro_inst->param_insts);
+        while (param_inst != NULL) {
+            stream = &param_inst->stream;
+
+            if (!ts_end(stream)) {
+                return stream;
+            }
+
+            // Mark stringification of paramaters
+            if (stringify != NULL && param_inst->stringify) {
+                *stringify = true;
+            }
+            param_inst = sl_pop_front(&macro_inst->param_insts);
+            free(param_inst);
+            param_inst = sl_head(&macro_inst->param_insts);
+        }
+
         stream = &macro_inst->stream;
 
         if (!ts_end(stream)) { // Found an unfinished macro
@@ -472,7 +474,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
     pp_file_t *file_inst = sl_tail(&pp->file_insts);
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
-    pp_param_inst_t *param_inst = sl_head(&pp->param_insts);
+    pp_param_inst_t *param_inst =
+        macro_inst == NULL ? NULL : sl_head(&macro_inst->param_insts);
 
     // Finished processing all files
     if (stream == NULL) {
@@ -634,7 +637,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             param_inst->stream.cur = param->val.str;
             param_inst->stream.end = param->val.str + param->val.len;
             param_inst->stringify = true;
-            sl_prepend(&pp->param_insts, &param_inst->link);
+            sl_prepend(&macro_inst->param_insts, &param_inst->link);
 
             // We are stringifying, so return a double quote
             return '"';
@@ -675,20 +678,20 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         bool found_cur_macro = param_inst == NULL;
         sl_link_t *cur;
         SL_FOREACH(cur, &pp->macro_insts) {
-            pp_macro_inst_t *macro_inst = GET_ELEM(&pp->macro_insts, cur);
+            pp_macro_inst_t *cur_macro_inst = GET_ELEM(&pp->macro_insts, cur);
             // Avoid infinite recursion with parameters.
             // If we haven't found the macro we're currently in a parameter for,
             // skip the macro instance. Also skip the macro we're currently in
             // a parameter for.
             if (!found_cur_macro) {
-                if (param_inst->macro == macro_inst->macro) {
+                if (param_inst->macro == cur_macro_inst->macro) {
                     found_cur_macro = true;
                 }
                 continue;
             }
 
             pp_param_map_elem_t *param =
-                ht_lookup(&macro_inst->param_map, &lookup);
+                ht_lookup(&cur_macro_inst->param_map, &lookup);
 
             // Found a parameter
             if (param != NULL) {
@@ -700,12 +703,14 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
 
                 ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
-                param_inst->macro = macro_inst->macro;
+                param_inst->macro = cur_macro_inst->macro;
                 param_inst->stream.cur = param->val.str;
                 param_inst->stream.end = param->val.str + param->val.len;
                 param_inst->stream.last = ' ';
                 param_inst->stringify = false;
-                sl_prepend(&pp->param_insts, &param_inst->link);
+
+                // Add to stack of upper most macro, not cur_macro_inst
+                sl_prepend(&macro_inst->param_insts, &param_inst->link);
                 return -(int)CCC_RETRY;
             }
         }
@@ -912,17 +917,18 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     static bool time_err = false;
 
     // Found a parameter, set param state in pp
-    pp_param_inst_t *param_inst = malloc(sizeof(pp_param_inst_t));
-    if (param_inst == NULL) {
+    pp_macro_inst_t *macro_inst;
+    if (CCC_OK != (status = pp_macro_inst_create(NULL, &macro_inst))) {
         goto fail;
     }
-    param_inst->macro = NULL;
+    macro_inst->macro = NULL;
 
     time_t t;
     struct tm *tm;
 
-    char *buf = pp->macro_buf;
-    size_t buf_size = sizeof(pp->macro_buf);
+    pp->macro_buf[0] = '"';
+    char *buf = pp->macro_buf + 1;
+    size_t buf_size = sizeof(pp->macro_buf) - 1;
     bool quotes = true;
 
     size_t len = 0;
@@ -962,21 +968,22 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     default:
         assert(false);
     }
-    len = MIN(len, buf_size - 1);
+    len = MIN(len, buf_size - 2);
+    if (quotes) {
+        buf[len++] = '"';
+    }
     buf[len] = '\0';
 
-    ts_copy(&param_inst->stream, stream, TS_COPY_SHALLOW);
-    param_inst->stream.cur = pp->macro_buf;
-    param_inst->stream.end = pp->macro_buf + len;
-    sl_prepend(&pp->param_insts, &param_inst->link);
-
+    ts_copy(&macro_inst->stream, stream, TS_COPY_SHALLOW);
     if (quotes) {
-        param_inst->stringify = true;
-        return '"';
+        macro_inst->stream.cur = pp->macro_buf;
     } else {
-        param_inst->stringify = false;
-        return -(int)CCC_RETRY;
+        macro_inst->stream.cur = pp->macro_buf + 1; // Skip the quote
     }
+    macro_inst->stream.end = pp->macro_buf + len + 1; // +1 for leading quote
+    sl_prepend(&pp->macro_insts, &macro_inst->link);
+
+    return -(int)CCC_RETRY;
 
 fail:
     return -(int)status;
