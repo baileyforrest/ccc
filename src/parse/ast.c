@@ -718,6 +718,12 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
     }
     case TYPE_ENUM: {
         ast_directed_print(dest, remain, ast_basic_type_str(type->type));
+        if (type->enum_params.name != NULL) {
+            ast_directed_print(dest, remain, " %.*s",
+                               type->struct_params.name->len,
+                               type->struct_params.name->str);
+        }
+
         ast_directed_print(dest, remain, " {\n");
         sl_link_t *cur;
         SL_FOREACH(cur, &type->enum_params.ids) {
