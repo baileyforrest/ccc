@@ -120,6 +120,9 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
             *result = expr->sizeof_params.expr->etype->size;
         }
         return;
+    case EXPR_ALIGNOF:
+        // TODO: Handle this
+        break;
     case EXPR_VOID:
     case EXPR_VAR:
     case EXPR_ASSIGN:
@@ -596,6 +599,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         expr->etype = tt_long; // TODO: Fix this
         return retval;
+    case EXPR_ALIGNOF:
+        // TODO: Handle this
+        break;
     case EXPR_MEM_ACC:
         retval &= typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST);
         // TODO: Make sure compatible type with op, make sure member exists

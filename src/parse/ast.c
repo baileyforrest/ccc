@@ -534,6 +534,12 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
             ast_expr_print(expr->sizeof_params.expr, dest, remain);
         }
         break;
+    case EXPR_ALIGNOF:
+        ast_directed_print(dest, remain, "_Alignof(");
+        ast_decl_print(expr->alignof_params.type, TYPE_VOID, 0, dest,
+                       remain);
+        ast_directed_print(dest, remain, ")");
+        break;
     case EXPR_MEM_ACC:
         ast_expr_print(expr->mem_acc.base, dest, remain);
         ast_oper_print(expr->mem_acc.op, dest, remain);
@@ -1003,6 +1009,9 @@ void ast_expr_destroy(expr_t *expr) {
     case EXPR_SIZEOF:
         ast_decl_destroy(expr->sizeof_params.type);
         ast_expr_destroy(expr->sizeof_params.expr);
+        break;
+    case EXPR_ALIGNOF:
+        ast_decl_destroy(expr->alignof_params.type);
         break;
     case EXPR_MEM_ACC:
         ast_expr_destroy(expr->mem_acc.base);

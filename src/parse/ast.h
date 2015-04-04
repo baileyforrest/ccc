@@ -196,6 +196,7 @@ typedef enum expr_type_t {
     EXPR_CALL,        /**< Function call */
     EXPR_CMPD,        /**< Compound expression */
     EXPR_SIZEOF,      /**< Sizeof expression */
+    EXPR_ALIGNOF,     /**< alignof expression */
     EXPR_MEM_ACC,     /**< Member access */
     EXPR_INIT_LIST,   /**< Initializer list */
 } expr_type_t;
@@ -265,6 +266,10 @@ typedef struct expr_t {
             struct decl_t *type;    /**< Type to get sizeof. NULL if expr */
             struct expr_t *expr;    /**< Expr to get sizeof. NULL if type */
         } sizeof_params;
+
+        struct {                    /**< alignof paramaters */
+            struct decl_t *type;    /**< Type to get alignof */
+        } alignof_params;
 
         struct {                    /**< Member access of a compound type */
             struct expr_t *base;    /**< Expression to get type */

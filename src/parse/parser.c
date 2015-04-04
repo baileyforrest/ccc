@@ -1268,6 +1268,17 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         }
         break;
 
+    case ALIGNOF:
+        LEX_ADVANCE(lex);
+        ALLOC_NODE(lex, base, expr_t);
+        base->type = EXPR_ALIGNOF;
+        base->alignof_params.type = NULL;
+        if (CCC_OK !=
+            (status = par_type_name(lex, true, &base->alignof_params.type))) {
+            goto fail;
+        }
+        break;
+
     case BITAND:
     case STAR:
     case PLUS:
