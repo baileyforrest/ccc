@@ -526,14 +526,11 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     // If we're in a comment when the newline occurs, just continue until the
     // comment is done
     while (!ts_end(stream)) {
-        if (ts_cur(stream) == '/') {
-            if (ts_next(stream) == '*') {
-                macro_end = ts_location(stream);
-            } else if (ts_next(stream) == '/') {
-                // Must be done after single line comment
-                macro_end = ts_location(stream);
-                break;
-            }
+        if (ts_cur(stream) == '/' && ts_next(stream) == '/') {
+            macro_end = ts_location(stream);
+            break;
+        } else if (ts_cur(stream) == '/' && ts_next(stream) == '*') {
+            macro_end = ts_location(stream);
         } else if (ts_last(stream) == '*' && ts_cur(stream) == '/') {
             macro_end = NULL;
         } else if (ts_cur(stream) == '\n' && ts_last(stream) != '\\') {
