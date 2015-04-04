@@ -147,11 +147,18 @@ size_t ts_skip_string(tstream_t *ts) {
     ts_advance(ts);
     ++num_chars;
 
+    bool ignore_escape = false;
     while (!ts_end(ts)) {
         ++num_chars;
-        if (ts_cur(ts) == terminator && ts_last(ts) != '\\') {
+        if (ts_cur(ts) == terminator &&
+            (ts_last(ts) != '\\' && !ignore_escape)) {
             ts_advance(ts);
             break;
+        }
+        if (ts_cur(ts) == '\\' && ts_last(ts) == '\\') {
+            ignore_escape = true;
+        } else {
+            ignore_escape = false;
         }
         ts_advance(ts);
     }

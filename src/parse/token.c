@@ -48,8 +48,7 @@ void token_print(lexeme_t *token) {
         }
         if (token->int_params.hasL) {
             printf("L");
-        }
-        if (token->int_params.hasLL) {
+        } else if (token->int_params.hasLL) {
             printf("LL");
         }
         break;
