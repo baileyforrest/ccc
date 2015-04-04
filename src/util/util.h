@@ -44,27 +44,17 @@
 #define STATIC_ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 /**
- * Typesafe/single evalutation max macro
- *
- * Source: https://gcc.gnu.org/onlinedocs/gcc-4.9.2/gcc/Typeof.html#Typeof
+ * max macro
  */
 #ifndef MAX
-#define MAX(a,b) \
-    ({ __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a > _b ? _a : _b; })
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif /* MAX */
 
 /**
- * Typesafe/single evalutation max macro
- *
- * Source: https://gcc.gnu.org/onlinedocs/gcc-4.9.2/gcc/Typeof.html#Typeof
+ * min macro
  */
 #ifndef MIN
-#define MIN(a,b) \
-    ({ __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a < _b ? _a : _b; })
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif /* MIN */
 
 /**

@@ -1642,7 +1642,9 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t **result) {
     return status;
 
 fail:
-    ast_expr_destroy(left);
+    if (expr == NULL) {
+        ast_expr_destroy(left);
+    }
     ast_expr_destroy(expr);
     return status;
 }
