@@ -147,6 +147,15 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
                          bool *macro_param);
 
 /**
+ * Lookups up a macro parameter in a preprocessor. Ignores mapped macros
+ *
+ * @param pp Preprocessor to use
+ * @param lookup Param name to lookup
+ */
+pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
+                                           len_str_t *lookup);
+
+/**
  * Helper function to fetch characters with macro substitution
  *
  * @param pp The preprocessor to fetch characters from

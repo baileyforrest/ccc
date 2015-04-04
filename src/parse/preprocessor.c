@@ -470,6 +470,26 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
     return NULL;
 }
 
+pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
+                                           len_str_t *lookup) {
+    sl_link_t *cur;
+    SL_FOREACH(cur, &pp->macro_insts) {
+        pp_macro_inst_t *cur_macro_inst = GET_ELEM(&pp->macro_insts, cur);
+
+        // Skip mapped macros
+        if (cur_macro_inst->macro == NULL) {
+            continue;
+        }
+        pp_param_map_elem_t *param =
+            ht_lookup(&cur_macro_inst->param_map, lookup);
+
+        // Only search up to the first not mapped macro
+        return param;
+    }
+
+    return NULL;
+}
+
 int pp_nextchar_helper(preprocessor_t *pp) {
     status_t status = CCC_OK;
 
@@ -647,7 +667,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             size_t len = ts_advance_identifier(stream);
             len_str_t lookup = { start, len };
             pp_param_map_elem_t *param =
-                ht_lookup(&macro_inst->param_map, &lookup);
+                pp_lookup_macro_param(pp, &lookup);
 
             if (param == NULL) {
                 logger_log(&stream->mark, LOG_ERR,
@@ -701,41 +721,29 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Macro paramaters take precidence, look them up first
     if (macro_inst != NULL) {
-        sl_link_t *cur;
-        SL_FOREACH(cur, &pp->macro_insts) {
-            pp_macro_inst_t *cur_macro_inst = GET_ELEM(&pp->macro_insts, cur);
+        pp_param_map_elem_t *param =
+            pp_lookup_macro_param(pp, &lookup);
 
-            // Skip mapped macros
-            if (cur_macro_inst->macro == NULL) {
-                continue;
+        // Found a parameter
+        if (param != NULL) {
+            // Skip over parameter name
+            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+
+            pp_param_inst_t *param_inst = malloc(sizeof(pp_param_inst_t));
+            if (param_inst == NULL) {
+                return -(int)CCC_NOMEM;
             }
+            ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
+            param_inst->stream.cur = param->val.str;
+            param_inst->stream.end = param->val.str + param->val.len;
+            param_inst->stream.last = ' ';
+            param_inst->stringify = false;
 
-            pp_param_map_elem_t *param =
-                ht_lookup(&cur_macro_inst->param_map, &lookup);
-
-            // Found a parameter
-            if (param != NULL) {
-                // Skip over parameter name
-                ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
-
-                pp_param_inst_t *param_inst = malloc(sizeof(pp_param_inst_t));
-                if (param_inst == NULL) {
-                    return -(int)CCC_NOMEM;
-                }
-                ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
-                param_inst->stream.cur = param->val.str;
-                param_inst->stream.end = param->val.str + param->val.len;
-                param_inst->stream.last = ' ';
-                param_inst->stringify = false;
-
-                // Add to stack of upper most macro, not cur_macro_inst
-                sl_prepend(&macro_inst->param_insts, &param_inst->link);
-                return -(int)CCC_RETRY;
-            }
-
-            // Only search up to the first not mapped macro
-            break;
+            // Add to stack of upper most macro, not cur_macro_inst
+            sl_prepend(&macro_inst->param_insts, &param_inst->link);
+            return -(int)CCC_RETRY;
         }
+
     }
 
     // Don't expand macros if we're concatenating
