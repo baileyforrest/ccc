@@ -50,6 +50,7 @@ typedef struct preprocessor_t {
     bool line_comment;    /**< true if in a line comment */
     bool string;          /**< true if in string */
     bool char_string;     /**< true if in a character string */
+    bool stringify_esc;   /**< if true, we already escaped a string literal */
     bool ignore_escape;   /**< If last character was \\ */
     bool char_line;       /**< true if non whitespace on current line */
     bool ignore;          /**< Conditional compilation - ignore output */

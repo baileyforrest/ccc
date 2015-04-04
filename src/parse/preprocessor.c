@@ -172,6 +172,7 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     pp->line_comment = false;
     pp->string = false;
     pp->char_string = false;
+    pp->stringify_esc = false;
     pp->ignore_escape = false;
     pp->char_line = false;
     pp->ignore = false;
@@ -426,6 +427,9 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
                 if (macro_param != NULL) {
                     *macro_param = true;
                 }
+                if (stringify != NULL && param_inst->stringify) {
+                    *stringify = true;
+                }
                 return stream;
             }
 
@@ -504,6 +508,16 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Macros already have parameters evaluated, just continue
     if (macro_param) {
+        // If we're stringifying, and current character is a \ or "
+        // we need to escape
+        if (stringify && (ts_cur(stream) == '"' || ts_cur(stream) == '\\')) {
+            if (!pp->stringify_esc) {
+                pp->stringify_esc = true;
+                return '\\';
+            } else {
+                pp->stringify_esc = false;
+            }
+        }
         return ts_advance(stream);
     }
 
