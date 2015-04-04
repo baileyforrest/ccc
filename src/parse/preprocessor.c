@@ -171,6 +171,8 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     pp->block_comment = false;
     pp->line_comment = false;
     pp->string = false;
+    pp->char_string = false;
+    pp->ignore_escape = false;
     pp->char_line = false;
     pp->ignore = false;
     pp->in_directive = false;
@@ -500,7 +502,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Handle comments
     if (cur_char == '/' && !pp->line_comment && !pp->block_comment &&
-        !pp->string) {
+        !pp->string && !pp->char_string) {
         if (next_char == '/') {
             pp->line_comment = true;
         } else if (next_char == '*') {
@@ -530,19 +532,37 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         pp->char_line = true;
     }
 
+    if (!pp->string && !pp->char_string && cur_char == '\'') {
+        pp->char_string = true;
+        return ts_advance(stream);
+    }
+
+    if (pp->char_string && cur_char == '\'' &&
+        (last_char != '\\' || pp->ignore_escape)) {
+        pp->char_string = false;
+    }
+
     // Handle strings
-    if (!pp->string && cur_char == '"') {
+    if (!pp->string && !pp->char_string && cur_char == '"') {
         pp->string = true;
         return ts_advance(stream);
     }
 
-    if (pp->string && cur_char == '"') {
+    if (pp->string && cur_char == '"' &&
+        (last_char != '\\' || pp->ignore_escape)) {
         pp->string = false;
     }
 
     if (cur_char == '\n') {
         pp->char_line = false;
     }
+
+    if (cur_char == '\\' && last_char == '\\') {
+        pp->ignore_escape = true;
+    } else {
+        pp->ignore_escape = false;
+    }
+
 
     tstream_t lookahead;
     ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
