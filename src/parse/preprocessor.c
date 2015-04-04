@@ -428,9 +428,15 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
                 }
                 return stream;
             }
+
             // Mark stringification of paramaters
+            // Return the string in case both the stringification and the
+            // end of a mapped stream happen at the same time (we want the
+            // stringification sent before the EOF)
             if (stringify != NULL && param_inst->stringify) {
                 *stringify = true;
+                param_inst->stringify = false; // Avoid infinite loop
+                return stream;
             }
 
             param_inst = sl_pop_front(&macro_inst->param_insts);
@@ -577,10 +583,13 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         pp->char_line = false;
     }
 
-    if (cur_char == '\\' && last_char == '\\') {
-        pp->ignore_escape = true;
-    } else {
-        pp->ignore_escape = false;
+    if (pp->string || pp->char_string) {
+        if (cur_char == '\\' && last_char == '\\') {
+            pp->ignore_escape = true;
+        } else {
+            pp->ignore_escape = false;
+        }
+        return ts_advance(stream);
     }
 
 
