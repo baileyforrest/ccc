@@ -48,9 +48,10 @@ typedef struct pp_file_t {
  * Mapping from macro paramater to value
  */
 typedef struct pp_param_map_elem_t {
-    sl_link_t link; /**< List link */
-    len_str_t key;  /**< Macro paramater being mappend */
-    len_str_t val;  /**< Macro paramater value */
+    sl_link_t link;       /**< List link */
+    len_str_t key;        /**< Macro paramater being mappend */
+    len_str_t expand_val; /**< Macro paramater with macros expanded */
+    len_str_t raw_val;    /**< Macro paramater raw value */
 } pp_param_map_elem_t;
 
 /**

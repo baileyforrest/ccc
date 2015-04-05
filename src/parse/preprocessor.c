@@ -704,8 +704,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 return -(int)CCC_NOMEM;
             }
             ts_copy(&param_inst->stream, stream, TS_COPY_SHALLOW);
-            param_inst->stream.cur = param->val.str;
-            param_inst->stream.end = param->val.str + param->val.len;
+            param_inst->stream.cur = param->raw_val.str;
+            param_inst->stream.end = param->raw_val.str + param->raw_val.len;
             param_inst->stringify = true;
             sl_prepend(&macro_inst->param_insts, &param_inst->link);
 
@@ -757,8 +757,26 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 return -(int)CCC_NOMEM;
             }
             ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
-            param_inst->stream.cur = param->val.str;
-            param_inst->stream.end = param->val.str + param->val.len;
+
+            // Check if there's a concatenation after the parameter
+            if (!concat) {
+                ts_skip_ws_and_comment(&lookahead);
+                if (ts_cur(&lookahead) == '#' && ts_cur(&lookahead) == '#') {
+                    concat = true;
+                }
+            }
+
+            // If we're concatenating, use raw macro value, not expanded value
+            if (concat) {
+                param_inst->stream.cur = param->raw_val.str;
+                param_inst->stream.end = param->raw_val.str +
+                    param->raw_val.len;
+            } else {
+                param_inst->stream.cur = param->expand_val.str;
+                param_inst->stream.end = param->expand_val.str +
+                    param->expand_val.len;
+            }
+
             param_inst->stream.last = ' ';
             param_inst->stringify = false;
 
@@ -925,6 +943,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     error = -(int)CCC_NOMEM;
                     goto fail;
                 }
+                param_elem->raw_val.str = cur_param.cur;
+                param_elem->raw_val.len = cur_len;
 
                 size_t offset = 0;
                 if (cur_len == 0) {
@@ -972,8 +992,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 // Insert the paramater mapping into the instance's hash table
                 param_elem->key.str = param_str->str.str;
                 param_elem->key.len = param_str->str.len;
-                param_elem->val.str = (char *)param_elem + sizeof(*param_elem);
-                param_elem->val.len = offset;
+                param_elem->expand_val.str =
+                    (char *)param_elem + sizeof(*param_elem);
+                param_elem->expand_val.len = offset;
 
                 ht_insert(&new_macro_inst->param_map, &param_elem->link);
 
