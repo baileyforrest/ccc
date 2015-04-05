@@ -123,6 +123,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         case '\n':
         case ' ':
         case '\t':
+        case '\f':
         case '\\':
             break;
         default:

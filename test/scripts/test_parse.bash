@@ -5,8 +5,9 @@ BIN_NAME=./bin/ccc
 OUTPUT_C=dump.c
 OUTPUT_O=dump.c
 
+FILES=$(find $SRC -name "*.c")
 
-for i in $(find $SRC -name "*.c")
+for i in $FILES
 do
     $BIN_NAME -I$SRC --dump_ast $i > $OUTPUT_C
     if [ $? -ne 0 ]
@@ -21,4 +22,4 @@ do
     fi
 done
 
-valgrind --leak-check=full ./bin/ccc -I$SRC --dump_ast $(find $SRC -name "*.c") > $OUTPUT_C
+valgrind --leak-check=full ./bin/ccc -I$SRC --dump_ast $FILES > $OUTPUT_C
