@@ -943,9 +943,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     error = -(int)CCC_NOMEM;
                     goto fail;
                 }
-                param_elem->raw_val.str = cur_param.cur;
-                param_elem->raw_val.len = cur_len;
-
                 size_t offset = 0;
                 if (cur_len == 0) {
                     *((char *)param_elem + sizeof(*param_elem)) = '\0';
@@ -995,6 +992,16 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 param_elem->expand_val.str =
                     (char *)param_elem + sizeof(*param_elem);
                 param_elem->expand_val.len = offset;
+
+                // If we're in a macro, then the macro's parameters need to be
+                // expanded. Otherwise, they are not
+                if (macro_inst == NULL) {
+                    param_elem->raw_val.str = cur_param.cur;
+                    param_elem->raw_val.len = cur_len;
+                } else {
+                    param_elem->raw_val.str = param_elem->expand_val.str;
+                    param_elem->raw_val.len = param_elem->expand_val.len;
+                }
 
                 ht_insert(&new_macro_inst->param_map, &param_elem->link);
 
