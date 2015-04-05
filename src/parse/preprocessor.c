@@ -895,10 +895,12 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 tstream_t cur_param;
                 ts_copy(&cur_param, &lookahead, TS_COPY_SHALLOW);
                 int num_parens = 0;
+                char *space_start = NULL;
                 while (!ts_end(&lookahead)) {
                     if (ts_cur(&lookahead) == '"' ||
                         ts_cur(&lookahead) == '\'') {
                         ts_skip_string(&lookahead);
+                        space_start = NULL;
                         continue;
                     }
                     if (ts_cur(&lookahead) == '/' &&
@@ -919,7 +921,12 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                             break;
                         }
                     }
-                    ts_advance(&lookahead); // Blindly copy param data
+                    if (!isspace(ts_cur(&lookahead))) {
+                        space_start = NULL;
+                    } else if (space_start == NULL) {
+                        space_start = ts_location(&lookahead);
+                    }
+                    ts_advance(&lookahead);
                 }
 
                 if (ts_end(&lookahead)
@@ -930,9 +937,10 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     goto fail;
                 }
 
-                size_t cur_len = ts_location(&lookahead) -
-                    ts_location(&cur_param);
-                cur_param.end = ts_location(&lookahead);
+                char *end = space_start == NULL ?
+                    ts_location(&lookahead) : space_start;
+                size_t cur_len = end - ts_location(&cur_param);
+                cur_param.end = end;
 
                 size_t buf_len = cur_len + 1;
                 pp_param_map_elem_t *param_elem =
