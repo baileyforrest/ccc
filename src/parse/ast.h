@@ -199,6 +199,7 @@ typedef enum expr_type_t {
     EXPR_ALIGNOF,     /**< alignof expression */
     EXPR_MEM_ACC,     /**< Member access */
     EXPR_INIT_LIST,   /**< Initializer list */
+    EXPR_DESIG_INIT,  /**< Designated initializer */
 } expr_type_t;
 
 /**
@@ -280,6 +281,11 @@ typedef struct expr_t {
         struct {                    /**< Initalizer list */
             slist_t exprs;          /**< List of expressions */
         } init_list;
+
+        struct {
+            struct expr_t *val;
+            len_str_t *name;
+        } desig_init;
     };
 } expr_t;
 

@@ -72,7 +72,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
  *
  * @param expr expr_t to print
  */
-void ast_expr_print(expr_t *expr, char **dest, size_t *remain);
+void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain);
 
 /**
  * Prints a oper_t

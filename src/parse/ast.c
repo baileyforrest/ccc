@@ -120,7 +120,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
     case STMT_CASE:
         printf("case ");
-        ast_expr_print(stmt->case_params.val, NULL, NULL);
+        ast_expr_print(stmt->case_params.val, 0, NULL, NULL);
         printf(":\n");
         PRINT_CMPD_CUR_INDENT(stmt->case_params.stmt, indent - 1);
         print_newline = false;
@@ -133,7 +133,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
 
     case STMT_IF:
         printf("if (");
-        ast_expr_print(stmt->if_params.expr, NULL, NULL);
+        ast_expr_print(stmt->if_params.expr, 0, NULL, NULL);
         printf(")\n");
         PRINT_CMPD_CUR_INDENT(stmt->if_params.true_stmt, indent);
         if (stmt->if_params.false_stmt) {
@@ -149,7 +149,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         break;
     case STMT_SWITCH:
         printf("switch (");
-        ast_expr_print(stmt->switch_params.expr, NULL, NULL);
+        ast_expr_print(stmt->switch_params.expr, 0, NULL, NULL);
         printf(")\n");
         PRINT_CMPD_CUR_INDENT(stmt->switch_params.stmt, indent);
         break;
@@ -159,30 +159,30 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
         PRINT_CMPD_CUR_INDENT(stmt->do_params.stmt, indent);
         PRINT_INDENT(indent);
         printf("while (");
-        ast_expr_print(stmt->do_params.expr, NULL, NULL);
+        ast_expr_print(stmt->do_params.expr, 0, NULL, NULL);
         printf(");\n");
         break;
     case STMT_WHILE:
         printf("while (");
-        ast_expr_print(stmt->while_params.expr, NULL, NULL);
+        ast_expr_print(stmt->while_params.expr, 0, NULL, NULL);
         printf(")\n");
         PRINT_CMPD_CUR_INDENT(stmt->while_params.stmt, indent);
         break;
     case STMT_FOR:
         printf("for (");
         if (stmt->for_params.expr1 != NULL) {
-            ast_expr_print(stmt->for_params.expr1, NULL, NULL);
+            ast_expr_print(stmt->for_params.expr1, 0, NULL, NULL);
         }
         if (stmt->for_params.decl1 != NULL) {
             ast_decl_print(stmt->for_params.decl1, TYPE_VOID, 0, NULL, NULL);
         }
         printf("; ");
         if (stmt->for_params.expr2 != NULL) {
-            ast_expr_print(stmt->for_params.expr2, NULL, NULL);
+            ast_expr_print(stmt->for_params.expr2, 0, NULL, NULL);
         }
         printf("; ");
         if (stmt->for_params.expr3 != NULL) {
-            ast_expr_print(stmt->for_params.expr3, NULL, NULL);
+            ast_expr_print(stmt->for_params.expr3, 0, NULL, NULL);
         }
         printf(")\n");
         PRINT_CMPD_CUR_INDENT(stmt->for_params.stmt, indent);
@@ -200,7 +200,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
     case STMT_RETURN:
         printf("return ");
         if (stmt->return_params.expr != NULL) {
-            ast_expr_print(stmt->return_params.expr, NULL, NULL);
+            ast_expr_print(stmt->return_params.expr, 0, NULL, NULL);
         }
         printf(";");
         break;
@@ -217,7 +217,7 @@ void ast_stmt_print(stmt_t *stmt, int indent) {
     }
 
     case STMT_EXPR:
-        ast_expr_print(stmt->expr.expr, NULL, NULL);
+        ast_expr_print(stmt->expr.expr, indent, NULL, NULL);
         printf(";");
         break;
 
@@ -254,7 +254,7 @@ void ast_decl_print(decl_t *decl, basic_type_t type, int indent, char **dest,
                 ast_directed_print(dest, remain, " = ");
                 break;
             }
-            ast_expr_print(node->expr, dest, remain);
+            ast_expr_print(node->expr, indent, dest, remain);
         }
     }
     if (type == TYPE_STRUCT || type == TYPE_UNION) {
@@ -365,7 +365,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
         case TYPE_ARR:
             PUT_CUR('[');
             if (type->arr.len != NULL) {
-                ast_expr_print(type->arr.len, &cur, &remain);
+                ast_expr_print(type->arr.len, 0, &cur, &remain);
             }
             if (remain > 0) {
                 PUT_CUR(']');
@@ -404,24 +404,24 @@ fail:
     printf("%s: Out of memory", __func__);
 }
 
-void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
+void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
     switch (expr->type) {
     case EXPR_VOID:
         break;
     case EXPR_PAREN:
         ast_directed_print(dest, remain, "(");
-        ast_expr_print(expr->paren_base, dest, remain);
+        ast_expr_print(expr->paren_base, 0, dest, remain);
         ast_directed_print(dest, remain, ")");
         break;
     case EXPR_VAR:
         ast_directed_print(dest, remain, "%s", expr->var_id->str);
         break;
     case EXPR_ASSIGN:
-        ast_expr_print(expr->assign.dest, dest, remain);
+        ast_expr_print(expr->assign.dest, 0, dest, remain);
         ast_directed_print(dest, remain, " ");
         ast_oper_print(expr->assign.op, dest, remain);
         ast_directed_print(dest, remain, "= ");
-        ast_expr_print(expr->assign.expr, dest, remain);
+        ast_expr_print(expr->assign.expr, 0, dest, remain);
         break;
     case EXPR_CONST_INT:
         ast_directed_print(dest, remain, "%lld", expr->const_val.int_val);
@@ -457,46 +457,46 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
         break;
     case EXPR_BIN:
         if (expr->bin.op == OP_ARR_ACC) {
-            ast_expr_print(expr->bin.expr1, dest, remain);
+            ast_expr_print(expr->bin.expr1, 0, dest, remain);
             ast_directed_print(dest, remain, "[");
-            ast_expr_print(expr->bin.expr2, dest, remain);
+            ast_expr_print(expr->bin.expr2, 0, dest, remain);
             ast_directed_print(dest, remain, "]");
         } else {
-            ast_expr_print(expr->bin.expr1, dest, remain);
+            ast_expr_print(expr->bin.expr1, 0, dest, remain);
             ast_directed_print(dest, remain, " ");
             ast_oper_print(expr->bin.op, dest, remain);
             ast_directed_print(dest, remain, " ");
-            ast_expr_print(expr->bin.expr2, dest, remain);
+            ast_expr_print(expr->bin.expr2, 0, dest, remain);
         }
         break;
     case EXPR_UNARY:
         switch (expr->unary.op) {
         case OP_POSTINC:
         case OP_POSTDEC:
-            ast_expr_print(expr->unary.expr, dest, remain);
+            ast_expr_print(expr->unary.expr, 0, dest, remain);
             ast_oper_print(expr->unary.op, dest, remain);
             break;
         default:
             ast_oper_print(expr->unary.op, dest, remain);
-            ast_expr_print(expr->unary.expr, dest, remain);
+            ast_expr_print(expr->unary.expr, 0, dest, remain);
             break;
         }
         break;
     case EXPR_COND:
-        ast_expr_print(expr->cond.expr1, dest, remain);
+        ast_expr_print(expr->cond.expr1, 0, dest, remain);
         ast_directed_print(dest, remain, " ? ");
-        ast_expr_print(expr->cond.expr2, dest, remain);
+        ast_expr_print(expr->cond.expr2, 0, dest, remain);
         ast_directed_print(dest, remain, " : ");
-        ast_expr_print(expr->cond.expr3, dest, remain);
+        ast_expr_print(expr->cond.expr3, 0, dest, remain);
         break;
     case EXPR_CAST:
         ast_directed_print(dest, remain, "(");
         ast_decl_print(expr->cast.cast, TYPE_VOID, 0, dest, remain);
         ast_directed_print(dest, remain, ")");
-        ast_expr_print(expr->cast.base, dest, remain);
+        ast_expr_print(expr->cast.base, 0, dest, remain);
         break;
     case EXPR_CALL:
-        ast_expr_print(expr->call.func, dest, remain);
+        ast_expr_print(expr->call.func, 0, dest, remain);
         ast_directed_print(dest, remain, "(");
         bool first = true;
         sl_link_t *cur;
@@ -506,7 +506,7 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
             } else {
                 ast_directed_print(dest, remain, ", ");
             }
-            ast_expr_print(GET_ELEM(&expr->call.params, cur), dest, remain);
+            ast_expr_print(GET_ELEM(&expr->call.params, cur), 0, dest, remain);
         }
         ast_directed_print(dest, remain, ")");
         break;
@@ -519,7 +519,7 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
             } else {
                 ast_directed_print(dest, remain, ", ");
             }
-            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur), dest, remain);
+            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur), 0, dest, remain);
         }
         break;
     }
@@ -531,7 +531,7 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
                            remain);
             ast_directed_print(dest, remain, ")");
         } else {
-            ast_expr_print(expr->sizeof_params.expr, dest, remain);
+            ast_expr_print(expr->sizeof_params.expr, 0, dest, remain);
         }
         break;
     case EXPR_ALIGNOF:
@@ -541,26 +541,37 @@ void ast_expr_print(expr_t *expr, char **dest, size_t *remain) {
         ast_directed_print(dest, remain, ")");
         break;
     case EXPR_MEM_ACC:
-        ast_expr_print(expr->mem_acc.base, dest, remain);
+        ast_expr_print(expr->mem_acc.base, 0, dest, remain);
         ast_oper_print(expr->mem_acc.op, dest, remain);
         ast_directed_print(dest, remain, "%s", expr->mem_acc.name->str, dest,
                     remain);
         break;
     case EXPR_INIT_LIST: {
-        ast_directed_print(dest, remain, "{ ");
+        ast_directed_print(dest, remain, "{\n");
         bool first = true;
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->cmpd.exprs) {
             if (first) {
                 first = false;
             } else {
-                ast_directed_print(dest, remain, ", ");
+                ast_directed_print(dest, remain, ",\n");
             }
-            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur), dest, remain);
+            PRINT_INDENT(indent + 1);
+            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur), indent + 1,
+                           dest, remain);
         }
-        ast_directed_print(dest, remain, " }");
+        ast_directed_print(dest, remain, "\n");
+        PRINT_INDENT(indent);
+        ast_directed_print(dest, remain, "}");
         break;
     }
+    case EXPR_DESIG_INIT:
+        ast_directed_print(dest, remain, ".%.*s = ",
+                           (int)expr->desig_init.name->len,
+                           expr->desig_init.name->str);
+        ast_expr_print(expr->desig_init.val, indent,
+                       dest, remain);
+        break;
 
     default:
         assert(false);
@@ -733,7 +744,7 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
                     enum_id->id->str);
             if (enum_id->expr != NULL) {
                 ast_directed_print(dest, remain, " = ");
-                ast_expr_print(enum_id->expr, dest, remain);
+                ast_expr_print(enum_id->expr, 0, dest, remain);
             }
             if (enum_id != sl_tail(&type->enum_params.ids)) {
                 ast_directed_print(dest, remain, ",");
@@ -1024,6 +1035,9 @@ void ast_expr_destroy(expr_t *expr) {
         break;
     case EXPR_INIT_LIST:
         SL_DESTROY_FUNC(&expr->init_list.exprs, ast_expr_destroy);
+        break;
+    case EXPR_DESIG_INIT:
+        ast_expr_destroy(expr->desig_init.val);
         break;
     default:
         assert(false);

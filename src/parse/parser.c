@@ -1932,8 +1932,26 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
             break;
         }
         expr_t *cur = NULL;
-        if (CCC_OK != (status = par_initializer(lex, &cur))) {
-            goto fail;
+        if (LEX_CUR(lex).type == DOT) { // Designated initalizer
+            LEX_ADVANCE(lex);
+            if (LEX_CUR(lex).type != ID || LEX_NEXT(lex).type != ASSIGN) {
+                goto fail;
+            }
+            ALLOC_NODE(lex, cur, expr_t);
+            cur->type = EXPR_DESIG_INIT;
+            cur->desig_init.val = NULL;
+            cur->desig_init.name = &LEX_CUR(lex).tab_entry->key;
+            LEX_ADVANCE(lex); // Skip the ID
+            LEX_ADVANCE(lex); // Skip the =
+            if (CCC_OK != (status = par_initializer(lex,
+                                                    &cur->desig_init.val))) {
+                ast_expr_destroy(cur);
+                goto fail;
+            }
+        } else {
+            if (CCC_OK != (status = par_initializer(lex, &cur))) {
+                goto fail;
+            }
         }
         sl_append(&expr->init_list.exprs, &cur->link);
     }

@@ -132,6 +132,7 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
     case EXPR_CMPD:
     case EXPR_MEM_ACC:
     case EXPR_INIT_LIST:
+    case EXPR_DESIG_INIT:
     default:
         assert(false);
     }
@@ -618,6 +619,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = NULL;
         return retval;
     }
+    case EXPR_DESIG_INIT:
+        // TODO: This
+        break;
     default:
         assert(false);
     }
