@@ -1329,13 +1329,12 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
         case LBRACK: // Array index
             LEX_ADVANCE(lex);
             ALLOC_NODE(lex, expr, expr_t);
-            expr->type = EXPR_BIN;
-            expr->bin.op = OP_ARR_ACC;
-            expr->bin.expr1 = base;
-            expr->bin.expr2 = NULL;
+            expr->type = EXPR_ARR_IDX;
+            expr->arr_idx.array = base;
+            expr->arr_idx.index = NULL;
 
             if (CCC_OK !=
-                (status = par_expression(lex, &expr->bin.expr2))) {
+                (status = par_expression(lex, &expr->arr_idx.index))) {
                 goto fail;
             }
             LEX_MATCH(lex, RBRACK);

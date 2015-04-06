@@ -134,6 +134,7 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
     case EXPR_CALL:
     case EXPR_CMPD:
     case EXPR_MEM_ACC:
+    case EXPR_ARR_IDX:
     case EXPR_INIT_LIST:
     case EXPR_DESIG_INIT:
     default:
@@ -182,7 +183,9 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
             typecheck_type_equal(t1->mod.base, t2->mod.base);
 
     case TYPE_PAREN:
-        return typecheck_type_equal(t1->paren_base, t2->paren_base);
+        assert(false && "Parens should be removed");
+        return false;
+
     case TYPE_FUNC: {
         if (!typecheck_type_equal(t1->func.type, t2->func.type)) {
             return false;
@@ -219,8 +222,26 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
 }
 
 type_t *typecheck_untypedef(type_t *type) {
-    while (type->type == TYPE_TYPEDEF) {
-        type = type->typedef_params.base;
+    bool done = false;
+    while (!done) {
+        switch (type->type) {
+        case TYPE_TYPEDEF:
+            type = type->typedef_params.base;
+            break;
+        case TYPE_PAREN:
+            type = type->paren_base;
+            break;
+        default:
+            done = true;
+        }
+    }
+
+    return type;
+}
+
+type_t *typecheck_unmod(type_t *type) {
+    if (type->type == TYPE_MOD) {
+        type = type->mod.base;
     }
 
     return type;
@@ -233,12 +254,125 @@ bool typecheck_type_assignable(type_t *to, type_t *from) {
     return true;
 }
 
-bool typecheck_type_conversion(type_t *t1, type_t *t2, type_t **result) {
-    // TODO: This
-    (void)t1;
-    (void)t2;
-    *result = NULL;
+bool typecheck_types_binop(type_t *t1, type_t *t2, oper_t op) {
+    t1 = typecheck_untypedef(t1);
+    t2 = typecheck_untypedef(t2);
+    type_t *umod1 = typecheck_unmod(t1);
+    type_t *umod2 = typecheck_unmod(t2);
+
+    bool is_numeric1 = TYPE_IS_NUMERIC(umod1);
+    bool is_numeric2 = TYPE_IS_NUMERIC(umod2);
+    bool is_int1 = TYPE_IS_INTEGRAL(umod1);
+    bool is_int2 = TYPE_IS_INTEGRAL(umod2);
+    bool is_ptr1 = TYPE_IS_PTR(umod1);
+    bool is_ptr2 = TYPE_IS_PTR(umod2);
+
+    // If both are integer types, they can use any binaary operator
+    if (is_int1 && is_int2) {
+        return true;
+    }
+
+    switch (op) {
+    case OP_TIMES:
+    case OP_DIV:
+        // times, div, only allow numeric operands
+        return is_numeric1 && is_numeric2;
+
+        // Require both operands to be integers, which was already checked
+    case OP_BITAND:
+    case OP_BITXOR:
+    case OP_BITOR:
+    case OP_MOD:
+    case OP_LSHIFT:
+    case OP_RSHIFT:
+        return false;
+
+    case OP_PLUS:
+    case OP_MINUS:
+        // Allow pointers to be added with integers
+        return (is_ptr1 && is_int2) || (is_int1 && is_ptr2);
+
+    case OP_LT:
+    case OP_GT:
+    case OP_LE:
+    case OP_GE:
+    case OP_EQ:
+    case OP_NE:
+    case OP_LOGICAND:
+    case OP_LOGICOR:
+        return (is_ptr1 && is_ptr2) || (is_ptr1 && is_int2) ||
+            (is_int1 && is_ptr2);
+
+    default:
+        assert(false);
+    }
+
     return true;
+}
+
+bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
+    t1 = typecheck_untypedef(t1);
+    t2 = typecheck_untypedef(t2);
+
+    if (typecheck_type_equal(t1, t2)) {
+        *result = t1;
+        return true;
+    }
+
+    type_t *umod1 = typecheck_unmod(t1);
+    type_t *umod2 = typecheck_unmod(t2);
+
+    bool is_numeric1 = TYPE_IS_NUMERIC(umod1);
+    bool is_numeric2 = TYPE_IS_NUMERIC(umod2);
+    bool is_int2 = TYPE_IS_INTEGRAL(umod2);
+    bool is_ptr2 = TYPE_IS_PTR(umod2);
+
+    if (is_numeric1 && is_numeric2) {
+        if (umod1->type >= umod2->type) {
+            *result = t1;
+        } else {
+            *result = t2;
+        }
+        return true;
+    }
+
+    switch (umod1->type) {
+    case TYPE_VOID: // Void cannot be converted to anything
+        return false;
+
+    case TYPE_BOOL:
+    case TYPE_CHAR:
+    case TYPE_SHORT:
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_LONG_LONG:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
+        if (is_ptr2) {
+            *result = t2;
+            return true;
+        }
+        return false;
+
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+    case TYPE_ENUM:
+        // Compound types cannot be converted
+        return false;
+
+        // Only allowed to combine with integral types
+    case TYPE_FUNC:
+    case TYPE_ARR:
+    case TYPE_PTR:
+        if (is_int2) {
+            *result = t1;
+            return true;
+        }
+        return false;
+    default:
+        assert(false);
+    }
 }
 
 bool typecheck_type_integral(type_t *type) {
@@ -569,7 +703,6 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
     retval &= typecheck_expr(tcs, decl_node->expr, constant);
     retval &= typecheck_type_assignable(decl_node->type,
                                         decl_node->expr->etype);
-    // TODO: Handle constant
     return retval;
 }
 
@@ -617,9 +750,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_expr(tcs, expr->bin.expr1, TC_NOCONST);
         retval &= typecheck_expr(tcs, expr->bin.expr2, TC_NOCONST);
         // TODO: Make sure expr1 & expr2 are compatible with op
-        retval &= typecheck_type_conversion(expr->bin.expr1->etype,
-                                            expr->bin.expr2->etype,
-                                            &expr->etype);
+        retval &= typecheck_type_max(expr->bin.expr1->etype,
+                                     expr->bin.expr2->etype,
+                                     &expr->etype);
         return retval;
     case EXPR_UNARY:
         retval &= typecheck_expr(tcs, expr->unary.expr, TC_NOCONST);
@@ -630,9 +763,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_expr_conditional(tcs, expr->cond.expr1);
         retval &= typecheck_expr(tcs, expr->cond.expr2, TC_NOCONST);
         retval &= typecheck_expr(tcs, expr->cond.expr3, TC_NOCONST);
-        retval &= typecheck_type_conversion(expr->cond.expr2->etype,
-                                            expr->cond.expr3->etype,
-                                            &expr->etype);
+        retval &= typecheck_type_max(expr->cond.expr2->etype,
+                                     expr->cond.expr3->etype,
+                                     &expr->etype);
         return retval;
     case EXPR_CAST: {
         retval &= typecheck_expr(tcs, expr->cast.base, TC_NOCONST);
@@ -706,11 +839,44 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_decl(tcs, expr->alignof_params.type, TC_NOCONST);
         expr->etype = tt_long; // TODO: Should be size_t
         break;
-    case EXPR_MEM_ACC:
+    case EXPR_MEM_ACC: {
         retval &= typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST);
-        // TODO: Make sure compatible type with op, make sure member exists
-        expr->etype = expr->mem_acc.base->etype; // TODO: Return member's type
-        return retval;
+        expr->etype = NULL;
+        type_t *compound;
+        switch (expr->mem_acc.base->etype->type) {
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+            if (expr->mem_acc.op != OP_DOT) {
+                return false;
+            }
+            compound = expr->mem_acc.base->etype;
+            break;
+        case TYPE_PTR:
+            if (expr->mem_acc.op != OP_ARROW) {
+                return false;
+            }
+            compound = expr->mem_acc.base->etype->ptr.base;
+            if (compound->type != TYPE_STRUCT && compound->type != TYPE_UNION) {
+                return false;
+            }
+            break;
+        default:
+            return false;
+        }
+        sl_link_t *cur;
+        SL_FOREACH(cur, &compound->struct_params.decls) {
+            decl_node_t *decl = GET_ELEM(&compound->struct_params.decls, cur);
+            if (vstrcmp(decl->id, expr->mem_acc.name)) {
+                expr->etype = decl->type;
+                return true;
+            }
+        }
+        return false;
+    }
+    case EXPR_ARR_IDX: {
+        // TODO: This
+        break;
+    }
     case EXPR_INIT_LIST: {
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->init_list.exprs) {

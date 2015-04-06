@@ -44,6 +44,15 @@ typedef struct tc_state_t {
  */
 #define TCS_LIT { NULL, NULL, NULL, NULL, NULL }
 
+#define TYPE_IS_NUMERIC(test)                                       \
+    (test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_DOUBLE;
+
+#define TYPE_IS_INTEGRAL(test)                                      \
+    (test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_LONG;
+
+#define TYPE_IS_PTR(test)                                   \
+    (test)->type >= TYPE_FUNC && (test)->type <= TYPE_ARR;
+
 /**
  * Returns a type with its typedefs removed
  *

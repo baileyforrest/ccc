@@ -56,6 +56,8 @@ typedef enum type_mod_t {
 
 /**
  * Basic varieties of types
+ *
+ * The order of the integral and pointer subgroups is important
  */
 typedef enum basic_type_t {
     // Primitive types
@@ -166,7 +168,6 @@ typedef enum oper_t {
     OP_LOGICAND,   // Logical AND
     OP_LOGICOR,    // Logical OR
     OP_BITNOT,     // Bitwise NOT
-    OP_ARR_ACC,    // Array access
     OP_PREINC,     // Pre increment
     OP_POSTINC,    // Post increment
     OP_PREDEC,     // Pre decrement
@@ -196,6 +197,7 @@ typedef enum expr_type_t {
     EXPR_SIZEOF,      /**< Sizeof expression */
     EXPR_ALIGNOF,     /**< alignof expression */
     EXPR_MEM_ACC,     /**< Member access */
+    EXPR_ARR_IDX,     /**< Array Index */
     EXPR_INIT_LIST,   /**< Initializer list */
     EXPR_DESIG_INIT,  /**< Designated initializer */
 } expr_type_t;
@@ -275,6 +277,11 @@ typedef struct expr_t {
             len_str_t *name;        /**< Name of member */
             oper_t op;              /**< Operation (., ->) */
         } mem_acc;
+
+        struct {                    /**< Array index */
+            struct expr_t *array;   /**< Array */
+            struct expr_t *index;   /**< index */
+        } arr_idx;
 
         struct {                    /**< Initalizer list */
             slist_t exprs;          /**< List of expressions */

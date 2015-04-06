@@ -460,18 +460,11 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
                            expr->const_val.str_val->str);
         break;
     case EXPR_BIN:
-        if (expr->bin.op == OP_ARR_ACC) {
-            ast_expr_print(expr->bin.expr1, 0, dest, remain);
-            ast_directed_print(dest, remain, "[");
-            ast_expr_print(expr->bin.expr2, 0, dest, remain);
-            ast_directed_print(dest, remain, "]");
-        } else {
-            ast_expr_print(expr->bin.expr1, 0, dest, remain);
-            ast_directed_print(dest, remain, " ");
-            ast_oper_print(expr->bin.op, dest, remain);
-            ast_directed_print(dest, remain, " ");
-            ast_expr_print(expr->bin.expr2, 0, dest, remain);
-        }
+        ast_expr_print(expr->bin.expr1, 0, dest, remain);
+        ast_directed_print(dest, remain, " ");
+        ast_oper_print(expr->bin.op, dest, remain);
+        ast_directed_print(dest, remain, " ");
+        ast_expr_print(expr->bin.expr2, 0, dest, remain);
         break;
     case EXPR_UNARY:
         switch (expr->unary.op) {
@@ -549,6 +542,12 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         ast_oper_print(expr->mem_acc.op, dest, remain);
         ast_directed_print(dest, remain, "%s", expr->mem_acc.name->str, dest,
                     remain);
+        break;
+    case EXPR_ARR_IDX:
+        ast_expr_print(expr->arr_idx.array, 0, dest, remain);
+        ast_directed_print(dest, remain, "[");
+        ast_expr_print(expr->arr_idx.index, 0, dest, remain);
+        ast_directed_print(dest, remain, "]");
         break;
     case EXPR_INIT_LIST: {
         ast_directed_print(dest, remain, "{\n");
@@ -648,9 +647,6 @@ void ast_oper_print(oper_t op, char **dest, size_t *remain) {
         break;
     case OP_BITNOT:
         ast_directed_print(dest, remain, "~");
-        break;
-    case OP_ARR_ACC:
-        ast_directed_print(dest, remain, "[]");
         break;
     case OP_PREINC:
     case OP_POSTINC:
@@ -1035,6 +1031,10 @@ void ast_expr_destroy(expr_t *expr) {
         break;
     case EXPR_MEM_ACC:
         ast_expr_destroy(expr->mem_acc.base);
+        break;
+    case EXPR_ARR_IDX:
+        ast_expr_destroy(expr->arr_idx.array);
+        ast_expr_destroy(expr->arr_idx.index);
         break;
     case EXPR_INIT_LIST:
         SL_DESTROY_FUNC(&expr->init_list.exprs, ast_expr_destroy);
