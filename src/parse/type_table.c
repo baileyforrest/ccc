@@ -47,6 +47,8 @@ static len_str_t float_str       = LEN_STR_LIT("float");
 static len_str_t double_str      = LEN_STR_LIT("double");
 static len_str_t long_double_str = LEN_STR_LIT("long double");
 
+static len_str_t size_t_str      = LEN_STR_LIT("____size_t__");
+
 static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
 static type_t stt_bool        = TYPE_LITERAL(TYPE_BOOL       , _Bool      );
 static type_t stt_char        = TYPE_LITERAL(TYPE_CHAR       , char       );
@@ -58,6 +60,14 @@ static type_t stt_float       = TYPE_LITERAL(TYPE_FLOAT      , float      );
 static type_t stt_double      = TYPE_LITERAL(TYPE_DOUBLE     , double     );
 static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 
+// TODO: This isn't portable
+// size_t is unsigned long.
+static type_t stt_size_t = {
+    SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, TYPE_MOD,
+    { .mod = { TMOD_UNSIGNED, &stt_long } }
+};
+
+
 type_t * const tt_void = &stt_void;
 type_t * const tt_bool = &stt_bool;
 type_t * const tt_char = &stt_char;
@@ -68,6 +78,8 @@ type_t * const tt_long_long = &stt_long_long;
 type_t * const tt_float = &stt_float;
 type_t * const tt_double = &stt_double;
 type_t * const tt_long_double = &stt_long_double;
+
+type_t * const tt_size_t = &stt_size_t;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
     { SL_LINK_LIT, &type##_str, TT_PRIM , &stt_ ## type }
@@ -85,7 +97,8 @@ static typetab_entry_t s_prim_types[] = {
     TYPE_TAB_LITERAL_ENTRY(long_long),
     TYPE_TAB_LITERAL_ENTRY(float),
     TYPE_TAB_LITERAL_ENTRY(double),
-    TYPE_TAB_LITERAL_ENTRY(long_double)
+    TYPE_TAB_LITERAL_ENTRY(long_double),
+    { SL_LINK_LIT, &size_t_str, TT_PRIM , &stt_size_t }
 };
 
 status_t tt_init(typetab_t *tt, typetab_t *last) {

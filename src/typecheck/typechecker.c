@@ -254,7 +254,7 @@ bool typecheck_type_assignable(type_t *to, type_t *from) {
     return true;
 }
 
-bool typecheck_types_binop(type_t *t1, type_t *t2, oper_t op) {
+bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2) {
     t1 = typecheck_untypedef(t1);
     t2 = typecheck_untypedef(t2);
     type_t *umod1 = typecheck_unmod(t1);
@@ -308,6 +308,38 @@ bool typecheck_types_binop(type_t *t1, type_t *t2, oper_t op) {
     }
 
     return true;
+}
+
+bool typecheck_type_unaryop(oper_t op, type_t *type) {
+    bool is_numeric = TYPE_IS_NUMERIC(type);
+    bool is_int = TYPE_IS_INTEGRAL(type);
+    bool is_ptr = TYPE_IS_PTR(type);
+
+    switch (op) {
+    case OP_PREINC:
+    case OP_POSTINC:
+    case OP_PREDEC:
+    case OP_POSTDEC:
+        return is_numeric || is_int || is_ptr;
+
+    case OP_ADDR:
+        return true;
+
+    case OP_DEREF:
+        return is_ptr;
+
+    case OP_UPLUS:
+    case OP_UMINUS:
+        return is_numeric;
+
+    case OP_BITNOT:
+        return is_int;
+
+    case OP_LOGICNOT:
+        return true;
+    default:
+        assert(false);
+    }
 }
 
 bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
@@ -708,14 +740,18 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
 
 bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     bool retval = true;
+    expr->etype = NULL;
+
     switch(expr->type) {
     case EXPR_VOID:
         expr->etype = tt_void;
         return retval;
+
     case EXPR_PAREN:
         retval &= typecheck_expr(tcs, expr->paren_base, constant);
         expr->etype = expr->paren_base->etype;
         return retval;
+
     case EXPR_VAR: {
         if (constant == TC_CONST) {
             logger_log(&expr->mark, LOG_ERR, "Expected constant value");
@@ -730,6 +766,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = entry->type;
         return retval;
     }
+
     case EXPR_ASSIGN:
         retval &= typecheck_expr(tcs, expr->assign.dest, TC_NOCONST);
         retval &= typecheck_expr(tcs, expr->assign.expr, TC_NOCONST);
@@ -737,28 +774,36 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                                             expr->assign.expr->etype);
         expr->etype = expr->assign.dest->etype;
         return retval;
+
     case EXPR_CONST_INT:
         expr->etype = expr->const_val.type;
         return retval;
+
     case EXPR_CONST_FLOAT:
         expr->etype = expr->const_val.type;
         return retval;
+
     case EXPR_CONST_STR:
         expr->etype = expr->const_val.type;
         return retval;
+
     case EXPR_BIN:
         retval &= typecheck_expr(tcs, expr->bin.expr1, TC_NOCONST);
         retval &= typecheck_expr(tcs, expr->bin.expr2, TC_NOCONST);
-        // TODO: Make sure expr1 & expr2 are compatible with op
+        retval &= typecheck_types_binop(expr->bin.op, expr->bin.expr1->etype,
+                                        expr->bin.expr2->etype);
         retval &= typecheck_type_max(expr->bin.expr1->etype,
                                      expr->bin.expr2->etype,
                                      &expr->etype);
         return retval;
+
     case EXPR_UNARY:
         retval &= typecheck_expr(tcs, expr->unary.expr, TC_NOCONST);
-        // TODO: Make sure expr compatible with op
+        retval &= typecheck_type_unaryop(expr->unary.op,
+                                         expr->unary.expr->etype);
         expr->etype = expr->unary.expr->etype;
         return retval;
+
     case EXPR_COND:
         retval &= typecheck_expr_conditional(tcs, expr->cond.expr1);
         retval &= typecheck_expr(tcs, expr->cond.expr2, TC_NOCONST);
@@ -767,6 +812,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                                      expr->cond.expr3->etype,
                                      &expr->etype);
         return retval;
+
     case EXPR_CAST: {
         retval &= typecheck_expr(tcs, expr->cast.base, TC_NOCONST);
         decl_node_t *node = sl_head(&expr->cast.cast->decls);
@@ -774,6 +820,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = node->type;
         return retval;
     }
+
     case EXPR_CALL: {
         if (!(retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST))) {
             return false;
@@ -816,6 +863,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = func_sig->func.type;
         return retval;
     }
+
     case EXPR_CMPD: {
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->cmpd.exprs) {
@@ -826,6 +874,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = tail->etype;
         return retval;
     }
+
     case EXPR_SIZEOF:
         if (expr->sizeof_params.type != NULL) {
             retval &= typecheck_decl(tcs, expr->sizeof_params.type, TC_NOCONST);
@@ -833,15 +882,16 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (expr->sizeof_params.expr != NULL) {
             retval &= typecheck_expr(tcs, expr->sizeof_params.expr, TC_NOCONST);
         }
-        expr->etype = tt_long; // TODO: Should be size_t
+        expr->etype = tt_size_t;
         return retval;
+
     case EXPR_ALIGNOF:
         retval &= typecheck_decl(tcs, expr->alignof_params.type, TC_NOCONST);
-        expr->etype = tt_long; // TODO: Should be size_t
+        expr->etype = tt_size_t;
         break;
+
     case EXPR_MEM_ACC: {
         retval &= typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST);
-        expr->etype = NULL;
         type_t *compound;
         switch (expr->mem_acc.base->etype->type) {
         case TYPE_STRUCT:
@@ -873,10 +923,30 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         return false;
     }
+
     case EXPR_ARR_IDX: {
-        // TODO: This
-        break;
+        retval &= typecheck_expr(tcs, expr->arr_idx.array, TC_NOCONST);
+        retval &= typecheck_expr(tcs, expr->arr_idx.index, TC_NOCONST);
+        type_t *umod_arr =
+            typecheck_unmod(typecheck_untypedef(expr->arr_idx.array->etype));
+        type_t *umod_index =
+            typecheck_unmod(typecheck_untypedef(expr->arr_idx.index->etype));
+
+        if (umod_arr->type != TYPE_PTR && umod_arr->type != TYPE_ARR) {
+            logger_log(&expr->arr_idx.array->mark, LOG_ERR,
+                       "subscripted value is neither array nor pointer nor"
+                       " vector");
+            retval = false;
+        }
+        if (!TYPE_IS_INTEGRAL(umod_index)) {
+            logger_log(&expr->arr_idx.index->mark, LOG_ERR,
+                       "array subscript is not an integer");
+            retval = false;
+        }
+
+        return retval;
     }
+
     case EXPR_INIT_LIST: {
         sl_link_t *cur;
         SL_FOREACH(cur, &expr->init_list.exprs) {
@@ -884,10 +954,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                                      TC_NOCONST);
         }
         // TODO: This needs to be set by user of init list, and verified with
-        // the exprs
-        expr->etype = NULL;
+        // the exprs. Need to set etype
         return retval;
     }
+
     case EXPR_DESIG_INIT:
         // TODO: This
         break;

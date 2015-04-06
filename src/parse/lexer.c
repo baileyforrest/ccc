@@ -25,6 +25,7 @@
 #include <stdio.h>
 
 #include <assert.h>
+#include <ctype.h>
 #include <uchar.h>
 #include <errno.h>
 #include <limits.h>
@@ -539,11 +540,7 @@ static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
             // then if we find another quote, skip that quote
             do {
                 NEXT_CHAR_NOERR(lexer, cur);
-                switch (cur) {
-                case ' ':
-                case '\t':
-                    break;
-                default:
+                if (!isspace(cur)) {
                     done = true;
                 }
             } while(!done);
