@@ -27,6 +27,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "typecheck/typechecker.h"
+
 #define INDENT ("    ")
 #define INDENT_LEN (sizeof(INDENT) - 1)
 
@@ -59,6 +61,121 @@ void ast_print_type(type_t *type) {
 
 void ast_destroy(trans_unit_t *ast) {
     ast_trans_unit_destroy(ast);
+}
+
+size_t ast_type_size(type_t *type) {
+    switch (type->type) {
+    case TYPE_VOID:        return sizeof(void);
+    case TYPE_BOOL:        return sizeof(bool);
+    case TYPE_CHAR:        return sizeof(char);
+    case TYPE_SHORT:       return sizeof(short);
+    case TYPE_INT:         return sizeof(int);
+    case TYPE_LONG:        return sizeof(long);
+    case TYPE_LONG_LONG:   return sizeof(long long);
+    case TYPE_FLOAT:       return sizeof(float);
+    case TYPE_DOUBLE:      return sizeof(double);
+    case TYPE_LONG_DOUBLE: return sizeof(long double);
+
+        // TODO: Handle bit fields
+    case TYPE_STRUCT:
+    case TYPE_UNION: {
+        size_t size = 0;
+        sl_link_t *cur;
+        SL_FOREACH(cur, &type->struct_params.decls) {
+            decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
+
+            sl_link_t *icur;
+            SL_FOREACH(icur, &decl->decls) {
+                decl_node_t *decl_node = GET_ELEM(&decl->decls, cur);
+                if (type->type == TYPE_STRUCT) {
+                    size += ast_type_size(decl_node->type);
+                } else { // type->type == TYPE_UNION
+                    size = MAX(size, ast_type_size(decl_node->type));
+                }
+            }
+        }
+        return size;
+    }
+    case TYPE_ENUM:
+        return ast_type_size(type->enum_params.type);
+
+    case TYPE_TYPEDEF:
+        return ast_type_size(type->typedef_params.base);
+
+    case TYPE_MOD:
+        return ast_type_size(type->mod.base);
+
+    case TYPE_PAREN:
+        return ast_type_size(type->paren_base);
+    case TYPE_FUNC:
+        return sizeof(ast_type_size);
+    case TYPE_ARR: {
+        size_t size = ast_type_size(type->arr.base);
+        long long len;
+        if (!typecheck_const_expr(type->arr.len, &len)) {
+            return -1;
+        }
+        return size * len;
+    }
+    case TYPE_PTR:
+        return sizeof(void *);
+    default:
+        assert(false);
+    }
+
+    return 0;
+}
+
+size_t ast_type_align(type_t *type) {
+    switch (type->type) {
+    case TYPE_VOID:        return alignof(void);
+    case TYPE_BOOL:        return alignof(bool);
+    case TYPE_CHAR:        return alignof(char);
+    case TYPE_SHORT:       return alignof(short);
+    case TYPE_INT:         return alignof(int);
+    case TYPE_LONG:        return alignof(long);
+    case TYPE_LONG_LONG:   return alignof(long long);
+    case TYPE_FLOAT:       return alignof(float);
+    case TYPE_DOUBLE:      return alignof(double);
+    case TYPE_LONG_DOUBLE: return alignof(long double);
+
+    case TYPE_STRUCT:
+    case TYPE_UNION: {
+        size_t align = 0;
+        sl_link_t *cur;
+        SL_FOREACH(cur, &type->struct_params.decls) {
+            decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
+
+            sl_link_t *icur;
+            SL_FOREACH(icur, &decl->decls) {
+                decl_node_t *decl_node = GET_ELEM(&decl->decls, cur);
+                align = MAX(align, ast_type_align(decl_node->type));
+            }
+        }
+        return align;
+    }
+    case TYPE_ENUM:
+        return ast_type_align(type->enum_params.type);
+
+    case TYPE_TYPEDEF:
+        return ast_type_align(type->typedef_params.base);
+
+    case TYPE_MOD:
+        return ast_type_align(type->mod.base);
+
+    case TYPE_PAREN:
+        return ast_type_align(type->paren_base);
+    case TYPE_FUNC:
+        return alignof(ast_type_align);
+    case TYPE_ARR:
+        return ast_type_align(type->arr.base);
+    case TYPE_PTR:
+        return alignof(void *);
+    default:
+        assert(false);
+    }
+
+    return 0;
 }
 
 void ast_trans_unit_print(trans_unit_t *tras_unit) {
@@ -521,7 +638,12 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         break;
     }
     case EXPR_SIZEOF:
-        ast_directed_print(dest, remain, "sizeof");
+    case EXPR_ALIGNOF:
+        if (expr->type == EXPR_SIZEOF) {
+            ast_directed_print(dest, remain, "sizeof");
+        } else { // expr->type == EXPR_ALIGNOF
+            ast_directed_print(dest, remain, "_Alignof");
+        }
         if (expr->sizeof_params.type != NULL) {
             ast_directed_print(dest, remain, "(");
             ast_decl_print(expr->sizeof_params.type, TYPE_VOID, 0, dest,
@@ -530,12 +652,6 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         } else {
             ast_expr_print(expr->sizeof_params.expr, 0, dest, remain);
         }
-        break;
-    case EXPR_ALIGNOF:
-        ast_directed_print(dest, remain, "_Alignof(");
-        ast_decl_print(expr->alignof_params.type, TYPE_VOID, 0, dest,
-                       remain);
-        ast_directed_print(dest, remain, ")");
         break;
     case EXPR_MEM_ACC:
         ast_expr_print(expr->mem_acc.base, 0, dest, remain);
@@ -1023,11 +1139,9 @@ void ast_expr_destroy(expr_t *expr) {
         SL_DESTROY_FUNC(&expr->cmpd.exprs, ast_expr_destroy);
         break;
     case EXPR_SIZEOF:
+    case EXPR_ALIGNOF:
         ast_decl_destroy(expr->sizeof_params.type);
         ast_expr_destroy(expr->sizeof_params.expr);
-        break;
-    case EXPR_ALIGNOF:
-        ast_decl_destroy(expr->alignof_params.type);
         break;
     case EXPR_MEM_ACC:
         ast_expr_destroy(expr->mem_acc.base);

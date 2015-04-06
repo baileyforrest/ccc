@@ -263,14 +263,10 @@ typedef struct expr_t {
             slist_t exprs;          /**< List of expressions */
         } cmpd;
 
-        struct {                    /**< Sizeof paramaters */
+        struct {                    /**< Sizeof and alignof paramaters */
             struct decl_t *type;    /**< Type to get sizeof. NULL if expr */
             struct expr_t *expr;    /**< Expr to get sizeof. NULL if type */
         } sizeof_params;
-
-        struct {                    /**< alignof paramaters */
-            struct decl_t *type;    /**< Type to get alignof */
-        } alignof_params;
 
         struct {                    /**< Member access of a compound type */
             struct expr_t *base;    /**< Expression to get type */
@@ -495,6 +491,22 @@ void ast_print_type(type_t *type);
  * @param ast The ast to destroy
  */
 void ast_destroy(trans_unit_t *ast);
+
+/**
+ * Gets the size of a type
+ *
+ * @param type Type to get the size of
+ * @return Returns the size of a type. Returns -1 if variable sized array,
+ */
+size_t ast_type_size(type_t *type);
+
+/**
+ * Gets the alignment of a type
+ *
+ * @param type Type to get the alignment of
+ * @return Returns the alignment of the type
+ */
+size_t ast_type_align(type_t *type);
 
 /**
  * Destroys a type_t that is protected. A protected type is one that is shared
