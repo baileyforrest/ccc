@@ -55,24 +55,27 @@ int main(int argc, char **argv) {
         if (optman.dump_opts & DUMP_TOKENS) {
             printf("//@ Tokens %s\n", node->str.str);
             man_dump_tokens(&manager);
-        } else {
-            trans_unit_t *ast;
-            if (optman.dump_opts & DUMP_AST) {
-                printf("//@ AST %s\n", node->str.str);
-            }
-
-            if (CCC_OK != (status = man_parse(&manager, &ast))) {
-                logger_log(NULL, LOG_ERR, "Failed to parse %s", node->str.str);
-                goto src_fail0;
-            }
-            if (optman.dump_opts & DUMP_AST) {
-                ast_print(ast);
-            }
-
-            ast_destroy(ast);
+            goto src_done0;
         }
 
-    src_fail0:
+        trans_unit_t *ast;
+        if (optman.dump_opts & DUMP_AST) {
+            printf("//@ AST %s\n", node->str.str);
+        }
+
+        if (CCC_OK != (status = man_parse(&manager, &ast))) {
+            logger_log(NULL, LOG_ERR, "Failed to parse %s", node->str.str);
+            goto src_done0;
+        }
+        if (optman.dump_opts & DUMP_AST) {
+            ast_print(ast);
+            ast_destroy(ast);
+            goto src_done0;
+        }
+
+        ast_destroy(ast);
+
+    src_done0:
         man_destroy(&manager);
     }
 

@@ -44,6 +44,7 @@
 
 #include "util/htable.h"
 #include "util/logger.h"
+#include "typecheck/typechecker.h"
 
 #include "optman.h"
 
@@ -804,11 +805,14 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
             if (status != CCC_DUPLICATE) {
                 goto fail;
             } else {
-                // TODO: Check the types are equal, if so don't print error
-                logger_log(&decl_node->mark, LOG_ERR,
-                           "conflicting types for '%.*s'",
-                           decl_node->id->len, decl_node->id->str);
-                status = CCC_OK;
+                typetab_entry_t *entry = tt_lookup(lex->typetab, decl_node->id);
+                if (typecheck_type_equal(entry->type, decl_node->type)) {
+                    status = CCC_OK;
+                } else {
+                    logger_log(&decl_node->mark, LOG_ERR,
+                               "conflicting types for '%.*s'",
+                               decl_node->id->len, decl_node->id->str);
+                }
             }
         }
     }

@@ -233,10 +233,6 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
         status = ht_insert(&tt->types, &new_entry->link);
     }
     if (status != CCC_OK) {
-        if (status == CCC_DUPLICATE) {
-            logger_log(&type->mark, LOG_ERR, "conflicting types for '%.*s'",
-                       name->len, name->str);
-        }
         goto fail;
     }
 

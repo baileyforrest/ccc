@@ -294,7 +294,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
 fail:
     logger_log(&pp->last_mark, LOG_ERR, "Failed to include file: %.*s",
-               (int)suffix.len, suffix.str);
+               suffix.len, suffix.str);
     status = CCC_ESYNTAX;
 
     return status;
@@ -383,7 +383,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
         }
         if (redefined) {
             logger_log(&stream->mark, LOG_WARN, "\"%.*s\" redefined",
-                       (int)new_macro->name.len, new_macro->name.str);
+                       new_macro->name.len, new_macro->name.str);
         }
 
         // Remove and cleanup existing macro
@@ -834,7 +834,7 @@ status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err) {
 
     log_type_t log_type = is_err ? LOG_ERR : LOG_WARN;
 
-    logger_log(&stream->mark, log_type, "%.*s", (int)len, stream->cur);
+    logger_log(&stream->mark, log_type, "%.*s", len, stream->cur);
 
     return status;
 }

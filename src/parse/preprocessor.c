@@ -663,8 +663,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
             if (directive == NULL) {
                 logger_log(&stream->mark, LOG_ERR,
-                           "Invalid preprocessing directive %.*s", (int)len,
-                           start);
+                           "Invalid preprocessing directive %.*s", len, start);
                 ts_skip_line(stream, &pp->block_comment); // Skip rest of line
                 return -(int)CCC_ESYNTAX;
             }
@@ -878,7 +877,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             if (ts_cur(&lookahead) != ')') {
                 logger_log(&stream->mark, LOG_ERR,
                            "unterminated argument list invoking macro \"%.*s\"",
-                           (int)lookup.len, lookup.str);
+                           lookup.len, lookup.str);
                 error = -(int)CCC_ESYNTAX;
                 goto fail;
             }

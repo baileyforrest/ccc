@@ -53,6 +53,10 @@ void ast_print(trans_unit_t *ast) {
     ast_trans_unit_print(ast);
 }
 
+void ast_print_type(type_t *type) {
+    ast_type_print(type, 0, NULL, NULL);
+}
+
 void ast_destroy(trans_unit_t *ast) {
     ast_trans_unit_destroy(ast);
 }
@@ -273,7 +277,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
     default:
         if (decl_node->id != NULL) {
             // No special decl node modifiers, just print
-            ast_directed_print(dest, remain, "%.*s", (int)decl_node->id->len,
+            ast_directed_print(dest, remain, "%.*s", decl_node->id->len,
                                decl_node->id->str);
         }
         return;
@@ -395,7 +399,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
     sl_link_t *cur;
     SL_FOREACH(cur, &accum) {
         len_str_node_t *node = GET_ELEM(&accum, cur);
-        ast_directed_print(dest, remain, "%.*s", (int)node->str.len,
+        ast_directed_print(dest, remain, "%.*s", node->str.len,
                            node->str.str);
     }
     SL_DESTROY_FUNC(&accum, free);
@@ -566,8 +570,7 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         break;
     }
     case EXPR_DESIG_INIT:
-        ast_directed_print(dest, remain, ".%.*s = ",
-                           (int)expr->desig_init.name->len,
+        ast_directed_print(dest, remain, ".%.*s = ", expr->desig_init.name->len,
                            expr->desig_init.name->str);
         ast_expr_print(expr->desig_init.val, indent,
                        dest, remain);
@@ -740,7 +743,7 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
         SL_FOREACH(cur, &type->enum_params.ids) {
             PRINT_INDENT(indent + 1);
             decl_node_t *enum_id = GET_ELEM(&type->enum_params.ids, cur);
-            ast_directed_print(dest, remain, "%.*s", (int)enum_id->id->len,
+            ast_directed_print(dest, remain, "%.*s", enum_id->id->len,
                     enum_id->id->str);
             if (enum_id->expr != NULL) {
                 ast_directed_print(dest, remain, " = ");
@@ -769,7 +772,7 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
             assert(false);
         }
         ast_directed_print(dest, remain, "%.*s",
-                           (int)type->typedef_params.name->len,
+                           type->typedef_params.name->len,
                            type->typedef_params.name->str);
         break;
 

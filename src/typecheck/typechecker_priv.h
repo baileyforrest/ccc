@@ -45,6 +45,35 @@ typedef struct tc_state_t {
 #define TCS_LIT { NULL, NULL, NULL, NULL, NULL }
 
 /**
+ * Returns a type with its typedefs removed
+ *
+ * @param type The type
+ * @return The type with its typedefs removed
+ */
+type_t *typecheck_untypedef(type_t *type);
+
+/**
+ * Returns true if type from can be assigned to type to, false otherwise
+ *
+ * @param to Type to assign to
+ * @param from Type to assign from
+ * @return true if the node typechecks, false otherwise
+ */
+bool typecheck_type_assignable(type_t *to, type_t *from);
+
+/**
+ * Verifies that t1 and t2 are compatible, and the returns the "higher" type of
+ * the two.
+ *
+ * @param t1 Type 1
+ * @param t2 Type 2
+ * @param result The wider of t1 and t2 otherwise.
+ *     NULL if they are not compatible
+ * @return true if the node typechecks, false otherwise
+ */
+bool typecheck_type_conversion(type_t *t1, type_t *t2, type_t **result);
+
+/**
  * Returns true if type is integral, false otherwise
  *
  * @param type The type to check

@@ -478,6 +478,13 @@ typedef struct trans_unit_t {
 void ast_print(trans_unit_t *tu);
 
 /**
+ * Print a type
+ *
+ * @param type The type to print
+ */
+void ast_print_type(type_t *type);
+
+/**
  * Destroys an AST
  *
  * @param ast The ast to destroy

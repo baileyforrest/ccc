@@ -45,4 +45,13 @@ bool typecheck_ast(trans_unit_t *ast);
  */
 bool typecheck_const_expr(expr_t *expr, long long *result);
 
+/**
+ * Returns true if t1 is equivalent to t2
+ *
+ * @param t1 Type 1
+ * @param t2 Type 2
+ * @return true if the types are equal, false otherwise
+ */
+bool typecheck_type_equal(type_t *t1, type_t *t2);
+
 #endif /* _TYPECHECKER_H_ */
