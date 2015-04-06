@@ -114,16 +114,16 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
         if (expr->sizeof_params.type != NULL) {
             decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
             assert(node != NULL);
-            *result = node->type->size;
+            *result = 0; // TODO: Get type size
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            *result = expr->sizeof_params.expr->etype->size;
+            *result = 0; // TODO: Get type size
         }
         return;
     case EXPR_ALIGNOF: {
         decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
         assert(node != NULL);
-        *result = node->type->align;
+        *result = 0; // TODO: Get type align
         return;
     }
     case EXPR_VOID:

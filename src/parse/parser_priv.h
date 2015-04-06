@@ -246,7 +246,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type);
  *
  * @param lex Current lexer state
  * @param base The struct type being constructed
- * @param base The base type of the decl
+ * @param decl_type The current declaration's type
  * @return CCC_OK on success, error code on error
  */
 status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
@@ -255,12 +255,10 @@ status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
  * Parses a struct declarator
  *
  * @param lex Current lexer state
- * @param base The struct type being constructed
- * @param base The base type of the decl
+ * @param decl The declaration being added to
  * @return CCC_OK on success, error code on error
  */
-status_t par_struct_declarator(lex_wrap_t *lex, type_t *base,
-                               decl_t *decl);
+status_t par_struct_declarator(lex_wrap_t *lex, decl_t *decl);
 
 /**
  * Parses a posibly abstract declarator given a preexisting declaration.

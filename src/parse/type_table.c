@@ -33,8 +33,8 @@
 static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
 
 #define TYPE_LITERAL(typename, type) \
-    { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, \
-       sizeof(type), alignof(type), { .ptr = { NULL, 0 } } }
+    { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename,    \
+      { .ptr = { NULL, 0 } } }
 
 static len_str_t void_str        = LEN_STR_LIT("void");
 static len_str_t bool_str        = LEN_STR_LIT("_Bool");

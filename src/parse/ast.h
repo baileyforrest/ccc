@@ -92,8 +92,6 @@ typedef struct type_t {
     sl_link_t link;                /**< Storage Link */
     fmark_t mark;                  /**< File mark */
     basic_type_t type;             /**< Basic type */
-    int size;                      /**< Size of this type */
-    char align;                    /**< Alignment */
 
     union {
         struct {                   /**< Struct/union params */
