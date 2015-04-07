@@ -94,11 +94,12 @@ bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr);
 /**
  * Returns true if type from can be assigned to type to, false otherwise
  *
+ * @param mark Location of the assignment
  * @param to Type to assign to
  * @param from Type to assign from
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_type_assignable(type_t *to, type_t *from);
+bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from);
 
 /**
  * Returns true if types t1 and t2 can be combined with given binop
@@ -134,27 +135,30 @@ bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result);
 /**
  * Returns true if from can be cast to to.
  *
+ * @param mark Location of the type cast
  * @param to Type being casted to
  * @param from Type being casted from
  * @return true if the the cast can be completed, false otherwise
  */
-bool typecheck_type_cast(type_t *to, type_t *from);
+bool typecheck_type_cast(fmark_t *mark, type_t *to, type_t *from);
 
 /**
  * Returns true if type can be used in a conditional
  *
+ * @param mark Location where the instance of the type occurs
  * @param type The type to check
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_type_conditional(type_t *type);
+bool typecheck_type_conditional(fmark_t *mark, type_t *type);
 
 /**
  * Returns true if type is integral, false otherwise
  *
+ * @param mark Location where the instance of the type occurs
  * @param type The type to check
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_type_integral(type_t *type);
+bool typecheck_type_integral(fmark_t *mark, type_t *type);
 
 /**
  * Typechecks the given expression and ensures its type can be used in a
@@ -164,14 +168,6 @@ bool typecheck_type_integral(type_t *type);
  * @return true if the node typechecks, false otherwise
  */
 bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr);
-
-/**
- * Returns true if type can be in a conditional, false otherwise
- *
- * @param type The type to check
- * @return true if the node typechecks, false otherwise
- */
-bool typecheck_type_conditional(type_t *type);
 
 /**
  * Typechecks expression, and makes sure its an integral type
