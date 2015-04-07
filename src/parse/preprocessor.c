@@ -510,12 +510,17 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     if (macro_param) {
         // If we're stringifying, and current character is a \ or "
         // we need to escape
-        if (stringify && (ts_cur(stream) == '"' || ts_cur(stream) == '\\')) {
+        if (stringify && (ts_cur(stream) == '"' || ts_cur(stream) == '\\' ||
+                          ts_cur(stream) == '\n')) {
             if (!pp->stringify_esc) {
                 pp->stringify_esc = true;
                 return '\\';
             } else {
                 pp->stringify_esc = false;
+            }
+            if (ts_cur(stream) == '\n') {
+                ts_advance(stream);
+                return 'n';
             }
         }
         return ts_advance(stream);

@@ -18,7 +18,7 @@ do
     gcc -c -std=c11 $OUTPUT_C -o $OUTPUT_O
     if [ $? -ne 0 ]
     then
-        echo "&i: Compile failed!"
+        echo "$i: Compile failed!"
     fi
 done
 
