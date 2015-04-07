@@ -406,6 +406,51 @@ bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
     }
 }
 
+bool typecheck_type_cast(type_t *to, type_t *from) {
+    to = typecheck_untypedef(to);
+    from = typecheck_untypedef(from);
+
+    if (typecheck_type_equal(to, from)) {
+        return true;
+    }
+
+    // Anything can be casted to void
+    if (to->type == TYPE_VOID) {
+        return true;
+    }
+
+    type_t *umod_to = typecheck_unmod(to);
+    type_t *umod_from = typecheck_unmod(from);
+
+    bool is_num_to = TYPE_IS_NUMERIC(umod_to);
+    bool is_num_from = TYPE_IS_NUMERIC(umod_from);
+    bool is_ptr_to = TYPE_IS_PTR(umod_to);
+    bool is_ptr_from = TYPE_IS_PTR(umod_from);
+
+    if (is_num_to && is_num_from) {
+        return true;
+    }
+
+    if (is_ptr_to && is_ptr_from) {
+        return true;
+    }
+
+    // Can't cast to struct/union types
+    if (umod_to->type == TYPE_STRUCT || umod_to->type == TYPE_UNION) {
+        logger_log(&to->mark, LOG_ERR,
+                   "conversion to non-scalar type requested");
+        return false;
+    }
+    // Can't cast from struct/union types
+    if (umod_from->type == TYPE_STRUCT || umod_from->type == TYPE_UNION) {
+        logger_log(&to->mark, LOG_ERR,
+                   "to from non-scalar type requested");
+        return false;
+    }
+
+    return true;
+}
+
 bool typecheck_type_integral(type_t *type) {
     switch (type->type) {
     case TYPE_BOOL:
@@ -445,7 +490,6 @@ bool typecheck_type_integral(type_t *type) {
 
 bool typecheck_type_conditional(type_t *type) {
     switch (type->type) {
-    // Primitive types
     case TYPE_BOOL:
     case TYPE_CHAR:
     case TYPE_SHORT:
@@ -727,13 +771,152 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, bool constant) {
     return retval;
 }
 
+
+bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
+    bool retval = true;
+    switch (type->type) {
+    case TYPE_STRUCT: {
+        sl_link_t *cur_decl;
+        decl_t *decl;
+        sl_link_t *cur_node;
+        decl_node_t *node;
+
+#define RESET_NODE()                                                \
+        do {                                                        \
+            cur_decl = type->struct_params.decls.head;              \
+            decl = GET_ELEM(&type->struct_params.decls, cur_decl);  \
+            cur_node = decl->decls.head;                            \
+            node = GET_ELEM(&decl->decls, cur_node);                \
+        } while (0)
+
+#define ADVANCE_NODE()                                                  \
+        do {                                                            \
+            cur_node = cur_node->next;                                  \
+            if (cur_node == NULL) {                                     \
+                cur_decl = cur_decl->next;                              \
+                if (cur_decl != NULL) {                                 \
+                    decl = GET_ELEM(&type->struct_params.decls, cur_decl); \
+                    cur_node = decl->decls.head;                        \
+                }                                                       \
+            }                                                           \
+            if (cur_node != NULL) {                                     \
+                node = GET_ELEM(&decl->decls, cur_node);                \
+            } else {                                                    \
+                node = NULL;                                            \
+            }                                                           \
+        } while (0)                                                     \
+
+        RESET_NODE();
+        sl_link_t *cur_elem;
+        SL_FOREACH(cur_elem, &expr->init_list.exprs) {
+            expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
+            retval &= typecheck_expr(tcs, elem, TC_NOCONST);
+
+            // If we encounter a designated initializer, find the
+            // decl with the correct name and continue from there
+            if (elem->type == EXPR_DESIG_INIT) {
+                if (!vstrcmp(node->id, elem->desig_init.name)) {
+                    RESET_NODE();
+                    while (!vstrcmp(node->id, elem->desig_init.name)) {
+                        ADVANCE_NODE();
+                        if (node == NULL) {
+                            logger_log(&expr->mark, LOG_ERR,
+                                       "unknown field %.*s specified in"
+                                       "initializer",
+                                       elem->desig_init.name->len,
+                                       elem->desig_init.name->str);
+                            return false;
+                        }
+                    }
+                }
+                elem = elem->desig_init.val;
+            }
+            switch (elem->type) {
+            case EXPR_DESIG_INIT:
+                assert(false); // Handled above
+                break;
+            case EXPR_INIT_LIST:
+                retval &= typecheck_init_list(tcs, node->type, elem);
+                ADVANCE_NODE();
+                break;
+            default:
+                retval &= typecheck_type_assignable(node->type,
+                                                    elem->etype);
+                ADVANCE_NODE();
+            }
+        }
+
+        return retval;
+    }
+    case TYPE_ARR: {
+        if (!typecheck_expr(tcs, type->arr.len, TC_CONST)) {
+            return false;
+        }
+        long long decl_len;
+        typecheck_const_expr_eval(type->arr.len, &decl_len);
+
+        long len = 0;
+        sl_link_t *cur;
+        SL_FOREACH(cur, &expr->init_list.exprs) {
+            ++len;
+            expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
+            retval &= typecheck_expr(tcs, cur_expr, TC_NOCONST);
+            if (expr->type == EXPR_INIT_LIST) {
+                retval &= typecheck_init_list(tcs, type->arr.base,
+                                              cur_expr);
+            } else {
+                retval &= typecheck_type_assignable(type->arr.base,
+                                                    expr->etype);
+            }
+        }
+
+        if (decl_len >= 0 && decl_len < len) {
+            logger_log(&expr->arr_idx.index->mark, LOG_ERR,
+                       "excess elements in array initializer");
+        }
+        return retval;
+    }
+    default: {
+        if (sl_head(&expr->init_list.exprs) == NULL) {
+            logger_log(&expr->arr_idx.index->mark, LOG_ERR,
+                       "empty scalar initializer");
+            return false;
+        }
+        if (sl_head(&expr->init_list.exprs) !=
+            sl_tail(&expr->init_list.exprs)) {
+            logger_log(&expr->arr_idx.index->mark, LOG_WARN,
+                       "excess elements in scalar initializer");
+        }
+        expr_t *first = sl_head(&expr->init_list.exprs);
+        retval &= typecheck_expr(tcs, first, TC_NOCONST);
+        retval &= typecheck_type_assignable(type, first->etype);
+    }
+    }
+    return retval;
+}
+
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                          bool constant) {
     bool retval = true;
     retval &= typecheck_type(tcs, decl_node->type);
     retval &= typecheck_expr(tcs, decl_node->expr, constant);
-    retval &= typecheck_type_assignable(decl_node->type,
-                                        decl_node->expr->etype);
+    if (!constant) {
+        switch (decl_node->expr->type) {
+        case EXPR_DESIG_INIT: // This should not parse
+            assert(false);
+            return false;
+        case EXPR_INIT_LIST:
+            retval &= typecheck_init_list(tcs, decl_node->type,
+                                          decl_node->expr);
+            return retval;
+        default:
+            retval &= typecheck_type_assignable(decl_node->type,
+                                                decl_node->expr->etype);
+            return retval;
+        }
+    } else {
+        return TYPE_IS_INTEGRAL(decl_node->expr->etype);
+    }
     return retval;
 }
 
@@ -815,7 +998,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     case EXPR_CAST: {
         retval &= typecheck_expr(tcs, expr->cast.base, TC_NOCONST);
         decl_node_t *node = sl_head(&expr->cast.cast->decls);
-        // TODO: make sure can be casted to type
+        retval &= typecheck_type_cast(node->type, expr->cast.base->etype);
         expr->etype = node->type;
         return retval;
     }
@@ -952,14 +1135,14 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             retval &= typecheck_expr(tcs, GET_ELEM(&expr->init_list.exprs, cur),
                                      TC_NOCONST);
         }
-        // TODO: This needs to be set by user of init list, and verified with
-        // the exprs. Need to set etype
+        // Don't know what etype is
         return retval;
     }
 
     case EXPR_DESIG_INIT:
-        // TODO: This
-        break;
+        retval &= typecheck_expr(tcs, expr->desig_init.val, TC_NOCONST);
+        // Don't know what etype is
+        return retval;
     default:
         assert(false);
     }
@@ -1012,7 +1195,8 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         if (type->mod.type_mod & TMOD_SIGNED &&
             type->mod.type_mod & TMOD_UNSIGNED) {
             logger_log(&type->mark, LOG_ERR,
-                       "both ‘signed’ and ‘unsigned’ in declaration specifiers");
+                       "both ‘signed’ and ‘unsigned’ in declaration"
+                       " specifiers");
             retval = false;
         }
         switch (type->mod.type_mod &
