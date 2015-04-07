@@ -43,9 +43,6 @@ bool typecheck_const_expr(expr_t *expr, long long *result) {
     return true;
 }
 
-/**
- * TODO: Support more types of expressions
- */
 void typecheck_const_expr_eval(expr_t *expr, long long *result) {
     switch (expr->type) {
     case EXPR_PAREN:
@@ -122,7 +119,13 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            *result = 0; // TODO: Get type size
+            tc_state_t tcs = TCS_LIT;
+            typecheck_expr(&tcs, expr->sizeof_params.expr, TC_NOCONST);
+            if (expr->type == EXPR_SIZEOF) {
+                *result = ast_type_size(expr->sizeof_params.expr->etype);
+            } else { // expr->type == EXPR_ALIGNOF
+                *result = ast_type_align(expr->sizeof_params.expr->etype);
+            }
         }
         return;
     case EXPR_VOID:
@@ -246,11 +249,152 @@ type_t *typecheck_unmod(type_t *type) {
     return type;
 }
 
+bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr) {
+    switch (expr->type) {
+    case EXPR_PAREN:
+        return typecheck_expr_lvalue(tcs, expr->paren_base);
+
+    case EXPR_MEM_ACC:
+    case EXPR_ARR_IDX:
+    case EXPR_VAR:
+        return true;
+
+    case EXPR_UNARY:
+        switch (expr->unary.op) {
+        case OP_PREINC:
+        case OP_POSTINC:
+        case OP_PREDEC:
+        case OP_POSTDEC:
+            return typecheck_expr_lvalue(tcs, expr->unary.expr);
+        case OP_DEREF:
+            return true;
+        default:
+            break;
+        }
+        break;
+    case EXPR_CALL: {
+        assert(expr->call.func->etype != NULL &&
+               expr->call.func->etype->type == TYPE_FUNC);
+        // Only a function returning a pointer can be an lvalue
+        return expr->call.func->etype->func.type->type == TYPE_PTR;
+    }
+    case EXPR_CMPD: {
+        expr_t *last = sl_tail(&expr->cmpd.exprs);
+        return typecheck_expr_lvalue(tcs, last);
+    }
+    default:
+        break;
+    }
+    logger_log(&expr->mark, LOG_ERR,
+               "lvalue required as left operand of assignment");
+    return false;
+}
+
 bool typecheck_type_assignable(type_t *to, type_t *from) {
-    // TODO: This
-    (void)to;
-    (void)from;
-    return true;
+    to = typecheck_untypedef(to);
+    from = typecheck_untypedef(from);
+
+    if (typecheck_type_equal(to, from)) {
+        return true;
+    }
+
+    type_t *umod_to = typecheck_unmod(to);
+    type_t *umod_from = typecheck_unmod(from);
+
+    if (umod_from->type == TYPE_VOID) {
+        logger_log(&from->mark, LOG_ERR,
+                   "void value not ignored as it ought to be");
+        return false;
+    }
+
+    if (umod_from->type == TYPE_STRUCT || umod_from->type == TYPE_UNION) {
+        goto fail;
+    }
+
+    bool is_num_from = TYPE_IS_NUMERIC(umod_from);
+    bool is_int_from = TYPE_IS_INTEGRAL(umod_from);
+    bool is_ptr_from = TYPE_IS_PTR(umod_from);
+
+    switch (umod_to->type) {
+    case TYPE_VOID:
+        logger_log(&to->mark, LOG_ERR, "can't assign to void");
+        return false;
+
+    case TYPE_BOOL:
+    case TYPE_CHAR:
+    case TYPE_SHORT:
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_LONG_LONG:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_LONG_DOUBLE:
+        if (is_num_from) {
+            return true;
+        }
+
+        if (is_ptr_from) {
+            logger_log(&to->mark, LOG_WARN, "initialization makes integer from"
+                       " pointer without a cast");
+            return true;
+        }
+
+        goto fail;
+
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+        logger_log(&from->mark, LOG_ERR,
+                   "incompatible types when assigning");
+        return false;
+    case TYPE_ENUM:
+        if (is_num_from) {
+            return true;
+        }
+        goto fail;
+
+    case TYPE_ARR:
+        logger_log(&from->mark, LOG_ERR,
+                   "assignment to expression with array type");
+        return false;
+    case TYPE_PTR:
+        if (is_int_from) {
+            return true;
+        }
+
+        // Can assign any pointer type to void *
+        if (umod_to->ptr.base->type == TYPE_VOID && is_ptr_from) {
+            return true;
+        }
+
+        switch (umod_to->type) {
+        case TYPE_FUNC:
+            if (typecheck_type_equal(umod_from->ptr.base, umod_to)) {
+                return true;
+            }
+            break;
+        case TYPE_ARR:
+            if (typecheck_type_equal(umod_from->ptr.base, umod_to->arr.base)) {
+                return true;
+            }
+            break;
+        case TYPE_PTR:
+            if (umod_from->ptr.base->type == TYPE_VOID) {
+                return true;
+            }
+            break;
+        default:
+            break;
+        }
+
+        goto fail;
+    default:
+        assert(false);
+    }
+
+fail:
+    logger_log(&from->mark, LOG_ERR,
+               "incompatible types when assigning");
+    return false;
 }
 
 bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2) {
@@ -444,7 +588,7 @@ bool typecheck_type_cast(type_t *to, type_t *from) {
     // Can't cast from struct/union types
     if (umod_from->type == TYPE_STRUCT || umod_from->type == TYPE_UNION) {
         logger_log(&to->mark, LOG_ERR,
-                   "to from non-scalar type requested");
+                   "conversion from non-scalar type requested");
         return false;
     }
 
@@ -951,9 +1095,15 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
 
     case EXPR_ASSIGN:
         retval &= typecheck_expr(tcs, expr->assign.dest, TC_NOCONST);
+        retval &= typecheck_expr_lvalue(tcs, expr->assign.dest);
         retval &= typecheck_expr(tcs, expr->assign.expr, TC_NOCONST);
         retval &= typecheck_type_assignable(expr->assign.dest->etype,
                                             expr->assign.expr->etype);
+        if (expr->assign.op != OP_NOP) {
+            retval &= typecheck_types_binop(expr->assign.op,
+                                            expr->assign.dest->etype,
+                                            expr->assign.expr->etype);
+        }
         expr->etype = expr->assign.dest->etype;
         return retval;
 

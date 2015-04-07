@@ -28,6 +28,9 @@
 #define TC_CONST true
 #define TC_NOCONST false
 
+/** Buffer size used for reporting errors */
+#define ERR_BUF_SIZE 512
+
 /**
  * Container for type checking context
  */
@@ -78,6 +81,15 @@ type_t *typecheck_untypedef(type_t *type);
  * @return The type with its modifers removed
  */
 type_t *typecheck_unmod(type_t *type);
+
+/**
+ * Checks whether an expression is a suitable lvalue. The expression must be
+ * typechecked first.
+ *
+ * @param expr The expression to check
+ * @return true if the expression is an lvalue, false otherwise
+ */
+bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr);
 
 /**
  * Returns true if type from can be assigned to type to, false otherwise
