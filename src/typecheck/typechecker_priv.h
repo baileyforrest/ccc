@@ -35,17 +35,13 @@
  * Container for type checking context
  */
 typedef struct tc_state_t {
+    slist_t etypes;
     typetab_t *typetab; /*< Type table on top of the stack */
     gdecl_t *func;
     stmt_t *last_switch;
     stmt_t *last_loop;
     stmt_t *last_break;
 } tc_state_t;
-
-/**
- * Literal for tc_state_t
- */
-#define TCS_LIT { NULL, NULL, NULL, NULL, NULL }
 
 #define TYPE_IS_NUMERIC(test)                                       \
     ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_DOUBLE)
@@ -54,7 +50,21 @@ typedef struct tc_state_t {
     ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_LONG)
 
 #define TYPE_IS_PTR(test)                                   \
-    ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_ARR)
+    ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_PTR)
+
+/**
+ * Initializes a type checker context
+ *
+ * @param tcs Type checker context to init
+ */
+void tc_state_init(tc_state_t *tcs);
+
+/**
+ * Destroys a type checker context
+ *
+ * @param tcs Type checker context to destroy
+ */
+void tc_state_destroy(tc_state_t *tcs);
 
 /**
  * Evaluates a given constant expression expression.
@@ -104,33 +114,36 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from);
 /**
  * Returns true if types t1 and t2 can be combined with given binop
  *
+ * @param mark Location of the binop
  * @param op The binary operation
  * @param t1 The first type
  * @param t2 The second type
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2);
+bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2);
 
 /**
  * Returns true if given unary op can be applied to given type
  *
+ * @param mark Location of the op
  * @param op The unary operation
  * @param type The type
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_type_unaryop(oper_t op, type_t *type);
+bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type);
 
 /**
  * Verifies that t1 and t2 are compatible, and the returns the "higher" type of
  * the two.
  *
+ * @param mark Location of usage
  * @param t1 Type 1
  * @param t2 Type 2
  * @param result The wider of t1 and t2 otherwise.
  *     NULL if they are not compatible
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result);
+bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2, type_t **result);
 
 /**
  * Returns true if from can be cast to to.

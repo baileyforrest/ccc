@@ -52,6 +52,7 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__LINE__", "", MACRO_LINE),
     PREDEF_MACRO_LIT("__DATE__", "", MACRO_DATE),
     PREDEF_MACRO_LIT("__TIME__", "", MACRO_TIME),
+    PREDEF_MACRO_LIT("__func__", "\"TODO\"", MACRO_BASIC), // TODO: This
     PREDEF_MACRO_LIT("defined", "",  MACRO_DEFINED),
     PREDEF_MACRO_LIT("_Pragma", "",  MACRO_PRAGMA),
     PREDEF_MACRO_LIT("__STDC__", "1", MACRO_BASIC), // ISO C

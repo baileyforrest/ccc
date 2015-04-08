@@ -35,6 +35,7 @@
  * All AST destructor functions ignore NULL, so child nodes should be
  * initialized to NULL.
  */
+// TODO: Use TYPE_TYPEDEF only if print ast mode is on
 
 #include "parser.h"
 #include "parser_priv.h"

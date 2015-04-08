@@ -209,7 +209,7 @@ typedef struct expr_t {
     sl_link_t link;                 /**< Storage link */
     fmark_t mark;                   /**< File mark */
     expr_type_t type;               /**< Expression type */
-    type_t *etype;                  /**< Not Owned: Type of the expression */
+    type_t *etype;                  /**< Not owned: type of the expression */
 
     union {
         len_str_t *var_id;          /**< Variable identifier */
@@ -590,5 +590,13 @@ const char *ast_type_mod_str(type_mod_t type_mod);
  * @return Returns static string of basic type
  */
 const char *ast_basic_type_str(basic_type_t type);
+
+/**
+ * Get a string of an operator
+ *
+ * @param op the string of the given operation
+ * @return Returns static string of basic type
+ */
+const char *ast_oper_str(oper_t op);
 
 #endif /* _AST_H_ */

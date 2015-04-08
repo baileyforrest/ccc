@@ -20,13 +20,15 @@
  * Program entry point
  */
 
+#include "manager.h"
+#include "optman.h"
+
 #include "parse/ast.h"
 
 #include "util/file_directory.h"
 #include "util/logger.h"
 
-#include "manager.h"
-#include "optman.h"
+#include "typecheck/typechecker.h"
 
 int main(int argc, char **argv) {
     status_t status = CCC_OK;
@@ -59,20 +61,22 @@ int main(int argc, char **argv) {
         }
 
         trans_unit_t *ast;
-        if (optman.dump_opts & DUMP_AST) {
-            printf("//@ AST %s\n", node->str.str);
-        }
-
         if (CCC_OK != (status = man_parse(&manager, &ast))) {
             logger_log(NULL, LOG_ERR, "Failed to parse %s", node->str.str);
             goto src_done0;
         }
+
         if (optman.dump_opts & DUMP_AST) {
+            printf("//@ AST %s\n", node->str.str);
             ast_print(ast);
-            ast_destroy(ast);
-            goto src_done0;
         }
 
+        if (!typecheck_ast(ast)) {
+            logger_log(NULL, LOG_ERR, "Failed to typecheck %s", node->str.str);
+            goto src_fail0;
+        }
+
+    src_fail0:
         ast_destroy(ast);
 
     src_done0:

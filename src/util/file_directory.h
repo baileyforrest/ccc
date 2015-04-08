@@ -73,6 +73,13 @@ typedef struct fmark_refcnt_t {
 status_t fmark_copy_chain(fmark_t *mark, fmark_t **result);
 
 /**
+ * Increments the refcount of an fmark chain
+ *
+ * @param mark Head of mark chain to increase refcount
+ */
+void fmark_chain_inc_ref(fmark_t *mark);
+
+/**
  * Free a mark chain
  *
  * @param mark Head of mark chain to free

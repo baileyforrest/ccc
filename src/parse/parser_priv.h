@@ -111,9 +111,7 @@ typedef struct lex_wrap_t {
             goto fail;                                              \
         }                                                           \
         memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));  \
-        if ((loc)->mark.last != NULL) {                             \
-            ((fmark_refcnt_t *)(loc)->mark.last)->refcnt++;         \
-        }                                                           \
+        fmark_chain_inc_ref((loc)->mark.last);                      \
     } while (0)
 
 #define DECL_SPEC_STORAGE_CLASS \

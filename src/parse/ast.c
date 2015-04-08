@@ -696,91 +696,56 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
     }
 }
 
-void ast_oper_print(oper_t op, char **dest, size_t *remain) {
+const char *ast_oper_str(oper_t op) {
     switch (op) {
-    case OP_NOP:
-        break;
+    case OP_NOP:      return "";
+
     case OP_PLUS:
-    case OP_UPLUS:
-        ast_directed_print(dest, remain, "+");
-        break;
+    case OP_UPLUS:    return "+";
+
     case OP_MINUS:
-    case OP_UMINUS:
-        ast_directed_print(dest, remain, "-");
-        break;
+    case OP_UMINUS:   return "-";
+
     case OP_TIMES:
-    case OP_DEREF:
-        ast_directed_print(dest, remain, "*");
-        break;
-    case OP_DIV:
-        ast_directed_print(dest, remain, "/");
-        break;
-    case OP_MOD:
-        ast_directed_print(dest, remain, "%%");
-        break;
-    case OP_LT:
-        ast_directed_print(dest, remain, "<");
-        break;
-    case OP_LE:
-        ast_directed_print(dest, remain, "<=");
-        break;
-    case OP_GT:
-        ast_directed_print(dest, remain, ">");
-        break;
-    case OP_GE:
-        ast_directed_print(dest, remain, ">=");
-        break;
-    case OP_EQ:
-        ast_directed_print(dest, remain, "==");
-        break;
-    case OP_NE:
-        ast_directed_print(dest, remain, "!=");
-        break;
+    case OP_DEREF:    return "*";
+
+    case OP_DIV:      return "/";
+    case OP_MOD:      return "%%";
+    case OP_LT:       return "<";
+    case OP_LE:       return "<=";
+    case OP_GT:       return ">";
+    case OP_GE:       return ">=";
+    case OP_EQ:       return "==";
+    case OP_NE:       return "!=";
+
     case OP_BITAND:
-    case OP_ADDR:
-        ast_directed_print(dest, remain, "&");
-        break;
-    case OP_BITXOR:
-        ast_directed_print(dest, remain, "^");
-        break;
-    case OP_BITOR:
-        ast_directed_print(dest, remain, "|");
-        break;
-    case OP_LSHIFT:
-        ast_directed_print(dest, remain, "<<");
-        break;
-    case OP_RSHIFT:
-        ast_directed_print(dest, remain, ">>");
-        break;
-    case OP_LOGICNOT:
-        ast_directed_print(dest, remain, "!");
-        break;
-    case OP_LOGICAND:
-        ast_directed_print(dest, remain, "&&");
-        break;
-    case OP_LOGICOR:
-        ast_directed_print(dest, remain, "||");
-        break;
-    case OP_BITNOT:
-        ast_directed_print(dest, remain, "~");
-        break;
+    case OP_ADDR:     return "&";
+
+    case OP_BITXOR:   return "^";
+    case OP_BITOR:    return "|";
+    case OP_LSHIFT:   return "<<";
+    case OP_RSHIFT:   return ">>";
+    case OP_LOGICNOT: return "!";
+    case OP_LOGICAND: return "&&";
+    case OP_LOGICOR:  return "||";
+    case OP_BITNOT:   return "~";
+
     case OP_PREINC:
-    case OP_POSTINC:
-        ast_directed_print(dest, remain, "++");
-        break;
+    case OP_POSTINC:  return "++";
+
     case OP_PREDEC:
-    case OP_POSTDEC:
-        ast_directed_print(dest, remain, "--");
-        break;
-    case OP_ARROW:
-        ast_directed_print(dest, remain, "->");
-        break;
-    case OP_DOT:
-        ast_directed_print(dest, remain, ".");
-        break;
+    case OP_POSTDEC:  return "--";
+
+    case OP_ARROW:    return "->";
+    case OP_DOT:      return ".";
     default:
         assert(false);
     }
+    return NULL;
+}
+
+void ast_oper_print(oper_t op, char **dest, size_t *remain) {
+    ast_directed_print(dest, remain, ast_oper_str(op));
 }
 
 const char *ast_basic_type_str(basic_type_t type) {
@@ -1159,6 +1124,7 @@ void ast_expr_destroy(expr_t *expr) {
     default:
         assert(false);
     }
+
     fmark_chain_free(expr->mark.last);
     free(expr);
 }

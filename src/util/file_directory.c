@@ -47,6 +47,13 @@
  */
 static status_t fdir_entry_destroy(fdir_entry_t *entry);
 
+void fmark_chain_inc_ref(fmark_t *mark) {
+    if (mark == NULL) {
+        return;
+    }
+    ((fmark_refcnt_t *)mark)->refcnt++;
+}
+
 status_t fmark_copy_chain(fmark_t *mark, fmark_t **result) {
     status_t status = CCC_OK;
     fmark_t *res = NULL;

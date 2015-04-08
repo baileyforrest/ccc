@@ -28,19 +28,40 @@
 
 #include "util/logger.h"
 
+void tc_state_init(tc_state_t *tcs) {
+    sl_init(&tcs->etypes, offsetof(type_t, link));
+    tcs->typetab = NULL;
+    tcs->func = NULL;
+    tcs->last_switch = NULL;
+    tcs->last_loop = NULL;
+    tcs->last_break = NULL;
+}
+
+void tc_state_destroy(tc_state_t *tcs) {
+    SL_DESTROY_FUNC(&tcs->etypes, ast_type_destroy);
+}
+
 bool typecheck_ast(trans_unit_t *ast) {
-    tc_state_t tcs = TCS_LIT;
-    return typecheck_trans_unit(&tcs, ast);
+    tc_state_t tcs;
+    tc_state_init(&tcs);
+    bool retval = typecheck_trans_unit(&tcs, ast);
+    tc_state_destroy(&tcs);
+    return retval;
 }
 
 bool typecheck_const_expr(expr_t *expr, long long *result) {
-    tc_state_t tcs = TCS_LIT;
-    if (!typecheck_expr(&tcs, expr, TC_CONST)) {
-        return false;
+    bool retval;
+    tc_state_t tcs;
+    tc_state_init(&tcs);
+    if (typecheck_expr(&tcs, expr, TC_CONST)) {
+        typecheck_const_expr_eval(expr, result);
+        retval = true;
+    } else {
+        retval = false;
     }
+    tc_state_destroy(&tcs);
 
-    typecheck_const_expr_eval(expr, result);
-    return true;
+    return retval;
 }
 
 void typecheck_const_expr_eval(expr_t *expr, long long *result) {
@@ -119,13 +140,15 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            tc_state_t tcs = TCS_LIT;
+            tc_state_t tcs;
+            tc_state_init(&tcs);
             typecheck_expr(&tcs, expr->sizeof_params.expr, TC_NOCONST);
             if (expr->type == EXPR_SIZEOF) {
                 *result = ast_type_size(expr->sizeof_params.expr->etype);
             } else { // expr->type == EXPR_ALIGNOF
                 *result = ast_type_align(expr->sizeof_params.expr->etype);
             }
+            tc_state_destroy(&tcs);
         }
         return;
     case EXPR_VOID:
@@ -246,7 +269,7 @@ type_t *typecheck_unmod(type_t *type) {
         type = type->mod.base;
     }
 
-    return type;
+    return typecheck_untypedef(type);
 }
 
 bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr) {
@@ -288,16 +311,19 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
     to = typecheck_untypedef(to);
     from = typecheck_untypedef(from);
 
-    if (typecheck_type_equal(to, from)) {
-        return true;
-    }
-
     type_t *umod_to = typecheck_unmod(to);
     type_t *umod_from = typecheck_unmod(from);
 
+    // TODO: This ignores const
+    if (typecheck_type_equal(umod_from, umod_from)) {
+        return true;
+    }
+
     if (umod_from->type == TYPE_VOID) {
-        logger_log(mark, LOG_ERR,
-                   "void value not ignored as it ought to be");
+        if (mark != NULL) {
+            logger_log(mark, LOG_ERR,
+                       "void value not ignored as it ought to be");
+        }
         return false;
     }
 
@@ -311,7 +337,9 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
 
     switch (umod_to->type) {
     case TYPE_VOID:
-        logger_log(mark, LOG_ERR, "can't assign to void");
+        if (mark != NULL) {
+            logger_log(mark, LOG_ERR, "can't assign to void");
+        }
         return false;
 
     case TYPE_BOOL:
@@ -328,8 +356,10 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
         }
 
         if (is_ptr_from) {
-            logger_log(mark, LOG_WARN, "initialization makes integer from"
-                       " pointer without a cast");
+            if (mark != NULL) {
+                logger_log(mark, LOG_WARN, "initialization makes integer from"
+                           " pointer without a cast");
+            }
             return true;
         }
 
@@ -346,8 +376,10 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
         goto fail;
 
     case TYPE_ARR:
-        logger_log(mark, LOG_ERR,
-                   "assignment to expression with array type");
+        if (mark != NULL) {
+            logger_log(mark, LOG_ERR,
+                       "assignment to expression with array type");
+        }
         return false;
     case TYPE_PTR:
         if (is_int_from) {
@@ -366,7 +398,8 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
             }
             break;
         case TYPE_ARR:
-            if (typecheck_type_equal(umod_to->ptr.base, umod_from->arr.base)) {
+            if (typecheck_type_assignable(mark, umod_to->ptr.base,
+                                          umod_from->arr.base)) {
                 return true;
             }
             break;
@@ -374,7 +407,8 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
             if (umod_to->ptr.base->type == TYPE_VOID) {
                 return true;
             }
-            if (typecheck_type_equal(umod_to->ptr.base, umod_from->ptr.base)) {
+            if (typecheck_type_assignable(mark, umod_to->ptr.base,
+                                          umod_from->ptr.base)) {
                 return true;
             }
             break;
@@ -388,12 +422,14 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
     }
 
 fail:
-    logger_log(mark, LOG_ERR,
-               "incompatible types when assigning");
+    if (mark != NULL) {
+        logger_log(mark, LOG_ERR,
+                   "incompatible types when assigning");
+    }
     return false;
 }
 
-bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2) {
+bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
     t1 = typecheck_untypedef(t1);
     t2 = typecheck_untypedef(t2);
     type_t *umod1 = typecheck_unmod(t1);
@@ -415,7 +451,10 @@ bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2) {
     case OP_TIMES:
     case OP_DIV:
         // times, div, only allow numeric operands
-        return is_numeric1 && is_numeric2;
+        if (is_numeric1 && is_numeric2) {
+            return true;
+        }
+        break;
 
     case OP_BITAND:
     case OP_BITXOR:
@@ -424,12 +463,15 @@ bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2) {
     case OP_LSHIFT:
     case OP_RSHIFT:
         // Require both operands to be integers, which was already checked
-        return false;
+        break;
 
     case OP_PLUS:
     case OP_MINUS:
         // Allow pointers to be added with integers
-        return (is_ptr1 && is_int2) || (is_int1 && is_ptr2);
+        if ((is_ptr1 && is_int2) || (is_int1 && is_ptr2)) {
+            return true;
+        }
+        break;
 
     case OP_LT:
     case OP_GT:
@@ -440,17 +482,22 @@ bool typecheck_types_binop(oper_t op, type_t *t1, type_t *t2) {
     case OP_LOGICAND:
     case OP_LOGICOR:
         // Allow combinations of pointers and ints
-        return (is_ptr1 && is_ptr2) || (is_ptr1 && is_int2) ||
-            (is_int1 && is_ptr2);
+        if((is_ptr1 && is_ptr2) || (is_ptr1 && is_int2) ||
+           (is_int1 && is_ptr2)) {
+            return true;
+        }
+        break;
 
     default:
         assert(false);
     }
 
-    return true;
+    logger_log(mark, LOG_ERR, "invalid operands to binary %s",
+               ast_oper_str(op));
+    return false;
 }
 
-bool typecheck_type_unaryop(oper_t op, type_t *type) {
+bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type) {
     bool is_numeric = TYPE_IS_NUMERIC(type);
     bool is_int = TYPE_IS_INTEGRAL(type);
     bool is_ptr = TYPE_IS_PTR(type);
@@ -460,30 +507,50 @@ bool typecheck_type_unaryop(oper_t op, type_t *type) {
     case OP_POSTINC:
     case OP_PREDEC:
     case OP_POSTDEC:
-        return is_numeric || is_int || is_ptr;
+        if (is_numeric || is_int || is_ptr) {
+            return true;
+        }
+        break;
 
     case OP_ADDR:
         // Can take the address of anything
         return true;
 
     case OP_DEREF:
-        return is_ptr;
+        if (is_ptr) {
+            return true;
+        }
+        break;
 
     case OP_UPLUS:
     case OP_UMINUS:
-        return is_numeric;
+        if (is_numeric) {
+            return true;
+        }
+        break;
 
     case OP_BITNOT:
-        return is_int;
+        if (is_int) {
+            return true;
+        }
+        break;
 
     case OP_LOGICNOT:
-        return is_numeric || is_int || is_ptr || type->type == TYPE_ENUM;
+        if (is_numeric || is_int || is_ptr || type->type == TYPE_ENUM) {
+            return true;
+        }
+        break;
     default:
         assert(false);
     }
+
+    logger_log(mark, LOG_ERR, "invalid operand to operator %s",
+               ast_oper_str(op));
+    return false;
 }
 
-bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
+bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
+                        type_t **result) {
     t1 = typecheck_untypedef(t1);
     t2 = typecheck_untypedef(t2);
 
@@ -511,7 +578,7 @@ bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
 
     switch (umod1->type) {
     case TYPE_VOID: // Void cannot be converted to anything
-        return false;
+        break;
 
     case TYPE_BOOL:
     case TYPE_CHAR:
@@ -526,13 +593,13 @@ bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
             *result = t2;
             return true;
         }
-        return false;
+        break;
 
     case TYPE_STRUCT:
     case TYPE_UNION:
     case TYPE_ENUM:
         // Compound types cannot be converted
-        return false;
+        break;
 
         // Only allowed to combine with integral types
     case TYPE_FUNC:
@@ -542,10 +609,13 @@ bool typecheck_type_max(type_t *t1, type_t *t2, type_t **result) {
             *result = t1;
             return true;
         }
-        return false;
+        break;
     default:
         assert(false);
     }
+
+    logger_log(mark, LOG_ERR, "Incompatable types");
+    return false;
 }
 
 bool typecheck_type_cast(fmark_t *mark, type_t *to, type_t *from) {
@@ -848,8 +918,13 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         }
         return retval;
     case STMT_RETURN:
-        retval &= typecheck_expr(tcs, stmt->return_params.expr, TC_NOCONST);
-        retval &= typecheck_type_assignable(&stmt->mark, tcs->func->decl->type,
+        if (!typecheck_expr(tcs, stmt->return_params.expr, TC_NOCONST)) {
+            return false;
+        }
+        decl_node_t *func_sig = sl_head(&tcs->func->decl->decls);
+        assert(func_sig->type->type == TYPE_FUNC);
+        retval &= typecheck_type_assignable(&stmt->mark,
+                                            func_sig->type->func.type,
                                             stmt->return_params.expr->etype);
         return retval;
 
@@ -895,6 +970,8 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, bool constant) {
 
 bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
     bool retval = true;
+    type = typecheck_untypedef(type);
+    type = typecheck_unmod(type);
     switch (type->type) {
     case TYPE_STRUCT: {
         sl_link_t *cur_decl;
@@ -936,8 +1013,10 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
             // If we encounter a designated initializer, find the
             // decl with the correct name and continue from there
             if (elem->type == EXPR_DESIG_INIT) {
-                if (!vstrcmp(node->id, elem->desig_init.name)) {
+                if (node == NULL) {
                     RESET_NODE();
+                }
+                if (!vstrcmp(node->id, elem->desig_init.name)) {
                     while (!vstrcmp(node->id, elem->desig_init.name)) {
                         ADVANCE_NODE();
                         if (node == NULL) {
@@ -995,7 +1074,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         }
 
         if (decl_len >= 0 && decl_len < len) {
-            logger_log(&expr->arr_idx.index->mark, LOG_ERR,
+            logger_log(&expr->arr_idx.index->mark, LOG_WARN,
                        "excess elements in array initializer");
         }
         return retval;
@@ -1019,32 +1098,51 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
     return retval;
 }
 
+// TODO: Need to change behavior based on whether enum, struct/union or regular.
+// Need to specify TYPE_*
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                          bool constant) {
     bool retval = true;
     retval &= typecheck_type(tcs, decl_node->type);
-    retval &= typecheck_expr(tcs, decl_node->expr, constant);
-
-    // Constant denotes that the decl node is for a struct bitfield or an enum
-    // indentifier. Just maker sure its integral
-    if (constant) {
-        return TYPE_IS_INTEGRAL(decl_node->expr->etype);
-    } else {
-        switch (decl_node->expr->type) {
-        case EXPR_DESIG_INIT: // This should not parse
-            assert(false);
+    if (decl_node->id != NULL) {
+        tt_insert(tcs->typetab, decl_node->type, TT_VAR, decl_node->id, NULL);
+    }
+    if (decl_node->expr != NULL) {
+        retval &= typecheck_expr(tcs, decl_node->expr, constant);
+        if (!retval) {
             return false;
-        case EXPR_INIT_LIST:
-            retval &= typecheck_init_list(tcs, decl_node->type,
-                                          decl_node->expr);
-            return retval;
-        default:
-            retval &= typecheck_type_assignable(&decl_node->mark,
-                                                decl_node->type,
-                                                decl_node->expr->etype);
-            return retval;
+        }
+
+        // Constant denotes that the decl node is for a struct bitfield or an
+        // enum indentifier. Just maker sure its integral
+        if (constant) {
+            type_t *type = decl_node->expr->etype;
+            type = typecheck_untypedef(type);
+            type = typecheck_unmod(type);
+            if (TYPE_IS_INTEGRAL(type)) {
+                return true;
+            }
+            logger_log(&decl_node->mark, LOG_ERR,
+                       "bit-field '%.*s' width not an integer constant",
+                       decl_node->id->len, decl_node->id->str);
+            return false;
+        } else {
+            switch (decl_node->expr->type) {
+            case EXPR_DESIG_INIT: // This should not parse
+                assert(false);
+                return false;
+            case EXPR_INIT_LIST:
+                retval &= typecheck_init_list(tcs, decl_node->type,
+                                              decl_node->expr);
+                break;
+            default:
+                retval &= typecheck_type_assignable(&decl_node->mark,
+                                                    decl_node->type,
+                                                    decl_node->expr->etype);
+            }
         }
     }
+
     return retval;
 }
 
@@ -1088,7 +1186,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                                             expr->assign.dest->etype,
                                             expr->assign.expr->etype);
         if (expr->assign.op != OP_NOP) {
-            retval &= typecheck_types_binop(expr->assign.op,
+            retval &= typecheck_types_binop(&expr->mark, expr->assign.op,
                                             expr->assign.dest->etype,
                                             expr->assign.expr->etype);
         }
@@ -1107,9 +1205,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        retval &= typecheck_types_binop(expr->bin.op, expr->bin.expr1->etype,
+        retval &= typecheck_types_binop(&expr->mark, expr->bin.op,
+                                        expr->bin.expr1->etype,
                                         expr->bin.expr2->etype);
-        retval &= typecheck_type_max(expr->bin.expr1->etype,
+        retval &= typecheck_type_max(&expr->mark, expr->bin.expr1->etype,
                                      expr->bin.expr2->etype,
                                      &expr->etype);
         return retval;
@@ -1118,9 +1217,34 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!typecheck_expr(tcs, expr->unary.expr, TC_NOCONST)) {
             return false;
         }
-        retval &= typecheck_type_unaryop(expr->unary.op,
-                                         expr->unary.expr->etype);
-        expr->etype = expr->unary.expr->etype;
+        if (!typecheck_type_unaryop(&expr->mark, expr->unary.op,
+                                    expr->unary.expr->etype)) {
+            return false;
+        }
+        switch (expr->unary.op) {
+        case OP_ADDR:
+            if (!typecheck_expr_lvalue(tcs, expr->unary.expr)) {
+                return false;
+            }
+            expr->etype = malloc(sizeof(type_t));
+            if (expr->etype == NULL) {
+                logger_log(NULL, LOG_ERR, "Out of memory in typechecker");
+                return false;
+            }
+            memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
+            fmark_chain_inc_ref(expr->mark.last);
+            sl_append(&tcs->etypes, &expr->etype->link);
+            expr->etype->type = TYPE_PTR;
+            expr->etype->ptr.type_mod = TMOD_NONE;
+            expr->etype->ptr.base = expr->unary.expr->etype;
+            break;
+        case OP_DEREF:
+            assert(expr->unary.expr->etype->type == TYPE_PTR);
+            expr->etype = expr->unary.expr->etype->ptr.base;
+            break;
+        default:
+            expr->etype = expr->unary.expr->etype;
+        }
         return retval;
 
     case EXPR_COND:
@@ -1130,9 +1254,13 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        retval &= typecheck_type_max(expr->cond.expr2->etype,
+        /* TODO: Do this only when its being used in an expr stmt or another
+           expr
+        retval &= typecheck_type_max(&expr->mark, expr->cond.expr2->etype,
                                      expr->cond.expr3->etype,
                                      &expr->etype);
+        */
+        expr->etype = expr->cond.expr2->etype;
         return retval;
 
     case EXPR_CAST: {
@@ -1140,9 +1268,16 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             return false;
         }
         decl_node_t *node = sl_head(&expr->cast.cast->decls);
-        retval &= typecheck_type_cast(&node->mark, node->type,
-                                      expr->cast.base->etype);
-        expr->etype = node->type;
+        if (node == NULL) {
+            retval &= typecheck_type_cast(&expr->cast.cast->mark,
+                                          expr->cast.cast->type,
+                                          expr->cast.base->etype);
+            expr->etype = expr->cast.cast->type;
+        } else {
+            retval &= typecheck_type_cast(&node->mark, node->type,
+                                          expr->cast.base->etype);
+            expr->etype = node->type;
+        }
         return retval;
     }
 
@@ -1157,35 +1292,41 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             return false;
         }
         int arg_num = 1;
-        sl_link_t *cur_sig, *cur_expr;
+        sl_link_t *cur_sig, *cur_arg;
         cur_sig = func_sig->func.params.head;
-        cur_expr = expr->call.params.head;
-        while (cur_sig != NULL && cur_expr != NULL) {
+        cur_arg = expr->call.params.head;
+        while (cur_sig != NULL && cur_arg != NULL) {
             decl_t *decl = GET_ELEM(&func_sig->func.params, cur_sig);
             decl_node_t *param = sl_head(&decl->decls);
-            expr_t *expr = GET_ELEM(&expr->call.params, cur_expr);
-            retval &= typecheck_expr(tcs, expr, TC_NOCONST);
-            if (expr->etype != NULL &&
-                !typecheck_type_assignable(&expr->mark, param->type,
-                                           expr->etype)) {
-                logger_log(&expr->mark, LOG_ERR,
+            expr_t *arg = GET_ELEM(&expr->call.params, cur_arg);
+            retval &= typecheck_expr(tcs, arg, TC_NOCONST);
+            type_t *param_type = param == NULL ? decl->type : param->type;
+            if (arg->etype != NULL &&
+                !typecheck_type_assignable(NULL, param_type,
+                                           arg->etype)) {
+                logger_log(&arg->mark, LOG_ERR,
                            "incompatible type for argument %d of function",
                            arg_num);
-                ast_print_type(func_sig);
             }
 
             ++arg_num;
             cur_sig = cur_sig->next;
-            cur_expr = cur_expr->next;
+            cur_arg = cur_arg->next;
         }
         if (cur_sig != NULL) {
-            logger_log(&expr->mark, LOG_ERR, "too few arguments to function");
-            ast_print_type(func_sig);
-            retval = false;
+            decl_t *decl = GET_ELEM(&func_sig->func.params, cur_sig);
+            decl_node_t *param = sl_head(&decl->decls);
+
+            // Only report error if parameter isn't (void)
+            if (!(arg_num == 1 && param == NULL &&
+                  decl->type->type == TYPE_VOID)) {
+                logger_log(&expr->mark, LOG_ERR,
+                           "too few arguments to function");
+                retval = false;
+            }
         }
-        if (cur_expr != NULL) {
+        if (!func_sig->func.varargs && cur_arg != NULL) {
             logger_log(&expr->mark, LOG_ERR, "too many arguments to function");
-            ast_print_type(func_sig);
             retval = false;
         }
         expr->etype = func_sig->func.type;
@@ -1220,8 +1361,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
 
     case EXPR_MEM_ACC: {
         retval &= typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST);
-        type_t *compound;
-        switch (expr->mem_acc.base->etype->type) {
+        type_t *compound = typecheck_untypedef(expr->mem_acc.base->etype);
+        switch (compound->type) {
         case TYPE_STRUCT:
         case TYPE_UNION:
             if (expr->mem_acc.op != OP_DOT) {
@@ -1229,11 +1370,12 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                            "invalid type argument of '->'");
                 return false;
             }
-            compound = expr->mem_acc.base->etype;
+            compound = typecheck_untypedef(expr->mem_acc.base->etype);
             break;
         case TYPE_PTR:
             if (expr->mem_acc.op == OP_ARROW) {
-                compound = expr->mem_acc.base->etype->ptr.base;
+                compound =
+                    typecheck_untypedef(expr->mem_acc.base->etype->ptr.base);
                 if (compound->type == TYPE_STRUCT ||
                     compound->type == TYPE_UNION) {
                     break;
@@ -1249,10 +1391,14 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         sl_link_t *cur;
         SL_FOREACH(cur, &compound->struct_params.decls) {
-            decl_node_t *decl = GET_ELEM(&compound->struct_params.decls, cur);
-            if (vstrcmp(decl->id, expr->mem_acc.name)) {
-                expr->etype = decl->type;
-                return true;
+            decl_t *decl = GET_ELEM(&compound->struct_params.decls, cur);
+            sl_link_t *cur_node;
+            SL_FOREACH(cur_node, &decl->decls) {
+                decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
+                if (vstrcmp(node->id, expr->mem_acc.name)) {
+                    expr->etype = decl->type;
+                    return true;
+                }
             }
         }
         logger_log(&expr->mark, LOG_ERR, "compound type has no member '%.*s'",
@@ -1385,7 +1531,9 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         return retval;
     case TYPE_ARR:
         retval &= typecheck_type(tcs, type->arr.base);
-        retval &= typecheck_expr(tcs, type->arr.len, TC_CONST);
+        if (type->arr.len != NULL) {
+            retval &= typecheck_expr(tcs, type->arr.len, TC_CONST);
+        }
         return retval;
     case TYPE_PTR:
         return typecheck_type(tcs, type->ptr.base);
