@@ -33,8 +33,7 @@
 static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
 
 #define TYPE_LITERAL(typename, type) \
-    { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename,    \
-      { .ptr = { NULL, 0 } } }
+    { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, { } }
 
 static len_str_t void_str        = LEN_STR_LIT("void");
 static len_str_t bool_str        = LEN_STR_LIT("_Bool");
@@ -82,7 +81,7 @@ type_t * const tt_long_double = &stt_long_double;
 type_t * const tt_size_t = &stt_size_t;
 
 #define TYPE_TAB_LITERAL_ENTRY(type) \
-    { SL_LINK_LIT, &type##_str, TT_PRIM , &stt_ ## type }
+    { SL_LINK_LIT, &type##_str, TT_PRIM , &stt_ ## type, { } }
 
 /**
  * Table of primative types
@@ -98,7 +97,7 @@ static typetab_entry_t s_prim_types[] = {
     TYPE_TAB_LITERAL_ENTRY(float),
     TYPE_TAB_LITERAL_ENTRY(double),
     TYPE_TAB_LITERAL_ENTRY(long_double),
-    { SL_LINK_LIT, &size_t_str, TT_PRIM , &stt_size_t }
+    { SL_LINK_LIT, &size_t_str, TT_PRIM , &stt_size_t, { } }
 };
 
 status_t tt_init(typetab_t *tt, typetab_t *last) {
@@ -159,8 +158,12 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
         ast_decl_node_type_destroy(entry->type);
         break;
     case TT_VAR:
+    case TT_ENUM_ID:
         // Ignore variables, the type is in the decl node
+        // Also ignore ENUM_ID because the type is on the enum type
         break;
+    default:
+        assert(false);
     }
     free(entry);
 }

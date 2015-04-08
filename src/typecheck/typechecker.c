@@ -215,12 +215,27 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
         if (!typecheck_type_equal(t1->func.type, t2->func.type)) {
             return false;
         }
-        sl_link_t *ptype1, *ptype2;
+        sl_link_t *ptype1 = t1->func.params.head;
+        sl_link_t *ptype2 = t2->func.params.head;
         while (ptype1 != NULL && ptype2 != NULL) {
             decl_t *decl1 = GET_ELEM(&t1->func.params, ptype1);
             decl_t *decl2 = GET_ELEM(&t2->func.params, ptype2);
-            if (!typecheck_type_equal(decl1->type, decl2->type)) {
+            decl_node_t *node1 = sl_head(&decl1->decls);
+            decl_node_t *node2 = sl_head(&decl2->decls);
+            assert(node1 == sl_tail(&decl1->decls));
+            assert(node2 == sl_tail(&decl2->decls));
+            if ((node1 == NULL && node2 != NULL) ||
+                (node1 != NULL && node2 == NULL)) {
                 return false;
+            }
+            if (node1 == NULL) {
+                if (!typecheck_type_equal(decl1->type, decl1->type)) {
+                    return false;
+                }
+            } else {
+                if (!typecheck_type_equal(node1->type, node2->type)) {
+                    return false;
+                }
             }
             ptype1 = ptype1->next;
             ptype2 = ptype2->next;
@@ -755,12 +770,13 @@ bool typecheck_trans_unit(tc_state_t *tcs, trans_unit_t *trans_unit) {
 bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
     bool retval = true;
 
-    retval &= typecheck_decl(tcs, gdecl->decl, TC_NOCONST);
-
     switch (gdecl->type) {
     case GDECL_FDEFN: {
         gdecl_t *func_save = tcs->func;
+        assert(func_save == NULL); // Can't have nested functions in C
         tcs->func = gdecl;
+
+        retval &= typecheck_decl(tcs, gdecl->decl, TYPE_VOID);
         retval &= typecheck_stmt(tcs, gdecl->fdefn.stmt);
         sl_link_t *cur;
         SL_FOREACH(cur, &gdecl->fdefn.gotos) {
@@ -775,10 +791,13 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
                 retval = false;
             }
         }
+
+        // Restore old state
         tcs->func = func_save;
         break;
     }
     case GDECL_DECL:
+        retval &= typecheck_decl(tcs, gdecl->decl, TYPE_VOID);
         break;
     default:
         assert(false);
@@ -796,7 +815,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return true;
 
     case STMT_DECL:
-        return typecheck_decl(tcs, stmt->decl, TC_NOCONST);
+        return typecheck_decl(tcs, stmt->decl, TYPE_VOID);
 
     case STMT_LABEL:
         retval &= typecheck_stmt(tcs, stmt->label.stmt);
@@ -954,14 +973,19 @@ fail:
     return retval;
 }
 
-bool typecheck_decl(tc_state_t *tcs, decl_t *decl, bool constant) {
+bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type) {
     bool retval = true;
 
     retval &= typecheck_type(tcs, decl->type);
+
+    if (decl->type->type == TYPE_MOD &&
+        decl->type->mod.type_mod & TMOD_TYPEDEF) {
+        // Don't need to typecheck decl nodes if its a typedef
+        return retval;
+    }
     sl_link_t *cur;
     SL_FOREACH(cur, &decl->decls) {
-        retval &= typecheck_decl_node(tcs, GET_ELEM(&decl->decls, cur),
-                                      constant);
+        retval &= typecheck_decl_node(tcs, GET_ELEM(&decl->decls, cur), type);
     }
 
     return retval;
@@ -1098,35 +1122,42 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
     return retval;
 }
 
-// TODO: Need to change behavior based on whether enum, struct/union or regular.
-// Need to specify TYPE_*
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
-                         bool constant) {
+                         basic_type_t type) {
     bool retval = true;
     retval &= typecheck_type(tcs, decl_node->type);
-    if (decl_node->id != NULL) {
-        tt_insert(tcs->typetab, decl_node->type, TT_VAR, decl_node->id, NULL);
-    }
-    if (decl_node->expr != NULL) {
-        retval &= typecheck_expr(tcs, decl_node->expr, constant);
-        if (!retval) {
+    if (type == TYPE_VOID && decl_node->id != NULL) {
+        status_t status;
+        if (CCC_OK !=
+            (status =
+             tt_insert(tcs->typetab, decl_node->type, TT_VAR, decl_node->id,
+                       NULL))) {
+            if (status == CCC_DUPLICATE) {
+                // A previous function declaration with the same type is allowed
+                // TODO: Make sure that multiple function definitions are not
+                // allowed
+                if (decl_node->type->type == TYPE_FUNC) {
+                    typetab_entry_t *entry =
+                        tt_lookup(tcs->typetab, decl_node->id);
+                    if (entry->entry_type == TT_VAR &&
+                        typecheck_type_equal(entry->type, decl_node->type)) {
+                        return true;
+                    }
+                }
+                logger_log(&decl_node->mark, LOG_ERR, "Redefined symbol %.*s",
+                           decl_node->id->len, decl_node->id->str);
+            }
             return false;
         }
-
-        // Constant denotes that the decl node is for a struct bitfield or an
-        // enum indentifier. Just maker sure its integral
-        if (constant) {
-            type_t *type = decl_node->expr->etype;
-            type = typecheck_untypedef(type);
-            type = typecheck_unmod(type);
-            if (TYPE_IS_INTEGRAL(type)) {
-                return true;
+    }
+    if (decl_node->expr != NULL) {
+        switch (type) {
+        case TYPE_VOID:
+            retval &= typecheck_expr(tcs, decl_node->expr, TC_NOCONST);
+            if (!retval) {
+                return false;
             }
-            logger_log(&decl_node->mark, LOG_ERR,
-                       "bit-field '%.*s' width not an integer constant",
-                       decl_node->id->len, decl_node->id->str);
-            return false;
-        } else {
+
             switch (decl_node->expr->type) {
             case EXPR_DESIG_INIT: // This should not parse
                 assert(false);
@@ -1140,9 +1171,31 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                                                     decl_node->type,
                                                     decl_node->expr->etype);
             }
+            break;
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+        case TYPE_ENUM: {
+            retval &= typecheck_expr(tcs, decl_node->expr, TC_CONST);
+            if (!retval) {
+                return false;
+            }
+
+            type_t *type = decl_node->expr->etype;
+            type = typecheck_untypedef(type);
+            type = typecheck_unmod(type);
+            if (!TYPE_IS_INTEGRAL(type)) {
+                logger_log(&decl_node->mark, LOG_ERR,
+                           "bit-field '%.*s' width not an integer constant",
+                           decl_node->id->len, decl_node->id->str);
+                return false;
+            }
+            break;
+        }
+        default:
+            assert(false);
+            return false;
         }
     }
-
     return retval;
 }
 
@@ -1346,7 +1399,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
 
     case EXPR_SIZEOF:
         if (expr->sizeof_params.type != NULL) {
-            retval &= typecheck_decl(tcs, expr->sizeof_params.type, TC_NOCONST);
+            retval &= typecheck_decl(tcs, expr->sizeof_params.type, TYPE_VOID);
         }
         if (expr->sizeof_params.expr != NULL) {
             retval &= typecheck_expr(tcs, expr->sizeof_params.expr, TC_NOCONST);
@@ -1355,7 +1408,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         return retval;
 
     case EXPR_ALIGNOF:
-        retval &= typecheck_decl(tcs, expr->sizeof_params.type, TC_NOCONST);
+        retval &= typecheck_decl(tcs, expr->sizeof_params.type, TYPE_VOID);
         expr->etype = tt_size_t;
         break;
 
@@ -1476,17 +1529,38 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         SL_FOREACH(cur, &type->struct_params.decls) {
             retval &= typecheck_decl(tcs,
                                      GET_ELEM(&type->struct_params.decls, cur),
-                                     TC_CONST);
+                                     type->type);
         }
         return retval;
     }
     case TYPE_ENUM: {
         retval &= typecheck_type(tcs, type->enum_params.type);
+        long long next_val = 0;
         sl_link_t *cur;
         SL_FOREACH(cur, &type->enum_params.ids) {
-            retval &= typecheck_decl_node(tcs,
-                                          GET_ELEM(&type->enum_params.ids, cur),
-                                          TC_CONST);
+            decl_node_t *node = GET_ELEM(&type->enum_params.ids, cur);
+            retval &= typecheck_decl_node(tcs, node, TYPE_ENUM);
+            typetab_entry_t *entry;
+            status_t status;
+            if (CCC_OK !=
+                (status =
+                 tt_insert(tcs->typetab, type->enum_params.type,TT_ENUM_ID,
+                           node->id, &entry))) {
+                if (status == CCC_DUPLICATE) {
+                    logger_log(&node->mark, LOG_ERR,
+                               "Redefined symbol %.*s", node->id->len,
+                               node->id->str);
+                }
+                return false;
+            }
+            long long cur_val;
+            if (node->expr != NULL) {
+                typecheck_const_expr_eval(node->expr, &cur_val);
+                entry->enum_val = cur_val;
+                next_val = cur_val + 1;
+            } else {
+                entry->enum_val = next_val++;
+            }
         }
         return retval;
     }
@@ -1523,10 +1597,30 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         return typecheck_type(tcs, type->paren_base);
     case TYPE_FUNC:
         retval &= typecheck_type(tcs, type->func.type);
+
+        typetab_t *save_tab = NULL;
+        if (tcs->func != NULL) {
+            decl_node_t *func_node = sl_head(&tcs->func->decl->decls);
+            if (func_node->type == type) {
+                // Make sure to enter the scope of the function's body before
+                // typechecking the decl so that the variables are added to the
+                // correct scope
+                save_tab = tcs->typetab;
+                assert(tcs->func->fdefn.stmt->type = STMT_COMPOUND);
+                tcs->typetab = &tcs->func->fdefn.stmt->compound.typetab;
+            }
+        }
+        // If this is only a function declaration, we don't want to add the
+        // parameters to any symbol table
+        basic_type_t decl_type = save_tab == NULL ? TYPE_FUNC : TYPE_VOID;
         sl_link_t *cur;
         SL_FOREACH(cur, &type->func.params) {
             retval &= typecheck_decl(tcs, GET_ELEM(&type->func.params, cur),
-                                     TC_CONST);
+                                     decl_type);
+        }
+
+        if (save_tab != NULL) {
+            tcs->typetab = save_tab;
         }
         return retval;
     case TYPE_ARR:

@@ -232,11 +232,11 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt);
  *
  * @param tcs The typechecking state
  * @param decl Object to typecheck
- * @param constant if TC_CONST, make sure the decl has constant expressions
- *     as assignments, and they are integers (for struct bit fields)
+ * @param type Type of decl this is. TYPE_VOID for regular decl, otherwise
+ *     TYPE_STRUCT, TYPE_UNION, or TYPE_ENUM
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_decl(tc_state_t *tcs, decl_t *decl, bool constant);
+bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type);
 
 /**
  * Typechecks a type being assigned to an init list
@@ -253,12 +253,12 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr);
  *
  * @param tcs The typechecking state
  * @param decl_node Object to typecheck
- * @param constant if TC_CONST, make sure the expression is constant and of type
- *     integer. This is for struct bitfields and enum values
+ * @param type Type of decl this is. TYPE_VOID for regular decl, otherwise
+ *     TYPE_STRUCT, TYPE_UNION, or TYPE_ENUM
  * @return true if the node type checks, false otherwise
  */
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
-                         bool constant);
+                         basic_type_t type);
 
 /**
  * Typechecks a expr_t.

@@ -42,6 +42,7 @@ typedef enum tt_type_t {
     TT_TYPEDEF,
     TT_COMPOUND, /* struct, union, enum */
     TT_VAR,      /* Variable */
+    TT_ENUM_ID,  /* Enumeration name */
 } tt_type_t;
 
 typedef struct typetab_entry_t {
@@ -49,6 +50,9 @@ typedef struct typetab_entry_t {
     len_str_t *key;
     tt_type_t entry_type;
     struct type_t *type;
+    union {
+        long long enum_val;
+    };
 } typetab_entry_t;
 
 typedef struct typedef_base_t {
