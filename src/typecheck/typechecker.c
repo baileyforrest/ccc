@@ -1184,26 +1184,49 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
     retval &= typecheck_type(tcs, decl_node->type);
     if (type == TYPE_VOID && decl_node->id != NULL) {
         status_t status;
+        typetab_entry_t *entry = NULL;
+        type_t *untypedef = typecheck_untypedef(decl_node->type);
+
+        // Not a definiton if its a variable with extern, or a function
+        // declaration not equal to the function we're currently in
+        bool is_decl = ((untypedef->type == TYPE_MOD &&
+                         untypedef->mod.type_mod & TMOD_EXTERN) ||
+                        (decl_node->type->type == TYPE_FUNC &&
+                         (tcs->func == NULL ||
+                          decl_node != sl_head(&tcs->func->decl->decls))));
+
         if (CCC_OK !=
             (status =
              tt_insert(tcs->typetab, decl_node->type, TT_VAR, decl_node->id,
-                       NULL))) {
-            if (status == CCC_DUPLICATE) {
-                // A previous function declaration with the same type is allowed
-                // TODO: Make sure that multiple function definitions are not
-                // allowed
-                if (decl_node->type->type == TYPE_FUNC) {
-                    typetab_entry_t *entry =
-                        tt_lookup(tcs->typetab, decl_node->id);
-                    if (entry->entry_type == TT_VAR &&
-                        typecheck_type_equal(entry->type, decl_node->type)) {
-                        return true;
-                    }
+                       &entry))) {
+            if (status != CCC_DUPLICATE) {
+                return false;
+            } else {
+                entry = tt_lookup(tcs->typetab, decl_node->id);
+
+                // If existing type is extern, compare with the type
+                // without extern
+                type_t *cmp_type;
+                if (entry->type->type == TYPE_MOD &&
+                    entry->type->mod.type_mod == TMOD_EXTERN) {
+                    cmp_type = entry->type->mod.base;
+                } else {
+                    cmp_type = entry->type;
                 }
-                logger_log(&decl_node->mark, LOG_ERR, "Redefined symbol %.*s",
-                           decl_node->id->len, decl_node->id->str);
+                // Redefined if old entry is not a variable, last variable was
+                // already defined, and this is a definiton, or if the
+                // types are not equal
+                if (entry->entry_type != TT_VAR ||
+                    (entry->var_defined && !is_decl) ||
+                    !typecheck_type_equal(cmp_type, decl_node->type)) {
+                    logger_log(&decl_node->mark, LOG_ERR,
+                               "Redefined symbol %.*s",
+                               decl_node->id->len, decl_node->id->str);
+                    return false;
+                }
             }
-            return false;
+        } else {
+            entry->var_defined = !is_decl;
         }
     }
     if (decl_node->expr != NULL) {
