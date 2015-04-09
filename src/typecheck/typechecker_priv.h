@@ -263,6 +263,16 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                          basic_type_t type);
 
 /**
+ * Finds the type of a member in a struct or union type
+ *
+ * @param type Type to find member in
+ * @param name Name of the member
+ * @param offset location to store offset, NULL if not needed
+ * @return Return the type of the member, of NULL if doesn't exist
+ */
+type_t *typecheck_find_member(type_t *type, len_str_t *name, size_t *offset);
+
+/**
  * Typechecks a expr_t.
  *
  * @param tcs The typechecking state
