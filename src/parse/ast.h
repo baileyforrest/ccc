@@ -405,8 +405,9 @@ typedef struct stmt_t {
         } while_params;
 
         struct {                       /**< For paramaters */
-            expr_t *expr1;             /**< Expression 1 */
             decl_t *decl1;             /**< Declaration 1 */
+            typetab_t *typetab;        /**< vars defined in for loop decl */
+            expr_t *expr1;             /**< Expression 1 */
             expr_t *expr2;             /**< Expression 2 */
             expr_t *expr3;             /**< Expression 3 */
             struct stmt_t *stmt;       /**< Statement in loop */

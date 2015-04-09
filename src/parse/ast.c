@@ -1230,6 +1230,10 @@ void ast_stmt_destroy(stmt_t *stmt) {
         ast_expr_destroy(stmt->for_params.expr2);
         ast_expr_destroy(stmt->for_params.expr3);
         ast_stmt_destroy(stmt->for_params.stmt);
+        if (stmt->for_params.typetab != NULL) {
+            tt_destroy(stmt->for_params.typetab); // Must free last
+            free(stmt->for_params.typetab);
+        }
         break;
 
         // For goto, continue, break target/parent is supposed to be duplicated

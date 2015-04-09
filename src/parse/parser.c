@@ -2192,8 +2192,9 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
         stmt->type = STMT_FOR;
-        stmt->for_params.expr1 = NULL;
         stmt->for_params.decl1 = NULL;
+        stmt->for_params.typetab = NULL;
+        stmt->for_params.expr1 = NULL;
         stmt->for_params.expr2 = NULL;
         stmt->for_params.expr3 = NULL;
         stmt->for_params.stmt = NULL;
@@ -2215,6 +2216,9 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
                      par_declaration(lex, &stmt->for_params.decl1, false))) {
                     goto fail;
                 }
+
+                stmt->for_params.typetab = emalloc(sizeof(typetab_t));
+                tt_init(stmt->for_params.typetab, lex->typetab);
                 break;
             }
             default:
@@ -2243,9 +2247,19 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         }
         LEX_MATCH(lex, RPAREN);
 
+        // Enter new scope if there is one
+        if (stmt->for_params.typetab != NULL) {
+            lex->typetab = stmt->for_params.typetab;
+        }
+
         if (CCC_OK != (status = par_statement(lex, &stmt->for_params.stmt))) {
             goto fail;
         }
+
+        if (stmt->for_params.typetab != NULL) {
+            lex->typetab = stmt->for_params.typetab->last;
+        }
+
         break;
 
     default:

@@ -939,8 +939,12 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
 
         stmt_t *loop_save = tcs->last_loop;
         stmt_t *break_save = tcs->last_break;
+        typetab_t *last_tab = tcs->typetab;
         tcs->last_loop = stmt;
         tcs->last_break = stmt;
+        if (stmt->for_params.typetab != NULL) {
+            tcs->typetab = stmt->for_params.typetab;
+        }
 
         if (stmt->for_params.expr1 != NULL) {
             retval &= typecheck_expr(tcs, stmt->for_params.expr1, TC_NOCONST);
@@ -955,9 +959,10 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
             retval &= typecheck_expr(tcs, stmt->for_params.expr3, TC_NOCONST);
         }
 
-
         retval &= typecheck_stmt(tcs, stmt->for_params.stmt);
 
+        // Restore state
+        tcs->typetab = last_tab;
         tcs->last_loop = loop_save;
         tcs->last_break = break_save;
         return retval;
@@ -1156,11 +1161,11 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         return retval;
     }
     case TYPE_ARR: {
-        if (!typecheck_expr(tcs, type->arr.len, TC_CONST)) {
-            return false;
-        }
         long long decl_len = -1;
         if (type->arr.len != NULL) {
+            if (!typecheck_expr(tcs, type->arr.len, TC_CONST)) {
+                return false;
+            }
             typecheck_const_expr_eval(tcs, type->arr.len, &decl_len);
         }
 
@@ -1366,15 +1371,15 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         return retval;
 
     case EXPR_VAR: {
-        if (constant == TC_CONST) {
-            logger_log(&expr->mark, LOG_ERR, "Expected constant value");
-            return false;
-        }
         typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
         if (entry == NULL ||
             (entry->entry_type != TT_VAR && entry->entry_type != TT_ENUM_ID)) {
             logger_log(&expr->mark, LOG_ERR, "'%.*s' undeclared.",
                        expr->var_id->len, expr->var_id->str);
+            return false;
+        }
+        if (constant == TC_CONST && entry->entry_type == TT_VAR) {
+            logger_log(&expr->mark, LOG_ERR, "Expected constant value");
             return false;
         }
         expr->etype = entry->type;
