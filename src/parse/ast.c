@@ -653,15 +653,24 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
             ast_expr_print(expr->sizeof_params.expr, 0, dest, remain);
         }
         break;
-    case EXPR_OFFSETOF:
+    case EXPR_OFFSETOF: {
         ast_directed_print(dest, remain, "__builtin_offsetof(");
         ast_decl_print(expr->offsetof_params.type, TYPE_VOID, 0, dest, remain);
         ast_directed_print(dest, remain, ", ");
-        ast_directed_print(dest, remain, "%.*s",
-                           expr->offsetof_params.name->len,
-                           expr->offsetof_params.name->str);
+        bool first = true;
+        sl_link_t *cur;
+        SL_FOREACH(cur, &expr->offsetof_params.path) {
+            if (!first) {
+                ast_directed_print(dest, remain, ".");
+            }
+            len_str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
+            ast_directed_print(dest, remain, "%.*s", node->str.len,
+                               node->str.str);
+            first = false;
+        }
         ast_directed_print(dest, remain, ")");
         break;
+    }
     case EXPR_MEM_ACC:
         ast_expr_print(expr->mem_acc.base, 0, dest, remain);
         ast_oper_print(expr->mem_acc.op, dest, remain);
@@ -1119,6 +1128,7 @@ void ast_expr_destroy(expr_t *expr) {
         break;
     case EXPR_OFFSETOF:
         ast_decl_destroy(expr->offsetof_params.type);
+        SL_DESTROY_FUNC(&expr->offsetof_params.path, free);
         break;
     case EXPR_MEM_ACC:
         ast_expr_destroy(expr->mem_acc.base);

@@ -271,7 +271,7 @@ typedef struct expr_t {
 
         struct {                    /**< Offsetof parameters */
             struct decl_t *type;    /**< Type to get offsetof */
-            len_str_t *name;        /**< Name of member */
+            slist_t path;           /**< Names in offset path (len_str_t) */
         } offsetof_params;
 
         struct {                    /**< Member access of a compound type */

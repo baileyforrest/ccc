@@ -1414,9 +1414,22 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_types_binop(&expr->mark, expr->bin.op,
                                         expr->bin.expr1->etype,
                                         expr->bin.expr2->etype);
-        retval &= typecheck_type_max(&expr->mark, expr->bin.expr1->etype,
-                                     expr->bin.expr2->etype,
-                                     &expr->etype);
+        switch (expr->bin.op) {
+        case OP_LT:
+        case OP_GT:
+        case OP_LE:
+        case OP_GE:
+        case OP_EQ:
+        case OP_NE:
+        case OP_LOGICAND:
+        case OP_LOGICOR:
+            expr->etype = tt_bool;
+            break;
+        default:
+            retval &= typecheck_type_max(&expr->mark, expr->bin.expr1->etype,
+                                         expr->bin.expr2->etype,
+                                         &expr->etype);
+        }
         return retval;
 
     case EXPR_UNARY:
@@ -1567,6 +1580,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
         compound = typecheck_unmod(compound);
+        len_str_node_t *head = sl_head(&expr->offsetof_params.path);
         switch (compound->type) {
         case TYPE_STRUCT:
         case TYPE_UNION:
@@ -1574,21 +1588,26 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         default:
             logger_log(&expr->mark, LOG_ERR,
                        "request for member '%.*s' in something not a structure "
-                       "or union", expr->offsetof_params.name->len,
-                       expr->offsetof_params.name->str);
+                       "or union", head->str.len, head->str.str);
             return false;
         }
-        type_t *mem_type = typecheck_find_member(compound,
-                                                 expr->offsetof_params.name,
-                                                 NULL);
-        if (mem_type != NULL) {
-            expr->etype = tt_size_t;
-            return true;
+
+        sl_link_t *cur;
+        SL_FOREACH(cur, &expr->offsetof_params.path) {
+            len_str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
+            type_t *mem_type = typecheck_find_member(compound, &node->str,
+                                                     NULL);
+            if (mem_type == NULL) {
+                logger_log(&expr->mark, LOG_ERR,
+                           "compound type has no member '%.*s'",
+                           node->str.len,
+                           node->str.str);
+                return false;
+            }
         }
-        logger_log(&expr->mark, LOG_ERR, "compound type has no member '%.*s'",
-                   expr->offsetof_params.name->len,
-                   expr->offsetof_params.name->str);
-        return false;
+
+        expr->etype = tt_size_t;
+        return true;
 
     case EXPR_MEM_ACC: {
         if (!typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST)) {

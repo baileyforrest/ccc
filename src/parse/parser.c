@@ -1236,17 +1236,30 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         ALLOC_NODE(lex, base, expr_t);
         base->type = EXPR_OFFSETOF;
         base->offsetof_params.type = NULL;
+        sl_init(&base->offsetof_params.path, offsetof(len_str_node_t, link));
         LEX_MATCH(lex, LPAREN);
         if (CCC_OK != (status = par_type_name(lex, false,
                                               &base->offsetof_params.type))) {
             goto fail;
         }
         LEX_MATCH(lex, COMMA);
-        if (LEX_CUR(lex).type != ID) {
-            goto fail;
-        }
-        base->offsetof_params.name = &LEX_CUR(lex).tab_entry->key;
-        LEX_ADVANCE(lex);
+
+        bool first = true;
+        do {
+            if (!first && LEX_CUR(lex).type == DOT) {
+                LEX_ADVANCE(lex);
+            }
+            if (LEX_CUR(lex).type != ID) {
+                LEX_MATCH(lex, ID); // Generate the error message
+                goto fail;
+            }
+            len_str_node_t *node = emalloc(sizeof(len_str_node_t));
+            node->str.str = LEX_CUR(lex).tab_entry->key.str;
+            node->str.len = LEX_CUR(lex).tab_entry->key.len;
+            sl_append(&base->offsetof_params.path, &node->link);
+            LEX_ADVANCE(lex);
+            first = false;
+        } while (LEX_CUR(lex).type == DOT);
         LEX_MATCH(lex, RPAREN);
         break;
 

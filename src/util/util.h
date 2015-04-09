@@ -89,6 +89,12 @@ typedef struct len_str_node_node_t {
     len_str_node_t node;
 } len_str_node_node_t;
 
+// TODO: Replace calls to malloc with this
+/**
+ * Malloc that reports error and exits if memory cannot be obtained
+ */
+void *emalloc(size_t size);
+
 /**
  * djb2 String hash function for len_str_t.
  * Must be void * for hashtable interface
