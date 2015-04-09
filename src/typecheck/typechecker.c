@@ -38,7 +38,9 @@ void tc_state_init(tc_state_t *tcs) {
 }
 
 void tc_state_destroy(tc_state_t *tcs) {
-    SL_DESTROY_FUNC(&tcs->etypes, ast_type_destroy);
+    // Use free rather than ast_type_destroy because we don't want to
+    // recursively free other nodes
+    SL_DESTROY_FUNC(&tcs->etypes, free);
 }
 
 bool typecheck_ast(trans_unit_t *ast) {
@@ -280,11 +282,13 @@ type_t *typecheck_untypedef(type_t *type) {
 }
 
 type_t *typecheck_unmod(type_t *type) {
-    if (type->type == TYPE_MOD) {
+    type = typecheck_untypedef(type);
+    while (type->type == TYPE_MOD) {
         type = type->mod.base;
+        type = typecheck_untypedef(type);
     }
 
-    return typecheck_untypedef(type);
+    return type;
 }
 
 bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr) {
@@ -450,10 +454,10 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
     type_t *umod1 = typecheck_unmod(t1);
     type_t *umod2 = typecheck_unmod(t2);
 
-    bool is_numeric1 = TYPE_IS_NUMERIC(umod1);
-    bool is_numeric2 = TYPE_IS_NUMERIC(umod2);
-    bool is_int1 = TYPE_IS_INTEGRAL(umod1);
-    bool is_int2 = TYPE_IS_INTEGRAL(umod2);
+    bool is_numeric1 = TYPE_IS_NUMERIC(umod1) || umod1->type == TYPE_ENUM;
+    bool is_numeric2 = TYPE_IS_NUMERIC(umod2) || umod2->type == TYPE_ENUM;
+    bool is_int1 = TYPE_IS_INTEGRAL(umod1) || umod1->type == TYPE_ENUM;
+    bool is_int2 = TYPE_IS_INTEGRAL(umod2) || umod2->type == TYPE_ENUM;
     bool is_ptr1 = TYPE_IS_PTR(umod1);
     bool is_ptr2 = TYPE_IS_PTR(umod2);
 
@@ -513,6 +517,7 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
 }
 
 bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type) {
+    type = typecheck_unmod(type);
     bool is_numeric = TYPE_IS_NUMERIC(type);
     bool is_int = TYPE_IS_INTEGRAL(type);
     bool is_ptr = TYPE_IS_PTR(type);
@@ -604,6 +609,11 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_LONG_DOUBLE:
+        if (umod2->type == TYPE_ENUM) {
+            *result = t1;
+            return true;
+        }
+
         if (is_ptr2) {
             *result = t2;
             return true;
@@ -612,8 +622,18 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
 
     case TYPE_STRUCT:
     case TYPE_UNION:
-    case TYPE_ENUM:
         // Compound types cannot be converted
+        break;
+
+    case TYPE_ENUM:
+        if (umod2->type == TYPE_ENUM) {
+            *result = t1;
+            return true;
+        }
+        if (is_int2) {
+            *result = t2;
+            return true;
+        }
         break;
 
         // Only allowed to combine with integral types
@@ -622,6 +642,18 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
     case TYPE_PTR:
         if (is_int2) {
             *result = t1;
+            return true;
+        }
+
+        // If both are pointers, and one is a void *, return the other
+        if (umod2->type == TYPE_PTR && umod2->ptr.base->type == TYPE_VOID) {
+            *result = t1;
+            return true;
+        }
+
+        if (is_ptr2 &&
+            umod1->type == TYPE_PTR && umod1->ptr.base->type == TYPE_VOID) {
+            *result = t2;
             return true;
         }
         break;
@@ -747,10 +779,10 @@ bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
 }
 
 bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr) {
-    bool retval = typecheck_expr(tcs, expr, TC_NOCONST);
-    retval &= typecheck_type_conditional(&expr->mark, expr->etype);
-
-    return retval;
+    if (!typecheck_expr(tcs, expr, TC_NOCONST)) {
+        return false;
+    }
+    return typecheck_type_conditional(&expr->mark, expr->etype);
 }
 
 bool typecheck_trans_unit(tc_state_t *tcs, trans_unit_t *trans_unit) {
@@ -782,7 +814,7 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
         SL_FOREACH(cur, &gdecl->fdefn.gotos) {
             stmt_t *goto_stmt = GET_ELEM(&gdecl->fdefn.gotos, cur);
             stmt_t *label = ht_lookup(&tcs->func->fdefn.labels,
-                                      goto_stmt->goto_params.label);
+                                      &goto_stmt->goto_params.label);
             if (label == NULL) {
                 logger_log(&goto_stmt->mark, LOG_ERR,
                            "label %.*s used but not defined",
@@ -994,7 +1026,6 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type) {
 
 bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
     bool retval = true;
-    type = typecheck_untypedef(type);
     type = typecheck_unmod(type);
     switch (type->type) {
     case TYPE_STRUCT: {
@@ -1181,7 +1212,6 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
             }
 
             type_t *type = decl_node->expr->etype;
-            type = typecheck_untypedef(type);
             type = typecheck_unmod(type);
             if (!TYPE_IS_INTEGRAL(type)) {
                 logger_log(&decl_node->mark, LOG_ERR,
@@ -1219,7 +1249,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             return false;
         }
         typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
-        if (entry == NULL || entry->entry_type != TT_VAR) {
+        if (entry == NULL ||
+            (entry->entry_type != TT_VAR && entry->entry_type != TT_ENUM_ID)) {
             logger_log(&expr->mark, LOG_ERR, "'%.*s' undeclared.",
                        expr->var_id->len, expr->var_id->str);
             return false;
@@ -1413,8 +1444,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         break;
 
     case EXPR_MEM_ACC: {
-        retval &= typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST);
-        type_t *compound = typecheck_untypedef(expr->mem_acc.base->etype);
+        if (!typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST)) {
+            return false;
+        }
+        type_t *compound = typecheck_unmod(expr->mem_acc.base->etype);
         switch (compound->type) {
         case TYPE_STRUCT:
         case TYPE_UNION:
@@ -1423,12 +1456,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                            "invalid type argument of '->'");
                 return false;
             }
-            compound = typecheck_untypedef(expr->mem_acc.base->etype);
             break;
         case TYPE_PTR:
             if (expr->mem_acc.op == OP_ARROW) {
-                compound =
-                    typecheck_untypedef(expr->mem_acc.base->etype->ptr.base);
+                compound = typecheck_unmod(expr->mem_acc.base->etype->ptr.base);
                 if (compound->type == TYPE_STRUCT ||
                     compound->type == TYPE_UNION) {
                     break;
@@ -1449,7 +1480,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             SL_FOREACH(cur_node, &decl->decls) {
                 decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
                 if (vstrcmp(node->id, expr->mem_acc.name)) {
-                    expr->etype = decl->type;
+                    expr->etype = node->type;
                     return true;
                 }
             }
@@ -1465,10 +1496,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        type_t *umod_arr =
-            typecheck_unmod(typecheck_untypedef(expr->arr_idx.array->etype));
-        type_t *umod_index =
-            typecheck_unmod(typecheck_untypedef(expr->arr_idx.index->etype));
+        type_t *umod_arr = typecheck_unmod(expr->arr_idx.array->etype);
+        type_t *umod_index = typecheck_unmod(expr->arr_idx.index->etype);
 
         if (umod_arr->type != TYPE_PTR && umod_arr->type != TYPE_ARR) {
             logger_log(&expr->arr_idx.array->mark, LOG_ERR,
@@ -1544,7 +1573,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             status_t status;
             if (CCC_OK !=
                 (status =
-                 tt_insert(tcs->typetab, type->enum_params.type,TT_ENUM_ID,
+                 tt_insert(tcs->typetab, type->enum_params.type, TT_ENUM_ID,
                            node->id, &entry))) {
                 if (status == CCC_DUPLICATE) {
                     logger_log(&node->mark, LOG_ERR,
