@@ -174,8 +174,21 @@ void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
 }
 
 bool typecheck_type_equal(type_t *t1, type_t *t2) {
+    // Types which differ in these modifiers are still equal
+#define IGNORE_MASK (~(TMOD_EXTERN | TMOD_TYPEDEF | TMOD_INLINE))
+
     t1 = typecheck_untypedef(t1);
     t2 = typecheck_untypedef(t2);
+
+    // Remove any modifiers which do not effect equality
+    if (t1->type == TYPE_MOD && (t1->mod.type_mod & IGNORE_MASK) == 0) {
+        t1 = t1->mod.base;
+        t1 = typecheck_untypedef(t1);
+    }
+    if (t2->type == TYPE_MOD && (t2->mod.type_mod & IGNORE_MASK) == 0) {
+        t2 = t2->mod.base;
+        t2 = typecheck_untypedef(t2);
+    }
 
     if (t1 == t2) { // Pointers equal
         return true;
@@ -209,9 +222,11 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
         assert(false && "Should be untypedefed");
         return false;
 
-    case TYPE_MOD:
-        return (t1->mod.type_mod == t2->mod.type_mod) &&
+    case TYPE_MOD: {
+        return ((t1->mod.type_mod & IGNORE_MASK) ==
+                (t2->mod.type_mod & IGNORE_MASK)) &&
             typecheck_type_equal(t1->mod.base, t2->mod.base);
+    }
 
     case TYPE_PAREN:
         assert(false && "Parens should be removed");
@@ -1247,11 +1262,15 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
         status_t status;
         typetab_entry_t *entry = NULL;
         type_t *untypedef = typecheck_untypedef(decl_node->type);
+        type_t *type_base = untypedef;
+        while (type_base->type == TYPE_PTR || type_base->type == TYPE_ARR) {
+            type_base = typecheck_get_ptr_base(type_base);
+        }
 
         // Not a definiton if its a variable with extern, or a function
         // declaration not equal to the function we're currently in
-        bool is_decl = ((untypedef->type == TYPE_MOD &&
-                         untypedef->mod.type_mod & TMOD_EXTERN) ||
+        bool is_decl = ((type_base->type == TYPE_MOD &&
+                         type_base->mod.type_mod & TMOD_EXTERN) ||
                         (decl_node->type->type == TYPE_FUNC &&
                          (tcs->func == NULL ||
                           decl_node != sl_head(&tcs->func->decl->decls))));
