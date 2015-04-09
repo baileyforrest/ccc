@@ -1231,6 +1231,24 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         }
         break;
     }
+    case OFFSETOF:
+        LEX_ADVANCE(lex);
+        ALLOC_NODE(lex, base, expr_t);
+        base->type = EXPR_OFFSETOF;
+        base->offsetof_params.type = NULL;
+        LEX_MATCH(lex, LPAREN);
+        if (CCC_OK != (status = par_type_name(lex, false,
+                                              &base->offsetof_params.type))) {
+            goto fail;
+        }
+        LEX_MATCH(lex, COMMA);
+        if (LEX_CUR(lex).type != ID) {
+            goto fail;
+        }
+        base->offsetof_params.name = &LEX_CUR(lex).tab_entry->key;
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, RPAREN);
+        break;
 
     case BITAND:
     case STAR:

@@ -161,6 +161,8 @@ const char *token_str(token_t token) {
     case STATIC_ASSERT: return "_Static_assert";
     case THREAD_LOCAL:  return "_Thread_local";
 
+    case OFFSETOF:      return "__builtin_offsetof";
+
     case VOID:          return "void";
     case CHAR:          return "char";
     case SHORT:         return "short";

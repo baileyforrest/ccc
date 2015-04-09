@@ -124,6 +124,9 @@ typedef enum token_t {
     STATIC_ASSERT, // _Static_assert
     THREAD_LOCAL,  // _Thread_local
 
+    // Built in
+    OFFSETOF,      // __builtin_offsetof
+
     // Types
     VOID,     // void
 

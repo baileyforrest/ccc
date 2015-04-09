@@ -1477,6 +1477,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     }
 
     case EXPR_SIZEOF:
+    case EXPR_ALIGNOF:
         if (expr->sizeof_params.type != NULL) {
             retval &= typecheck_decl(tcs, expr->sizeof_params.type, TYPE_VOID);
         }
@@ -1486,10 +1487,40 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         expr->etype = tt_size_t;
         return retval;
 
-    case EXPR_ALIGNOF:
-        retval &= typecheck_decl(tcs, expr->sizeof_params.type, TYPE_VOID);
+    case EXPR_OFFSETOF:
+        retval &= typecheck_decl(tcs, expr->offsetof_params.type, TYPE_VOID);
+        decl_node_t *decl = sl_head(&expr->offsetof_params.type->decls);
+        type_t *compound = decl == NULL ?
+            expr->offsetof_params.type->type : decl->type;
+        compound = typecheck_unmod(compound);
+        switch (compound->type) {
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+            break;
+        default:
+            logger_log(&expr->mark, LOG_ERR,
+                       "request for member '%.*s' in something not a structure "
+                       "or union", expr->offsetof_params.name->len,
+                       expr->offsetof_params.name->str);
+            return false;
+        }
         expr->etype = tt_size_t;
-        break;
+
+        sl_link_t *cur;
+        SL_FOREACH(cur, &compound->struct_params.decls) {
+            decl_t *decl = GET_ELEM(&compound->struct_params.decls, cur);
+            sl_link_t *cur_node;
+            SL_FOREACH(cur_node, &decl->decls) {
+                decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
+                if (vstrcmp(node->id, expr->offsetof_params.name)) {
+                    return true;
+                }
+            }
+        }
+        logger_log(&expr->mark, LOG_ERR, "compound type has no member '%.*s'",
+                   expr->offsetof_params.name->len,
+                   expr->offsetof_params.name->str);
+        return false;
 
     case EXPR_MEM_ACC: {
         if (!typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST)) {

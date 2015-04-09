@@ -78,6 +78,9 @@ static symtab_entry_t s_reserved[] = {
     { SL_LINK_LIT, LEN_STR_LIT("_Static_assert"), STATIC_ASSERT },
     { SL_LINK_LIT, LEN_STR_LIT("_Thread_local" ), THREAD_LOCAL  },
 
+    // __builtin
+    { SL_LINK_LIT, LEN_STR_LIT("__builtin_offsetof"), OFFSETOF  },
+
     // Types
     { SL_LINK_LIT, LEN_STR_LIT("void"          ), VOID          },
 
