@@ -494,6 +494,15 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
         if ((is_ptr1 && is_int2) || (is_int1 && is_ptr2)) {
             return true;
         }
+
+        if (is_ptr1 && is_ptr2) {
+            type_t *umod_base1 = typecheck_unmod(typecheck_get_ptr_base(umod1));
+            type_t *umod_base2 = typecheck_unmod(typecheck_get_ptr_base(umod2));
+            if (typecheck_type_equal(umod_base1, umod_base2)) {
+                return true;
+            }
+        }
+
         break;
 
     case OP_LT:
@@ -571,6 +580,17 @@ bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type) {
     logger_log(mark, LOG_ERR, "invalid operand to operator %s",
                ast_oper_str(op));
     return false;
+}
+
+type_t *typecheck_get_ptr_base(type_t *t1) {
+    switch (t1->type) {
+    case TYPE_FUNC: return t1;
+    case TYPE_PTR:  return t1->ptr.base;
+    case TYPE_ARR:  return t1->arr.base;
+    default:
+        assert(false);
+    }
+    return NULL;
 }
 
 bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
@@ -660,6 +680,15 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
             typecheck_unmod(umod1->ptr.base)->type == TYPE_VOID) {
             *result = t2;
             return true;
+        }
+
+        if (is_ptr2) {
+            type_t *umod_base1 = typecheck_unmod(typecheck_get_ptr_base(umod1));
+            type_t *umod_base2 = typecheck_unmod(typecheck_get_ptr_base(umod2));
+            if (typecheck_type_equal(umod_base1, umod_base2)) {
+                *result = t1;
+                return true;
+            }
         }
         break;
     default:
@@ -1509,7 +1538,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!(retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST))) {
             return false;
         }
-        type_t *func_sig = expr->call.func->etype;
+        type_t *func_sig = typecheck_unmod(expr->call.func->etype);
+        if (func_sig->type == TYPE_PTR) {
+            func_sig = typecheck_unmod(func_sig->ptr.base);
+        }
         if (func_sig->type != TYPE_FUNC) {
             logger_log(&expr->mark, LOG_ERR,
                        "called object is not a function or function pointer");
