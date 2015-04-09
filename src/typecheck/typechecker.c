@@ -56,7 +56,7 @@ bool typecheck_const_expr(expr_t *expr, long long *result) {
     tc_state_t tcs;
     tc_state_init(&tcs);
     if (typecheck_expr(&tcs, expr, TC_CONST)) {
-        typecheck_const_expr_eval(expr, result);
+        typecheck_const_expr_eval(&tcs, expr, result);
         retval = true;
     } else {
         retval = false;
@@ -66,10 +66,11 @@ bool typecheck_const_expr(expr_t *expr, long long *result) {
     return retval;
 }
 
-void typecheck_const_expr_eval(expr_t *expr, long long *result) {
+void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
+                               long long *result) {
     switch (expr->type) {
     case EXPR_PAREN:
-        typecheck_const_expr_eval(expr->paren_base, result);
+        typecheck_const_expr_eval(tcs, expr->paren_base, result);
         return;
     case EXPR_CONST_INT:
         *result = expr->const_val.int_val;
@@ -77,8 +78,8 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
     case EXPR_BIN: {
         long long temp1;
         long long temp2;
-        typecheck_const_expr_eval(expr->bin.expr1, &temp1);
-        typecheck_const_expr_eval(expr->bin.expr2, &temp2);
+        typecheck_const_expr_eval(tcs, expr->bin.expr1, &temp1);
+        typecheck_const_expr_eval(tcs, expr->bin.expr2, &temp2);
         switch (expr->bin.op) {
         case OP_TIMES:    *result = temp1 *  temp2; break;
         case OP_DIV:      *result = temp1 /  temp2; break;
@@ -105,7 +106,7 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
     }
     case EXPR_UNARY: {
         long long temp;
-        typecheck_const_expr_eval(expr->unary.expr, &temp);
+        typecheck_const_expr_eval(tcs, expr->unary.expr, &temp);
         switch (expr->unary.op) {
         case OP_UPLUS:    *result =  temp; break;
         case OP_UMINUS:   *result = -temp; break;
@@ -118,16 +119,16 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
     }
     case EXPR_COND: {
         long long temp;
-        typecheck_const_expr_eval(expr->cond.expr1, &temp);
+        typecheck_const_expr_eval(tcs, expr->cond.expr1, &temp);
         if (temp) {
-            typecheck_const_expr_eval(expr->cond.expr2, result);
+            typecheck_const_expr_eval(tcs, expr->cond.expr2, result);
         } else {
-            typecheck_const_expr_eval(expr->cond.expr3, result);
+            typecheck_const_expr_eval(tcs, expr->cond.expr3, result);
         }
         return;
     }
     case EXPR_CAST:
-        typecheck_const_expr_eval(expr->cast.base, result);
+        typecheck_const_expr_eval(tcs, expr->cast.base, result);
         return;
 
     case EXPR_SIZEOF:
@@ -142,19 +143,22 @@ void typecheck_const_expr_eval(expr_t *expr, long long *result) {
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            tc_state_t tcs;
-            tc_state_init(&tcs);
-            typecheck_expr(&tcs, expr->sizeof_params.expr, TC_NOCONST);
+            typecheck_expr(tcs, expr->sizeof_params.expr, TC_NOCONST);
             if (expr->type == EXPR_SIZEOF) {
                 *result = ast_type_size(expr->sizeof_params.expr->etype);
             } else { // expr->type == EXPR_ALIGNOF
                 *result = ast_type_align(expr->sizeof_params.expr->etype);
             }
-            tc_state_destroy(&tcs);
         }
         return;
+    case EXPR_VAR: {
+        typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
+        if (entry->entry_type == TT_ENUM_ID) {
+            *result = entry->enum_val;
+            return;
+        }
+    }
     case EXPR_VOID:
-    case EXPR_VAR:
     case EXPR_ASSIGN:
     case EXPR_CONST_FLOAT:
     case EXPR_CONST_STR:
@@ -930,21 +934,33 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         tcs->last_break = break_save;
         return retval;
     }
-    case STMT_FOR:
-        retval &= typecheck_expr(tcs, stmt->for_params.expr1, TC_NOCONST);
-        retval &= typecheck_expr_conditional(tcs, stmt->for_params.expr2);
-        retval &= typecheck_expr(tcs, stmt->for_params.expr3, TC_NOCONST);
+    case STMT_FOR: {
 
         stmt_t *loop_save = tcs->last_loop;
         stmt_t *break_save = tcs->last_break;
         tcs->last_loop = stmt;
         tcs->last_break = stmt;
 
+        if (stmt->for_params.expr1 != NULL) {
+            retval &= typecheck_expr(tcs, stmt->for_params.expr1, TC_NOCONST);
+        }
+        if (stmt->for_params.decl1 != NULL) {
+            retval &= typecheck_decl(tcs, stmt->for_params.decl1, TYPE_VOID);
+        }
+        if (stmt->for_params.expr2 != NULL) {
+            retval &= typecheck_expr_conditional(tcs, stmt->for_params.expr2);
+        }
+        if (stmt->for_params.expr3 != NULL) {
+            retval &= typecheck_expr(tcs, stmt->for_params.expr3, TC_NOCONST);
+        }
+
+
         retval &= typecheck_stmt(tcs, stmt->for_params.stmt);
 
         tcs->last_loop = loop_save;
         tcs->last_break = break_save;
         return retval;
+    }
 
     case STMT_GOTO:
         assert(tcs->func != NULL);
@@ -968,16 +984,25 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
             stmt->break_params.parent = tcs->last_loop;
         }
         return retval;
-    case STMT_RETURN:
-        if (!typecheck_expr(tcs, stmt->return_params.expr, TC_NOCONST)) {
-            return false;
-        }
+    case STMT_RETURN: {
         decl_node_t *func_sig = sl_head(&tcs->func->decl->decls);
         assert(func_sig->type->type == TYPE_FUNC);
-        retval &= typecheck_type_assignable(&stmt->mark,
-                                            func_sig->type->func.type,
-                                            stmt->return_params.expr->etype);
+
+        if (stmt->return_params.expr == NULL) {
+            if (func_sig->type->func.type->type != TYPE_VOID) {
+                return false;
+            }
+        } else {
+            if (!typecheck_expr(tcs, stmt->return_params.expr, TC_NOCONST)) {
+                return false;
+            }
+            retval &=
+                typecheck_type_assignable(&stmt->mark,
+                                          func_sig->type->func.type,
+                                          stmt->return_params.expr->etype);
+        }
         return retval;
+    }
 
     case STMT_COMPOUND: {
         // Enter new scope
@@ -1109,7 +1134,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         }
         long long decl_len = -1;
         if (type->arr.len != NULL) {
-            typecheck_const_expr_eval(type->arr.len, &decl_len);
+            typecheck_const_expr_eval(tcs, type->arr.len, &decl_len);
         }
 
         long len = 0;
@@ -1511,6 +1536,11 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             retval = false;
         }
 
+        if (umod_arr->type == TYPE_PTR) {
+            expr->etype = expr->arr_idx.array->etype->ptr.base;
+        } else { // umod_arr->type == TYPE_ARR
+            expr->etype = expr->arr_idx.array->etype->arr.base;
+        }
         return retval;
     }
 
@@ -1584,7 +1614,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             }
             long long cur_val;
             if (node->expr != NULL) {
-                typecheck_const_expr_eval(node->expr, &cur_val);
+                typecheck_const_expr_eval(tcs, node->expr, &cur_val);
                 entry->enum_val = cur_val;
                 next_val = cur_val + 1;
             } else {

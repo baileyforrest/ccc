@@ -71,10 +71,12 @@ void tc_state_destroy(tc_state_t *tcs);
  *
  * Assumes that the expression typechecks
  *
+ * @param tcs Type checker context
  * @param expr The expression to evaluate
  * @param result Location to store the result
  */
-void typecheck_const_expr_eval(expr_t *expr, long long *result);
+void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
+                               long long *result);
 
 /**
  * Returns a type with its typedefs removed
