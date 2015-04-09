@@ -650,13 +650,14 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
         }
 
         // If both are pointers, and one is a void *, return the other
-        if (umod2->type == TYPE_PTR && umod2->ptr.base->type == TYPE_VOID) {
+        if (umod2->type == TYPE_PTR &&
+            typecheck_unmod(umod2->ptr.base)->type == TYPE_VOID) {
             *result = t1;
             return true;
         }
 
-        if (is_ptr2 &&
-            umod1->type == TYPE_PTR && umod1->ptr.base->type == TYPE_VOID) {
+        if (is_ptr2 && umod1->type == TYPE_PTR &&
+            typecheck_unmod(umod1->ptr.base)->type == TYPE_VOID) {
             *result = t2;
             return true;
         }
@@ -1053,6 +1054,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
     bool retval = true;
     type = typecheck_unmod(type);
     switch (type->type) {
+    case TYPE_UNION:
     case TYPE_STRUCT: {
         sl_link_t *cur_decl;
         decl_t *decl;
@@ -1069,7 +1071,9 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
 
 #define ADVANCE_NODE()                                                  \
         do {                                                            \
-            cur_node = cur_node->next;                                  \
+            if (cur_node != NULL) {                                     \
+                cur_node = cur_node->next;                              \
+            }                                                           \
             if (cur_node == NULL) {                                     \
                 cur_decl = cur_decl->next;                              \
                 if (cur_decl != NULL) {                                 \
@@ -1111,6 +1115,29 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 }
                 elem = elem->desig_init.val;
             }
+            bool do_cont = false;
+            while (node == NULL) {
+                if (decl == NULL) {
+                    logger_log(&expr->mark, LOG_WARN,
+                               "excess elements in struct initializer");
+                    return retval;
+                } else {
+                    type_t *decl_type = typecheck_unmod(decl->type);
+                    // Skip non struct/union anonymous members
+                    if (decl_type->type != TYPE_STRUCT &&
+                        decl_type->type != TYPE_UNION) {
+                        continue;
+                    }
+                    // Decl, but no decl node. Anonymous member
+                    retval &= typecheck_init_list(tcs, decl_type, elem);
+                    ADVANCE_NODE();
+                    do_cont = true;
+                    break;
+                }
+            }
+            if (do_cont) {
+                continue;
+            }
             switch (elem->type) {
             case EXPR_DESIG_INIT:
                 assert(false); // Handled above
@@ -1143,13 +1170,13 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
             ++len;
             expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
             retval &= typecheck_expr(tcs, cur_expr, TC_NOCONST);
-            if (expr->type == EXPR_INIT_LIST) {
+            if (cur_expr->type == EXPR_INIT_LIST) {
                 retval &= typecheck_init_list(tcs, type->arr.base,
                                               cur_expr);
             } else {
                 retval &= typecheck_type_assignable(&cur_expr->mark,
                                                     type->arr.base,
-                                                    expr->etype);
+                                                    cur_expr->etype);
             }
         }
 
