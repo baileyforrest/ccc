@@ -1039,8 +1039,10 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         assert(func_sig->type->type == TYPE_FUNC);
 
         if (stmt->return_params.expr == NULL) {
-            if (func_sig->type->func.type->type != TYPE_VOID) {
-                return false;
+            if (typecheck_unmod(func_sig->type->func.type)->type != TYPE_VOID) {
+                logger_log(&stmt->mark, LOG_WARN,
+                           "'return' with no value, in function returning"
+                           " non-void");
             }
         } else {
             if (!typecheck_expr(tcs, stmt->return_params.expr, TC_NOCONST)) {
@@ -1280,6 +1282,8 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
              tt_insert(tcs->typetab, decl_node->type, TT_VAR, decl_node->id,
                        &entry))) {
             if (status != CCC_DUPLICATE) {
+                logger_log(&decl_node->mark, LOG_ERR,
+                           "Failure inserting to type table");
                 return false;
             } else {
                 entry = tt_lookup(tcs->typetab, decl_node->id);
