@@ -21,3 +21,9 @@
  */
 
 #include "ir.h"
+
+void ir_print(FILE *stream, ir_trans_unit_t *irtree) {
+    // TODO: This
+    (void)stream;
+    (void)irtree;
+}

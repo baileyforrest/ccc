@@ -28,6 +28,9 @@
 #ifndef _IR_H_
 #define _IR_H_
 
+#include <stdio.h>
+
+#include "util/htable.h"
 #include "util/slist.h"
 #include "util/util.h"
 
@@ -357,5 +360,60 @@ typedef struct ir_stmt_t {
         } intrinsic_func;
     };
 } ir_stmt_t;
+
+typedef struct ir_symtab_t {
+    htable_t table;
+} ir_symtab_t;
+
+typedef struct ir_gdecl_t ir_gdecl_t;
+
+typedef enum ir_symtab_entry_type_t {
+    IR_SYMTAB_ENTRY_GDECL,
+    IR_SYMTAB_ENTRY_LOCAL,
+} ir_symtab_entry_type_t;
+
+typedef struct ir_symtab_entry_t {
+    sl_link_t link;
+    len_str_t name;
+    ir_symtab_entry_type_t type;
+    ir_type_t *entry_type;
+
+    union {
+        ir_gdecl_t *gdecl;
+        ir_expr_t *local; /**< Expression initialized to. NULL if none */
+    };
+} ir_symtab_entry_t;
+
+typedef enum ir_gdecl_type_t {
+    IR_GDECL_GDATA,
+    IR_GDECL_FUNC,
+} ir_gdecl_type_t;
+
+typedef struct ir_gdecl_t {
+    sl_link_t link;
+    ir_gdecl_type_t type;
+    len_str_t name;
+    ir_type_t *decl_type;
+
+    union {
+        struct {
+            ir_expr_t *val; /**< Null if decl */
+        } gdata;
+
+        struct {
+            slist_t body; /**< (ir_stmt_t) Empty if decl */
+            ir_symtab_t locals;
+            unsigned next_id; /**< Next temp name */
+        } func;
+    };
+} ir_gdecl_t;
+
+typedef struct ir_trans_unit_t {
+    slist_t gdecls;
+    ir_symtab_t globals;
+} ir_trans_unit_t;
+
+
+void ir_print(FILE *stream, ir_trans_unit_t *irtree);
 
 #endif /* _IR_H_ */
