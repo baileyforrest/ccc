@@ -845,6 +845,15 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         assert(false);
     }
 
+    if (macro->num_params >= 0) {
+        ts_skip_ws_and_comment(&lookahead);
+        if (ts_cur(&lookahead) != '(') {
+            // If macro requires params, but none are provided, this is just
+            // treated as identifier
+            return ts_advance(stream);
+        }
+    }
+
     pp_macro_inst_t *new_macro_inst;
     int error;
 
@@ -868,14 +877,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // -1 means non function style macro
     if (macro->num_params >= 0) {
-        ts_skip_ws_and_comment(&lookahead);
-
-        if (ts_cur(&lookahead) != '(') {
-            // If macro requires params, but none are provided, this is just
-            // treated as identifier
-            return ts_advance(stream);
-        }
-
         ts_advance(&lookahead); // Skip the paren
 
         if (macro->num_params == 0) {

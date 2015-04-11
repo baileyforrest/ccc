@@ -211,7 +211,7 @@ typedef enum ir_expr_type_t {
     IR_EXPR_PHI,
     IR_EXPR_SELECT,
     IR_EXPR_CALL,
-    IR_EXPR_VA_ARG,
+    IR_EXPR_VAARG,
 } ir_expr_type_t;
 
 struct ir_expr_t {
@@ -298,7 +298,7 @@ struct ir_expr_t {
             ir_type_t *va_list_type;
             slist_t arglist; /**< (ir_type_expr_pair_t) */
             ir_type_t *arg_type;
-        } va_arg;
+        } vaarg;
     };
 };
 

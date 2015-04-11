@@ -172,8 +172,8 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
     case IR_EXPR_CALL:
         sl_init(&expr->call.arglist, offsetof(ir_type_expr_pair_t, link));
         break;
-    case IR_EXPR_VA_ARG:
-        sl_init(&expr->va_arg.arglist, offsetof(ir_type_expr_pair_t, link));
+    case IR_EXPR_VAARG:
+        sl_init(&expr->vaarg.arglist, offsetof(ir_type_expr_pair_t, link));
         break;
     default:
         assert(false);
