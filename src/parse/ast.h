@@ -36,6 +36,7 @@ struct stmt_t;
 struct type_t;
 struct gdecl_t;
 struct decl_t;
+struct ir_label_t;
 
 /**
  * Modifiers for types. Should be stored in a bitmap
@@ -374,10 +375,12 @@ typedef struct stmt_t {
             sl_link_t link;            /**< Link in case statement */
             expr_t *val;               /**< Expression value */
             struct stmt_t *stmt;       /**< Statement labeled */
+            struct ir_label_t *label;  /**< Label of this case */
         } case_params;
 
         struct {                       /**< default parameters */
             struct stmt_t *stmt;       /**< Statement labeled */
+            struct ir_label_t *label;  /**< Label of default */
         } default_params;
 
         struct {                       /**< if paramaters */

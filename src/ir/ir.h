@@ -36,21 +36,20 @@
 
 typedef struct ir_label_t {
     sl_link_t link;
-    len_str_t str;
-    int refcnt;
+    len_str_t name;
 } ir_label_t;
 
 
 typedef enum ir_type_type_t {
-    IR_VOID,
-    IR_FUNC,
-    IR_INT,
-    IR_FLOAT,
-    IR_PTR,
-    IR_LABEL,
-    IR_ARR,
-    IR_STRUCT,
-    IR_OPAQUE,
+    IR_TYPE_VOID,
+    IR_TYPE_FUNC,
+    IR_TYPE_INT,
+    IR_TYPE_FLOAT,
+    IR_TYPE_PTR,
+    IR_TYPE_LABEL,
+    IR_TYPE_ARR,
+    IR_TYPE_STRUCT,
+    IR_TYPE_OPAQUE,
 } ir_type_type_t;
 
 typedef enum ir_float_type_t {
@@ -188,6 +187,7 @@ typedef enum ir_fcmp_type_t {
 } ir_fcmp_type_t;
 
 typedef struct ir_type_expr_pair_t {
+    sl_link_t link;
     ir_type_t *type;
     ir_expr_t *expr;
 } ir_type_expr_pair_t;
@@ -197,9 +197,10 @@ typedef struct ir_val_label_pair_t {
     sl_link_t link;
     ir_expr_t *val;
     ir_label_t *label;
-} ir_case_t;
+} ir_val_label_pair_t;
 
 typedef enum ir_expr_type_t {
+    IR_EXPR_CONST,
     IR_EXPR_BINOP,
     IR_EXPR_ALLOCA,
     IR_EXPR_LOAD,
@@ -218,6 +219,12 @@ struct ir_expr_t {
     ir_expr_type_t type;
 
     union {
+
+        struct {
+            ir_type_t *type;
+            long long val;
+        } const_params;
+
         struct {
             ir_oper_t op;
             ir_type_t *type;
@@ -301,6 +308,7 @@ typedef struct ir_label_node_t {
 } ir_label_node_t;
 
 typedef enum ir_stmt_type_t {
+    IR_STMT_LABEL,
     IR_STMT_RET,
     IR_STMT_BR,
     IR_STMT_SWITCH,
@@ -315,13 +323,15 @@ typedef struct ir_stmt_t {
     ir_stmt_type_t type;
 
     union {
+        ir_label_t *label;
+
         struct {
             ir_type_t *type;
             ir_expr_t *val;
         } ret;
 
         struct {
-            ir_expr_t *cond;
+            ir_expr_t *cond; /**< Condition. NULL if direct branch */
             union {
                 struct {
                     ir_label_t *if_true;
@@ -332,8 +342,9 @@ typedef struct ir_stmt_t {
         } br;
 
         struct {
-            ir_label_t *label;
+            ir_expr_t *expr;
             slist_t cases; /**< (ir_val_label_pair_t) */
+            ir_label_t *default_case;
         } switch_params;
 
         struct {
@@ -392,28 +403,51 @@ typedef enum ir_gdecl_type_t {
 typedef struct ir_gdecl_t {
     sl_link_t link;
     ir_gdecl_type_t type;
-    len_str_t name;
-    ir_type_t *decl_type;
 
     union {
         struct {
-            ir_expr_t *val; /**< Null if decl */
+            ir_stmt_t *stmt;
         } gdata;
 
         struct {
+            ir_type_t *type;
+            len_str_t name;
             slist_t body; /**< (ir_stmt_t) Empty if decl */
             ir_symtab_t locals;
-            unsigned next_id; /**< Next temp name */
+            int next_temp; /**< Next temp name */
+            int next_label; /**< Next label name */
         } func;
     };
 } ir_gdecl_t;
 
 typedef struct ir_trans_unit_t {
+    sl_link_t link;
     slist_t gdecls;
     ir_symtab_t globals;
+    htable_t labels;
 } ir_trans_unit_t;
 
+// Built in types
+extern ir_type_t ir_type_void;
+extern ir_type_t ir_type_i8;
+extern ir_type_t ir_type_i16;
+extern ir_type_t ir_type_i32;
+extern ir_type_t ir_type_i64;
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree);
+
+void ir_symtab_init(ir_symtab_t *symtab);
+
+ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str);
+
+ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num);
+
+ir_trans_unit_t *ir_trans_unit_create(void);
+
+ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type);
+
+ir_stmt_t *ir_stmt_create(ir_stmt_type_t type);
+
+ir_expr_t *ir_expr_create(ir_expr_type_t type);
 
 #endif /* _IR_H_ */
