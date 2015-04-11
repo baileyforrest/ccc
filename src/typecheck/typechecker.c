@@ -1145,6 +1145,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
             expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
             retval &= typecheck_expr(tcs, elem, TC_NOCONST);
 
+            bool do_cont = false;
             // If we encounter a designated initializer, find the
             // decl with the correct name and continue from there
             if (elem->type == EXPR_DESIG_INIT) {
@@ -1154,19 +1155,44 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 if (!vstrcmp(node->id, elem->desig_init.name)) {
                     while (!vstrcmp(node->id, elem->desig_init.name)) {
                         ADVANCE_NODE();
-                        if (node == NULL) {
-                            logger_log(&expr->mark, LOG_ERR,
-                                       "unknown field %.*s specified in"
-                                       "initializer",
-                                       elem->desig_init.name->len,
-                                       elem->desig_init.name->str);
-                            return false;
+                        while (node == NULL) {
+                            if (decl == NULL) {
+                                logger_log(&expr->mark, LOG_ERR,
+                                           "unknown field %.*s specified in"
+                                           "initializer",
+                                           elem->desig_init.name->len,
+                                           elem->desig_init.name->str);
+                                return false;
+                            }
+                            type_t *decl_type = typecheck_unmod(decl->type);
+                            // Skip non struct/union anonymous members
+                            if (decl_type->type != TYPE_STRUCT &&
+                                decl_type->type != TYPE_UNION) {
+                                ADVANCE_NODE();
+                                continue;
+                            }
+                            elem = elem->desig_init.val;
+                            if (elem->type != EXPR_INIT_LIST) {
+                                logger_log(&expr->mark, LOG_ERR,
+                                           "invalid_initializer");
+                                return false;
+                            }
+                            // Decl, but no decl node. Anonymous member
+                            retval &= typecheck_init_list(tcs, decl_type, elem);
+                            ADVANCE_NODE();
+                            do_cont = true;
+                            break;
+                        }
+                        if (do_cont) {
+                            break;
                         }
                     }
                 }
                 elem = elem->desig_init.val;
             }
-            bool do_cont = false;
+            if (do_cont) {
+                continue;
+            }
             while (node == NULL) {
                 if (decl == NULL) {
                     logger_log(&expr->mark, LOG_WARN,
@@ -1178,6 +1204,10 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                     if (decl_type->type != TYPE_STRUCT &&
                         decl_type->type != TYPE_UNION) {
                         continue;
+                    }
+                    if (elem->type != EXPR_INIT_LIST) {
+                        logger_log(&expr->mark, LOG_ERR, "invalid_initializer");
+                        return false;
                     }
                     // Decl, but no decl node. Anonymous member
                     retval &= typecheck_init_list(tcs, decl_type, elem);
