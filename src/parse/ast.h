@@ -479,6 +479,7 @@ typedef struct trans_unit_t {
     fmark_t mark;       /**< File mark */
     slist_t gdecls;     /**< List of gdecl in compilation unit */
     typetab_t typetab;  /**< Types defined at top level */
+    slist_t etypes;     /**< Evaluated types of the translation unit */
 } trans_unit_t;
 
 /**

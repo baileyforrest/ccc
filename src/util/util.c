@@ -35,7 +35,7 @@ void *emalloc(size_t size) {
     void *result = malloc(size);
     if (result == NULL) {
         logger_log(NULL, LOG_ERR, "out of memory, giving up");
-        exit(255);
+        exit(EXIT_FAILURE);
     }
     return result;
 }

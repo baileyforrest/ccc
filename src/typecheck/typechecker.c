@@ -30,6 +30,7 @@
 
 void tc_state_init(tc_state_t *tcs) {
     sl_init(&tcs->etypes, offsetof(type_t, link));
+    tcs->tunit = NULL;
     tcs->typetab = NULL;
     tcs->func = NULL;
     tcs->last_switch = NULL;
@@ -46,6 +47,7 @@ void tc_state_destroy(tc_state_t *tcs) {
 bool typecheck_ast(trans_unit_t *ast) {
     tc_state_t tcs;
     tc_state_init(&tcs);
+    tcs.tunit = ast;
     bool retval = typecheck_trans_unit(&tcs, ast);
     tc_state_destroy(&tcs);
     return retval;
@@ -1539,7 +1541,14 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             }
             memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
             fmark_chain_inc_ref(expr->mark.last);
-            sl_append(&tcs->etypes, &expr->etype->link);
+
+            // If we have a translation unit, save etypes on it because we'll
+            // need them later
+            if (tcs->tunit != NULL) {
+                sl_append(&tcs->tunit->etypes, &expr->etype->link);
+            } else {
+                sl_append(&tcs->etypes, &expr->etype->link);
+            }
             expr->etype->type = TYPE_PTR;
             expr->etype->ptr.type_mod = TMOD_NONE;
             expr->etype->ptr.base = expr->unary.expr->etype;

@@ -128,6 +128,7 @@ status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result) {
     trans_unit_t *tunit = NULL;
     ALLOC_NODE(lex, tunit, trans_unit_t);
     sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
+    sl_init(&tunit->etypes, offsetof(type_t, link));
     if (CCC_OK != (status = tt_init(&tunit->typetab, NULL))) {
         goto fail;
     }

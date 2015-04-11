@@ -1266,6 +1266,9 @@ void ast_trans_unit_destroy(trans_unit_t *trans_unit) {
     if (trans_unit == NULL) {
         return;
     }
+    // Use free rather than ast_type_destroy because we don't want to
+    // recursively free other nodes
+    SL_DESTROY_FUNC(&trans_unit->etypes, free);
     SL_DESTROY_FUNC(&trans_unit->gdecls, ast_gdecl_destroy);
     tt_destroy(&trans_unit->typetab); // Must free after trans units
     fmark_chain_free(trans_unit->mark.last);

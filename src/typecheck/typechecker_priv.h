@@ -36,6 +36,7 @@
  */
 typedef struct tc_state_t {
     slist_t etypes;
+    trans_unit_t *tunit;
     typetab_t *typetab; /*< Type table on top of the stack */
     gdecl_t *func;
     stmt_t *last_switch;
