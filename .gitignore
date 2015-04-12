@@ -10,3 +10,4 @@ doxygen.warn
 doc
 bin
 gcc_tests
+dump*

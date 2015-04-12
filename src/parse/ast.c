@@ -609,7 +609,7 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         }
         break;
     case EXPR_CONST_FLOAT:
-        ast_directed_print(dest, remain, "%f", expr->const_val.float_val);
+        ast_directed_print(dest, remain, "%Lf", expr->const_val.float_val);
         if (expr->const_val.type->type == TYPE_MOD) {
             ast_directed_print(dest, remain, "f");
         }
