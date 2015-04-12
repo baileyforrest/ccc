@@ -245,7 +245,6 @@ typedef struct expr_t {
         } unary;
 
         struct {                    /**< Operation paramaters */
-            oper_t op;              /**< Type of operation */
             struct expr_t *expr1;   /**< Expr 1 */
             struct expr_t *expr2;   /**< Expr 2 */
             struct expr_t *expr3;   /**< Expr 3 */
@@ -518,6 +517,24 @@ size_t ast_type_size(type_t *type);
  * @return Returns the alignment of the type
  */
 size_t ast_type_align(type_t *type);
+
+/**
+ * Gets the offset of a member in a type
+ *
+ * @param type Type to get offset in
+ * @param path list of member names
+ * @return Returns the offset of the member in the type
+ */
+size_t ast_type_offset(type_t *type, slist_t path);
+
+/**
+ * Gets the number of a member in a struct/union
+ *
+ * @param type Type to use
+ * @param name Name of the member
+ * @return Returns the member number or -1 if it doesn't exist
+ */
+int ast_get_member_num(type_t *type, len_str_t *name);
 
 /**
  * Destroys a type_t that is protected. A protected type is one that is shared

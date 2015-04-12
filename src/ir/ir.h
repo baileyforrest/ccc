@@ -200,6 +200,7 @@ typedef struct ir_val_label_pair_t {
 } ir_val_label_pair_t;
 
 typedef enum ir_expr_type_t {
+    IR_EXPR_VAR,
     IR_EXPR_CONST,
     IR_EXPR_BINOP,
     IR_EXPR_ALLOCA,
@@ -219,10 +220,19 @@ struct ir_expr_t {
     ir_expr_type_t type;
 
     union {
+        struct {
+            ir_type_t *type;
+            len_str_t name;
+            bool local;
+        } var;
 
         struct {
             ir_type_t *type;
-            long long val;
+            union {
+                long long int_val;
+                long double float_val;
+                ir_expr_t *str_val;
+            };
         } const_params;
 
         struct {
@@ -241,13 +251,11 @@ struct ir_expr_t {
 
         struct {
             ir_type_t *type;
-            ir_type_t *ptr_type;
             ir_expr_t *ptr;
         } load;
 
         struct {
             ir_type_t *type;
-            ir_type_t *ptr_type;
             ir_expr_t *ptr_val;
             slist_t idxs; /**< ir_type_expr_pair_t */
         } getelemptr;
@@ -361,7 +369,6 @@ typedef struct ir_stmt_t {
         struct {
             ir_type_t *type;
             ir_expr_t *val;
-            ir_type_t *ptr_type;
             ir_expr_t *ptr;
         } store;
 
@@ -406,7 +413,7 @@ typedef struct ir_gdecl_t {
 
     union {
         struct {
-            ir_stmt_t *stmt;
+            slist_t stmts; /**< (ir_stmt_t) Any initialization and the def */
         } gdata;
 
         struct {
@@ -442,6 +449,8 @@ ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str);
 
 ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num);
 
+ir_expr_t *ir_temp_create(ir_type_t *type, int num);
+
 ir_trans_unit_t *ir_trans_unit_create(void);
 
 ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type);
@@ -449,5 +458,9 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type);
 ir_stmt_t *ir_stmt_create(ir_stmt_type_t type);
 
 ir_expr_t *ir_expr_create(ir_expr_type_t type);
+
+ir_expr_t *ir_expr_ref(ir_expr_t *expr);
+
+ir_type_t *ir_type_ref(ir_type_t *type);
 
 #endif /* _IR_H_ */

@@ -26,13 +26,14 @@
 #include "ir/ir.h"
 
 typedef struct trans_state_t {
+    typetab_t *typetab;
     ir_trans_unit_t *tunit;
     ir_gdecl_t *func;
     ir_label_t *break_target;
     ir_label_t *continue_target;
 } trans_state_t;
 
-#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL }
+#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL }
 
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
 
@@ -42,8 +43,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts);
 
 ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts);
 
-ir_stmt_t *trans_decl_node(trans_state_t *ts, decl_node_t *node);
+void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts);
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type);
+
+ir_oper_t trans_op(oper_t op);
 
 #endif /* _TRANSLATOR_PRIV_H */

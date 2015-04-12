@@ -93,6 +93,22 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
     return label;
 }
 
+ir_expr_t *ir_temp_create(ir_type_t *type, int num) {
+    assert(num >= 0);
+    char buf[MAX_LABEL_LEN];
+    snprintf(buf, sizeof(buf), ANON_LABEL_PREFIX "%d", num);
+    buf[sizeof(buf) - 1] = '\0';
+    size_t len = strlen(buf);
+    ir_expr_t *temp = emalloc(sizeof(ir_expr_t) + len + 1);
+    temp->type = IR_EXPR_VAR;
+    temp->var.type = type;
+    temp->var.name.str = (char *)temp + sizeof(*temp);
+    temp->var.name.len = len;
+    temp->var.local = true;
+
+    return temp;
+}
+
 ir_trans_unit_t *ir_trans_unit_create(void) {
     ir_trans_unit_t *tunit = emalloc(sizeof(ir_trans_unit_t));
     sl_init(&tunit->gdecls, offsetof(ir_gdecl_t, link));
@@ -153,6 +169,7 @@ ir_stmt_t *ir_stmt_create(ir_stmt_type_t type) {
 ir_expr_t *ir_expr_create(ir_expr_type_t type) {
     ir_expr_t *expr = emalloc(sizeof(ir_expr_t));
     switch (type) {
+    case IR_EXPR_VAR:
     case IR_EXPR_CONST:
     case IR_EXPR_BINOP:
     case IR_EXPR_ALLOCA:
@@ -179,4 +196,12 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
         assert(false);
     }
     return expr;
+}
+
+ir_expr_t *ir_expr_ref(ir_expr_t *expr) {
+    return expr;
+}
+
+ir_type_t *ir_type_ref(ir_type_t *type) {
+    return type;
 }

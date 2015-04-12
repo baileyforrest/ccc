@@ -178,6 +178,20 @@ size_t ast_type_align(type_t *type) {
     return 0;
 }
 
+size_t ast_type_offset(type_t *type, slist_t path) {
+    (void)type;
+    (void)path;
+    // TODO: This
+    return 0;
+}
+
+int ast_get_member_num(type_t *type, len_str_t *name) {
+    // TODO: This
+    (void)type;
+    (void)name;
+    return 0;
+}
+
 void ast_trans_unit_print(trans_unit_t *tras_unit) {
     sl_link_t *cur;
     SL_FOREACH(cur, &tras_unit->gdecls) {
