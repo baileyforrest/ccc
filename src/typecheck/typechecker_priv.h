@@ -44,15 +44,6 @@ typedef struct tc_state_t {
     stmt_t *last_break;
 } tc_state_t;
 
-#define TYPE_IS_NUMERIC(test)                                       \
-    ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_DOUBLE)
-
-#define TYPE_IS_INTEGRAL(test)                                      \
-    ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_LONG)
-
-#define TYPE_IS_PTR(test)                                   \
-    ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_PTR)
-
 /**
  * Initializes a type checker context
  *
@@ -78,22 +69,6 @@ void tc_state_destroy(tc_state_t *tcs);
  */
 void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
                                long long *result);
-
-/**
- * Returns a type with its typedefs removed
- *
- * @param type The type
- * @return The type with its typedefs removed
- */
-type_t *typecheck_untypedef(type_t *type);
-
-/**
- * Returns a type with its modifers removed
- *
- * @param type The type
- * @return The type with its modifers removed
- */
-type_t *typecheck_unmod(type_t *type);
 
 /**
  * Checks whether an expression is a suitable lvalue. The expression must be

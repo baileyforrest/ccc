@@ -29,11 +29,17 @@
 
 #define IR_INT_LIT(width) { SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
 
+#define IR_FLOAT_LIT(type)                                      \
+    { SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
+
 ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, { } };
+ir_type_t ir_type_i1 = IR_INT_LIT(1);
 ir_type_t ir_type_i8 = IR_INT_LIT(8);
 ir_type_t ir_type_i16 = IR_INT_LIT(16);
 ir_type_t ir_type_i32 = IR_INT_LIT(32);
 ir_type_t ir_type_i64 = IR_INT_LIT(64);
+ir_type_t ir_type_float = IR_FLOAT_LIT(IR_FLOAT_FLOAT);
+ir_type_t ir_type_double = IR_FLOAT_LIT(IR_FLOAT_DOUBLE);
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree) {
     assert(stream != NULL);
@@ -196,6 +202,33 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
         assert(false);
     }
     return expr;
+}
+
+ir_type_t *ir_type_create(ir_type_type_t type) {
+    ir_type_t *ir_type = emalloc(sizeof(ir_type_t));
+    switch (type) {
+    case IR_TYPE_VOID:
+    case IR_TYPE_INT:
+    case IR_TYPE_FLOAT:
+        assert(false && "Use the static types");
+        break;
+
+    case IR_TYPE_FUNC:
+        sl_init(&ir_type->func.params, offsetof(ir_type_t, link));
+        break;
+    case IR_TYPE_STRUCT:
+        sl_init(&ir_type->struct_params.types, offsetof(ir_type_t, link));
+        break;
+
+    case IR_TYPE_PTR:
+    case IR_TYPE_ARR:
+    case IR_TYPE_OPAQUE:
+        break;
+    default:
+        assert(false);
+    }
+
+    return ir_type;
 }
 
 ir_expr_t *ir_expr_ref(ir_expr_t *expr) {

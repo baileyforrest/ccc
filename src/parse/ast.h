@@ -38,6 +38,16 @@ struct gdecl_t;
 struct decl_t;
 struct ir_label_t;
 
+#define TYPE_IS_NUMERIC(test)                                       \
+    ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_DOUBLE)
+
+#define TYPE_IS_INTEGRAL(test)                                      \
+    ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_LONG)
+
+#define TYPE_IS_PTR(test)                                   \
+    ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_PTR)
+
+
 /**
  * Modifiers for types. Should be stored in a bitmap
  */
@@ -124,7 +134,6 @@ typedef struct type_t {
         struct {                   /**< Function signature */
             struct type_t *type;   /**< Return type */
             slist_t params;        /**< Paramater signature (decl list) */
-            int num_params;        /**< Number of paramaters */
             bool varargs;          /**< Whether or not function has VA */
         } func;
 
@@ -535,6 +544,23 @@ size_t ast_type_offset(type_t *type, slist_t path);
  * @return Returns the member number or -1 if it doesn't exist
  */
 int ast_get_member_num(type_t *type, len_str_t *name);
+
+/**
+ * Returns a type with its typedefs removed
+ *
+ * @param type The type
+ * @return The type with its typedefs removed
+ */
+type_t *ast_type_untypedef(type_t *type);
+
+/**
+ * Returns a type with its modifers removed
+ *
+ * @param type The type
+ * @return The type with its modifers removed
+ */
+type_t *ast_type_unmod(type_t *type);
+
 
 /**
  * Destroys a type_t that is protected. A protected type is one that is shared

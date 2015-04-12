@@ -192,6 +192,34 @@ int ast_get_member_num(type_t *type, len_str_t *name) {
     return 0;
 }
 
+type_t *ast_type_untypedef(type_t *type) {
+    bool done = false;
+    while (!done) {
+        switch (type->type) {
+        case TYPE_TYPEDEF:
+            type = type->typedef_params.base;
+            break;
+        case TYPE_PAREN:
+            type = type->paren_base;
+            break;
+        default:
+            done = true;
+        }
+    }
+
+    return type;
+}
+
+type_t *ast_type_unmod(type_t *type) {
+    type = ast_type_untypedef(type);
+    while (type->type == TYPE_MOD) {
+        type = type->mod.base;
+        type = ast_type_untypedef(type);
+    }
+
+    return type;
+}
+
 void ast_trans_unit_print(trans_unit_t *tras_unit) {
     sl_link_t *cur;
     SL_FOREACH(cur, &tras_unit->gdecls) {

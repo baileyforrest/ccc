@@ -951,7 +951,6 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             type_t *func_type;
             ALLOC_NODE(lex, func_type, type_t);
             func_type->type = TYPE_FUNC;
-            func_type->func.num_params = 0;
             func_type->func.varargs = false;
             sl_init(&func_type->func.params, offsetof(stmt_t, link));
 
@@ -1718,7 +1717,6 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
         if (status != CCC_OK) {
             goto fail;
         }
-        func->func.num_params++;
         if (LEX_CUR(lex).type == COMMA) {
             LEX_ADVANCE(lex);
         }

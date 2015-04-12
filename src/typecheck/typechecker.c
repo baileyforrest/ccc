@@ -179,17 +179,17 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
     // Types which differ in these modifiers are still equal
 #define IGNORE_MASK (~(TMOD_EXTERN | TMOD_TYPEDEF | TMOD_INLINE))
 
-    t1 = typecheck_untypedef(t1);
-    t2 = typecheck_untypedef(t2);
+    t1 = ast_type_untypedef(t1);
+    t2 = ast_type_untypedef(t2);
 
     // Remove any modifiers which do not effect equality
     if (t1->type == TYPE_MOD && (t1->mod.type_mod & IGNORE_MASK) == 0) {
         t1 = t1->mod.base;
-        t1 = typecheck_untypedef(t1);
+        t1 = ast_type_untypedef(t1);
     }
     if (t2->type == TYPE_MOD && (t2->mod.type_mod & IGNORE_MASK) == 0) {
         t2 = t2->mod.base;
-        t2 = typecheck_untypedef(t2);
+        t2 = ast_type_untypedef(t2);
     }
 
     if (t1 == t2) { // Pointers equal
@@ -284,34 +284,6 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
     return true;
 }
 
-type_t *typecheck_untypedef(type_t *type) {
-    bool done = false;
-    while (!done) {
-        switch (type->type) {
-        case TYPE_TYPEDEF:
-            type = type->typedef_params.base;
-            break;
-        case TYPE_PAREN:
-            type = type->paren_base;
-            break;
-        default:
-            done = true;
-        }
-    }
-
-    return type;
-}
-
-type_t *typecheck_unmod(type_t *type) {
-    type = typecheck_untypedef(type);
-    while (type->type == TYPE_MOD) {
-        type = type->mod.base;
-        type = typecheck_untypedef(type);
-    }
-
-    return type;
-}
-
 bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr) {
     switch (expr->type) {
     case EXPR_PAREN:
@@ -348,11 +320,11 @@ bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr) {
 }
 
 bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
-    to = typecheck_untypedef(to);
-    from = typecheck_untypedef(from);
+    to = ast_type_untypedef(to);
+    from = ast_type_untypedef(from);
 
-    type_t *umod_to = typecheck_unmod(to);
-    type_t *umod_from = typecheck_unmod(from);
+    type_t *umod_to = ast_type_unmod(to);
+    type_t *umod_from = ast_type_unmod(from);
 
     // TODO: This ignores const
     if (typecheck_type_equal(umod_from, umod_from)) {
@@ -470,10 +442,10 @@ fail:
 }
 
 bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
-    t1 = typecheck_untypedef(t1);
-    t2 = typecheck_untypedef(t2);
-    type_t *umod1 = typecheck_unmod(t1);
-    type_t *umod2 = typecheck_unmod(t2);
+    t1 = ast_type_untypedef(t1);
+    t2 = ast_type_untypedef(t2);
+    type_t *umod1 = ast_type_unmod(t1);
+    type_t *umod2 = ast_type_unmod(t2);
 
     bool is_numeric1 = TYPE_IS_NUMERIC(umod1) || umod1->type == TYPE_ENUM;
     bool is_numeric2 = TYPE_IS_NUMERIC(umod2) || umod2->type == TYPE_ENUM;
@@ -513,8 +485,8 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
         }
 
         if (is_ptr1 && is_ptr2) {
-            type_t *umod_base1 = typecheck_unmod(typecheck_get_ptr_base(umod1));
-            type_t *umod_base2 = typecheck_unmod(typecheck_get_ptr_base(umod2));
+            type_t *umod_base1 = ast_type_unmod(typecheck_get_ptr_base(umod1));
+            type_t *umod_base2 = ast_type_unmod(typecheck_get_ptr_base(umod2));
             if (typecheck_type_equal(umod_base1, umod_base2)) {
                 return true;
             }
@@ -547,7 +519,7 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
 }
 
 bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type) {
-    type = typecheck_unmod(type);
+    type = ast_type_unmod(type);
     bool is_numeric = TYPE_IS_NUMERIC(type);
     bool is_int = TYPE_IS_INTEGRAL(type);
     bool is_ptr = TYPE_IS_PTR(type);
@@ -612,16 +584,16 @@ type_t *typecheck_get_ptr_base(type_t *t1) {
 
 bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
                         type_t **result) {
-    t1 = typecheck_untypedef(t1);
-    t2 = typecheck_untypedef(t2);
+    t1 = ast_type_untypedef(t1);
+    t2 = ast_type_untypedef(t2);
 
     if (typecheck_type_equal(t1, t2)) {
         *result = t1;
         return true;
     }
 
-    type_t *umod1 = typecheck_unmod(t1);
-    type_t *umod2 = typecheck_unmod(t2);
+    type_t *umod1 = ast_type_unmod(t1);
+    type_t *umod2 = ast_type_unmod(t2);
 
     bool is_numeric1 = TYPE_IS_NUMERIC(umod1);
     bool is_numeric2 = TYPE_IS_NUMERIC(umod2);
@@ -688,20 +660,20 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
 
         // If both are pointers, and one is a void *, return the other
         if (umod2->type == TYPE_PTR &&
-            typecheck_unmod(umod2->ptr.base)->type == TYPE_VOID) {
+            ast_type_unmod(umod2->ptr.base)->type == TYPE_VOID) {
             *result = t1;
             return true;
         }
 
         if (is_ptr2 && umod1->type == TYPE_PTR &&
-            typecheck_unmod(umod1->ptr.base)->type == TYPE_VOID) {
+            ast_type_unmod(umod1->ptr.base)->type == TYPE_VOID) {
             *result = t2;
             return true;
         }
 
         if (is_ptr2) {
-            type_t *umod_base1 = typecheck_unmod(typecheck_get_ptr_base(umod1));
-            type_t *umod_base2 = typecheck_unmod(typecheck_get_ptr_base(umod2));
+            type_t *umod_base1 = ast_type_unmod(typecheck_get_ptr_base(umod1));
+            type_t *umod_base2 = ast_type_unmod(typecheck_get_ptr_base(umod2));
             if (typecheck_type_equal(umod_base1, umod_base2)) {
                 *result = t1;
                 return true;
@@ -717,8 +689,8 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
 }
 
 bool typecheck_type_cast(fmark_t *mark, type_t *to, type_t *from) {
-    to = typecheck_untypedef(to);
-    from = typecheck_untypedef(from);
+    to = ast_type_untypedef(to);
+    from = ast_type_untypedef(from);
 
     if (typecheck_type_equal(to, from)) {
         return true;
@@ -729,8 +701,8 @@ bool typecheck_type_cast(fmark_t *mark, type_t *to, type_t *from) {
         return true;
     }
 
-    type_t *umod_to = typecheck_unmod(to);
-    type_t *umod_from = typecheck_unmod(from);
+    type_t *umod_to = ast_type_unmod(to);
+    type_t *umod_from = ast_type_unmod(from);
 
     // Can't cast to struct/union types
     if (umod_to->type == TYPE_STRUCT || umod_to->type == TYPE_UNION) {
@@ -1041,7 +1013,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         assert(func_sig->type->type == TYPE_FUNC);
 
         if (stmt->return_params.expr == NULL) {
-            if (typecheck_unmod(func_sig->type->func.type)->type != TYPE_VOID) {
+            if (ast_type_unmod(func_sig->type->func.type)->type != TYPE_VOID) {
                 logger_log(&stmt->mark, LOG_WARN,
                            "'return' with no value, in function returning"
                            " non-void");
@@ -1105,7 +1077,7 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type) {
 
 bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
     bool retval = true;
-    type = typecheck_unmod(type);
+    type = ast_type_unmod(type);
     switch (type->type) {
     case TYPE_UNION:
     case TYPE_STRUCT: {
@@ -1166,7 +1138,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                                            elem->desig_init.name->str);
                                 return false;
                             }
-                            type_t *decl_type = typecheck_unmod(decl->type);
+                            type_t *decl_type = ast_type_unmod(decl->type);
                             // Skip non struct/union anonymous members
                             if (decl_type->type != TYPE_STRUCT &&
                                 decl_type->type != TYPE_UNION) {
@@ -1201,7 +1173,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                                "excess elements in struct initializer");
                     return retval;
                 } else {
-                    type_t *decl_type = typecheck_unmod(decl->type);
+                    type_t *decl_type = ast_type_unmod(decl->type);
                     // Skip non struct/union anonymous members
                     if (decl_type->type != TYPE_STRUCT &&
                         decl_type->type != TYPE_UNION) {
@@ -1295,7 +1267,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
     if (type == TYPE_VOID && decl_node->id != NULL) {
         status_t status;
         typetab_entry_t *entry = NULL;
-        type_t *untypedef = typecheck_untypedef(decl_node->type);
+        type_t *untypedef = ast_type_untypedef(decl_node->type);
         type_t *type_base = untypedef;
         while (type_base->type == TYPE_PTR || type_base->type == TYPE_ARR) {
             type_base = typecheck_get_ptr_base(type_base);
@@ -1376,7 +1348,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
             }
 
             type_t *type = decl_node->expr->etype;
-            type = typecheck_unmod(type);
+            type = ast_type_unmod(type);
             if (!TYPE_IS_INTEGRAL(type)) {
                 logger_log(&decl_node->mark, LOG_ERR,
                            "bit-field '%.*s' width not an integer constant",
@@ -1404,7 +1376,7 @@ type_t *typecheck_find_member(type_t *type, len_str_t *name, size_t *offset) {
 
         // Search in anonymous structs and unions too
         if (sl_head(&decl->decls) == NULL) {
-            type_t *decl_type = typecheck_unmod(decl->type);
+            type_t *decl_type = ast_type_unmod(decl->type);
             switch (decl_type->type) {
             case TYPE_STRUCT:
             case TYPE_UNION: {
@@ -1600,9 +1572,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!(retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST))) {
             return false;
         }
-        type_t *func_sig = typecheck_unmod(expr->call.func->etype);
+        type_t *func_sig = ast_type_unmod(expr->call.func->etype);
         if (func_sig->type == TYPE_PTR) {
-            func_sig = typecheck_unmod(func_sig->ptr.base);
+            func_sig = ast_type_unmod(func_sig->ptr.base);
         }
         if (func_sig->type != TYPE_FUNC) {
             logger_log(&expr->mark, LOG_ERR,
@@ -1678,7 +1650,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         decl_node_t *decl = sl_head(&expr->offsetof_params.type->decls);
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
-        compound = typecheck_unmod(compound);
+        compound = ast_type_unmod(compound);
         len_str_node_t *head = sl_head(&expr->offsetof_params.path);
         switch (compound->type) {
         case TYPE_STRUCT:
@@ -1712,7 +1684,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!typecheck_expr(tcs, expr->mem_acc.base, TC_NOCONST)) {
             return false;
         }
-        type_t *compound = typecheck_unmod(expr->mem_acc.base->etype);
+        type_t *compound = ast_type_unmod(expr->mem_acc.base->etype);
         switch (compound->type) {
         case TYPE_STRUCT:
         case TYPE_UNION:
@@ -1724,7 +1696,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             break;
         case TYPE_PTR:
             if (expr->mem_acc.op == OP_ARROW) {
-                compound = typecheck_unmod(expr->mem_acc.base->etype->ptr.base);
+                compound = ast_type_unmod(expr->mem_acc.base->etype->ptr.base);
                 if (compound->type == TYPE_STRUCT ||
                     compound->type == TYPE_UNION) {
                     break;
@@ -1755,8 +1727,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        type_t *umod_arr = typecheck_unmod(expr->arr_idx.array->etype);
-        type_t *umod_index = typecheck_unmod(expr->arr_idx.index->etype);
+        type_t *umod_arr = ast_type_unmod(expr->arr_idx.array->etype);
+        type_t *umod_index = ast_type_unmod(expr->arr_idx.index->etype);
 
         if (umod_arr->type != TYPE_PTR && umod_arr->type != TYPE_ARR) {
             logger_log(&expr->arr_idx.array->mark, LOG_ERR,

@@ -46,7 +46,6 @@ typedef enum ir_type_type_t {
     IR_TYPE_INT,
     IR_TYPE_FLOAT,
     IR_TYPE_PTR,
-    IR_TYPE_LABEL,
     IR_TYPE_ARR,
     IR_TYPE_STRUCT,
     IR_TYPE_OPAQUE,
@@ -66,8 +65,7 @@ struct ir_type_t {
         struct {
             ir_type_t *type;
             slist_t params;
-            int num_params;
-            int varargs;
+            bool varargs;
         } func;
 
         struct {
@@ -132,6 +130,7 @@ typedef enum ir_oper_t {
     IR_OP_FDIV,
     IR_OP_UREM,
     IR_OP_SREM,
+    IR_OP_FREM,
     IR_OP_SHL,
     IR_OP_LSHR,
     IR_OP_ASHR,
@@ -423,6 +422,7 @@ typedef struct ir_gdecl_t {
             ir_symtab_t locals;
             int next_temp; /**< Next temp name */
             int next_label; /**< Next label name */
+            ir_label_t *last_label;
         } func;
     };
 } ir_gdecl_t;
@@ -436,10 +436,13 @@ typedef struct ir_trans_unit_t {
 
 // Built in types
 extern ir_type_t ir_type_void;
+extern ir_type_t ir_type_i1;
 extern ir_type_t ir_type_i8;
 extern ir_type_t ir_type_i16;
 extern ir_type_t ir_type_i32;
 extern ir_type_t ir_type_i64;
+extern ir_type_t ir_type_float;
+extern ir_type_t ir_type_double;
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree);
 
@@ -458,6 +461,8 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type);
 ir_stmt_t *ir_stmt_create(ir_stmt_type_t type);
 
 ir_expr_t *ir_expr_create(ir_expr_type_t type);
+
+ir_type_t *ir_type_create(ir_type_type_t type);
 
 ir_expr_t *ir_expr_ref(ir_expr_t *expr);
 
