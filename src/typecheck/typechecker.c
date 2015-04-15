@@ -502,6 +502,10 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
     case OP_NE:
     case OP_LOGICAND:
     case OP_LOGICOR:
+        // Two integral types allowed
+        if (is_numeric1 && is_numeric2) {
+            return true;
+        }
         // Allow combinations of pointers and ints
         if((is_ptr1 && is_ptr2) || (is_ptr1 && is_int2) ||
            (is_int1 && is_ptr2)) {

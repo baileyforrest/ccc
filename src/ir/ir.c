@@ -27,12 +27,13 @@
 #define MAX_LABEL_LEN 512
 #define ANON_LABEL_PREFIX "BB"
 
-#define IR_INT_LIT(width) { SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
+#define IR_INT_LIT(width)                                   \
+    { SL_LINK_LIT, IR_TYPE_INT, 0, .int_params = { width } }
 
 #define IR_FLOAT_LIT(type)                                      \
-    { SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
+    { SL_LINK_LIT, IR_TYPE_FLOAT, 0, .float_params = { type } }
 
-ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, { } };
+ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, 0, { } };
 ir_type_t ir_type_i1 = IR_INT_LIT(1);
 ir_type_t ir_type_i8 = IR_INT_LIT(8);
 ir_type_t ir_type_i16 = IR_INT_LIT(16);
@@ -40,6 +41,7 @@ ir_type_t ir_type_i32 = IR_INT_LIT(32);
 ir_type_t ir_type_i64 = IR_INT_LIT(64);
 ir_type_t ir_type_float = IR_FLOAT_LIT(IR_FLOAT_FLOAT);
 ir_type_t ir_type_double = IR_FLOAT_LIT(IR_FLOAT_DOUBLE);
+ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree) {
     assert(stream != NULL);
@@ -102,14 +104,16 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
 ir_expr_t *ir_temp_create(ir_type_t *type, int num) {
     assert(num >= 0);
     char buf[MAX_LABEL_LEN];
-    snprintf(buf, sizeof(buf), ANON_LABEL_PREFIX "%d", num);
+    snprintf(buf, sizeof(buf), "%d", num);
     buf[sizeof(buf) - 1] = '\0';
     size_t len = strlen(buf);
     ir_expr_t *temp = emalloc(sizeof(ir_expr_t) + len + 1);
     temp->type = IR_EXPR_VAR;
+    temp->refcnt = 1;
     temp->var.type = type;
     temp->var.name.str = (char *)temp + sizeof(*temp);
     temp->var.name.len = len;
+    strcpy(temp->var.name.str, buf);
     temp->var.local = true;
 
     return temp;
@@ -174,6 +178,7 @@ ir_stmt_t *ir_stmt_create(ir_stmt_type_t type) {
 
 ir_expr_t *ir_expr_create(ir_expr_type_t type) {
     ir_expr_t *expr = emalloc(sizeof(ir_expr_t));
+    expr->refcnt = 1;
     switch (type) {
     case IR_EXPR_VAR:
     case IR_EXPR_CONST:
@@ -206,6 +211,8 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
 
 ir_type_t *ir_type_create(ir_type_type_t type) {
     ir_type_t *ir_type = emalloc(sizeof(ir_type_t));
+    ir_type->refcnt = 1;
+
     switch (type) {
     case IR_TYPE_VOID:
     case IR_TYPE_INT:
@@ -232,9 +239,21 @@ ir_type_t *ir_type_create(ir_type_type_t type) {
 }
 
 ir_expr_t *ir_expr_ref(ir_expr_t *expr) {
+    assert(expr->refcnt >= 1);
+    ++expr->refcnt;
     return expr;
 }
 
 ir_type_t *ir_type_ref(ir_type_t *type) {
+    switch (type->type) {
+    case IR_TYPE_VOID:
+    case IR_TYPE_INT:
+    case IR_TYPE_FLOAT:
+        return type;
+    default:
+        break;
+    }
+    assert(type->refcnt >= 1);
+    ++type->refcnt;
     return type;
 }

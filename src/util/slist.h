@@ -170,6 +170,7 @@ void sl_concat_front(slist_t *list1, slist_t *list2);
  * @param CURRENT_ELEMENT pp_link_t pointer to store current element
  * @param SL_HEAD Head of the list
  */
+// TODO: add cur_elem decl to here, so it doesn't need to be before every usage
 #define SL_FOREACH(CURRENT_ELEM, SL_HEAD)                               \
     for (CURRENT_ELEM = (SL_HEAD)->head;                                \
          CURRENT_ELEM != NULL;                                          \

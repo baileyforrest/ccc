@@ -54,12 +54,14 @@ typedef enum ir_type_type_t {
 typedef enum ir_float_type_t {
     IR_FLOAT_FLOAT,
     IR_FLOAT_DOUBLE,
+    IR_FLOAT_X86_FP80,
 } ir_float_type_t;
 
 typedef struct ir_type_t ir_type_t;
 struct ir_type_t {
     sl_link_t link;
     ir_type_type_t type;
+    int refcnt;
 
     union {
         struct {
@@ -217,6 +219,7 @@ typedef enum ir_expr_type_t {
 struct ir_expr_t {
     sl_link_t link;
     ir_expr_type_t type;
+    int refcnt;
 
     union {
         struct {
@@ -443,6 +446,7 @@ extern ir_type_t ir_type_i32;
 extern ir_type_t ir_type_i64;
 extern ir_type_t ir_type_float;
 extern ir_type_t ir_type_double;
+extern ir_type_t ir_type_x86_fp80;
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree);
 

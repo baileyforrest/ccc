@@ -28,6 +28,8 @@
 #include "util/util.h"
 #include "typecheck/typechecker.h"
 
+#define CASE_VAL_TYPE ir_type_i64;
+
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
 
@@ -51,20 +53,21 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
     switch (gdecl->type) {
     case GDECL_FDEFN: {
         decl_node_t *node = sl_head(&gdecl->decl->decls);
+
         assert(node != NULL);
         assert(node == sl_tail(&gdecl->decl->decls));
+
         ir_gdecl_t *ir_gdecl = ir_gdecl_create(IR_GDECL_FUNC);
         ir_gdecl->func.type = trans_type(ts, node->type);
         ir_gdecl->func.name.str = node->id->str;
         ir_gdecl->func.name.len = node->id->len;
 
-        sl_link_t *cur;
-        assert(gdecl->fdefn.stmt->type == STMT_COMPOUND);
-        SL_FOREACH(cur, &gdecl->fdefn.stmt->compound.stmts) {
-            stmt_t *stmt = GET_ELEM(&gdecl->fdefn.stmt->compound.stmts, cur);
-            trans_stmt(ts, stmt, &ir_gdecl->func.body);
-        }
+        assert(ts->func == NULL); // Nested functions not allowed
+        ts->func = ir_gdecl;
+
+        trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
         sl_append(ir_gdecls, &ir_gdecl->link);
+        ts->func = NULL;
         break;
     }
     case GDECL_DECL: {
@@ -184,7 +187,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             ir_val_label_pair_t *pair = emalloc(sizeof(ir_val_label_pair_t));
             pair->val = ir_expr_create(IR_EXPR_CONST);
             pair->val->const_params.int_val = case_val;
-            pair->val->const_params.type = &ir_type_i64;
+            pair->val->const_params.type = &CASE_VAL_TYPE;
             pair->label = label;
 
             sl_append(&ir_stmt->switch_params.cases, &pair->link);
@@ -387,18 +390,22 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     }
     case STMT_RETURN: {
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_RET);
-        assert(ts->func->func.type->type == IR_TYPE_FUNC);
+        assert(ts->func->type == IR_GDECL_FUNC &&
+               ts->func->func.type->type == IR_TYPE_FUNC);
         ir_stmt->ret.type = ts->func->func.type->func.type;
         ir_stmt->ret.val = trans_expr(ts, stmt->return_params.expr, ir_stmts);
         break;
     }
 
     case STMT_COMPOUND: {
+        typetab_t *typetab_save = ts->typetab;
+        ts->typetab = &stmt->compound.typetab;
         sl_link_t *cur;
         SL_FOREACH(cur, &stmt->compound.stmts) {
             stmt_t *cur_stmt = GET_ELEM(&stmt->compound.stmts, cur);
             trans_stmt(ts, cur_stmt, ir_stmts);
         }
+        ts->typetab = typetab_save;
         break;
     }
 
@@ -417,12 +424,12 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_PAREN:
         return trans_expr(ts, expr->paren_base, ir_stmts);
     case EXPR_VAR: {
-        ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_VAR);
         typetab_entry_t *entry = tt_lookup(ts->typetab, expr->var_id);
 
         // Must be valid if typechecked
         assert(entry != NULL && entry->entry_type == TT_VAR);
 
+        ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_VAR);
         ir_expr->var.type = trans_type(ts, entry->type);
         ir_expr->var.name.str = expr->var_id->str;
         ir_expr->var.name.len = expr->var_id->len;
@@ -447,13 +454,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_stmt_t *binop = ir_stmt_create(IR_STMT_ASSIGN);
         binop->assign.dest = temp;
         binop->assign.src = op_expr;
-
         sl_append(ir_stmts, &binop->link);
 
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
         ir_stmt->assign.dest = dest;
         ir_stmt->assign.src = temp;
         sl_append(ir_stmts, &ir_stmt->link);
+
         return dest;
     }
     case EXPR_CONST_INT: {
@@ -505,7 +512,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_BR);
         ir_stmt->br.cond = expr1;
         ir_stmt->br.if_true = if_true;
-        ir_stmt->br.if_false = if_false == NULL ? after : if_false;
+        ir_stmt->br.if_false = if_false;
         sl_append(ir_stmts, &ir_stmt->link);
 
         // True branch
@@ -551,6 +558,11 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_stmt->br.uncond = after;
         sl_append(ir_stmts, &ir_stmt->link);
 
+        // End label
+        ir_stmt = ir_stmt_create(IR_STMT_LABEL);
+        ir_stmt->label = after;
+        sl_append(ir_stmts, &ir_stmt->link);
+
         return temp;
     }
     case EXPR_CAST: {
@@ -587,7 +599,11 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
             sl_append(&call->call.arglist, &pair->link);
         }
 
-        // TODO: Only return temp if function is non void, else return NULL
+        // Void returning function, don't create a temp
+        if (expr->call.func->etype->func.type->type == TYPE_VOID) {
+            return NULL;
+        }
+
         ir_expr_t *temp = ir_temp_create(ir_type_ref(call->call.ret_type),
                                          ts->func->func.next_temp++);
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
@@ -614,6 +630,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
             if (node != NULL) {
                 ir_expr->const_params.int_val = ast_type_size(node->type);
             } else {
+                assert(node == sl_tail(&expr->sizeof_params.type->decls));
                 ir_expr->const_params.int_val =
                     ast_type_size(expr->sizeof_params.type->type);
             }
@@ -632,6 +649,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
             if (node != NULL) {
                 ir_expr->const_params.int_val = ast_type_align(node->type);
             } else {
+                assert(node == sl_tail(&expr->sizeof_params.type->decls));
                 ir_expr->const_params.int_val =
                     ast_type_align(expr->sizeof_params.type->type);
             }
@@ -653,6 +671,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_MEM_ACC: {
         ir_expr_t *pointer = trans_expr(ts, expr->mem_acc.base, ir_stmts);
         if (expr->mem_acc.op == OP_ARROW) {
+            // TODO: Handle this
         } else {
             assert(expr->mem_acc.op = OP_DOT);
         }
@@ -882,15 +901,15 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         sl_append(ir_stmts, &ir_stmt->link);
 
         ir_expr = trans_expr(ts, right, ir_stmts);
-        ir_expr = trans_expr_bool(ts, ir_expr, trans_type(ts, type), ir_stmts);
-        ir_expr_t *right_val = ir_expr;
+        ir_expr_t *right_val =
+            trans_expr_bool(ts, ir_expr, trans_type(ts, type), ir_stmts);
 
         ir_stmt = ir_stmt_create(IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = done;
         sl_append(ir_stmts, &ir_stmt->link);
 
-        // True statement
+
         ir_stmt = ir_stmt_create(IR_STMT_LABEL);
         ir_stmt->label = done;
         sl_append(ir_stmts, &ir_stmt->link);
@@ -927,9 +946,9 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     default:
         assert(false);
     }
+
+    // Comparisons need to be handled separately
     if (is_cmp) {
-        ir_expr_t *temp =
-            ir_temp_create(&ir_type_i1, ts->func->func.next_temp++);
         ir_expr_t *cmp;
         ir_expr_t *left_expr;
         if (is_float) {
@@ -947,14 +966,10 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
             cmp->icmp.expr1 = left_expr;
             cmp->icmp.expr2 = trans_expr(ts, right, ir_stmts);;
         }
-        ir_stmt_t *stmt = ir_stmt_create(IR_STMT_ASSIGN);
-        stmt->assign.dest = temp;
-        stmt->assign.src = cmp;
-        sl_append(ir_stmts, &stmt->link);
         if (left_loc != NULL) {
             *left_loc = left_expr;
         }
-        return temp;
+        return cmp;
     }
 
     // Basic bin op case
@@ -981,7 +996,8 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
     stmt->assign.dest = name;
 
     if (global) {
-        ir_expr_t *src = trans_expr(ts, node->expr, ir_stmts);
+        ir_expr_t *src = node->expr == NULL ?
+            NULL : trans_expr(ts, node->expr, ir_stmts);
         stmt->assign.src = src;
         sl_append(ir_stmts, &stmt->link);
     } else {
