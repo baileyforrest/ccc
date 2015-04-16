@@ -86,7 +86,6 @@ status_t pp_directives_init(preprocessor_t *pp) {
     }
 
     // Add to search path with -I option
-    sl_link_t *cur;
     SL_FOREACH(cur, &optman.include_paths) {
         len_str_node_node_t *node = GET_ELEM(&optman.include_paths, cur);
         sl_append(&pp->search_path, &node->node.link);
@@ -105,7 +104,6 @@ void pp_directives_destroy(preprocessor_t *pp) {
 
     // Remove search path -I options
     // This should be fast because the -I options are at the front
-    sl_link_t *cur;
     SL_FOREACH(cur, &optman.include_paths) {
         len_str_node_node_t *node = GET_ELEM(&optman.include_paths, cur);
         sl_remove(&pp->search_path, &node->node.link);
@@ -239,7 +237,6 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     bool found_cur_path = false;
 
     // Search for the string in all of the search paths
-    sl_link_t *link;
     SL_FOREACH(link, &pp->search_path) {
         len_str_node_t *cur = GET_ELEM(&pp->search_path, link);
 

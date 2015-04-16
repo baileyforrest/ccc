@@ -38,7 +38,6 @@ ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast) {
     ir_trans_unit_t *tunit = ir_trans_unit_create();
     ts->tunit = tunit;
-    sl_link_t *cur;
     SL_FOREACH(cur, &ast->gdecls) {
         gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
         trans_gdecl(ts, gdecl, &tunit->gdecls);
@@ -69,7 +68,6 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         break;
     }
     case GDECL_DECL: {
-        sl_link_t *cur;
         SL_FOREACH(cur, &gdecl->decl->decls) {
             decl_node_t *node = GET_ELEM(&gdecl->decl->decls, cur);
             ir_gdecl_t *ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
@@ -89,7 +87,6 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         break;
 
     case STMT_DECL: {
-        sl_link_t *cur;
         SL_FOREACH(cur, &stmt->decl->decls) {
             decl_node_t *node = GET_ELEM(&stmt->decl->decls, cur);
             trans_decl_node(ts, node, ir_stmts);
@@ -169,7 +166,6 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_SWITCH);
         ir_stmt->switch_params.expr =
             trans_expr(ts, stmt->switch_params.expr, ir_stmts);
-        sl_link_t *cur;
         SL_FOREACH(cur, &stmt->switch_params.cases) {
             stmt_t *cur_case = GET_ELEM(&stmt->switch_params.cases, cur);
             ir_label_t *label = ir_numlabel_create(ts->tunit,
@@ -316,7 +312,6 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
 
         // Loop header:
         if (stmt->for_params.decl1 != NULL) {
-            sl_link_t *cur;
             SL_FOREACH(cur, &stmt->for_params.decl1->decls) {
                 trans_decl_node(ts,
                                 GET_ELEM(&stmt->for_params.decl1->decls, cur),
@@ -398,7 +393,6 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     case STMT_COMPOUND: {
         typetab_t *typetab_save = ts->typetab;
         ts->typetab = &stmt->compound.typetab;
-        sl_link_t *cur;
         SL_FOREACH(cur, &stmt->compound.stmts) {
             stmt_t *cur_stmt = GET_ELEM(&stmt->compound.stmts, cur);
             trans_stmt(ts, cur_stmt, ir_stmts);
@@ -587,7 +581,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         call->call.func_sig = trans_type(ts, expr->call.func->etype);
         call->call.func_ptr = trans_expr(ts, expr->call.func, ir_stmts);
 
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->call.params) {
             expr_t *param = GET_ELEM(&expr->call.params, cur);
             ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
@@ -611,7 +604,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         return temp;
     }
     case EXPR_CMPD: {
-        sl_link_t *cur;
         ir_expr_t *ir_expr = NULL;
         SL_FOREACH(cur, &expr->cmpd.exprs) {
             expr_t *expr = GET_ELEM(&expr->cmpd.exprs, cur);
@@ -1036,10 +1028,8 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
 
     case TYPE_STRUCT:
         ir_type = ir_type_create(IR_TYPE_STRUCT);
-        sl_link_t *cur_decl;
         SL_FOREACH(cur_decl, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
-            sl_link_t *cur_node;
             SL_FOREACH(cur_node, &decl->decls) {
                 decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
                 ir_type_t *node_type = trans_type(ts, node->type);
@@ -1059,10 +1049,8 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     case TYPE_UNION: {
         type_t *max_type = NULL;
         size_t max_size = 0;
-        sl_link_t *cur_decl;
         SL_FOREACH(cur_decl, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
-            sl_link_t *cur_node;
             SL_FOREACH(cur_node, &decl->decls) {
                 decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
                 size_t size = ast_type_size(node->type);
@@ -1090,7 +1078,6 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         ir_type = ir_type_create(IR_TYPE_FUNC);
         ir_type->func.type = trans_type(ts, type->func.type);
         ir_type->func.varargs = type->func.varargs;
-        sl_link_t *cur;
         SL_FOREACH(cur, &type->func.params) {
             ir_type_t *param_type =
                 trans_type(ts, GET_ELEM(&type->func.params, cur));

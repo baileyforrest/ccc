@@ -93,33 +93,6 @@ struct ir_type_t {
     };
 };
 
-/* TODO: Remove
-typedef enum ir_const_type_t {
-    IR_CONST_BOOL,
-    IR_CONST_INT,
-    IR_CONST_FLOAT,
-    IR_CONST_NULL,
-    IR_CONST_GLOBAL,
-} ir_const_type_t;
-
-typedef struct ir_const_t ir_const_t;
-struct ir_const_t {
-    sl_link_t link;
-    ir_const_type_t type;
-
-    union {
-        bool bool_val;
-        long long int_val;
-        long double float_val;
-
-        struct {
-            ir_type_t *type;
-            ir_const_t *val;
-        } global;
-    };
-};
-*/
-
 typedef struct ir_expr_t ir_expr_t;
 
 typedef enum ir_const_type_t {

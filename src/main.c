@@ -41,7 +41,6 @@ int main(int argc, char **argv) {
         goto fail0;
     }
 
-    sl_link_t *cur;
     SL_FOREACH(cur, &optman.src_files) {
         len_str_node_t *node = GET_ELEM(&optman.src_files, cur);
         manager_t manager;

@@ -153,7 +153,6 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
         }
 
         // Load command line parameter macros
-        sl_link_t *cur;
         SL_FOREACH(cur, &optman.macros) {
             macro_node_t *macro_node = GET_ELEM(&optman.macros, cur);
             if (CCC_OK != (status = ht_insert(&pp->macros,
@@ -483,7 +482,6 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
 
 pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
                                            len_str_t *lookup) {
-    sl_link_t *cur;
     SL_FOREACH(cur, &pp->macro_insts) {
         pp_macro_inst_t *cur_macro_inst = GET_ELEM(&pp->macro_insts, cur);
 
@@ -814,7 +812,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     bool recursive = false;
     // Protect against recursive macros
-    sl_link_t *cur;
     SL_FOREACH(cur, &pp->macro_insts) {
         pp_macro_inst_t *macro_inst = GET_ELEM(&pp->macro_insts, cur);
         if (macro_inst->macro != NULL && macro_inst->macro == macro) {
@@ -894,7 +891,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
             bool done = false;
 
-            sl_link_t *cur_link;
             SL_FOREACH(cur_link, &macro->params) {
                 ts_skip_ws_and_comment(&lookahead);
                 num_params++;

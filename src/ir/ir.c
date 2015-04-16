@@ -478,7 +478,6 @@ void ir_symtab_destroy(ir_symtab_t *symtab) {
 }
 
 void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
-    sl_link_t *cur;
     SL_FOREACH(cur, &irtree->gdecls) {
         ir_gdecl_print(stream, GET_ELEM(&irtree->gdecls, cur));
     }
@@ -487,7 +486,6 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA: {
-        sl_link_t *cur;
         SL_FOREACH(cur, &gdecl->gdata.stmts) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->gdata.stmts, cur), false);
         }
@@ -497,7 +495,6 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         fprintf(stream, "define ");
         ir_type_print(stream, gdecl->func.type, &gdecl->func.name);
         fprintf(stream, " {\n");
-        sl_link_t *cur;
         SL_FOREACH(cur, &gdecl->func.body) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->func.body, cur), true);
         }
@@ -544,7 +541,6 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         fprintf(stream, ", label %%%.*s [ ",
                 (int)stmt->switch_params.default_case->name.len,
                 stmt->switch_params.default_case->name.str);
-        sl_link_t *cur;
         SL_FOREACH(cur, &stmt->switch_params.cases) {
             ir_expr_label_pair_t *pair =
                 GET_ELEM(&stmt->switch_params.cases, cur);
@@ -610,7 +606,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             break;
         case IR_CONST_STRUCT:
             fprintf(stream, "{ ");
-            sl_link_t *cur;
             SL_FOREACH(cur, &expr->const_params.struct_val) {
                 ir_type_expr_pair_t *pair =
                     GET_ELEM(&expr->const_params.struct_val, cur);
@@ -627,7 +622,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             fprintf(stream, "[ ");
             assert(expr->const_params.type->type == IR_TYPE_ARR);
             ir_type_t *elem_type = expr->const_params.type->arr.elem_type;
-            sl_link_t *cur;
             SL_FOREACH(cur, &expr->const_params.struct_val) {
                 ir_expr_t *elem = GET_ELEM(&expr->const_params.arr_val, cur);
                 ir_type_print(stream, elem_type, NULL);
@@ -683,7 +677,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         fprintf(stream, "* ");
         ir_expr_print(stream, expr->getelemptr.ptr_val);
         fprintf(stream, ", ");
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->getelemptr.idxs) {
             ir_type_expr_pair_t *pair = GET_ELEM(&expr->getelemptr.idxs, cur);
             ir_type_print(stream, pair->type, NULL);
@@ -720,7 +713,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     case IR_EXPR_PHI: {
         fprintf(stream, "phi ");
         ir_type_print(stream, expr->phi.type, NULL);
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->phi.preds) {
             ir_expr_label_pair_t *pair = GET_ELEM(&expr->phi.preds, cur);
             fprintf(stream, "[ ");
@@ -754,7 +746,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_expr_print(stream, expr->call.func_ptr);
         fprintf(stream, " (");
 
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->call.arglist) {
             ir_type_expr_pair_t *pair = GET_ELEM(&expr->call.arglist, cur);
             ir_type_print(stream, pair->type, NULL);
@@ -786,7 +777,6 @@ void ir_type_print(FILE *stream, ir_type_t *type, len_str_t *func_name) {
             fprintf(stream, " @%*.s", (int)func_name->len, func_name->str);
         }
         fprintf(stream, " (");
-        sl_link_t *cur;
         SL_FOREACH(cur, &type->func.params) {
             ir_type_t *arg = GET_ELEM(&type->func.params, cur);
             ir_type_print(stream, arg, NULL);
@@ -813,7 +803,6 @@ void ir_type_print(FILE *stream, ir_type_t *type, len_str_t *func_name) {
         break;
     case IR_TYPE_STRUCT: {
         fprintf(stream, "type { ");
-        sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_params.types) {
             ir_type_t *elem = GET_ELEM(&type->struct_params.types, cur);
             ir_type_print(stream, elem, NULL);

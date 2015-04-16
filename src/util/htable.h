@@ -148,6 +148,6 @@ void *ht_lookup(const htable_t *ht, const void *key);
 
 #define HT_FOREACH(link, ht)                                            \
     for (size_t i = 0; i < (ht)->nbuckets; ++i)                         \
-        for (link = (ht)->buckets[i]; link != NULL; link = link->next)  \
+        for (sl_link_t *link = (ht)->buckets[i]; link != NULL; link = link->next)  \
 
 #endif /* _HTABLE_H_ */

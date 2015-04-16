@@ -817,7 +817,6 @@ bool typecheck_trans_unit(tc_state_t *tcs, trans_unit_t *trans_unit) {
     tcs->typetab = &trans_unit->typetab;
     bool retval = true;
 
-    sl_link_t *cur;
     SL_FOREACH(cur, &trans_unit->gdecls) {
         retval &= typecheck_gdecl(tcs, GET_ELEM(&trans_unit->gdecls, cur));
     }
@@ -837,7 +836,6 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
 
         retval &= typecheck_decl(tcs, gdecl->decl, TYPE_VOID);
         retval &= typecheck_stmt(tcs, gdecl->fdefn.stmt);
-        sl_link_t *cur;
         SL_FOREACH(cur, &gdecl->fdefn.gotos) {
             stmt_t *goto_stmt = GET_ELEM(&gdecl->fdefn.gotos, cur);
             stmt_t *label = ht_lookup(&tcs->func->fdefn.labels,
@@ -1039,7 +1037,6 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         typetab_t *save_tab = tcs->typetab;
         tcs->typetab = &stmt->compound.typetab;
 
-        sl_link_t *cur;
         SL_FOREACH(cur, &stmt->compound.stmts) {
             retval &= typecheck_stmt(tcs, GET_ELEM(&stmt->compound.stmts, cur));
         }
@@ -1070,7 +1067,6 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type) {
         // Don't need to typecheck decl nodes if its a typedef
         return retval;
     }
-    sl_link_t *cur;
     SL_FOREACH(cur, &decl->decls) {
         retval &= typecheck_decl_node(tcs, GET_ELEM(&decl->decls, cur), type);
     }
@@ -1118,7 +1114,6 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         } while (0)                                                     \
 
         RESET_NODE();
-        sl_link_t *cur_elem;
         SL_FOREACH(cur_elem, &expr->init_list.exprs) {
             expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
             retval &= typecheck_expr(tcs, elem, TC_NOCONST);
@@ -1224,7 +1219,6 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         }
 
         long len = 0;
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->init_list.exprs) {
             ++len;
             expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
@@ -1374,7 +1368,6 @@ type_t *typecheck_find_member(type_t *type, len_str_t *name, size_t *offset) {
     // TODO: Update offset
     size_t cur_offset = 0;
 
-    sl_link_t *cur;
     SL_FOREACH(cur, &type->struct_params.decls) {
         decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
 
@@ -1400,7 +1393,6 @@ type_t *typecheck_find_member(type_t *type, len_str_t *name, size_t *offset) {
                 break;
             }
         } else {
-            sl_link_t *cur_node;
             SL_FOREACH(cur_node, &decl->decls) {
                 decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
                 if (vstrcmp(node->id, name)) {
@@ -1628,7 +1620,6 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     }
 
     case EXPR_CMPD: {
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->cmpd.exprs) {
             retval &= typecheck_expr(tcs, GET_ELEM(&expr->cmpd.exprs, cur),
                                      TC_NOCONST);
@@ -1667,7 +1658,6 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             return false;
         }
 
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->offsetof_params.path) {
             len_str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
             type_t *mem_type = typecheck_find_member(compound, &node->str,
@@ -1755,7 +1745,6 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     }
 
     case EXPR_INIT_LIST: {
-        sl_link_t *cur;
         SL_FOREACH(cur, &expr->init_list.exprs) {
             retval &= typecheck_expr(tcs, GET_ELEM(&expr->init_list.exprs, cur),
                                      TC_NOCONST);
@@ -1794,7 +1783,6 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
 
     case TYPE_STRUCT:
     case TYPE_UNION: {
-        sl_link_t *cur;
         SL_FOREACH(cur, &type->struct_params.decls) {
             retval &= typecheck_decl(tcs,
                                      GET_ELEM(&type->struct_params.decls, cur),
@@ -1805,7 +1793,6 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
     case TYPE_ENUM: {
         retval &= typecheck_type(tcs, type->enum_params.type);
         long long next_val = 0;
-        sl_link_t *cur;
         SL_FOREACH(cur, &type->enum_params.ids) {
             decl_node_t *node = GET_ELEM(&type->enum_params.ids, cur);
             retval &= typecheck_decl_node(tcs, node, TYPE_ENUM);
@@ -1882,7 +1869,6 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         // If this is only a function declaration, we don't want to add the
         // parameters to any symbol table
         basic_type_t decl_type = save_tab == NULL ? TYPE_FUNC : TYPE_VOID;
-        sl_link_t *cur;
         SL_FOREACH(cur, &type->func.params) {
             retval &= typecheck_decl(tcs, GET_ELEM(&type->func.params, cur),
                                      decl_type);
