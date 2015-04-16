@@ -165,7 +165,7 @@ ir_stmt_t *ir_stmt_create(ir_stmt_type_t type) {
         break;
     case IR_STMT_SWITCH:
         sl_init(&stmt->switch_params.cases,
-                offsetof(ir_val_label_pair_t, link));
+                offsetof(ir_expr_label_pair_t, link));
         break;
     case IR_STMT_INDIR_BR:
         sl_init(&stmt->indirectbr.labels, offsetof(ir_label_t, link));
@@ -195,7 +195,7 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
         sl_init(&expr->getelemptr.idxs, offsetof(ir_type_expr_pair_t, link));
         break;
     case IR_EXPR_PHI:
-        sl_init(&expr->phi.preds, offsetof(ir_val_label_pair_t, link));
+        sl_init(&expr->phi.preds, offsetof(ir_expr_label_pair_t, link));
         break;
     case IR_EXPR_CALL:
         sl_init(&expr->call.arglist, offsetof(ir_type_expr_pair_t, link));
@@ -256,4 +256,221 @@ ir_type_t *ir_type_ref(ir_type_t *type) {
     assert(type->refcnt >= 1);
     ++type->refcnt;
     return type;
+}
+
+void ir_type_destroy(ir_type_t *type) {
+    switch (type->type) {
+    case IR_TYPE_VOID:
+    case IR_TYPE_INT:
+    case IR_TYPE_FLOAT:
+        // These types are allocated statically
+        return;
+    default:
+        break;
+    }
+    if (--type->refcnt > 0) {
+        return;
+    }
+
+    switch (type->type) {
+    case IR_TYPE_FUNC:
+        ir_type_destroy(type->func.type);
+        SL_DESTROY_FUNC(&type->func.params, ir_type_destroy);
+        break;
+    case IR_TYPE_PTR:
+        ir_type_destroy(type->ptr.base);
+        break;
+    case IR_TYPE_ARR:
+        ir_type_destroy(type->arr.elem_type);
+        break;
+    case IR_TYPE_STRUCT:
+        SL_DESTROY_FUNC(&type->struct_params.types, ir_type_destroy);
+        break;
+    case IR_TYPE_OPAQUE:
+        break;
+    default:
+        assert(false);
+    }
+    free(type);
+}
+
+void ir_type_expr_pair_destroy(ir_type_expr_pair_t *pair) {
+    ir_type_destroy(pair->type);
+    ir_expr_destroy(pair->expr);
+    free(pair);
+}
+
+void ir_expr_label_pair_destroy(ir_expr_label_pair_t *pair) {
+    ir_expr_destroy(pair->expr);
+    free(pair);
+}
+
+void ir_expr_destroy(ir_expr_t *expr) {
+    if (--expr->refcnt > 0) {
+        return;
+    }
+    switch (expr->type) {
+    case IR_EXPR_VAR:
+        ir_type_destroy(expr->var.type);
+        break;
+    case IR_EXPR_CONST:
+        switch (expr->const_params.ctype) {
+        case IR_CONST_BOOL:
+        case IR_CONST_INT:
+        case IR_CONST_FLOAT:
+        case IR_CONST_NULL:
+        case IR_CONST_ZERO:
+            break;
+        case IR_CONST_STRUCT:
+            SL_DESTROY_FUNC(&expr->const_params.struct_val,
+                            ir_type_expr_pair_destroy);
+            break;
+        case IR_CONST_ARR:
+            SL_DESTROY_FUNC(&expr->const_params.struct_val,
+                            ir_expr_destroy);
+            break;
+        default:
+            assert(false);
+        }
+        break;
+    case IR_EXPR_BINOP:
+        ir_type_destroy(expr->binop.type);
+        ir_expr_destroy(expr->binop.expr1);
+        ir_expr_destroy(expr->binop.expr2);
+        break;
+    case IR_EXPR_ALLOCA:
+        ir_type_destroy(expr->alloca.type);
+        ir_type_destroy(expr->alloca.nelem_type);
+        break;
+    case IR_EXPR_LOAD:
+        ir_type_destroy(expr->load.type);
+        ir_expr_destroy(expr->load.ptr);
+        break;
+    case IR_EXPR_GETELEMPTR:
+        ir_type_destroy(expr->getelemptr.type);
+        ir_expr_destroy(expr->getelemptr.ptr_val);
+        SL_DESTROY_FUNC(&expr->getelemptr.idxs, ir_type_expr_pair_destroy);
+        break;
+    case IR_EXPR_CONVERT:
+        ir_type_destroy(expr->convert.src_type);
+        ir_expr_destroy(expr->convert.val);
+        ir_type_destroy(expr->convert.dest_type);
+        break;
+    case IR_EXPR_ICMP:
+        ir_type_destroy(expr->icmp.type);
+        ir_expr_destroy(expr->icmp.expr1);
+        ir_expr_destroy(expr->icmp.expr2);
+        break;
+    case IR_EXPR_FCMP:
+        ir_type_destroy(expr->fcmp.type);
+        ir_expr_destroy(expr->fcmp.expr1);
+        ir_expr_destroy(expr->fcmp.expr2);
+        break;
+    case IR_EXPR_PHI:
+        ir_type_destroy(expr->phi.type);
+        SL_DESTROY_FUNC(&expr->phi.preds, ir_expr_label_pair_destroy);
+        break;
+    case IR_EXPR_SELECT:
+        ir_type_destroy(expr->select.selty);
+        ir_expr_destroy(expr->select.cond);
+        ir_type_destroy(expr->select.type1);
+        ir_expr_destroy(expr->select.expr1);
+        ir_type_destroy(expr->select.type2);
+        ir_expr_destroy(expr->select.expr2);
+        break;
+    case IR_EXPR_CALL:
+        ir_type_destroy(expr->call.func_sig);
+        ir_expr_destroy(expr->call.func_ptr);
+        SL_DESTROY_FUNC(&expr->call.arglist, ir_type_expr_pair_destroy);
+        break;
+    case IR_EXPR_VAARG:
+        ir_type_destroy(expr->vaarg.va_list_type);
+        SL_DESTROY_FUNC(&expr->vaarg.arglist, ir_type_expr_pair_destroy);
+        ir_type_destroy(expr->vaarg.arg_type);
+        break;
+    default:
+        assert(false);
+    }
+    free(expr);
+}
+
+void ir_stmt_destroy(ir_stmt_t *stmt) {
+    switch (stmt->type) {
+    case IR_STMT_LABEL:
+        break;
+    case IR_STMT_RET:
+        ir_type_destroy(stmt->ret.type);
+        ir_expr_destroy(stmt->ret.val);
+        break;
+    case IR_STMT_BR:
+        if (stmt->br.cond != NULL) {
+            ir_expr_destroy(stmt->br.cond);
+        }
+        break;
+    case IR_STMT_SWITCH:
+        ir_expr_destroy(stmt->switch_params.expr);
+        SL_DESTROY_FUNC(&stmt->switch_params.cases, ir_expr_label_pair_destroy);
+        break;
+    case IR_STMT_INDIR_BR:
+        ir_type_destroy(stmt->indirectbr.type);
+        ir_expr_destroy(stmt->indirectbr.addr);
+        SL_DESTROY_FUNC(&stmt->indirectbr.labels, free);
+        break;
+    case IR_STMT_ASSIGN:
+        ir_expr_destroy(stmt->assign.dest);
+        ir_expr_destroy(stmt->assign.src);
+        break;
+    case IR_STMT_STORE:
+        ir_type_destroy(stmt->store.type);
+        ir_expr_destroy(stmt->store.val);
+        ir_expr_destroy(stmt->store.ptr);
+        break;
+    case IR_STMT_INTRINSIC_FUNC:
+        ir_type_destroy(stmt->intrinsic_func.func_sig);
+        break;
+    default:
+        assert(false);
+    }
+    free(stmt);
+}
+
+void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
+    switch (gdecl->type) {
+    case IR_GDECL_GDATA:
+        SL_DESTROY_FUNC(&gdecl->gdata.stmts, ir_stmt_destroy);
+        break;
+    case IR_GDECL_FUNC:
+        ir_type_destroy(gdecl->func.type);
+        SL_DESTROY_FUNC(&gdecl->func.body, ir_stmt_destroy);
+        break;
+    default:
+        assert(false);
+    }
+    free(gdecl);
+}
+
+void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
+    SL_DESTROY_FUNC(&trans_unit->gdecls, ir_gdecl_destroy);
+    ir_symtab_destroy(&trans_unit->globals);
+    HT_DESTROY_FUNC(&trans_unit->labels, free);
+    free(trans_unit);
+}
+
+void ir_symtab_entry_destroy(ir_symtab_entry_t *entry) {
+    ir_type_destroy(entry->entry_type);
+    switch (entry->type) {
+    case IR_SYMTAB_ENTRY_GDECL:
+        ir_gdecl_destroy(entry->gdecl);
+        break;
+    case IR_SYMTAB_ENTRY_LOCAL:
+        ir_expr_destroy(entry->local);
+        break;
+    default:
+        assert(false);
+    }
+    free(entry);
+}
+
+void ir_symtab_destroy(ir_symtab_t *symtab) {
+    HT_DESTROY_FUNC(&symtab->table, ir_symtab_entry_destroy);
 }

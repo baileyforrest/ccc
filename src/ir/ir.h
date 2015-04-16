@@ -40,6 +40,12 @@ typedef struct ir_label_t {
 } ir_label_t;
 
 
+typedef enum ir_float_type_t {
+    IR_FLOAT_FLOAT,
+    IR_FLOAT_DOUBLE,
+    IR_FLOAT_X86_FP80,
+} ir_float_type_t;
+
 typedef enum ir_type_type_t {
     IR_TYPE_VOID,
     IR_TYPE_FUNC,
@@ -50,12 +56,6 @@ typedef enum ir_type_type_t {
     IR_TYPE_STRUCT,
     IR_TYPE_OPAQUE,
 } ir_type_type_t;
-
-typedef enum ir_float_type_t {
-    IR_FLOAT_FLOAT,
-    IR_FLOAT_DOUBLE,
-    IR_FLOAT_X86_FP80,
-} ir_float_type_t;
 
 typedef struct ir_type_t ir_type_t;
 struct ir_type_t {
@@ -93,6 +93,7 @@ struct ir_type_t {
     };
 };
 
+/* TODO: Remove
 typedef enum ir_const_type_t {
     IR_CONST_BOOL,
     IR_CONST_INT,
@@ -117,8 +118,20 @@ struct ir_const_t {
         } global;
     };
 };
+*/
 
 typedef struct ir_expr_t ir_expr_t;
+
+typedef enum ir_const_type_t {
+    IR_CONST_BOOL,
+    IR_CONST_INT,
+    IR_CONST_FLOAT,
+    IR_CONST_NULL,
+    IR_CONST_STRUCT,
+    IR_CONST_ARR,
+    IR_CONST_ZERO,
+} ir_const_type_t;
+
 typedef enum ir_oper_t {
     // Binary operations
     IR_OP_ADD,
@@ -194,11 +207,11 @@ typedef struct ir_type_expr_pair_t {
 } ir_type_expr_pair_t;
 
 
-typedef struct ir_val_label_pair_t {
+typedef struct ir_expr_label_pair_t {
     sl_link_t link;
-    ir_expr_t *val;
+    ir_expr_t *expr;
     ir_label_t *label;
-} ir_val_label_pair_t;
+} ir_expr_label_pair_t;
 
 typedef enum ir_expr_type_t {
     IR_EXPR_VAR,
@@ -229,11 +242,14 @@ struct ir_expr_t {
         } var;
 
         struct {
+            ir_const_type_t ctype;
             ir_type_t *type;
             union {
+                bool bool_val;
                 long long int_val;
                 long double float_val;
-                ir_expr_t *str_val;
+                slist_t struct_val; /**< (ir_type_expr_pair_t) */
+                slist_t arr_val; /**< (ir_expr_t) */
             };
         } const_params;
 
@@ -285,7 +301,7 @@ struct ir_expr_t {
 
         struct {
             ir_type_t *type;
-            slist_t preds; /**< (ir_val_label_pair_t) */
+            slist_t preds; /**< (ir_expr_label_pair_t) */
         } phi;
 
         struct {
@@ -298,7 +314,6 @@ struct ir_expr_t {
         } select;
 
         struct {
-            ir_type_t *ret_type;
             ir_type_t *func_sig;
             ir_expr_t *func_ptr;
             slist_t arglist; /**< (ir_type_expr_pair_t) */
@@ -353,7 +368,7 @@ typedef struct ir_stmt_t {
 
         struct {
             ir_expr_t *expr;
-            slist_t cases; /**< (ir_val_label_pair_t) */
+            slist_t cases; /**< (ir_expr_label_pair_t) */
             ir_label_t *default_case;
         } switch_params;
 
@@ -381,12 +396,14 @@ typedef struct ir_stmt_t {
     };
 } ir_stmt_t;
 
+// TODO: Use this
 typedef struct ir_symtab_t {
     htable_t table;
 } ir_symtab_t;
 
 typedef struct ir_gdecl_t ir_gdecl_t;
 
+// TODO: Maybe change this
 typedef enum ir_symtab_entry_type_t {
     IR_SYMTAB_ENTRY_GDECL,
     IR_SYMTAB_ENTRY_LOCAL,
@@ -471,5 +488,21 @@ ir_type_t *ir_type_create(ir_type_type_t type);
 ir_expr_t *ir_expr_ref(ir_expr_t *expr);
 
 ir_type_t *ir_type_ref(ir_type_t *type);
+
+void ir_type_destroy(ir_type_t *type);
+
+void ir_type_expr_pair_destroy(ir_type_expr_pair_t *pair);
+
+void ir_expr_label_pair_destroy(ir_expr_label_pair_t *pair);
+
+void ir_expr_destroy(ir_expr_t *expr);
+
+void ir_stmt_destroy(ir_stmt_t *stmt);
+
+void ir_gdecl_destroy(ir_gdecl_t *gdecl);
+
+void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit);
+
+void ir_symtab_destroy(ir_symtab_t *symtab);
 
 #endif /* _IR_H_ */

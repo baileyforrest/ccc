@@ -29,6 +29,7 @@
 #include "typecheck/typechecker.h"
 
 #define CASE_VAL_TYPE ir_type_i64;
+#define NELEM_TYPE ir_type_i64;
 
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
@@ -184,10 +185,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
                 typecheck_const_expr(cur_case->case_params.val, &case_val);
             assert(retval == true);
 
-            ir_val_label_pair_t *pair = emalloc(sizeof(ir_val_label_pair_t));
-            pair->val = ir_expr_create(IR_EXPR_CONST);
-            pair->val->const_params.int_val = case_val;
-            pair->val->const_params.type = &CASE_VAL_TYPE;
+            ir_expr_label_pair_t *pair = emalloc(sizeof(ir_expr_label_pair_t));
+            pair->expr = ir_expr_create(IR_EXPR_CONST);
+            pair->expr->const_params.int_val = case_val;
+            pair->expr->const_params.type = &CASE_VAL_TYPE;
             pair->label = label;
 
             sl_append(&ir_stmt->switch_params.cases, &pair->link);
@@ -392,7 +393,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_RET);
         assert(ts->func->type == IR_GDECL_FUNC &&
                ts->func->func.type->type == IR_TYPE_FUNC);
-        ir_stmt->ret.type = ts->func->func.type->func.type;
+        ir_stmt->ret.type = ir_type_ref(ts->func->func.type->func.type);
         ir_stmt->ret.val = trans_expr(ts, stmt->return_params.expr, ir_stmts);
         break;
     }
@@ -586,7 +587,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     }
     case EXPR_CALL: {
         ir_expr_t *call = ir_expr_create(IR_EXPR_CALL);
-        call->call.ret_type = trans_type(ts, expr->etype);
         call->call.func_sig = trans_type(ts, expr->call.func->etype);
         call->call.func_ptr = trans_expr(ts, expr->call.func, ir_stmts);
 
@@ -604,8 +604,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
             return NULL;
         }
 
-        ir_expr_t *temp = ir_temp_create(ir_type_ref(call->call.ret_type),
-                                         ts->func->func.next_temp++);
+        ir_type_t *ret_type = ir_type_ref(call->call.func_sig->func.type);
+        ir_expr_t *temp = ir_temp_create(ret_type, ts->func->func.next_temp++);
         ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
         ir_stmt->assign.dest = temp;
         ir_stmt->assign.src = call;
@@ -917,19 +917,19 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         ir_expr = ir_expr_create(IR_EXPR_PHI);
         ir_expr->phi.type = &ir_type_i1;
 
-        ir_val_label_pair_t *pred = emalloc(sizeof(*pred));
-        pred->val = ir_expr_create(IR_EXPR_CONST);
-        pred->val->const_params.type = &ir_type_i1;
+        ir_expr_label_pair_t *pred = emalloc(sizeof(*pred));
+        pred->expr = ir_expr_create(IR_EXPR_CONST);
+        pred->expr->const_params.type = &ir_type_i1;
         if (is_and) {
-            pred->val->const_params.int_val = 0;
+            pred->expr->const_params.int_val = 0;
         } else {
-            pred->val->const_params.int_val = 1;
+            pred->expr->const_params.int_val = 1;
         }
         pred->label = block;
         sl_append(&ir_expr->phi.preds, &pred->link);
 
         pred = emalloc(sizeof(*pred));
-        pred->val = right_val;
+        pred->expr = right_val;
         pred->label = right_label;
         sl_append(&ir_expr->phi.preds, &pred->link);
 
@@ -1002,6 +1002,10 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
         sl_append(ir_stmts, &stmt->link);
     } else {
         ir_expr_t *src = ir_expr_create(IR_EXPR_ALLOCA);
+        src->alloca.type = ir_type_ref(name->var.type);
+        src->alloca.nelem_type = &NELEM_TYPE;
+        src->alloca.nelems = 0;
+        src->alloca.align = ast_type_align(node->type);
         stmt->assign.src = src;
         sl_append(ir_stmts, &stmt->link);
         if (node->expr != NULL) {
