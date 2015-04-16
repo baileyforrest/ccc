@@ -465,8 +465,8 @@ extern ir_type_t ir_type_float;
 extern ir_type_t ir_type_double;
 extern ir_type_t ir_type_x86_fp80;
 
-#define SWITCH_VAL_TYPE ir_type_i64;
-#define NELEM_TYPE ir_type_i64;
+#define SWITCH_VAL_TYPE ir_type_i64
+#define NELEM_TYPE ir_type_i64
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree);
 

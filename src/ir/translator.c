@@ -28,9 +28,6 @@
 #include "util/util.h"
 #include "typecheck/typechecker.h"
 
-#define SWITCH_VAL_TYPE ir_type_i64;
-#define NELEM_TYPE ir_type_i64;
-
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
 
