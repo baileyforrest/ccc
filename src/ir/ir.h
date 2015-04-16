@@ -66,7 +66,7 @@ struct ir_type_t {
     union {
         struct {
             ir_type_t *type;
-            slist_t params;
+            slist_t params; /**< (ir_type_t) */
             bool varargs;
         } func;
 
@@ -305,7 +305,6 @@ struct ir_expr_t {
         } phi;
 
         struct {
-            ir_type_t *selty;
             ir_expr_t *cond;
             ir_type_t *type1;
             ir_expr_t *expr1;
@@ -372,6 +371,7 @@ typedef struct ir_stmt_t {
             ir_label_t *default_case;
         } switch_params;
 
+        // TODO: Is this used?
         struct {
             ir_type_t *type;
             ir_expr_t *addr;
@@ -464,6 +464,9 @@ extern ir_type_t ir_type_i64;
 extern ir_type_t ir_type_float;
 extern ir_type_t ir_type_double;
 extern ir_type_t ir_type_x86_fp80;
+
+#define SWITCH_VAL_TYPE ir_type_i64;
+#define NELEM_TYPE ir_type_i64;
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree);
 

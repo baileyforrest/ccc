@@ -28,7 +28,7 @@
 #include "util/util.h"
 #include "typecheck/typechecker.h"
 
-#define CASE_VAL_TYPE ir_type_i64;
+#define SWITCH_VAL_TYPE ir_type_i64;
 #define NELEM_TYPE ir_type_i64;
 
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
@@ -188,7 +188,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             ir_expr_label_pair_t *pair = emalloc(sizeof(ir_expr_label_pair_t));
             pair->expr = ir_expr_create(IR_EXPR_CONST);
             pair->expr->const_params.int_val = case_val;
-            pair->expr->const_params.type = &CASE_VAL_TYPE;
+            pair->expr->const_params.type = &SWITCH_VAL_TYPE;
             pair->label = label;
 
             sl_append(&ir_stmt->switch_params.cases, &pair->link);
