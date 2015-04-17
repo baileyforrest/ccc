@@ -32,12 +32,12 @@
 #define TRIPLE "x86_64-unknown-linux-gnu"
 
 #define IR_INT_LIT(width)                                   \
-    { SL_LINK_LIT, IR_TYPE_INT, 0, .int_params = { width } }
+    { SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
 
 #define IR_FLOAT_LIT(type)                                      \
-    { SL_LINK_LIT, IR_TYPE_FLOAT, 0, .float_params = { type } }
+    { SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
 
-ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, 0, { } };
+ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, { } };
 ir_type_t ir_type_i1 = IR_INT_LIT(1);
 ir_type_t ir_type_i8 = IR_INT_LIT(8);
 ir_type_t ir_type_i16 = IR_INT_LIT(16);
@@ -123,20 +123,27 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
     return label;
 }
 
-ir_expr_t *ir_temp_create(ir_type_t *type, int num) {
+ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num) {
     assert(num >= 0);
+    assert(func->type == IR_GDECL_FUNC);
+
     char buf[MAX_LABEL_LEN];
     snprintf(buf, sizeof(buf), "%d", num);
     buf[sizeof(buf) - 1] = '\0';
     size_t len = strlen(buf);
     ir_expr_t *temp = emalloc(sizeof(ir_expr_t) + len + 1);
     temp->type = IR_EXPR_VAR;
-    temp->refcnt = 1;
     temp->var.type = type;
     temp->var.name.str = (char *)temp + sizeof(*temp);
     temp->var.name.len = len;
     strcpy(temp->var.name.str, buf);
     temp->var.local = true;
+
+    ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,
+                                                      &temp->var.name);
+    entry->var = temp;
+    status_t status = ir_symtab_insert(&func->func.locals, entry);
+    assert(status == CCC_OK);
 
     return temp;
 }
@@ -206,7 +213,6 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
     ir_expr_t *expr = emalloc(sizeof(ir_expr_t));
     expr->type = type;
 
-    expr->refcnt = 1;
     switch (type) {
     case IR_EXPR_VAR:
     case IR_EXPR_CONST:
@@ -240,7 +246,6 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
 ir_type_t *ir_type_create(ir_type_type_t type) {
     ir_type_t *ir_type = emalloc(sizeof(ir_type_t));
     ir_type->type = type;
-    ir_type->refcnt = 1;
 
     switch (type) {
     case IR_TYPE_VOID:
@@ -267,31 +272,6 @@ ir_type_t *ir_type_create(ir_type_type_t type) {
     return ir_type;
 }
 
-ir_expr_t *ir_expr_ref(ir_expr_t *expr) {
-    assert(expr->refcnt >= 0);
-    ++expr->refcnt;
-    return expr;
-}
-
-ir_expr_t *ir_expr_unref(ir_expr_t *expr) {
-    --expr->refcnt;
-    return expr;
-}
-
-ir_type_t *ir_type_ref(ir_type_t *type) {
-    switch (type->type) {
-    case IR_TYPE_VOID:
-    case IR_TYPE_INT:
-    case IR_TYPE_FLOAT:
-        return type;
-    default:
-        break;
-    }
-    assert(type->refcnt >= 1);
-    ++type->refcnt;
-    return type;
-}
-
 void ir_type_destroy(ir_type_t *type) {
     switch (type->type) {
     case IR_TYPE_VOID:
@@ -301,9 +281,6 @@ void ir_type_destroy(ir_type_t *type) {
         return;
     default:
         break;
-    }
-    if (--type->refcnt > 0) {
-        return;
     }
 
     switch (type->type) {
@@ -339,14 +316,18 @@ void ir_expr_label_pair_destroy(ir_expr_label_pair_t *pair) {
     free(pair);
 }
 
+void ir_expr_var_destroy(ir_expr_t *expr) {
+    assert(expr->type == IR_EXPR_VAR);
+
+    ir_type_destroy(expr->var.type);
+    free(expr);
+}
+
 void ir_expr_destroy(ir_expr_t *expr) {
-    if (--expr->refcnt > 0) {
-        return;
-    }
     switch (expr->type) {
     case IR_EXPR_VAR:
-        ir_type_destroy(expr->var.type);
-        break;
+        // Variables are stored in symtab
+        return;
     case IR_EXPR_CONST:
         switch (expr->const_params.ctype) {
         case IR_CONST_BOOL:

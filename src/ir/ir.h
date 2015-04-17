@@ -63,7 +63,6 @@ typedef struct ir_type_t ir_type_t;
 struct ir_type_t {
     sl_link_t link;
     ir_type_type_t type;
-    int refcnt;
 
     union {
         struct {
@@ -207,7 +206,6 @@ typedef enum ir_expr_type_t {
 struct ir_expr_t {
     sl_link_t link;
     ir_expr_type_t type;
-    int refcnt;
 
     union {
         struct {
@@ -426,7 +424,7 @@ ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str);
 
 ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num);
 
-ir_expr_t *ir_temp_create(ir_type_t *type, int num);
+ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num);
 
 ir_trans_unit_t *ir_trans_unit_create(void);
 
@@ -438,17 +436,13 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type);
 
 ir_type_t *ir_type_create(ir_type_type_t type);
 
-ir_expr_t *ir_expr_ref(ir_expr_t *expr);
-
-ir_expr_t *ir_expr_unref(ir_expr_t *expr);
-
-ir_type_t *ir_type_ref(ir_type_t *type);
-
 void ir_type_destroy(ir_type_t *type);
 
 void ir_type_expr_pair_destroy(ir_type_expr_pair_t *pair);
 
 void ir_expr_label_pair_destroy(ir_expr_label_pair_t *pair);
+
+void ir_expr_var_destroy(ir_expr_t *expr);
 
 void ir_expr_destroy(ir_expr_t *expr);
 
