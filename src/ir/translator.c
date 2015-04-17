@@ -577,24 +577,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         return temp;
     }
     case EXPR_CAST: {
-        ir_type_t *dest_type = trans_type(ts, expr->etype);
-        ir_type_t *src_type = trans_type(ts, expr->cast.base->etype);
-        ir_expr_t *temp = ir_temp_create(ts->func, dest_type,
-                                         ts->func->func.next_temp++);
-
         ir_expr_t *src_expr = trans_expr(ts, expr->cast.base, ir_stmts);
-
-        ir_expr_t *convert = ir_expr_create(IR_EXPR_CONVERT);
-        // TODO0: This. choose right type based on src/dest types
-        //convert->convert.type = 
-        convert->convert.src_type = src_type;
-        convert->convert.val = src_expr;
-        convert->convert.dest_type = dest_type;
-
-        ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
-        ir_stmt->assign.dest = temp;
-        ir_stmt->assign.src = src_expr;
-        return temp;
+        return trans_type_conversion(ts, expr->etype, expr->cast.base->etype,
+                                     src_expr, ir_stmts);
     }
     case EXPR_CALL: {
         ir_expr_t *call = ir_expr_create(IR_EXPR_CALL);
@@ -986,13 +971,128 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     ir_expr_t *op_expr = ir_expr_create(IR_EXPR_BINOP);
     op_expr->binop.op = ir_op;
     op_expr->binop.type = trans_type(ts, type);
+
+    // Evaluate the types and convert types if necessary
     ir_expr_t *left_expr = trans_expr(ts, left, ir_stmts);
-    op_expr->binop.expr1 = left_expr;
-    op_expr->binop.expr2 = trans_expr(ts, right, ir_stmts);
+    op_expr->binop.expr1 = trans_type_conversion(ts, type, left->etype,
+                                                 left_expr, ir_stmts);
+    ir_expr_t *right_expr = trans_expr(ts, right, ir_stmts);
+    op_expr->binop.expr2 = trans_type_conversion(ts, type, right->etype,
+                                                 right_expr, ir_stmts);
     if (left_loc != NULL) {
         *left_loc = left_expr;
     }
     return op_expr;
+}
+
+ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
+                                 ir_expr_t *src_expr, slist_t *ir_stmts) {
+    // Don't do anything if types are equal
+    if (typecheck_type_equal(dest, src)) {
+        return src_expr;
+    }
+
+    ir_type_t *dest_type = trans_type(ts, dest);
+    ir_type_t *src_type = trans_type(ts, src);
+    ir_expr_t *temp = ir_temp_create(ts->func, dest_type,
+                                     ts->func->func.next_temp++);
+
+    ir_expr_t *convert = ir_expr_create(IR_EXPR_CONVERT);
+    ir_convert_t convert_op;
+    switch (dest_type->type) {
+    case IR_TYPE_INT: {
+        bool dest_signed =
+            dest->type == TYPE_MOD && dest->mod.type_mod & TMOD_UNSIGNED;
+        switch (src_type->type) {
+        case IR_TYPE_INT:
+            if (dest_type->int_params.width < src_type->int_params.width) {
+                convert_op = IR_CONVERT_TRUNC;
+            } else {
+                bool src_signed =
+                    src->type == TYPE_MOD && src->mod.type_mod & TMOD_UNSIGNED;
+                if (src_signed) {
+                    convert_op = IR_CONVERT_SEXT;
+                } else {
+                    convert_op = IR_CONVERT_ZEXT;
+                }
+            }
+            break;
+        case IR_TYPE_FLOAT:
+            if (dest_signed) {
+                convert_op = IR_CONVERT_FPTOSI;
+            } else {
+                convert_op = IR_CONVERT_FPTOUI;
+            }
+            break;
+        case IR_TYPE_FUNC:
+        case IR_TYPE_PTR:
+        case IR_TYPE_ARR:
+            convert_op = IR_CONVERT_PTRTOINT;
+            break;
+        default:
+            assert(false);
+        }
+        break;
+    }
+    case IR_TYPE_FLOAT:
+        switch (src_type->type) {
+        case IR_TYPE_INT: {
+            bool src_signed =
+                src->type == TYPE_MOD && src->mod.type_mod & TMOD_UNSIGNED;
+            if (src_signed) {
+                convert_op = IR_CONVERT_FPTOSI;
+            } else {
+                convert_op = IR_CONVERT_FPTOUI;
+            }
+            break;
+        }
+        case IR_TYPE_FLOAT:
+            if (src_type->float_params.type < dest_type->float_params.type) {
+                convert_op = IR_CONVERT_FPEXT;
+            } else {
+                // We would have returned if they were equal
+                assert(src_type->float_params.type >
+                       dest_type->float_params.type);
+                convert_op = IR_CONVERT_FPTRUNC;
+            }
+            break;
+        default:
+            assert(false);
+        }
+        break;
+    case IR_TYPE_FUNC:
+    case IR_TYPE_PTR:
+    case IR_TYPE_ARR:
+        switch (src_type->type) {
+        case IR_TYPE_INT:
+            convert_op = IR_CONVERT_INTTOPTR;
+            break;
+        case IR_TYPE_FUNC:
+        case IR_TYPE_PTR:
+        case IR_TYPE_ARR:
+            convert_op = IR_CONVERT_BITCAST;
+            break;
+        default:
+            assert(false);
+        }
+        break;
+
+    case IR_TYPE_OPAQUE:
+    case IR_TYPE_VOID:
+    case IR_TYPE_STRUCT:
+    default:
+        assert(false);
+    }
+    convert->convert.type = convert_op;
+    convert->convert.src_type = src_type;
+    convert->convert.val = src_expr;
+    convert->convert.dest_type = dest_type;
+
+    ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
+    ir_stmt->assign.dest = temp;
+    ir_stmt->assign.src = convert;
+    sl_append(ir_stmts, &ir_stmt->link);
+    return temp;
 }
 
 void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {

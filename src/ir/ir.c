@@ -175,7 +175,8 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
         sl_init(&gdecl->func.allocs, offsetof(ir_stmt_t, link));
         sl_init(&gdecl->func.body, offsetof(ir_stmt_t, link));
         ir_symtab_init(&gdecl->func.locals);
-        gdecl->func.next_temp = 0;
+        // Must start with 1, because %0 is for entry block label
+        gdecl->func.next_temp = 1;
         gdecl->func.next_label = 0;
         break;
     default:
@@ -692,6 +693,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     case IR_EXPR_CONVERT:
         fprintf(stream, "%s ", ir_convert_str(expr->convert.type));
         ir_type_print(stream, expr->convert.src_type, NULL);
+        fprintf(stream, " ");
         ir_expr_print(stream, expr->convert.val);
         fprintf(stream, " to ");
         ir_type_print(stream, expr->convert.dest_type, NULL);

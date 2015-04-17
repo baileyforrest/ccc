@@ -42,6 +42,7 @@ typedef struct ir_label_t {
 } ir_label_t;
 
 
+// order is important here, must be lowest to greatest width
 typedef enum ir_float_type_t {
     IR_FLOAT_FLOAT,
     IR_FLOAT_DOUBLE,
@@ -140,6 +141,7 @@ typedef enum ir_convert_t {
     IR_CONVERT_SITOFP,
     IR_CONVERT_PTRTOINT,
     IR_CONVERT_INTTOPTR,
+    IR_CONVERT_BITCAST,
 } ir_convert_t;
 
 typedef enum ir_icmp_type_t {
