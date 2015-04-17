@@ -46,6 +46,18 @@ bool typecheck_ast(trans_unit_t *ast);
 bool typecheck_const_expr(expr_t *expr, long long *result);
 
 /**
+ * Evaluates a given constant expression expression.
+ *
+ * Assumes that the expression is typechecked
+ *
+ * @param tcs Type checker context
+ * @param expr The expression to evaluate
+ * @param result Location to store the result
+ */
+void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
+                               long long *result);
+
+/**
  * Returns true if t1 is equivalent to t2
  *
  * @param t1 Type 1

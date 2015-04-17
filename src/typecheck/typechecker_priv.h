@@ -59,18 +59,6 @@ void tc_state_init(tc_state_t *tcs);
 void tc_state_destroy(tc_state_t *tcs);
 
 /**
- * Evaluates a given constant expression expression.
- *
- * Assumes that the expression typechecks
- *
- * @param tcs Type checker context
- * @param expr The expression to evaluate
- * @param result Location to store the result
- */
-void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
-                               long long *result);
-
-/**
  * Checks whether an expression is a suitable lvalue. The expression must be
  * typechecked first.
  *

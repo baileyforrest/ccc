@@ -174,9 +174,8 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             cur_case->case_params.label = label;
 
             long long case_val;
-            bool retval =
-                typecheck_const_expr(cur_case->case_params.val, &case_val);
-            assert(retval == true);
+            typecheck_const_expr_eval(ts->typetab,
+                                      cur_case->case_params.val, &case_val);
 
             ir_expr_label_pair_t *pair = emalloc(sizeof(ir_expr_label_pair_t));
             pair->expr = ir_expr_create(IR_EXPR_CONST);
@@ -1088,10 +1087,8 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     case TYPE_ARR:
         ir_type = ir_type_create(IR_TYPE_ARR);
         long long size;
-        bool retval =
-            typecheck_const_expr(type->arr.len, &size);
+        typecheck_const_expr_eval(ts->typetab, type->arr.len, &size);
         ir_type->arr.nelems = size;
-        assert(retval == true);
         ir_type->arr.elem_type = trans_type(ts, type->arr.base);
         return ir_type;
     case TYPE_PTR:

@@ -58,7 +58,7 @@ bool typecheck_const_expr(expr_t *expr, long long *result) {
     tc_state_t tcs;
     tc_state_init(&tcs);
     if (typecheck_expr(&tcs, expr, TC_CONST)) {
-        typecheck_const_expr_eval(&tcs, expr, result);
+        typecheck_const_expr_eval(tcs.typetab, expr, result);
         retval = true;
     } else {
         retval = false;
@@ -68,11 +68,11 @@ bool typecheck_const_expr(expr_t *expr, long long *result) {
     return retval;
 }
 
-void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
+void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
                                long long *result) {
     switch (expr->type) {
     case EXPR_PAREN:
-        typecheck_const_expr_eval(tcs, expr->paren_base, result);
+        typecheck_const_expr_eval(typetab, expr->paren_base, result);
         return;
     case EXPR_CONST_INT:
         *result = expr->const_val.int_val;
@@ -80,8 +80,8 @@ void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
     case EXPR_BIN: {
         long long temp1;
         long long temp2;
-        typecheck_const_expr_eval(tcs, expr->bin.expr1, &temp1);
-        typecheck_const_expr_eval(tcs, expr->bin.expr2, &temp2);
+        typecheck_const_expr_eval(typetab, expr->bin.expr1, &temp1);
+        typecheck_const_expr_eval(typetab, expr->bin.expr2, &temp2);
         switch (expr->bin.op) {
         case OP_TIMES:    *result = temp1 *  temp2; break;
         case OP_DIV:      *result = temp1 /  temp2; break;
@@ -108,7 +108,7 @@ void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
     }
     case EXPR_UNARY: {
         long long temp;
-        typecheck_const_expr_eval(tcs, expr->unary.expr, &temp);
+        typecheck_const_expr_eval(typetab, expr->unary.expr, &temp);
         switch (expr->unary.op) {
         case OP_UPLUS:    *result =  temp; break;
         case OP_UMINUS:   *result = -temp; break;
@@ -121,16 +121,16 @@ void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
     }
     case EXPR_COND: {
         long long temp;
-        typecheck_const_expr_eval(tcs, expr->cond.expr1, &temp);
+        typecheck_const_expr_eval(typetab, expr->cond.expr1, &temp);
         if (temp) {
-            typecheck_const_expr_eval(tcs, expr->cond.expr2, result);
+            typecheck_const_expr_eval(typetab, expr->cond.expr2, result);
         } else {
-            typecheck_const_expr_eval(tcs, expr->cond.expr3, result);
+            typecheck_const_expr_eval(typetab, expr->cond.expr3, result);
         }
         return;
     }
     case EXPR_CAST:
-        typecheck_const_expr_eval(tcs, expr->cast.base, result);
+        typecheck_const_expr_eval(typetab, expr->cast.base, result);
         return;
 
     case EXPR_SIZEOF:
@@ -145,7 +145,6 @@ void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            typecheck_expr(tcs, expr->sizeof_params.expr, TC_NOCONST);
             if (expr->type == EXPR_SIZEOF) {
                 *result = ast_type_size(expr->sizeof_params.expr->etype);
             } else { // expr->type == EXPR_ALIGNOF
@@ -154,7 +153,7 @@ void typecheck_const_expr_eval(tc_state_t *tcs, expr_t *expr,
         }
         return;
     case EXPR_VAR: {
-        typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
+        typetab_entry_t *entry = tt_lookup(typetab, expr->var_id);
         if (entry->entry_type == TT_ENUM_ID) {
             *result = entry->enum_val;
             return;
@@ -1215,7 +1214,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
             if (!typecheck_expr(tcs, type->arr.len, TC_CONST)) {
                 return false;
             }
-            typecheck_const_expr_eval(tcs, type->arr.len, &decl_len);
+            typecheck_const_expr_eval(tcs->typetab, type->arr.len, &decl_len);
         }
 
         long len = 0;
@@ -1762,7 +1761,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             }
             long long cur_val;
             if (node->expr != NULL) {
-                typecheck_const_expr_eval(tcs, node->expr, &cur_val);
+                typecheck_const_expr_eval(tcs->typetab, node->expr, &cur_val);
                 entry->enum_val = cur_val;
                 next_val = cur_val + 1;
             } else {
