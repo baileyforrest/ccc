@@ -56,9 +56,8 @@ typedef struct symtab_entry_t {
  * @param sym_tab Symbol table to initialize
  * @param is_sym IS_SYM if symbol table. else NOT_SYM. if IS_SYM, then table
  *     will be populated with reserved words
- * @return CCC_OK on success, error code on error
  */
-status_t st_init(symtab_t *table, bool is_sym);
+void st_init(symtab_t *table, bool is_sym);
 
 /**
  * Does not destroy sym_tab. Destroys a symbol table.

@@ -77,7 +77,7 @@ static len_str_t s_predef_param_macros[] = {
     LEN_STR_LIT("__attribute__(xyz) /* None */") // Pesky attribute
 };
 
-status_t pp_init(preprocessor_t *pp, htable_t *macros) {
+void pp_init(preprocessor_t *pp, htable_t *macros) {
     static const ht_params_t macro_params = {
         0,                                // No Size estimate
         offsetof(pp_macro_t, name),       // Offset of key
@@ -94,31 +94,22 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
         vstrcmp,                          // void string compare
     };
 
-    status_t status = CCC_OK;
     sl_init(&pp->file_insts, offsetof(pp_file_t, link));
     sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link));
     sl_init(&pp->search_path, offsetof(len_str_node_t, link));
 
-    if (CCC_OK != (status = ht_init(&pp->directives, &directive_params))) {
-        goto fail1;
-    }
+    ht_init(&pp->directives, &directive_params);
 
     if (macros == NULL) {
-        if (CCC_OK != (status = ht_init(&pp->macros, &macro_params))) {
-            goto fail2;
-        }
+        ht_init(&pp->macros, &macro_params);
 
         // Register directive handlers
-        if (CCC_OK != (status = pp_directives_init(pp))) {
-            goto fail3;
-        }
+        pp_directives_init(pp);
 
         // Load predefined macros
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
-            if (CCC_OK != (status = ht_insert(&pp->macros,
-                                              &s_predef_macros[i].link))) {
-                goto fail3;
-            }
+            status_t status = ht_insert(&pp->macros, &s_predef_macros[i].link);
+            assert(status == CCC_OK);
         }
 
         static bool predef_loaded = false;
@@ -130,22 +121,16 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
 
             for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_param_macros);
                  ++i) {
-                macro_node_t *node = malloc(sizeof(macro_node_t));
-                if (node == NULL) {
-                    status = CCC_NOMEM;
-                    goto fail3;
-                }
+                macro_node_t *node = emalloc(sizeof(macro_node_t));
                 len_str_t *str = &s_predef_param_macros[i];
                 tstream_t stream;
                 ts_init(&stream, str->str, str->str + str->len,
                         &s_built_in_file, BUILT_IN_FILENAME, NULL, 0, 0);
 
-                if (CCC_OK !=
-                    (status =
-                     pp_directive_define_helper(&stream, &node->macro, false,
-                                                NULL))) {
+                if (CCC_OK != pp_directive_define_helper(&stream, &node->macro,
+                                                         false, NULL)) {
                     free(node);
-                    goto fail3;
+                    continue;
                 }
                 node->macro->type = MACRO_CLI_OPT;
                 sl_append(&optman.macros, &node->link);
@@ -155,10 +140,8 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
         // Load command line parameter macros
         SL_FOREACH(cur, &optman.macros) {
             macro_node_t *macro_node = GET_ELEM(&optman.macros, cur);
-            if (CCC_OK != (status = ht_insert(&pp->macros,
-                                              &macro_node->macro->link))) {
-                goto fail3;
-            }
+            status_t status = ht_insert(&pp->macros, &macro_node->macro->link);
+            assert(status == CCC_OK);
         }
 
         pp->pp_if = false;
@@ -177,20 +160,6 @@ status_t pp_init(preprocessor_t *pp, htable_t *macros) {
     pp->char_line = false;
     pp->ignore = false;
     pp->in_directive = false;
-
-    return status;
-
-fail3:
-    if (macros != NULL) {
-        ht_destroy(&pp->macros);
-    }
-fail2:
-    ht_destroy(&pp->directives);
-fail1:
-    sl_destroy(&pp->search_path);
-    sl_destroy(&pp->macro_insts);
-    sl_destroy(&pp->file_insts);
-    return status;
 }
 
 /**
@@ -257,21 +226,14 @@ int pp_nextchar(preprocessor_t *pp) {
     return result;
 }
 
-status_t pp_file_create(pp_file_t **result) {
-    status_t status = CCC_OK;
-    pp_file_t *pp_file = malloc(sizeof(pp_file_t));
-    if (pp_file == NULL) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
+pp_file_t *pp_file_create(void) {
+    pp_file_t *pp_file = emalloc(sizeof(pp_file_t));
 
     sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
     pp_file->if_count = 0;
     pp_file->owns_name = false;
 
-    *result = pp_file;
-fail:
-    return status;
+    return pp_file;
 }
 
 void pp_file_destroy(pp_file_t *pp_file) {
@@ -284,10 +246,7 @@ void pp_file_destroy(pp_file_t *pp_file) {
 
 status_t pp_map_file(const char *filename, size_t len, pp_file_t **result) {
     status_t status = CCC_OK;
-    pp_file_t *pp_file;
-    if (CCC_OK != (status = pp_file_create(&pp_file))) {
-        goto fail;
-    }
+    pp_file_t *pp_file = pp_file_create();
 
     fdir_entry_t *entry;
     if (CCC_OK != (status = fdir_insert(filename, len, &entry))) {
@@ -305,26 +264,15 @@ fail:
     return status;
 }
 
-status_t pp_map_stream(preprocessor_t *pp, tstream_t *src) {
-    status_t status = CCC_OK;
-    pp_macro_inst_t *macro;
-    if (CCC_OK != (status = pp_macro_inst_create(NULL, &macro))) {
-        goto fail;
-    }
+void pp_map_stream(preprocessor_t *pp, tstream_t *src) {
+    pp_macro_inst_t *macro = pp_macro_inst_create(NULL);
     ts_copy(&macro->stream, src, TS_COPY_SHALLOW);
     sl_prepend(&pp->macro_insts, &macro->link);
-fail:
-    return status;
 }
 
-status_t pp_macro_create(char *name, size_t len, pp_macro_t **result) {
-    status_t status = CCC_OK;
+pp_macro_t *pp_macro_create(char *name, size_t len) {
     // Allocate macro and name in one chunk
-    pp_macro_t *macro = malloc(sizeof(pp_macro_t) + len + 1);
-    if (macro == NULL) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
+    pp_macro_t *macro = emalloc(sizeof(pp_macro_t) + len + 1);
     sl_init(&macro->params, offsetof(len_str_node_t, link));
 
     // Set to safe value for destruction
@@ -337,12 +285,7 @@ status_t pp_macro_create(char *name, size_t len, pp_macro_t **result) {
 
     macro->type = MACRO_BASIC;
 
-    *result = macro;
-    return status;
-
-fail:
-    pp_macro_destroy(macro);
-    return status;
+    return macro;
 }
 
 void pp_macro_destroy(pp_macro_t *macro) {
@@ -357,15 +300,8 @@ void pp_macro_destroy(pp_macro_t *macro) {
     free(macro);
 }
 
-status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
-    status_t status = CCC_OK;
-
-    pp_macro_inst_t *macro_inst = malloc(sizeof(pp_macro_inst_t));
-    if (macro_inst == NULL) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
-
+pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro) {
+    pp_macro_inst_t *macro_inst = emalloc(sizeof(pp_macro_inst_t));
     sl_init(&macro_inst->param_insts, offsetof(pp_param_inst_t, link));
 
     static const ht_params_t pp_param_map_params = {
@@ -376,10 +312,7 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
         vstrcmp                              // void string compare
     };
 
-    if (CCC_OK !=
-        (status = ht_init(&macro_inst->param_map, &pp_param_map_params))) {
-        goto fail;
-    }
+    ht_init(&macro_inst->param_map, &pp_param_map_params);
 
     // Shallow copy because macro already has a copy of its fmarks
     if (macro != NULL) {
@@ -387,12 +320,7 @@ status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result) {
     }
     macro_inst->macro = macro;
 
-    *result = macro_inst;
-    return status;
-
-fail:
-    pp_macro_inst_destroy(macro_inst);
-    return status;
+    return macro_inst;
 }
 
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
@@ -500,8 +428,6 @@ pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
 }
 
 int pp_nextchar_helper(preprocessor_t *pp) {
-    status_t status = CCC_OK;
-
     bool stringify, macro_param;
     tstream_t *stream = pp_get_stream(pp, &stringify, &macro_param);
 
@@ -702,10 +628,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 return -(int)CCC_ESYNTAX;
             }
 
-            pp_param_inst_t *param_inst = malloc(sizeof(pp_param_inst_t));
-            if (param_inst == NULL) {
-                return -(int)CCC_NOMEM;
-            }
+            pp_param_inst_t *param_inst = emalloc(sizeof(pp_param_inst_t));
             ts_copy(&param_inst->stream, stream, TS_COPY_SHALLOW);
             param_inst->stream.cur = param->raw_val.str;
             param_inst->stream.end = param->raw_val.str + param->raw_val.len;
@@ -755,10 +678,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             // Skip over parameter name
             ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
 
-            pp_param_inst_t *param_inst = malloc(sizeof(pp_param_inst_t));
-            if (param_inst == NULL) {
-                return -(int)CCC_NOMEM;
-            }
+            pp_param_inst_t *param_inst = emalloc(sizeof(pp_param_inst_t));
             ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
 
             // Check if there's a concatenation after the parameter
@@ -851,14 +771,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
     }
 
-    pp_macro_inst_t *new_macro_inst;
     int error;
-
-    if (CCC_OK != (status = pp_macro_inst_create(macro, &new_macro_inst))) {
-        logger_log(&stream->mark, LOG_ERR, "Failed to create new macro.");
-        error = -(int)status;
-        goto fail;
-    }
+    pp_macro_inst_t *new_macro_inst = pp_macro_inst_create(macro);
 
     // TODO: Enable this after fixed
     (void)file_inst;
@@ -946,23 +860,12 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
                 size_t buf_len = cur_len + 1;
                 pp_param_map_elem_t *param_elem =
-                    malloc(sizeof(pp_param_map_elem_t) + buf_len);
-                if (param_elem == NULL) {
-                    logger_log(&stream->mark, LOG_ERR,
-                               "Out of memory while scanning macro");
-                    error = -(int)CCC_NOMEM;
-                    goto fail;
-                }
+                    emalloc(sizeof(pp_param_map_elem_t) + buf_len);
                 size_t offset = 0;
                 if (cur_len == 0) {
                     *((char *)param_elem + sizeof(*param_elem)) = '\0';
                 } else {
-                    if (CCC_OK != (status = pp_map_stream(pp, &cur_param))) {
-                        logger_log(&stream->mark, LOG_ERR,
-                                   "Failed to create new macro.");
-                        error = -(int)status;
-                        goto fail;
-                    }
+                    pp_map_stream(pp, &cur_param);
 
                     while (true) {
                         char *loc =
@@ -980,15 +883,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                         offset++;
                         if (offset == buf_len) {
                             buf_len <<= 1; // 2.0 growth factor
-                            if (NULL ==
-                                (param_elem = realloc(param_elem,
-                                                      sizeof(*param_elem) +
-                                                      buf_len))) {
-                                logger_log(&stream->mark, LOG_ERR,
-                                           "Out of memory while scanning macro");
-                                error = -(int)CCC_NOMEM;
-                                goto fail;
-                            }
+                            param_elem = erealloc(param_elem,
+                                                  sizeof(*param_elem) +
+                                                  buf_len);
                         }
                     }
                 }
@@ -1046,16 +943,11 @@ fail:
 
 int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
                             pp_macro_t *macro) {
-    status_t status = CCC_OK;
-
     static bool date_err = false;
     static bool time_err = false;
 
     // Found a parameter, set param state in pp
-    pp_macro_inst_t *macro_inst;
-    if (CCC_OK != (status = pp_macro_inst_create(macro, &macro_inst))) {
-        goto fail;
-    }
+    pp_macro_inst_t *macro_inst = pp_macro_inst_create(macro);
 
     time_t t;
     struct tm *tm;
@@ -1118,9 +1010,6 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     sl_prepend(&pp->macro_insts, &macro_inst->link);
 
     return -(int)CCC_RETRY;
-
-fail:
-    return -(int)status;
 }
 
 int pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,

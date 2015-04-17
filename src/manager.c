@@ -30,40 +30,21 @@
 #include "parse/preprocessor.h"
 #include "parse/symtab.h"
 
-status_t man_init(manager_t *manager, htable_t *macros) {
+void man_init(manager_t *manager, htable_t *macros) {
     assert(manager != NULL);
-    status_t status = CCC_OK;
 
-    if (CCC_OK != (status = pp_init(&manager->pp, macros))) {
-        goto fail0;
-    }
+    pp_init(&manager->pp, macros);
 
     // If macros != NULL, then this is for evaluating preprocessor if, so then
     // don't initialize with symbols. This is important because the static
     // entries can only be in one table at a time
     bool sym = macros == NULL ? IS_SYM : NOT_SYM;
-    if (CCC_OK != (status = st_init(&manager->symtab, sym))) {
-        goto fail1;
-    }
-    if (CCC_OK != (status = st_init(&manager->string_tab, NOT_SYM))) {
-        goto fail2;
-    }
-    if (CCC_OK !=
-        (status = lexer_init(&manager->lexer, &manager->pp, &manager->symtab,
-                             &manager->string_tab))) {
-        goto fail3;
-    }
+    st_init(&manager->symtab, sym);
+    st_init(&manager->string_tab, NOT_SYM);
 
-    return status;
+    lexer_init(&manager->lexer, &manager->pp, &manager->symtab,
+               &manager->string_tab);
 
-fail3:
-    st_destroy(&manager->string_tab);
-fail2:
-    st_destroy(&manager->symtab);
-fail1:
-    pp_destroy(&manager->pp);
-fail0:
-    return status;
 }
 
 void man_destroy(manager_t *manager) {

@@ -1502,11 +1502,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             if (!typecheck_expr_lvalue(tcs, expr->unary.expr)) {
                 return false;
             }
-            expr->etype = malloc(sizeof(type_t));
-            if (expr->etype == NULL) {
-                logger_log(NULL, LOG_ERR, "Out of memory in typechecker");
-                return false;
-            }
+            expr->etype = emalloc(sizeof(type_t));
             memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
             fmark_chain_inc_ref(expr->mark.last);
 

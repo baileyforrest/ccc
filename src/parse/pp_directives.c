@@ -74,15 +74,11 @@ static len_str_node_t s_default_search_path[] = {
     //{ SL_LINK_LIT, LEN_STR_LIT("/usr/lib/clang/3.6.0/include") },
 };
 
-status_t pp_directives_init(preprocessor_t *pp) {
-    status_t status = CCC_OK;
-
+void pp_directives_init(preprocessor_t *pp) {
     // Add directive handlers
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_directives); ++i) {
-        if (CCC_OK !=
-            (status = ht_insert(&pp->directives, &s_directives[i].link))) {
-            goto fail;
-        }
+        status_t status = ht_insert(&pp->directives, &s_directives[i].link);
+        assert(status == CCC_OK);
     }
 
     // Add to search path with -I option
@@ -95,9 +91,6 @@ status_t pp_directives_init(preprocessor_t *pp) {
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_default_search_path); ++i) {
         sl_append(&pp->search_path, &s_default_search_path[i].link);
     }
-
-fail:
-    return status;
 }
 
 void pp_directives_destroy(preprocessor_t *pp) {
@@ -424,10 +417,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     size_t name_len = ts_advance_identifier(stream);
 
     // Allocate new macro object
-    if (CCC_OK != (status = pp_macro_create(cur, name_len, &new_macro))) {
-        logger_log(&stream->mark, LOG_ERR, "Failed to create macro");
-        goto fail;
-    }
+    new_macro = pp_macro_create(cur, name_len);
 
     // Process paramaters
     if (ts_cur(stream) != '(') {
@@ -461,13 +451,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
 
             // Allocate paramater with string in one chunk
             len_str_node_t *string =
-                malloc(sizeof(len_str_node_t) + param_len + 1);
-            if (string == NULL) {
-                logger_log(&stream->mark, LOG_ERR,
-                           "Out of memory while defining macro");
-                status = CCC_NOMEM;
-                goto fail;
-            }
+                emalloc(sizeof(len_str_node_t) + param_len + 1);
             string->str.len = param_len;
             string->str.str = (char *)string + sizeof(*string);
             strncpy(string->str.str, cur, param_len);
@@ -512,10 +496,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     cur = ts_location(stream);
 
     // Set macro to start at this location on the stream
-    if (CCC_OK != (status = ts_copy((tstream_t *)&new_macro->stream, stream,
-                                    TS_COPY_SHALLOW))) {
-        goto fail;
-    }
+    ts_copy((tstream_t *)&new_macro->stream, stream, TS_COPY_SHALLOW);
 
     char *macro_end = NULL;
 
@@ -618,12 +599,7 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
         goto fail;
     }
 
-    if (NULL == (cond_inst = malloc(sizeof(*cond_inst)))) {
-        logger_log(&stream->mark, LOG_ERR, "Out of memory in %s", directive);
-        status = CCC_NOMEM;
-        goto fail;
-    }
-
+    cond_inst = emalloc(sizeof(*cond_inst));
     char *cur = ts_location(stream);
     size_t len = ts_advance_identifier(stream);
     if (ts_end(stream)) {
@@ -690,7 +666,6 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
     pp_file_t *file = sl_head(&pp->file_insts);
     tstream_t *stream = &file->stream;
     tstream_t lookahead;
-    pp_cond_inst_t *cond_inst = NULL;
 
     // Find the end of the line
     ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
@@ -702,16 +677,9 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
     lookahead.last = 0;
 
     manager_t manager;
-    if (CCC_OK != (status = man_init(&manager, &pp->macros))) {
-        logger_log(&stream->mark, LOG_ERR,
-                   "Failed to initialize parser in #%s", directive);
-        goto fail0;
-    }
-    if (CCC_OK != (status = pp_map_stream(&manager.pp, &lookahead))) {
-        logger_log(&stream->mark, LOG_ERR,
-                   "Failed to map stream in #%s", directive);
-        goto fail1;
-    }
+    man_init(&manager, &pp->macros);
+
+    pp_map_stream(&manager.pp, &lookahead);
 
     expr_t *expr = NULL;
     if (CCC_OK != (status = man_parse_expr(&manager, &expr))) {
@@ -730,12 +698,7 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
 
     pp_cond_inst_t *head;
     if (is_if) {
-        if (NULL == (head = malloc(sizeof(*head)))) {
-            logger_log(&stream->mark, LOG_ERR, "Out of memory in #%s",
-                       directive);
-            status = CCC_NOMEM;
-            goto fail2;
-        }
+        head = emalloc(sizeof(*head));
         head->start_if_count = file->if_count;
         sl_prepend(&file->cond_insts, &head->link);
     } else {
@@ -758,10 +721,6 @@ fail2:
     ast_expr_destroy(expr);
 fail1:
     man_destroy(&manager);
-fail0:
-    if (is_if) {
-        free(cond_inst);
-    }
     return status;
 }
 
@@ -896,12 +855,7 @@ status_t pp_directive_line(preprocessor_t *pp) {
             goto fail;
         }
         len -= 2; // -2 for quotes
-        len_str_t *new_filename = malloc(sizeof(len_str_t) + len + 1);
-        if (new_filename == NULL) {
-            logger_log(&pp->last_mark, LOG_ERR, "Out of memory");
-            status = CCC_NOMEM;
-            goto fail;
-        }
+        len_str_t *new_filename = emalloc(sizeof(len_str_t) + len + 1);
         new_filename->str = (char *)new_filename + sizeof(*new_filename);
         new_filename->len = len;
         // Copy filename + 1 so we don't copy the quote

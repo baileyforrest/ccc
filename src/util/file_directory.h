@@ -67,10 +67,9 @@ typedef struct fmark_refcnt_t {
  * Copy a mark chain
  *
  * @param mark Mark chain to copy
- * @param result Location to store resurt
- * @return CCC_OK on success, error code on error
+ * @return copied mark chain
  */
-status_t fmark_copy_chain(fmark_t *mark, fmark_t **result);
+fmark_t *fmark_copy_chain(fmark_t *mark);
 
 /**
  * Increments the refcount of an fmark chain
@@ -101,10 +100,8 @@ typedef struct fdir_entry_t {
 
 /**
  * Initializes the file directiory
- *
- * @return CCC_OK on success, error code on failure
  */
-status_t fdir_init(void);
+void fdir_init(void);
 
 /**
  * Destroys the file directory, freeing its memory

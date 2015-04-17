@@ -30,7 +30,6 @@
  */
 typedef enum {
     CCC_OK = 0,    /**< Success */
-    CCC_NOMEM,     /**< No Memory */
     CCC_FILEERR,   /**< File Error */
     CCC_ESYNTAX,   /**< Syntax Error */
     CCC_BACKTRACK, /**< Backtrack required */

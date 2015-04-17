@@ -103,13 +103,7 @@ typedef struct lex_wrap_t {
  */
 #define ALLOC_NODE(lex, loc, type)                                  \
     do {                                                            \
-        loc = malloc(sizeof(type));                                 \
-        if (loc == NULL) {                                          \
-            logger_log(&LEX_CUR(lex).mark, LOG_ERR,                 \
-                       "Out of memory in parser");                  \
-            status = CCC_NOMEM;                                     \
-            goto fail;                                              \
-        }                                                           \
+        loc = emalloc(sizeof(type));                                \
         memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));  \
         fmark_chain_inc_ref((loc)->mark.last);                      \
     } while (0)

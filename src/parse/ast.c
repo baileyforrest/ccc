@@ -442,10 +442,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
 
     len_str_node_t *node = NULL;
     if (decl_node->id != NULL) {
-        node = malloc(sizeof(*node) + decl_node->id->len + 1);
-        if (node == NULL) {
-            goto fail;
-        }
+        node = emalloc(sizeof(*node) + decl_node->id->len + 1);
         node->str.str = (char *)node + sizeof(*node);
         strncpy(node->str.str, decl_node->id->str, decl_node->id->len);
         node->str.str[decl_node->id->len] = '\0';
@@ -459,10 +456,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
 #define ALLOC_COPY_NODE()                                               \
     do {                                                                \
         size_t len = OFFSET;                                            \
-        if (NULL ==                                                     \
-            (node = malloc(sizeof(*node) + len + 1))) {                 \
-            goto fail;                                                  \
-        }                                                               \
+        node = emalloc(sizeof(*node) + len + 1);                        \
         node->str.str = (char *)node + sizeof(*node);                   \
         strncpy(node->str.str, print_buf, len);                         \
         node->str.str[len] = '\0';                                      \
@@ -553,9 +547,6 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
                            node->str.str);
     }
     SL_DESTROY_FUNC(&accum, free);
-    return;
-fail:
-    printf("%s: Out of memory", __func__);
 }
 
 void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {

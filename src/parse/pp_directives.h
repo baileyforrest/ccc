@@ -54,7 +54,7 @@ typedef struct pp_directive_t {
  * @param pp preprocessor to operate on
  * @return CCC_OK on success, error code on error
  */
-status_t pp_directives_init(preprocessor_t *pp);
+void pp_directives_init(preprocessor_t *pp);
 
 /**
  * Destroys preprocessor directive structures in a preprocessor

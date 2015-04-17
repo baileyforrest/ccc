@@ -100,9 +100,8 @@ static typetab_entry_t s_prim_types[] = {
     { SL_LINK_LIT, &size_t_str, TT_PRIM , &stt_size_t, { } }
 };
 
-status_t tt_init(typetab_t *tt, typetab_t *last) {
+void tt_init(typetab_t *tt, typetab_t *last) {
     assert(tt != NULL);
-    status_t status = CCC_OK;
     tt->last = last;
 
     sl_init(&tt->typedef_bases, offsetof(typedef_base_t, link));
@@ -115,30 +114,16 @@ status_t tt_init(typetab_t *tt, typetab_t *last) {
         ind_vstrcmp,                     // void string compare
     };
 
-    if (CCC_OK != (status = ht_init(&tt->types, &params))) {
-        goto fail;
-    }
-
-    if (CCC_OK != (status = ht_init(&tt->compound_types, &params))) {
-        goto fail;
-    }
+    ht_init(&tt->types, &params);
+    ht_init(&tt->compound_types, &params);
 
     // Initialize top level table with primitive types
     if (last == NULL) {
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
-            if (CCC_OK != (status = ht_insert(&tt->types,
-                                              &s_prim_types[i].link))) {
-                goto fail1;
-            }
+            status_t status = ht_insert(&tt->types, &s_prim_types[i].link);
+            assert(status == CCC_OK);
         }
     }
-    return status;
-
-fail1:
-    ht_destroy(&tt->types);
-    ht_destroy(&tt->compound_types);
-fail:
-    return status;
 }
 
 static void typetab_typedef_base_destroy(typedef_base_t *entry) {
@@ -185,12 +170,8 @@ void tt_destroy(typetab_t *tt) {
 status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
                            decl_node_t *decl_node) {
     status_t status = CCC_OK;
-    typetab_entry_t *new_entry = malloc(sizeof(typetab_entry_t));
+    typetab_entry_t *new_entry = emalloc(sizeof(typetab_entry_t));
     typedef_base_t *base = NULL;
-    if (new_entry == NULL) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
 
     new_entry->type = decl_node->type;
     new_entry->entry_type = TT_TYPEDEF;
@@ -199,11 +180,7 @@ status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
     // Only create an entry in the second table if its the first decl, to make
     // sure it is only removed once
     if (decl_node == sl_head(&decl->decls)) {
-        base = malloc(sizeof(typedef_base_t));
-        if (base == NULL) {
-            status = CCC_NOMEM;
-            goto fail;
-        }
+        base = emalloc(sizeof(typedef_base_t));
         base->type = decl->type;
     }
 
@@ -233,11 +210,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
     assert(tt_type != TT_TYPEDEF && "Use tt_insert_typedef");
 
     status_t status = CCC_OK;
-    typetab_entry_t *new_entry = malloc(sizeof(typetab_entry_t));
-    if (new_entry == NULL) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
+    typetab_entry_t *new_entry = emalloc(sizeof(typetab_entry_t));
 
     new_entry->type = type;
     new_entry->entry_type = tt_type;

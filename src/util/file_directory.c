@@ -47,46 +47,32 @@
  */
 static status_t fdir_entry_destroy(fdir_entry_t *entry);
 
-void fmark_chain_inc_ref(fmark_t *mark) {
-    if (mark == NULL) {
-        return;
-    }
-    ((fmark_refcnt_t *)mark)->refcnt++;
-}
-
-status_t fmark_copy_chain(fmark_t *mark, fmark_t **result) {
-    status_t status = CCC_OK;
+fmark_t *fmark_copy_chain(fmark_t *mark) {
     fmark_t *res = NULL;
 
     for (fmark_t *cur = mark, *res_cur = NULL; cur != NULL; cur = cur->last) {
         fmark_t *new_mark;
         if (res == NULL) {
-            fmark_refcnt_t *mark_refcnt = malloc(sizeof(fmark_refcnt_t));
-            if (mark_refcnt == NULL) {
-                status = CCC_NOMEM;
-                goto fail;
-            }
+            fmark_refcnt_t *mark_refcnt = emalloc(sizeof(fmark_refcnt_t));
             mark_refcnt->refcnt = 1;
             new_mark = &mark_refcnt->mark;
             res = new_mark;
         } else {
-            new_mark = malloc(sizeof(fmark_t));
+            new_mark = emalloc(sizeof(fmark_t));
             res_cur->last = new_mark;
-        }
-        if (new_mark == NULL) {
-            status = CCC_NOMEM;
-            goto fail;
         }
         memcpy(new_mark, cur, sizeof(fmark_t));
         res_cur = new_mark;
     }
 
-    *result = res;
-    return status;
+    return res;
+}
 
-fail:
-    fmark_chain_free(res);
-    return status;
+void fmark_chain_inc_ref(fmark_t *mark) {
+    if (mark == NULL) {
+        return;
+    }
+    ((fmark_refcnt_t *)mark)->refcnt++;
 }
 
 void fmark_chain_free(fmark_t *mark) {
@@ -109,7 +95,7 @@ typedef struct fdir_t {
 
 static fdir_t s_fdir;
 
-status_t fdir_init(void) {
+void fdir_init(void) {
     static const ht_params_t s_params = {
         0,                                // No Size estimate
         offsetof(fdir_entry_t, filename), // Offset of key
@@ -118,7 +104,7 @@ status_t fdir_init(void) {
         vstrcmp,                          // void string compare
     };
 
-    return ht_init(&s_fdir.table, &s_params);
+    ht_init(&s_fdir.table, &s_params);
 }
 
 static status_t fdir_entry_destroy(fdir_entry_t *entry) {
@@ -154,11 +140,7 @@ status_t fdir_insert(const char *filename, size_t len, fdir_entry_t **result) {
     }
 
     // Allocate the entry and name string in one region
-    entry = malloc(sizeof(fdir_entry_t) + len + 1);
-    if (entry == NULL) {
-        status = CCC_NOMEM;
-        goto fail;
-    }
+    entry = emalloc(sizeof(fdir_entry_t) + len + 1);
     // Initialize to safe values for destructor
     entry->buf = MAP_FAILED;
     entry->fd = -1;

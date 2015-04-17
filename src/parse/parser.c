@@ -129,9 +129,7 @@ status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result) {
     ALLOC_NODE(lex, tunit, trans_unit_t);
     sl_init(&tunit->gdecls, offsetof(gdecl_t, link));
     sl_init(&tunit->etypes, offsetof(type_t, link));
-    if (CCC_OK != (status = tt_init(&tunit->typetab, NULL))) {
-        goto fail;
-    }
+    tt_init(&tunit->typetab, NULL);
 
     lex->typetab = &tunit->typetab; // Set top type table to translation units
 
@@ -230,10 +228,7 @@ status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
         ind_vstrcmp,                    // void string compare
     };
 
-    if (CCC_OK !=
-        (status = ht_init(&gdecl->fdefn.labels, &s_gdecl_ht_params))) {
-        goto fail;
-    }
+    ht_init(&gdecl->fdefn.labels, &s_gdecl_ht_params);
 
     /* TODO: Handle old style function signature
     while (LEX_CUR(lex).type != RPAREN) {
@@ -2336,9 +2331,7 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     stmt->type = STMT_COMPOUND;
     sl_init(&stmt->compound.stmts, offsetof(stmt_t, link));
 
-    if (CCC_OK != (tt_init(&stmt->compound.typetab, lex->typetab))) {
-        goto fail;
-    }
+    tt_init(&stmt->compound.typetab, lex->typetab);
     // Add new typetab table to top of stack
     lex->typetab = &stmt->compound.typetab;
 

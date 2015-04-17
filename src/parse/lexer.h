@@ -48,10 +48,9 @@ typedef struct lexer_t {
  * @param pp Preprocessor to fetch chars from
  * @param symtab Symbol table to use
  * @param string_tab string table to use
- * @return CCC_OK on success, error code or error
  */
-status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
-                    symtab_t *string_tab);
+void lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
+                symtab_t *string_tab);
 
 /**
  * Destroys a lexer object

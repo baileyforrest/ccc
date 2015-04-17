@@ -169,11 +169,7 @@ static status_t optman_parse(int argc, char **argv) {
             break;
 
         case 'l': { // Link options
-            len_str_node_t *node = malloc(sizeof(len_str_node_t));
-            if (node == NULL) {
-                status = CCC_NOMEM;
-                goto fail;
-            }
+            len_str_node_t *node = emalloc(sizeof(len_str_node_t));
             node->str.str = optarg;
             node->str.len = strlen(optarg);
             sl_append(&optman.link_opts, &node->link);
@@ -181,11 +177,7 @@ static status_t optman_parse(int argc, char **argv) {
         }
 
         case 'I': { // Search path additions
-            len_str_node_node_t *node = malloc(sizeof(len_str_node_node_t));
-            if (node == NULL) {
-                status = CCC_NOMEM;
-                goto fail;
-            }
+            len_str_node_node_t *node = emalloc(sizeof(len_str_node_node_t));
             node->node.str.str = optarg;
             node->node.str.len = strlen(optarg);
             sl_append(&optman.include_paths, &node->link);
@@ -207,11 +199,7 @@ static status_t optman_parse(int argc, char **argv) {
             break;
 
         case 'D': { // Define macros
-            macro_node_t *node = malloc(sizeof(macro_node_t));
-            if (node == NULL) {
-                status = CCC_NOMEM;
-                goto fail;
-            }
+            macro_node_t *node = emalloc(sizeof(macro_node_t));
             tstream_t stream;
             ts_init(&stream, optarg, optarg + strlen(optarg),
                     &s_command_line_file, COMMAND_LINE_FILENAME, NULL, 0, 0);
@@ -259,11 +247,7 @@ static status_t optman_parse(int argc, char **argv) {
         printf("No param: %s\n", param);
 #endif /* DEBUG_PARAMS */
 
-        len_str_node_t *node = malloc(sizeof(len_str_node_t));
-        if (node == NULL) {
-            status = CCC_NOMEM;
-            goto fail;
-        }
+        len_str_node_t *node = emalloc(sizeof(len_str_node_t));
         node->str.str = param;
         node->str.len = len;
 

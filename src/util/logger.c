@@ -39,10 +39,9 @@ typedef struct logger_t {
 
 static logger_t logger;
 
-status_t logger_init() {
+void logger_init() {
     logger.has_error = false;
     logger.has_warning = false;
-    return CCC_OK;
 }
 
 void logger_destroy() {

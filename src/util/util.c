@@ -31,10 +31,30 @@ extern uint32_t ind_strhash(const void *vstr);
 extern bool vstrcmp(const void *vstr1, const void *vstr2);
 extern bool ind_vstrcmp(const void *vstr1, const void *vstr2);
 
+static const char *const mem_err = "out of memory, giving up";
+
 void *emalloc(size_t size) {
     void *result = malloc(size);
     if (result == NULL) {
-        logger_log(NULL, LOG_ERR, "out of memory, giving up");
+        logger_log(NULL, LOG_ERR, mem_err);
+        exit(EXIT_FAILURE);
+    }
+    return result;
+}
+
+void *ecalloc(size_t nmemb, size_t size) {
+    void *result = calloc(nmemb, size);
+    if (result == NULL) {
+        logger_log(NULL, LOG_ERR, mem_err);
+        exit(EXIT_FAILURE);
+    }
+    return result;
+}
+
+void *erealloc(void *ptr, size_t size) {
+    void *result = realloc(ptr, size);
+    if (result == NULL) {
+        logger_log(NULL, LOG_ERR, mem_err);
         exit(EXIT_FAILURE);
     }
     return result;

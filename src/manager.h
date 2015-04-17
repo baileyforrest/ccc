@@ -46,9 +46,8 @@ typedef struct manager_t {
  * @param macros If non NULL, manager's preprocessor is initialized with
  *     given macros. It is then used under the assumption that macros will not
  *     change during use, and that manager will not change macros
- * @return CCC_OK on success, error code on error.
  */
-status_t man_init(manager_t *manager, htable_t *macros);
+void man_init(manager_t *manager, htable_t *macros);
 
 /**
  * Destroy a compilation mananger

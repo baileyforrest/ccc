@@ -175,5 +175,4 @@ void sl_concat_front(slist_t *list1, slist_t *list2);
          cur_elem != NULL;                                          \
          cur_elem = cur_elem->next)
 
-
 #endif /* _SLIST_H_ */

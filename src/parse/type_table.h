@@ -80,10 +80,8 @@ extern struct type_t * const tt_size_t;
  * @param tt Type table to initialize
  * @param Last Typetable in previous scope. NULL if none (top level). If NULL,
  * the typetable will get initialized with primitive types
- *
- * @return CCC_OK on success, error code on error
  */
-status_t tt_init(typetab_t *tt, typetab_t *last);
+void tt_init(typetab_t *tt, typetab_t *last);
 
 /**
  * Destroys a type table
@@ -94,24 +92,6 @@ status_t tt_init(typetab_t *tt, typetab_t *last);
  * @return CCC_OK on success, error code on error
  */
 void tt_destroy(typetab_t *tt);
-
-/**
- * Looks up a type in the type table
- *
- * @param tt Type table to lookup in
- * @param key Key to lookup with
- * @return Returns pointer to type table entry, or NULL if it doesn't exist
- */
-typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key);
-
-/**
- * Looks up a compound type in the type table
- *
- * @param tt Type table to lookup in
- * @param key Key to lookup with
- * @return Returns pointer to type table entry, or NULL if it doesn't exist
- */
-typetab_entry_t *tt_lookup_compound(typetab_t *tt, len_str_t *key);
 
 /**
  * Inserts a typedef into the type table.
@@ -143,5 +123,23 @@ status_t tt_insert_typedef(typetab_t *tt, struct decl_t *decl,
  */
 status_t tt_insert(typetab_t *tt, struct type_t *type, tt_type_t tt_type,
                    len_str_t *name, typetab_entry_t **entry);
+
+/**
+ * Looks up a type in the type table
+ *
+ * @param tt Type table to lookup in
+ * @param key Key to lookup with
+ * @return Returns pointer to type table entry, or NULL if it doesn't exist
+ */
+typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key);
+
+/**
+ * Looks up a compound type in the type table
+ *
+ * @param tt Type table to lookup in
+ * @param key Key to lookup with
+ * @return Returns pointer to type table entry, or NULL if it doesn't exist
+ */
+typetab_entry_t *tt_lookup_compound(typetab_t *tt, len_str_t *key);
 
 #endif /* _TYPE_TABLE_H_ */

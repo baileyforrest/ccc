@@ -45,14 +45,12 @@ void ts_init(tstream_t *ts, char *start, char *end,
     ts->mark.col = col;
 }
 
-status_t ts_copy(tstream_t *dest, const tstream_t *src, bool deep) {
-    status_t status = CCC_OK;
+void ts_copy(tstream_t *dest, const tstream_t *src, bool deep) {
     memcpy(dest, src, sizeof(tstream_t));
 
     if (deep == TS_COPY_DEEP) {
-        status = fmark_copy_chain(src->mark.last, &dest->mark.last);
+        dest->mark.last = fmark_copy_chain(src->mark.last);
     }
-    return status;
 }
 
 void ts_destroy(tstream_t *ts) {

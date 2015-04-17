@@ -89,11 +89,31 @@ typedef struct len_str_node_node_t {
     len_str_node_t node;
 } len_str_node_node_t;
 
-// TODO: Replace calls to malloc with this
 /**
  * Malloc that reports error and exits if memory cannot be obtained
+ *
+ * @param size Size of memory to allocate
+ * @return Heap memory returned from malloc
  */
 void *emalloc(size_t size);
+
+/**
+ * calloc that reports error and exits if memory cannot be obtained
+ *
+ * @param nmemb Number of elems
+ * @param size size of each elem
+ * @return Heap memory returned from calloc
+ */
+void *ecalloc(size_t nmemb, size_t size);
+
+/**
+ * realloc that reports error and exits if memory cannot be obtained
+ *
+ * @param ptr previously allocated
+ * @param size of memory to reallocate
+ * @return Heap memory returned from realloc
+ */
+void *erealloc(void *ptr, size_t size);
 
 /**
  * djb2 String hash function for len_str_t.

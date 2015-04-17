@@ -37,7 +37,7 @@ typedef enum log_type_t {
 /**
  * Initializes logger
  */
-status_t logger_init();
+void logger_init();
 
 /**
  * Destroys logger

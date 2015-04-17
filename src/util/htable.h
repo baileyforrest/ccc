@@ -69,9 +69,8 @@ typedef struct htable_t {
  *
  * @param ht The hashtable to initialize
  * @param params paramaters
- * @return CCC_OK on success, relevant error code on failure
  */
-status_t ht_init(htable_t *ht, const ht_params_t *params);
+void ht_init(htable_t *ht, const ht_params_t *params);
 
 /**
  * Create a handle to a read only hashtable. Any mutation of dest or src during
@@ -123,13 +122,12 @@ void ht_destroy(htable_t *ht);
  *
  * @param ht The hashtable to insert into
  * @param elem The element to insert
- * @return CCC_OK on success, error code on failure. Returns CCC_DUPLICATE if
- * key with same value already exists
+ * @return Returns CCC_DUPLICATE if key with same value already exists
  */
 status_t ht_insert(htable_t *ht, sl_link_t *elem);
 
 /**
- * Remove specified element from hashtable. Frees the element
+ * Remove specified element from hashtable.
  *
  * @param ht The hashtable to remove from
  * @param key Key of element to remove

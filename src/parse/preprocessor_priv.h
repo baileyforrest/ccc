@@ -77,10 +77,9 @@ typedef struct pp_param_inst_t {
 /**
  * Creates a pp_file
  *
- * @param result The resulting mapped file
- * @return CCC_OK on success, error code otherwise
+ * @return The resulting mapped file
  */
-status_t pp_file_create(pp_file_t **pp_file);
+pp_file_t *pp_file_create(void);
 
 /**
  * Unmaps and given pp_file_t. Does free pp_file.
@@ -106,26 +105,25 @@ status_t pp_map_file(const char *filename, size_t len, pp_file_t **result);
  *
  * @param pp The preprocessor to map a stream for
  * @param stream The stream to map
- * @return CCC_OK on success, error code on error.
  */
-status_t pp_map_stream(preprocessor_t *pp, tstream_t *stream);
+void pp_map_stream(preprocessor_t *pp, tstream_t *stream);
 
 /**
  * Creates a macro
  *
- * @param macro Points to new macro on success
- * @return CCC_OK on success, error code otherwise
+ * @param name The name of the macro
+ * @param len The length of the macro's name
+ * @return The new macro
  */
-status_t pp_macro_create(char *name, size_t len, pp_macro_t **result);
+pp_macro_t *pp_macro_create(char *name, size_t len);
 
 /**
  * Creates a macro instance
  *
  * @param macro to create instace of
- * @param result Location to store result. NULL if failed
- * @return CCC_OK on success, error code otherwise
+ * @return Returns a newly created macro instance
  */
-status_t pp_macro_inst_create(pp_macro_t *macro, pp_macro_inst_t **result);
+pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro);
 
 /**
  * Destroys a macro instance. Does free macro_inst.

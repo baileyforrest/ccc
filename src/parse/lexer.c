@@ -80,7 +80,7 @@ static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
 static status_t lex_number(lexer_t *lexer, bool neg, int cur, lexeme_t *result);
 
 
-status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
+void lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
                     symtab_t *string_tab) {
     assert(lexer != NULL);
     assert(pp != NULL);
@@ -91,7 +91,6 @@ status_t lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
     lexer->symtab = symtab;
     lexer->string_tab = string_tab;
     lexer->next_char = 0;
-    return CCC_OK;
 }
 
 void lexer_destroy(lexer_t *lexer) {
@@ -133,11 +132,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     } while (!done);
 
     pp_last_mark(lexer->pp, &result->mark);
-    if (CCC_OK !=
-        (status =
-         fmark_copy_chain(result->mark.last, &result->mark.last))) {
-        goto fail;
-    }
+    result->mark.last = fmark_copy_chain(result->mark.last);
 
     int next;
     switch (cur) {
@@ -324,9 +319,6 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         status = CCC_ESYNTAX;
     } // switch (cur)
 
-    return status;
-
-fail:
     return status;
 }
 

@@ -81,9 +81,8 @@ void ts_init(tstream_t *ts, char *start, char *end,
  *
  * @param dest Destination
  * @param src Source
- * @return CCC_OK on success, error code on error
  */
-status_t ts_copy(tstream_t *dest, const tstream_t *src, bool deep);
+void ts_copy(tstream_t *dest, const tstream_t *src, bool deep);
 
 /**
  * Destroys a text stream. This function should only be called on a deep copy

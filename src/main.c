@@ -37,17 +37,14 @@ int main(int argc, char **argv) {
         goto fail0;
     }
 
-    if (CCC_OK != (status = fdir_init())) {
-        goto fail0;
-    }
+    fdir_init();
 
     SL_FOREACH(cur, &optman.src_files) {
         len_str_node_t *node = GET_ELEM(&optman.src_files, cur);
         manager_t manager;
 
-        if (CCC_OK != (status = man_init(&manager, NULL))) {
-            goto fail1;
-        }
+        man_init(&manager, NULL);
+
         if (CCC_OK != (status = pp_open(&manager.pp, node->str.str))) {
             man_destroy(&manager);
             goto fail1;
