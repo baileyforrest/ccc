@@ -59,7 +59,7 @@ static type_t stt_float       = TYPE_LITERAL(TYPE_FLOAT      , float      );
 static type_t stt_double      = TYPE_LITERAL(TYPE_DOUBLE     , double     );
 static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 
-// TODO: This isn't portable
+// TODO1: This isn't portable
 // size_t is unsigned long.
 static type_t stt_size_t = {
     SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, TYPE_MOD,

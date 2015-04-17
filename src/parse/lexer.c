@@ -19,7 +19,7 @@
 /**
  * Lexer implementation
  */
-// TODO: Support unicode literals
+// TODO2: Support unicode literals
 #include "lexer.h"
 
 #include <stdio.h>
@@ -473,9 +473,9 @@ static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
     }
 
     case 'u':
-        // TODO: Handle utf8
+        // TODO2: Handle utf8
     case 'U':
-        // TODO: Handle utf16
+        // TODO2: Handle utf16
 
     default:
         logger_log(&lexer->pp->last_mark, LOG_WARN,
@@ -513,7 +513,7 @@ static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
 
 static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
                            lex_str_type_t type) {
-    // TODO: Make sure wide character literals take up more space
+    // TODO2: Make sure wide character literals take up more space
     (void)type;
     status_t status = CCC_OK;
     result->type = STRING;

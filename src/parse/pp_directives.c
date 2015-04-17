@@ -69,7 +69,7 @@ static len_str_node_t s_default_search_path[] = {
     { SL_LINK_LIT, LEN_STR_LIT("/usr/local/include") },
     { SL_LINK_LIT, LEN_STR_LIT("/usr/include") },
 
-    // TODO: conditionally compile these
+    // TODO1: conditionally compile these
     { SL_LINK_LIT, LEN_STR_LIT("/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include") },
     //{ SL_LINK_LIT, LEN_STR_LIT("/usr/lib/clang/3.6.0/include") },
 };

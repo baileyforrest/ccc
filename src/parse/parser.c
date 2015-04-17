@@ -35,7 +35,7 @@
  * All AST destructor functions ignore NULL, so child nodes should be
  * initialized to NULL.
  */
-// TODO: Use TYPE_TYPEDEF only if print ast mode is on
+// TODO1: Use TYPE_TYPEDEF only if print ast mode is on
 
 #include "parser.h"
 #include "parser_priv.h"
@@ -230,7 +230,7 @@ status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
 
     ht_init(&gdecl->fdefn.labels, &s_gdecl_ht_params);
 
-    /* TODO: Handle old style function signature
+    /* TODO2: Handle K & R style function signature
     while (LEX_CUR(lex).type != RPAREN) {
         stmt_t *param = NULL;
         if (CCC_OK != (status = par_declaration(lex, &param))) {
@@ -357,7 +357,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         end_node = type;
     }
 
-    // TODO: This is nasty, find better solution for this
+    // TODO1: This is nasty, find better solution for this
     // Handle repeat end nodes
     if (*end_node != NULL) {
         bool okay = false;
@@ -953,7 +953,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             *last_node = func_type;
             last_node = &func_type->func.type;
 
-            /* TODO: Support old decl syntax
+            /* TODO2: Support K & R decl syntax
             if (LEX_CUR(lex).type == ID) {
                 while (LEX_CUR(lex).type == ID) {
                     LEX_ADVANCE(lex);

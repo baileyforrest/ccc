@@ -23,7 +23,7 @@
  *
  * Reference: http://llvm.org/docs/LangRef.html
  */
-// TODO: Finalize and doc this
+// TODO0: Finalize and doc this
 
 #ifndef _IR_H_
 #define _IR_H_
@@ -344,7 +344,7 @@ typedef struct ir_stmt_t {
             ir_label_t *default_case;
         } switch_params;
 
-        // TODO: Is this used?
+        // TODO0: Remove if unused
         struct {
             ir_type_t *type;
             ir_expr_t *addr;
@@ -369,14 +369,14 @@ typedef struct ir_stmt_t {
     };
 } ir_stmt_t;
 
-// TODO: Use this
+// TODO0: Use this, or remove if unused
 typedef struct ir_symtab_t {
     htable_t table;
 } ir_symtab_t;
 
 typedef struct ir_gdecl_t ir_gdecl_t;
 
-// TODO: Maybe change this
+// TODO0: Maybe change this
 typedef enum ir_symtab_entry_type_t {
     IR_SYMTAB_ENTRY_GDECL,
     IR_SYMTAB_ENTRY_LOCAL,

@@ -326,7 +326,7 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
     type_t *umod_to = ast_type_unmod(to);
     type_t *umod_from = ast_type_unmod(from);
 
-    // TODO: This ignores const
+    // TODO1: This ignores const
     if (typecheck_type_equal(umod_from, umod_from)) {
         return true;
     }
@@ -1365,7 +1365,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
 
 type_t *typecheck_find_member(type_t *type, len_str_t *name, size_t *offset) {
     assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
-    // TODO: Update offset
+    // TODO0: Update offset
     size_t cur_offset = 0;
 
     SL_FOREACH(cur, &type->struct_params.decls) {
@@ -1533,7 +1533,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        /* TODO: Do this only when its being used in an expr stmt or another
+        /* TODO1: Do this only when its being used in an expr stmt or another
            expr
         retval &= typecheck_type_max(&expr->mark, expr->cond.expr2->etype,
                                      expr->cond.expr3->etype,

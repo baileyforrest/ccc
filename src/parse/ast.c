@@ -76,7 +76,7 @@ size_t ast_type_size(type_t *type) {
     case TYPE_DOUBLE:      return sizeof(double);
     case TYPE_LONG_DOUBLE: return sizeof(long double);
 
-        // TODO: Handle bit fields
+        // TODO1: Handle bit fields
     case TYPE_STRUCT:
     case TYPE_UNION: {
         size_t size = 0;
@@ -177,12 +177,12 @@ size_t ast_type_align(type_t *type) {
 size_t ast_type_offset(type_t *type, slist_t path) {
     (void)type;
     (void)path;
-    // TODO: This
+    // TODO0: This
     return 0;
 }
 
 int ast_get_member_num(type_t *type, len_str_t *name) {
-    // TODO: This
+    // TODO0: This
     (void)type;
     (void)name;
     return 0;

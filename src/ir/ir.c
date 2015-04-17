@@ -553,7 +553,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         fprintf(stream, "]");
         break;
     case IR_STMT_INDIR_BR:
-        // TODO: Remove if unused
+        // TODO0: Remove if unused
         break;
     case IR_STMT_ASSIGN:
         ir_expr_print(stream, stmt->assign.dest);
@@ -570,7 +570,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         ir_expr_print(stream, stmt->store.ptr);
         break;
     case IR_STMT_INTRINSIC_FUNC:
-        // TODO: This
+        // TODO0: This
         break;
     default:
         assert(false);
@@ -759,7 +759,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         break;
     }
     case IR_EXPR_VAARG:
-        // TODO: This
+        // TODO0: This
         break;
     default:
         assert(false);

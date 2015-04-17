@@ -52,7 +52,7 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__LINE__", "", MACRO_LINE),
     PREDEF_MACRO_LIT("__DATE__", "", MACRO_DATE),
     PREDEF_MACRO_LIT("__TIME__", "", MACRO_TIME),
-    PREDEF_MACRO_LIT("__func__", "\"TODO\"", MACRO_BASIC), // TODO: This
+    PREDEF_MACRO_LIT("__func__", "\"TODO\"", MACRO_BASIC), // TODO1: This
     PREDEF_MACRO_LIT("defined", "",  MACRO_DEFINED),
     PREDEF_MACRO_LIT("_Pragma", "",  MACRO_PRAGMA),
     PREDEF_MACRO_LIT("__STDC__", "1", MACRO_BASIC), // ISO C
@@ -63,7 +63,7 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__x86_64__", "1", MACRO_BASIC),
 #endif
 
-    // TODO: Conditionally compile or handle these better
+    // TODO1: Conditionally compile or handle these better
     PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC),
     PREDEF_MACRO_LIT("char16_t", "short", MACRO_BASIC),
     PREDEF_MACRO_LIT("char32_t", "int", MACRO_BASIC)
@@ -774,7 +774,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     int error;
     pp_macro_inst_t *new_macro_inst = pp_macro_inst_create(macro);
 
-    // TODO: Enable this after fixed
+    // TODO1: Enable this after fixed
     (void)file_inst;
     /*
     if (param_inst != NULL) {

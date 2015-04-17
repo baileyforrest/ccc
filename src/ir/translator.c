@@ -470,7 +470,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_CONST_STR: {
         ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_CONST);
         ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
-        // TODO: Create a global string, change str_val to point to that
+        // TODO0: Create a global string, change str_val to point to that
         return ir_expr;
     }
     case EXPR_BIN: {
@@ -488,7 +488,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         return temp;
     }
     case EXPR_UNARY:
-        // TODO : This
+        // TODO0 : This
         return NULL;
     case EXPR_COND: {
         ir_type_t *type = trans_type(ts, expr->etype);
@@ -565,7 +565,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_expr_t *src_expr = trans_expr(ts, expr->cast.base, ir_stmts);
 
         ir_expr_t *convert = ir_expr_create(IR_EXPR_CONVERT);
-        // TODO: This. choose right type based on src/dest types
+        // TODO0: This. choose right type based on src/dest types
         //convert->convert.type = 
         convert->convert.src_type = src_type;
         convert->convert.val = src_expr;
@@ -660,7 +660,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_MEM_ACC: {
         ir_expr_t *pointer = trans_expr(ts, expr->mem_acc.base, ir_stmts);
         if (expr->mem_acc.op == OP_ARROW) {
-            // TODO: Handle this
+            // TODO0: Handle this
         } else {
             assert(expr->mem_acc.op = OP_DOT);
         }
@@ -718,7 +718,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     }
     case EXPR_INIT_LIST:
     case EXPR_DESIG_INIT:
-        // TODO: Create global data and copy it in
+        // TODO0: Create global data and copy it in
     default:
         assert(false);
     }
