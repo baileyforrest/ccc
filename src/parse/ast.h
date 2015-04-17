@@ -532,9 +532,10 @@ size_t ast_type_align(type_t *type);
  *
  * @param type Type to get offset in
  * @param path list of member names
- * @return Returns the offset of the member in the type
+ * @return Returns the offset of the member in the type, or -1 if it isn't a
+ *     member
  */
-size_t ast_type_offset(type_t *type, slist_t path);
+size_t ast_type_offset(type_t *type, slist_t *path);
 
 /**
  * Gets the number of a member in a struct/union
@@ -543,7 +544,19 @@ size_t ast_type_offset(type_t *type, slist_t path);
  * @param name Name of the member
  * @return Returns the member number or -1 if it doesn't exist
  */
-int ast_get_member_num(type_t *type, len_str_t *name);
+size_t ast_get_member_num(type_t *type, len_str_t *name);
+
+/**
+ * Finds the type of a member in a struct or union type
+ *
+ * @param type Type to find member in
+ * @param name Name of the member
+ * @param offset location to store offset, NULL if not needed
+ * @param mem_num location to store the member number, NULL if not needed
+ * @return Return the type of the member, of NULL if doesn't exist
+ */
+type_t *ast_type_find_member(type_t *type, len_str_t *name, size_t *offset,
+                             size_t *mem_num);
 
 /**
  * Returns a type with its typedefs removed

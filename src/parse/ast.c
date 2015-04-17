@@ -174,19 +174,98 @@ size_t ast_type_align(type_t *type) {
     return 0;
 }
 
-size_t ast_type_offset(type_t *type, slist_t path) {
-    (void)type;
-    (void)path;
-    // TODO0: This
-    return 0;
+size_t ast_type_offset(type_t *type, slist_t *path) {
+    size_t offset = 0;
+    SL_FOREACH(cur, path) {
+        size_t inner_offset;
+        len_str_node_t *node = GET_ELEM(path, cur);
+        if (type->type != TYPE_STRUCT || type->type != TYPE_UNION) {
+            return -1;
+        }
+        type = ast_type_find_member(type, &node->str, &inner_offset, NULL);
+        if (type == NULL) {
+            return -1;
+        }
+        offset += inner_offset;
+    }
+
+    return offset;
 }
 
-int ast_get_member_num(type_t *type, len_str_t *name) {
-    // TODO0: This
-    (void)type;
-    (void)name;
-    return 0;
+size_t ast_get_member_num(type_t *type, len_str_t *name) {
+    size_t mem_num;
+    type = ast_type_find_member(type, name, NULL, &mem_num);
+    if (type == NULL) {
+        return -1;
+    }
+
+    return mem_num;
 }
+
+type_t *ast_type_find_member(type_t *type, len_str_t *name, size_t *offset,
+                             size_t *mem_num) {
+    assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
+    size_t cur_offset = 0;
+    size_t cur_mem_num = 0;
+
+    SL_FOREACH(cur, &type->struct_params.decls) {
+        decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
+
+        // Search in anonymous structs and unions too
+        if (sl_head(&decl->decls) == NULL) {
+            type_t *decl_type = ast_type_unmod(decl->type);
+            switch (decl_type->type) {
+            case TYPE_STRUCT:
+            case TYPE_UNION: {
+                size_t inner_offset;
+                size_t inner_memnum;
+                size_t *offset_p = offset == NULL ? NULL : &inner_offset;
+                size_t *mem_num_p = mem_num == NULL ? NULL : &inner_memnum;
+                type_t *inner_type =
+                    ast_type_find_member(decl_type, name, offset_p, mem_num_p);
+                if (inner_type != NULL) {
+                    if (offset != NULL) {
+                        *offset = cur_offset + inner_offset;
+                    }
+                    if (mem_num != NULL) {
+                        *mem_num = cur_mem_num + inner_memnum;
+                    }
+                    return inner_type;
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        } else {
+            SL_FOREACH(cur_node, &decl->decls) {
+                decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
+                if (vstrcmp(node->id, name)) {
+                    if (offset != NULL) {
+                        *offset = cur_offset;
+                    }
+                    if (mem_num != NULL) {
+                        *mem_num = cur_mem_num;
+                    }
+                    return node->type;
+                }
+
+                // Only add offsets for struct types
+                if (type->type == TYPE_STRUCT) {
+                    if (offset != NULL) {
+                        cur_offset += ast_type_size(node->type);
+                    }
+                    if (mem_num != NULL) {
+                        ++cur_mem_num;
+                    }
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
 
 type_t *ast_type_untypedef(type_t *type) {
     bool done = false;

@@ -654,7 +654,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_expr->const_params.type = trans_type(ts, expr->etype);
         ir_expr->const_params.int_val =
             ast_type_offset(expr->offsetof_params.type->type,
-                            expr->offsetof_params.path);
+                            &expr->offsetof_params.path);
         return ir_expr;
     }
     case EXPR_MEM_ACC: {
