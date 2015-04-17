@@ -34,6 +34,8 @@
 #include "util/slist.h"
 #include "util/util.h"
 
+#include "ir/ir_symtab.h"
+
 typedef struct ir_label_t {
     sl_link_t link;
     len_str_t name;
@@ -279,9 +281,8 @@ struct ir_expr_t {
 
         struct {
             ir_expr_t *cond;
-            ir_type_t *type1;
+            ir_type_t *type;
             ir_expr_t *expr1;
-            ir_type_t *type2;
             ir_expr_t *expr2;
         } select;
 
@@ -369,31 +370,6 @@ typedef struct ir_stmt_t {
     };
 } ir_stmt_t;
 
-// TODO0: Use this, or remove if unused
-typedef struct ir_symtab_t {
-    htable_t table;
-} ir_symtab_t;
-
-typedef struct ir_gdecl_t ir_gdecl_t;
-
-// TODO0: Maybe change this
-typedef enum ir_symtab_entry_type_t {
-    IR_SYMTAB_ENTRY_GDECL,
-    IR_SYMTAB_ENTRY_LOCAL,
-} ir_symtab_entry_type_t;
-
-typedef struct ir_symtab_entry_t {
-    sl_link_t link;
-    len_str_t name;
-    ir_symtab_entry_type_t type;
-    ir_type_t *entry_type;
-
-    union {
-        ir_gdecl_t *gdecl;
-        ir_expr_t *local; /**< Expression initialized to. NULL if none */
-    };
-} ir_symtab_entry_t;
-
 typedef enum ir_gdecl_type_t {
     IR_GDECL_GDATA,
     IR_GDECL_FUNC,
@@ -411,6 +387,7 @@ typedef struct ir_gdecl_t {
         struct {
             ir_type_t *type;
             len_str_t name;
+            slist_t allocs; /**< (ir_stmt_t) Empty if decl */
             slist_t body; /**< (ir_stmt_t) Empty if decl */
             ir_symtab_t locals;
             int next_temp; /**< Next temp name */
@@ -443,7 +420,7 @@ extern ir_type_t ir_type_x86_fp80;
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree);
 
-void ir_symtab_init(ir_symtab_t *symtab);
+ir_type_t *ir_expr_type(ir_expr_t *expr);
 
 ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str);
 
@@ -463,6 +440,8 @@ ir_type_t *ir_type_create(ir_type_type_t type);
 
 ir_expr_t *ir_expr_ref(ir_expr_t *expr);
 
+ir_expr_t *ir_expr_unref(ir_expr_t *expr);
+
 ir_type_t *ir_type_ref(ir_type_t *type);
 
 void ir_type_destroy(ir_type_t *type);
@@ -478,7 +457,5 @@ void ir_stmt_destroy(ir_stmt_t *stmt);
 void ir_gdecl_destroy(ir_gdecl_t *gdecl);
 
 void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit);
-
-void ir_symtab_destroy(ir_symtab_t *symtab);
 
 #endif /* _IR_H_ */

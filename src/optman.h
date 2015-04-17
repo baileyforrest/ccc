@@ -38,6 +38,7 @@
 typedef enum dump_opts_t {
     DUMP_TOKENS = 1 << 0, // Dump tokens from lexer
     DUMP_AST    = 1 << 1, // Dump the AST after parsing
+    DUMP_IR     = 1 << 2, // Dump IR after translation
 } dump_opts_t;
 
 /**

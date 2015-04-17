@@ -364,6 +364,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = ir_label_create(ts->tunit,
                                              stmt->goto_params.label);
+        sl_append(ir_stmts, &ir_stmt->link);
         break;
     }
     case STMT_CONTINUE: {
@@ -371,6 +372,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = NULL;
         assert(ts->continue_target != NULL);
         ir_stmt->br.uncond = ts->continue_target;
+        sl_append(ir_stmts, &ir_stmt->link);
         break;
     }
     case STMT_BREAK: {
@@ -378,6 +380,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = NULL;
         assert(ts->break_target != NULL);
         ir_stmt->br.uncond = ts->break_target;
+        sl_append(ir_stmts, &ir_stmt->link);
         break;
     }
     case STMT_RETURN: {
@@ -386,6 +389,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
                ts->func->func.type->type == IR_TYPE_FUNC);
         ir_stmt->ret.type = ir_type_ref(ts->func->func.type->func.type);
         ir_stmt->ret.val = trans_expr(ts, stmt->return_params.expr, ir_stmts);
+        sl_append(ir_stmts, &ir_stmt->link);
         break;
     }
 
@@ -415,17 +419,26 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_PAREN:
         return trans_expr(ts, expr->paren_base, ir_stmts);
     case EXPR_VAR: {
-        typetab_entry_t *entry = tt_lookup(ts->typetab, expr->var_id);
+        // TODO0: Change name to include function if its in function
+        ir_symtab_t *symtab = &ts->func->func.locals;
+        ir_symtab_entry_t *entry = ir_symtab_lookup(symtab, expr->var_id);
 
         // Must be valid if typechecked
-        assert(entry != NULL && entry->entry_type == TT_VAR);
+        assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
 
-        ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_VAR);
-        ir_expr->var.type = trans_type(ts, entry->type);
-        ir_expr->var.name.str = expr->var_id->str;
-        ir_expr->var.name.len = expr->var_id->len;
-        ir_expr->var.local = ts->func != NULL;
-        return ir_expr;
+        // Load var into a temp
+        ir_expr_t *temp = ir_temp_create(ir_type_ref(ir_expr_type(entry->var)),
+                                         ts->func->func.next_temp++);
+        ir_expr_t *load = ir_expr_create(IR_EXPR_LOAD);
+        load->load.type = ir_type_ref(ir_expr_type(entry->var));
+        load->load.ptr = ir_expr_ref(entry->var);
+
+        ir_stmt_t *assign = ir_stmt_create(IR_STMT_ASSIGN);
+        assign->assign.dest = temp;
+        assign->assign.src = load;
+        sl_append(ir_stmts, &assign->link);
+
+        return temp;
     }
     case EXPR_ASSIGN: {
         if (expr->assign.op == OP_NOP) {
@@ -436,11 +449,12 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
             return ir_stmt->assign.dest;
         }
         ir_type_t *type = trans_type(ts, expr->etype);
-        ir_expr_t *temp = ir_temp_create(type, ts->func->func.next_temp++);
         ir_expr_t *dest;
         ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest,
                                          expr->assign.expr, expr->assign.op,
                                          expr->etype, ir_stmts, &dest);
+
+        ir_expr_t *temp = ir_temp_create(type, ts->func->func.next_temp++);
 
         ir_stmt_t *binop = ir_stmt_create(IR_STMT_ASSIGN);
         binop->assign.dest = temp;
@@ -456,29 +470,32 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     }
     case EXPR_CONST_INT: {
         ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_CONST);
+        ir_expr->const_params.ctype = IR_CONST_INT;
         ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
         ir_expr->const_params.int_val = expr->const_val.int_val;
-        return ir_expr;
+        return ir_expr_unref(ir_expr);
     }
     case EXPR_CONST_FLOAT: {
         ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_CONST);
+        ir_expr->const_params.ctype = IR_CONST_FLOAT;
         ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
         ir_expr->const_params.float_val = expr->const_val.float_val;
-        return ir_expr;
+        return ir_expr_unref(ir_expr);
     }
     case EXPR_CONST_STR: {
         ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_CONST);
+        ir_expr->const_params.ctype = IR_CONST_ARR;
         ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
         // TODO0: Create a global string, change str_val to point to that
-        return ir_expr;
+        return ir_expr_unref(ir_expr);
     }
     case EXPR_BIN: {
         ir_type_t *type = trans_type(ts, expr->etype);
-        ir_expr_t *temp = ir_temp_create(type, ts->func->func.next_temp++);
-
         ir_expr_t *op_expr = trans_binop(ts, expr->bin.expr1, expr->bin.expr2,
                                          expr->bin.op, expr->etype, ir_stmts,
                                          NULL);
+        ir_expr_t *temp = ir_temp_create(type, ts->func->func.next_temp++);
+
         ir_stmt_t *binop = ir_stmt_create(IR_STMT_ASSIGN);
         binop->assign.dest = temp;
         binop->assign.src = op_expr;
@@ -964,9 +981,9 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     ir_expr_t *op_expr = ir_expr_create(IR_EXPR_BINOP);
     op_expr->binop.op = ir_op;
     op_expr->binop.type = trans_type(ts, type);
-    ir_expr_t *left_expr = trans_expr(ts, left, ir_stmts);
+    ir_expr_t *left_expr = ir_expr_ref(trans_expr(ts, left, ir_stmts));
     op_expr->binop.expr1 = left_expr;
-    op_expr->binop.expr2 = trans_expr(ts, right, ir_stmts);
+    op_expr->binop.expr2 = ir_expr_ref(trans_expr(ts, right, ir_stmts));
     if (left_loc != NULL) {
         *left_loc = left_expr;
     }
@@ -979,6 +996,13 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
     name->var.type = trans_type(ts, node->type);
     name->var.name.str = node->id->str;
     name->var.name.len = node->id->len;
+    name->var.local = !global;
+    ir_symtab_t *symtab = global ? &ts->tunit->globals : &ts->func->func.locals;
+    ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,
+                                                      node->id);
+    entry->var = ir_expr_ref(name);
+    status_t status = ir_symtab_insert(symtab, entry);
+    assert(status == CCC_OK);
 
     ir_stmt_t *stmt = ir_stmt_create(IR_STMT_ASSIGN);
     stmt->assign.dest = name;
@@ -989,18 +1013,19 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
         stmt->assign.src = src;
         sl_append(ir_stmts, &stmt->link);
     } else {
+        slist_t *allocs = &ts->func->func.allocs;
         ir_expr_t *src = ir_expr_create(IR_EXPR_ALLOCA);
         src->alloca.type = ir_type_ref(name->var.type);
-        src->alloca.nelem_type = &NELEM_TYPE;
-        src->alloca.nelems = 0;
+        src->alloca.nelem_type = NULL;
         src->alloca.align = ast_type_align(node->type);
         stmt->assign.src = src;
-        sl_append(ir_stmts, &stmt->link);
+        sl_append(allocs, &stmt->link);
         if (node->expr != NULL) {
             ir_stmt_t *store = ir_stmt_create(IR_STMT_STORE);
             store->store.type = trans_type(ts, node->type);
-            store->store.val = trans_expr(ts, node->expr, ir_stmts);
-            store->store.ptr = name;
+            store->store.val = ir_expr_ref(
+                trans_expr(ts, node->expr, ir_stmts));
+            store->store.ptr = ir_expr_ref(name);
             sl_append(ir_stmts, &store->link);
         }
     }

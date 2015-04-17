@@ -23,6 +23,9 @@
 #include "manager.h"
 #include "optman.h"
 
+#include "ir/ir.h"
+#include "ir/translator.h"
+
 #include "parse/ast.h"
 
 #include "util/file_directory.h"
@@ -71,6 +74,21 @@ int main(int argc, char **argv) {
             logger_log(NULL, LOG_ERR, "Failed to typecheck %s", node->str.str);
             goto src_fail0;
         }
+
+        // TODO1: Remove after later stages debugged
+        if (optman.dump_opts & DUMP_AST) {
+            goto src_fail0;
+        }
+
+        ir_trans_unit_t *ir = trans_translate(ast);
+
+        if (optman.dump_opts & DUMP_IR) {
+            FILE *stream = stdout;
+            fprintf(stream, "; ModuleID = '%s'\n", node->str.str);
+            ir_print(stream, ir);
+        }
+
+        ir_trans_unit_destroy(ir);
 
     src_fail0:
         ast_destroy(ast);

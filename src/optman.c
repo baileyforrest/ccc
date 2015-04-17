@@ -44,6 +44,7 @@ typedef enum long_opt_idx_t {
     LOPT_STD = 0,
     LOPT_DUMP_TOKENS,
     LOPT_DUMP_AST,
+    LOPT_DUMP_IR,
     LOPT_NUM_ITEMS,
 } long_opt_idx_t;
 
@@ -96,6 +97,7 @@ static status_t optman_parse(int argc, char **argv) {
             // Custom options
             { "dump_tokens", no_argument      , 0, 0 },
             { "dump_ast"   , no_argument      , 0, 0 },
+            { "dump_ir"    , no_argument      , 0, 0 },
 
             { 0            , 0                , 0, 0 } // Terminator
         };
@@ -136,6 +138,9 @@ static status_t optman_parse(int argc, char **argv) {
                 break;
             case LOPT_DUMP_AST:
                 optman.dump_opts |= DUMP_AST;
+                break;
+            case LOPT_DUMP_IR:
+                optman.dump_opts |= DUMP_IR;
                 break;
             default:
                 break;
