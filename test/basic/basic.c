@@ -1,3 +1,7 @@
+//test return 60
+/**
+ * Basic test
+ */
 int main() {
     int x = 3;
     short y = 1337;
