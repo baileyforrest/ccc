@@ -57,6 +57,9 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
                                  ir_expr_t *src_expr, slist_t *ir_stmts);
 
+ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
+                        slist_t *ir_stmts);
+
 void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts);
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type);

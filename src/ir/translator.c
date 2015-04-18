@@ -443,11 +443,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     }
     case EXPR_ASSIGN: {
         if (expr->assign.op == OP_NOP) {
-            ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
-            ir_stmt->assign.dest = trans_expr(ts, expr->assign.expr, ir_stmts);
-            ir_stmt->assign.src = trans_expr(ts, expr->assign.dest, ir_stmts);
-            sl_append(ir_stmts, &ir_stmt->link);
-            return ir_stmt->assign.dest;
+            ir_expr_t *src = trans_expr(ts, expr->assign.expr, ir_stmts);
+            return trans_assign(ts, expr->assign.dest, src, ir_stmts);
         }
         ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *dest;
@@ -463,12 +460,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         binop->assign.src = op_expr;
         sl_append(ir_stmts, &binop->link);
 
-        ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_ASSIGN);
-        ir_stmt->assign.dest = dest;
-        ir_stmt->assign.src = temp;
-        sl_append(ir_stmts, &ir_stmt->link);
-
-        return dest;
+        return trans_assign(ts, expr->assign.dest, temp, ir_stmts);
     }
     case EXPR_CONST_INT: {
         ir_expr_t *ir_expr = ir_expr_create(IR_EXPR_CONST);
@@ -737,6 +729,58 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     }
     return NULL;
 }
+
+ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
+                        slist_t *ir_stmts) {
+    ir_expr_t *ptr = NULL;
+    while (dest->type == EXPR_PAREN) {
+        dest = dest->paren_base;
+    }
+    switch (dest->type) {
+    case EXPR_VAR: {
+        ir_symtab_entry_t *entry = ir_symtab_lookup(&ts->func->func.locals,
+                                                    dest->var_id);
+        // Must be valid if typechecked
+        assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
+
+        ptr = entry->var;
+        break;
+    }
+
+    case EXPR_MEM_ACC:
+    case EXPR_ARR_IDX:
+        // TODO0: This
+        assert(false);
+        break;
+    case EXPR_UNARY:
+        switch (dest->unary.op) {
+        case OP_PREINC:
+        case OP_POSTINC:
+        case OP_PREDEC:
+        case OP_POSTDEC:
+        case OP_DEREF:
+            // TODO0: This
+        default:
+            assert(false);
+        }
+        break;
+    case EXPR_CMPD: {
+        // TODO0: This
+        assert(false);
+        break;
+    }
+    default:
+        // Would not have typechecked if its not an lvalue
+        assert(false);
+    }
+    ir_stmt_t *ir_stmt = ir_stmt_create(IR_STMT_STORE);
+    ir_stmt->store.type = ir_expr_type(src);
+    ir_stmt->store.val = src;
+    ir_stmt->store.ptr = ptr;
+    sl_append(ir_stmts, &ir_stmt->link);
+    return src;
+}
+
 
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr, ir_type_t *type,
                            slist_t *ir_stmts) {

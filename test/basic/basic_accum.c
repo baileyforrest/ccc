@@ -1,3 +1,4 @@
+//test return 6
 int main() {
     int x = 0;
     x = x + 2;
