@@ -41,10 +41,6 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
 
 void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts);
 
-/**
- * Result is not referenced, so needs to be referenced if used
- * TODO0: Possibly make referenced flag
- */
 ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts);
 
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr, ir_type_t *type,

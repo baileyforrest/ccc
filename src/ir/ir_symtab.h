@@ -28,14 +28,12 @@
 
 typedef struct ir_expr_t ir_expr_t;
 
-// TODO0: Use this, or remove if unused
 typedef struct ir_symtab_t {
     htable_t table;
 } ir_symtab_t;
 
 typedef struct ir_gdecl_t ir_gdecl_t;
 
-// TODO0: Maybe change this
 typedef enum ir_symtab_entry_type_t {
     IR_SYMTAB_ENTRY_VAR,
 } ir_symtab_entry_type_t;
