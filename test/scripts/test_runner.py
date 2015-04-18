@@ -5,143 +5,175 @@ import sys
 import subprocess
 import time
 
+RUNTIME = "./test/util/runtime.c"
 HEADER_STR = "//test"
 TEMP_NAME = "temp"
 LLVM_SUFFIX = "ll"
 TIMEOUT = 5
 CC = "cc"
-LLC = "llc"
-
-DEFAULT_VERBOSITY = True
+CLANG = "clang"
 
 DEV_NULL = open(os.devnull, 'w')
 
+failure = False
+
 def usage():
-    print("usage: %s [-llvm] [test] [compiler and options]\n" % sys.argv[0])
+    print("usage: %s [-llvm] [-v] [compiler and options] [tests] \n"
+          % sys.argv[0])
     print("test must be a c source file with a correct first line header:")
-    print("%s [return n | error | except | noreturn ]" % HEADER_STR)
+    print("%s [return n | error | exception | noreturn ]" % HEADER_STR)
 
     print("\noptional arguments:");
+    print("-v Verbose - Prints passed tests and compiler's stdout/stderr")
     print("-llvm Compiles to llvm ir")
     sys.exit(-1)
 
 def fail(src_name, msg):
+    global failure
+    failure = True
     print("FAIL: " + src_name + " " + msg)
-    sys.exit(-1)
 
 def success(src_name, verbose):
     if verbose:
         print("PASS: " + src_name)
-    sys.exit(0)
 
 def main():
     if len(sys.argv) < 3:
         usage()
 
-    verbose = DEFAULT_VERBOSITY
+    verbose = False
     llvm = False
 
-    if (sys.argv[1] == "-llvm"):
-        llvm = True
-        args = sys.argv[2:]
-    else:
-        args = sys.argv[1:]
+    args = sys.argv[1:]
 
-    src_name = args[0]
-    src = open(src_name)
-    header = src.readline()
-    src.close()
-
-    header = header[:len(header) - 1] # Remove trailing newline
-    header = header.split(" ")
-
-    if len(header) < 2 or header[0] != HEADER_STR:
-        usage()
-
-    is_return = False
-    return_val = 0
-    is_error = False
-    is_except = False
-    is_noreturn = False
-
-    if header[1] == "return":
-        if len(header) < 3:
+    while args[0][0] == "-":
+        if args[0] == "-llvm":
+            llvm = True
+        elif args[0] == "-v":
+            verbose = True
+        else:
             usage()
-        is_return = True
-        return_val = int(header[2])
-    elif header[1] == "error":
-        is_error = True
-    elif header[1] == "except":
-        is_except = True
-    elif header[1] == "noreturn":
-        is_noreturn = True
-    else:
-        usage()
+        args = args[1:]
 
-    timeout_remain = TIMEOUT
+    compiler_opts = args[0].split()
+    for src_name in args[1:]:
+        src = open(src_name)
+        header = src.readline()
+        src.close()
 
-    if llvm:
-        outname = TEMP_NAME + "." + LLVM_SUFFIX
-    else:
-        outname = TEMP_NAME
+        header = header[:len(header) - 1] # Remove trailing newline
+        header = header.split(" ")
 
-    start = time.clock()
-    try:
-        if verbose:
-            retval = subprocess.call(
-                args[1:] + ["-o", "./" + outname] + [src_name],
-                timeout=timeout_remain)
+        if len(header) < 2 or header[0] != HEADER_STR:
+            fail(src_name, "Invalid header")
+            continue
+
+        is_return = False
+        return_val = 0
+        is_error = False
+        is_except = False
+        is_noreturn = False
+
+        if header[1] == "return":
+            if len(header) < 3:
+                fail(src_name, "Invalid header")
+                continue
+            is_return = True
+            return_val = int(header[2])
+        elif header[1] == "error":
+            is_error = True
+        elif header[1] == "exception":
+            is_except = True
+        elif header[1] == "noreturn":
+            is_noreturn = True
         else:
-            retval = subprocess.call(
-                args[1:] + ["-o", "./" + outname] + [src_name],
-                timeout=timeout_remain, stdout=DEV_NULL,
-                stderr=subprocess.STDOUT)
-    except subprocess.TimeoutExpired:
-        fail(src_name, "Compile timed out")
+            fail(src_name, "Invalid header")
+            continue
 
-    end = time.clock()
-    timeout_remain -= end - start
+        timeout_remain = TIMEOUT
 
-    if llvm:
-        asm_name = TEMP_NAME + "." + "S"
-        retval = subprocess.call([LLC, outname, "-o", asm_name])
+        if llvm:
+            outname = TEMP_NAME + "." + LLVM_SUFFIX
+        else:
+            outname = TEMP_NAME
+
+        start = time.clock()
+        try:
+            if verbose and not is_error:
+                retval = subprocess.call(
+                    compiler_opts + ["-o", "./" + outname, src_name, RUNTIME],
+                    timeout=timeout_remain)
+            else:
+                retval = subprocess.call(
+                    compiler_opts + ["-o", "./" + outname, src_name, RUNTIME],
+                    timeout=timeout_remain, stdout=DEV_NULL,
+                    stderr=subprocess.STDOUT)
+        except subprocess.TimeoutExpired:
+            fail(src_name, "Compile timed out")
+            continue
+
+        end = time.clock()
+        timeout_remain -= end - start
+
+        if llvm:
+            asm_name = TEMP_NAME + "." + "S"
+            retval = subprocess.call([CLANG, outname, RUNTIME, "-o", asm_name])
+            if retval != 0:
+                fail(src_name, "failed to create valid llvm ir")
+                continue
+
+        if is_error:
+            if retval == 0:
+                fail(src_name, "Compilation unexpectedly suceeded")
+            else:
+                success(src_name, verbose)
+            continue
+
         if retval != 0:
-            fail(src_name, "failed to llvm ir")
+            fail(src_name, "failed to compile")
+            continue
 
-        retval = subprocess.call([CC, asm_name, "-o", TEMP_NAME])
-        assert(retval == 0) #LLC better produce valid output...
+        try:
+            lines = subprocess.check_output("./" + TEMP_NAME,
+                                            timeout=timeout_remain,
+                                            universal_newlines=True)
+        except subprocess.TimeoutExpired:
+            if is_noreturn:
+                success(src_name, verbose)
+            else:
+                fail(src_name, "Executable timed out")
+            continue
 
-    if is_error:
-        if retval == 0:
-            fail(src_name, "Compilation unexpectedly suceeded")
-        else:
-            success(src_name, verbose)
+        except subprocess.CalledProcessError:
+            if is_except:
+                success(src_name, verbose)
+            else:
+                fail(src_name, "Unexpected exception")
+            continue
 
-    if retval != 0:
-        fail(src_name, "failed to compile")
-
-    try:
-        retval = subprocess.call("./" + TEMP_NAME, timeout=timeout_remain)
-    except subprocess.TimeoutExpired:
-        if is_noreturn:
-            success(src_name, verbose)
-        else:
-            fail(src_name, "Executable timed out")
-
-    if is_except:
-        if os.WIFSIGNALED(retval):
-            success(src_name, verbose)
-        else:
+        if is_except:
             fail(src_name, "Expected exception")
+            continue
 
-    if is_return:
-        if return_val != retval:
-            fail(src_name, "Returned %d expected %d" % retval, return_val)
-        else:
-            success(src_name, verbose)
+        # Return value is last line of output
+        lines = lines.split("\n")
+        assert(len(lines) > 1)
 
-    # Shouldn't get here
-    assert(false)
+        # Use -2 because there will be an empty string at end
+        retval = int(lines[len(lines) - 2]);
+
+        if is_return:
+            if return_val != retval:
+                fail(src_name, "Returned %d expected %d" % (retval, return_val))
+            else:
+                success(src_name, verbose)
+            continue
+
+        # Shouldn't get here
+        assert(False)
+
+    if failure:
+        sys.exit(1)
 
 # Run main
 main()
