@@ -39,13 +39,9 @@ typedef struct logger_t {
 
 static logger_t logger;
 
-void logger_init() {
+void logger_init(void) {
     logger.has_error = false;
     logger.has_warning = false;
-}
-
-void logger_destroy() {
-    // No op
 }
 
 void logger_log_line(fmark_t *mark) {
@@ -106,4 +102,12 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
                 cur->col, "In expansion of macro");
         logger_log_line(cur);
     }
+}
+
+bool logger_has_error(void) {
+    return logger.has_error;
+}
+
+bool logger_has_warn(void) {
+    return logger.has_warning;
 }

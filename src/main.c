@@ -38,11 +38,12 @@
 int main(int argc, char **argv) {
     status_t status = CCC_OK;
 
+    logger_init();
+    fdir_init();
+
     if (CCC_OK != (status = optman_init(argc, argv))) {
         goto fail0;
     }
-
-    fdir_init();
 
     SL_FOREACH(cur, &optman.src_files) {
         len_str_node_t *node = GET_ELEM(&optman.src_files, cur);
@@ -112,8 +113,13 @@ int main(int argc, char **argv) {
     }
 
 fail1:
-    fdir_destroy();
-fail0:
     optman_destroy();
-    return status;
+fail0:
+    fdir_destroy();
+
+    if (status != CCC_OK || logger_has_error() ||
+        (optman.warn_opts & WARN_ERROR && logger_has_warn())) {
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }

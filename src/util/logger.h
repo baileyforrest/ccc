@@ -37,12 +37,7 @@ typedef enum log_type_t {
 /**
  * Initializes logger
  */
-void logger_init();
-
-/**
- * Destroys logger
- */
-void logger_destroy();
+void logger_init(void);
 
 /**
  * Log a message
@@ -55,11 +50,11 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...);
 /**
  * @return Returns true if an error message has been logged
  */
-bool logger_has_error();
+bool logger_has_error(void);
 
 /**
  * @return Returns true if warning message has been logged
  */
-bool logger_has_error();
+bool logger_has_warn(void);
 
 #endif /* _LOGGER_H_ */
