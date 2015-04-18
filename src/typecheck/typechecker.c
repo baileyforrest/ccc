@@ -1727,6 +1727,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_expr(tcs, expr->desig_init.val, TC_NOCONST);
         // Don't know what etype is
         return retval;
+
     case EXPR_VA_START: {
         retval &= typecheck_expr_va_list(tcs, expr->vastart.ap);
         gdecl_t *func = tcs->func;
@@ -1750,18 +1751,28 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                        "Expected function parameter name");
             retval = false;
         }
+        expr->etype = tt_void;
         return retval;
     }
-    case EXPR_VA_ARG:
+    case EXPR_VA_ARG: {
         retval &= typecheck_expr_va_list(tcs, expr->vaarg.ap);
         retval &= typecheck_decl(tcs, expr->vaarg.type, TC_NOCONST);
+        decl_node_t *node = sl_head(&expr->vaarg.type->decls);
+        if (node != NULL) {
+            expr->etype = node->type;
+        } else {
+            expr->etype = expr->vaarg.type->type;
+        }
         return retval;
+    }
     case EXPR_VA_END:
         retval &= typecheck_expr_va_list(tcs, expr->vaend.ap);
+        expr->etype = tt_void;
         return retval;
     case EXPR_VA_COPY:
         retval &= typecheck_expr_va_list(tcs, expr->vacopy.dest);
         retval &= typecheck_expr_va_list(tcs, expr->vacopy.src);
+        expr->etype = tt_void;
         return retval;
     default:
         retval = false;
