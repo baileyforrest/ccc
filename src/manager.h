@@ -1,27 +1,29 @@
 /*
-  Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
-
-  This file is part of CCC.
-
-  CCC is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  CCC is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with CCC.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
+ *
+ * This file is part of CCC.
+ *
+ * CCC is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * CCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
+ */
 /**
  * Interface for compliation manager
  */
 
 #ifndef _MANAGER_H_
 #define _MANAGER_H_
+
+#include "ir/ir.h"
 
 #include "parse/ast.h"
 #include "parse/lexer.h"
@@ -37,6 +39,8 @@ typedef struct manager_t {
     symtab_t symtab;
     symtab_t string_tab;
     lexer_t lexer;
+    trans_unit_t *ast;
+    ir_trans_unit_t *ir;
 } manager_t;
 
 /**
@@ -55,6 +59,26 @@ void man_init(manager_t *manager, htable_t *macros);
  * @param manager The compilation mananger to destroy
  */
 void man_destroy(manager_t *manager);
+
+/**
+ * Destroy a compilation mananger's ast
+ *
+ * Calling this is optional because destructor destroys ast. May be used to
+ * reduce memory usage however.
+ *
+ * @param manager The compilation mananger to destroy ast
+ */
+void man_destroy_ast(manager_t *manager);
+
+/**
+ * Destroy a compilation mananger's ir
+ *
+ * Calling this is optional because destructor destroys ir. May be used to
+ * reduce memory usage however.
+ *
+ * @param manager The compilation mananger to destroy ir
+ */
+void man_destroy_ir(manager_t *manager);
 
 /**
  * Parse a translation unit from a compilation manager.
@@ -77,6 +101,16 @@ status_t man_parse(manager_t *manager, trans_unit_t **ast);
  * @return CCC_OK on success, error code on error.
  */
 status_t man_parse_expr(manager_t *manager, expr_t **expr);
+
+/**
+ * Translate the ast in a manager
+ *
+ * The manager must have a vaild ast from man_parse
+ *
+ * @param manager The compilation mananger to use
+ * @return Returns the ir tree
+ */
+ir_trans_unit_t *man_translate(manager_t *manager);
 
 /**
  * Print the tokens from a compilation manager

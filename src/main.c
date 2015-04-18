@@ -27,7 +27,6 @@
 #include "optman.h"
 
 #include "ir/ir.h"
-#include "ir/translator.h"
 
 #include "parse/ast.h"
 
@@ -75,16 +74,16 @@ int main(int argc, char **argv) {
 
         if (!typecheck_ast(ast)) {
             logger_log(NULL, LOG_ERR, "Failed to typecheck %s", node->str.str);
-            goto src_fail0;
+            goto src_done0;
         }
 
         // TODO1: Remove after later stages debugged
         if (optman.dump_opts & DUMP_AST) {
-            goto src_fail0;
+            goto src_done0;
         }
 
-        ir_trans_unit_t *ir = trans_translate(ast);
-        ast_destroy(ast); // Don't need ast after translation
+        ir_trans_unit_t *ir = man_translate(&manager);
+        man_destroy_ast(&manager); // Don't need ast after translation
 
         if (optman.dump_opts & DUMP_IR) {
             ir_print(stdout, ir, node->str.str);
@@ -96,31 +95,19 @@ int main(int argc, char **argv) {
             if (output == NULL) {
                 logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
                            strerror(errno));
-                goto src_fail1;
+                goto src_done0;
             }
 
             ir_print(output, ir, node->str.str);
             if (EOF == fclose(output)) {
                 logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
                            strerror(errno));
-                goto src_fail1;
+                goto src_done0;
             }
 
         }
 
-        ir_trans_unit_destroy(ir);
-
     src_done0:
-        man_destroy(&manager);
-
-        continue;
-
-    src_fail1:
-        ir_trans_unit_destroy(ir);
-
-    src_fail0:
-        ast_destroy(ast);
-
         man_destroy(&manager);
     }
 

@@ -471,6 +471,9 @@ void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
 }
 
 void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
+    if (trans_unit == NULL) {
+        return;
+    }
     SL_DESTROY_FUNC(&trans_unit->gdecls, ir_gdecl_destroy);
     ir_symtab_destroy(&trans_unit->globals);
     HT_DESTROY_FUNC(&trans_unit->labels, free);
