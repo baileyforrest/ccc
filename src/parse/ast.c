@@ -804,8 +804,34 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
     case EXPR_DESIG_INIT:
         ast_directed_print(dest, remain, ".%.*s = ", expr->desig_init.name->len,
                            expr->desig_init.name->str);
-        ast_expr_print(expr->desig_init.val, indent,
-                       dest, remain);
+        ast_expr_print(expr->desig_init.val, indent, dest, remain);
+        break;
+
+    case EXPR_VA_START:
+        ast_directed_print(dest, remain, "__builtin_va_start(");
+        ast_expr_print(expr->vastart.ap, indent, dest, remain);
+        ast_directed_print(dest, remain, ", ");
+        ast_expr_print(expr->vastart.last, indent, dest, remain);
+        ast_directed_print(dest, remain, ")");
+        break;
+    case EXPR_VA_ARG:
+        ast_directed_print(dest, remain, "__builtin_va_arg(");
+        ast_expr_print(expr->vaarg.ap, indent, dest, remain);
+        ast_directed_print(dest, remain, ", ");
+        ast_decl_print(expr->vaarg.type, TYPE_VOID, indent, dest, remain);
+        ast_directed_print(dest, remain, ")");
+        break;
+    case EXPR_VA_END:
+        ast_directed_print(dest, remain, "__builtin_va_end(");
+        ast_expr_print(expr->vaend.ap, indent, dest, remain);
+        ast_directed_print(dest, remain, ")");
+        break;
+    case EXPR_VA_COPY:
+        ast_directed_print(dest, remain, "__builtin_va_copy(");
+        ast_expr_print(expr->vacopy.dest, indent, dest, remain);
+        ast_directed_print(dest, remain, ", ");
+        ast_expr_print(expr->vacopy.src, indent, dest, remain);
+        ast_directed_print(dest, remain, ")");
         break;
 
     default:
@@ -973,6 +999,10 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
         ast_type_print(type->mod.base, 0, dest, remain);
         break;
 
+    case TYPE_VA_LIST:
+        ast_directed_print(dest, remain, "__builtin_va_list");
+        break;
+
     default:
         assert(false);
     }
@@ -1111,6 +1141,7 @@ void ast_type_destroy(type_t *type) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_LONG_DOUBLE:
+    case TYPE_VA_LIST:
         return; // These are statically allocated
 
     case TYPE_STRUCT:
@@ -1239,6 +1270,21 @@ void ast_expr_destroy(expr_t *expr) {
         break;
     case EXPR_DESIG_INIT:
         ast_expr_destroy(expr->desig_init.val);
+        break;
+    case EXPR_VA_START:
+        ast_expr_destroy(expr->vastart.ap);
+        ast_expr_destroy(expr->vastart.last);
+        break;
+    case EXPR_VA_ARG:
+        ast_expr_destroy(expr->vaarg.ap);
+        ast_decl_destroy(expr->vaarg.type);
+        break;
+    case EXPR_VA_END:
+        ast_expr_destroy(expr->vaend.ap);
+        break;
+    case EXPR_VA_COPY:
+        ast_expr_destroy(expr->vacopy.dest);
+        ast_expr_destroy(expr->vacopy.src);
         break;
     default:
         assert(false);

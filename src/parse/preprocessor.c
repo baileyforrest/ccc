@@ -64,7 +64,6 @@ static pp_macro_t s_predef_macros[] = {
 #endif
 
     // TODO1: Conditionally compile or handle these better
-    PREDEF_MACRO_LIT("__builtin_va_list", "char *", MACRO_BASIC),
     PREDEF_MACRO_LIT("char16_t", "short", MACRO_BASIC),
     PREDEF_MACRO_LIT("char32_t", "int", MACRO_BASIC)
 };

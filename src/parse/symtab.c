@@ -80,6 +80,11 @@ static symtab_entry_t s_reserved[] = {
 
     // __builtin
     { SL_LINK_LIT, LEN_STR_LIT("__builtin_offsetof"), OFFSETOF  },
+    { SL_LINK_LIT, LEN_STR_LIT("__builtin_va_list" ), VA_LIST   },
+    { SL_LINK_LIT, LEN_STR_LIT("__builtin_va_start"), VA_START  },
+    { SL_LINK_LIT, LEN_STR_LIT("__builtin_va_arg"  ), VA_ARG    },
+    { SL_LINK_LIT, LEN_STR_LIT("__builtin_va_end"  ), VA_END    },
+    { SL_LINK_LIT, LEN_STR_LIT("__builtin_va_copy" ), VA_COPY   },
 
     // Types
     { SL_LINK_LIT, LEN_STR_LIT("void"          ), VOID          },

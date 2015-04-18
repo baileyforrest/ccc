@@ -458,14 +458,15 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         break;
     }
         // Primitive types
-    case VOID:   *end_node = tt_void;   break;
-    case BOOL:   *end_node = tt_bool;   break;
-    case CHAR:   *end_node = tt_char;   break;
-    case SHORT:  *end_node = tt_short;  break;
-    case INT:    *end_node = tt_int;    break;
-    case LONG:   *end_node = tt_long;   break;
-    case FLOAT:  *end_node = tt_float;  break;
-    case DOUBLE: *end_node = tt_double; break;
+    case VOID:    *end_node = tt_void;    break;
+    case BOOL:    *end_node = tt_bool;    break;
+    case CHAR:    *end_node = tt_char;    break;
+    case SHORT:   *end_node = tt_short;   break;
+    case INT:     *end_node = tt_int;     break;
+    case LONG:    *end_node = tt_long;    break;
+    case FLOAT:   *end_node = tt_float;   break;
+    case DOUBLE:  *end_node = tt_double;  break;
+    case VA_LIST: *end_node = tt_va_list; break;
 
         // Don't give a base type for signed/unsigned. No base type defaults to
         // int
@@ -1255,6 +1256,70 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             LEX_ADVANCE(lex);
             first = false;
         } while (LEX_CUR(lex).type == DOT);
+        LEX_MATCH(lex, RPAREN);
+        break;
+
+    case VA_START:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+
+        ALLOC_NODE(lex, base, expr_t);
+        base->type = EXPR_VA_START;
+        base->vastart.ap = NULL;
+        base->vastart.last = NULL;
+        if (CCC_OK != par_assignment_expression(lex, &base->vastart.ap)) {
+            goto fail;
+        }
+        LEX_MATCH(lex, COMMA);
+        if (CCC_OK != par_assignment_expression(lex, &base->vastart.last)) {
+            goto fail;
+        }
+        LEX_MATCH(lex, RPAREN);
+        break;
+    case VA_ARG:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+
+        ALLOC_NODE(lex, base, expr_t);
+        base->type = EXPR_VA_ARG;
+        base->vaarg.ap = NULL;
+        base->vaarg.type = NULL;
+        if (CCC_OK != par_assignment_expression(lex, &base->vaarg.ap)) {
+            goto fail;
+        }
+        LEX_MATCH(lex, COMMA);
+        if (CCC_OK != par_type_name(lex, false, &base->vaarg.type)) {
+            goto fail;
+        }
+        LEX_MATCH(lex, RPAREN);
+        break;
+    case VA_END:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+
+        ALLOC_NODE(lex, base, expr_t);
+        base->type = EXPR_VA_END;
+        base->vaend.ap = NULL;
+        if (CCC_OK != par_assignment_expression(lex, &base->vaend.ap)) {
+            goto fail;
+        }
+        LEX_MATCH(lex, RPAREN);
+        break;
+    case VA_COPY:
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+
+        ALLOC_NODE(lex, base, expr_t);
+        base->type = EXPR_VA_COPY;
+        base->vacopy.dest = NULL;
+        base->vacopy.src = NULL;
+        if (CCC_OK != par_assignment_expression(lex, &base->vacopy.dest)) {
+            goto fail;
+        }
+        LEX_MATCH(lex, COMMA);
+        if (CCC_OK != par_assignment_expression(lex, &base->vacopy.src)) {
+            goto fail;
+        }
         LEX_MATCH(lex, RPAREN);
         break;
 

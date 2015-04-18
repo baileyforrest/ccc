@@ -113,7 +113,9 @@ typedef struct lex_wrap_t {
 
 #define DECL_SPEC_TYPE_SPEC_NO_ID \
     VOID: case BOOL: case CHAR: case SHORT: case INT: case LONG: case FLOAT: \
-case DOUBLE: case SIGNED: case UNSIGNED: case STRUCT: case UNION: case ENUM
+case DOUBLE: case SIGNED: case UNSIGNED: case STRUCT: case UNION: case ENUM: \
+case VA_LIST
+
 
 #define DECL_SPEC_TYPE_QUALIFIER CONST: case VOLATILE
 

@@ -210,6 +210,7 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_LONG_DOUBLE:
+    case TYPE_VA_LIST:
         assert(false && "Primitive types should have same adderss");
         return false;
 
@@ -278,6 +279,8 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
     case TYPE_PTR:
         return (t1->ptr.type_mod == t2->ptr.type_mod) &&
             typecheck_type_equal(t1->ptr.base, t2->ptr.base);
+    default:
+        assert(false);
     }
 
     return true;
@@ -378,6 +381,7 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
 
     case TYPE_STRUCT:
     case TYPE_UNION:
+    case TYPE_VA_LIST:
         goto fail;
 
     case TYPE_ENUM:
@@ -638,6 +642,7 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
 
     case TYPE_STRUCT:
     case TYPE_UNION:
+    case TYPE_VA_LIST:
         // Compound types cannot be converted
         break;
 
@@ -749,6 +754,8 @@ bool typecheck_type_integral(fmark_t *mark, type_t *type) {
     case TYPE_FUNC:
     case TYPE_ARR:
     case TYPE_PTR:
+
+    case TYPE_VA_LIST:
         break;
 
     default:
@@ -787,6 +794,7 @@ bool typecheck_type_conditional(fmark_t *mark, type_t *type) {
     case TYPE_VOID:
     case TYPE_STRUCT:
     case TYPE_UNION:
+    case TYPE_VA_LIST:
         break;
 
     default:
@@ -809,6 +817,18 @@ bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr) {
         return false;
     }
     return typecheck_type_conditional(&expr->mark, expr->etype);
+}
+
+bool typecheck_expr_va_list(tc_state_t *tcs, expr_t *expr) {
+    if (!typecheck_expr(tcs, expr, TC_NOCONST)) {
+        return false;
+    }
+    type_t *type = ast_type_unmod(expr->etype);
+    if (type->type != TYPE_VA_LIST) {
+        logger_log(&expr->mark, LOG_ERR, "Expected __builtin_va_list");
+        return false;
+    }
+    return true;
 }
 
 bool typecheck_trans_unit(tc_state_t *tcs, trans_unit_t *trans_unit) {
@@ -1707,7 +1727,44 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_expr(tcs, expr->desig_init.val, TC_NOCONST);
         // Don't know what etype is
         return retval;
+    case EXPR_VA_START: {
+        retval &= typecheck_expr_va_list(tcs, expr->vastart.ap);
+        gdecl_t *func = tcs->func;
+        bool failed = true;
+        if (func != NULL && expr->vastart.last->type == EXPR_VAR) {
+            decl_node_t *fun_decl = sl_head(&func->decl->decls);
+            assert(fun_decl != NULL);
+            type_t *fun_type = fun_decl->type;
+            assert(fun_type->type == TYPE_FUNC);
+            decl_t *last_param = sl_tail(&fun_type->func.params);
+            if (last_param != NULL) {
+                decl_node_t *last_param_node = sl_tail(&last_param->decls);
+                assert(last_param_node != NULL);
+                if (vstrcmp(expr->vastart.last->var_id, last_param_node->id)) {
+                    failed = false;
+                }
+            }
+        }
+        if (failed) {
+            logger_log(&expr->vastart.last->mark, LOG_ERR,
+                       "Expected function parameter name");
+            retval = false;
+        }
+        return retval;
+    }
+    case EXPR_VA_ARG:
+        retval &= typecheck_expr_va_list(tcs, expr->vaarg.ap);
+        retval &= typecheck_decl(tcs, expr->vaarg.type, TC_NOCONST);
+        return retval;
+    case EXPR_VA_END:
+        retval &= typecheck_expr_va_list(tcs, expr->vaend.ap);
+        return retval;
+    case EXPR_VA_COPY:
+        retval &= typecheck_expr_va_list(tcs, expr->vacopy.dest);
+        retval &= typecheck_expr_va_list(tcs, expr->vacopy.src);
+        return retval;
     default:
+        retval = false;
         assert(false);
     }
 
@@ -1728,6 +1785,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_LONG_DOUBLE:
+    case TYPE_VA_LIST:
         // Primitive types always type check
         return retval;
 

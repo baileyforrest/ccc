@@ -83,6 +83,7 @@ void optman_destroy(void) {
     SL_DESTROY_FUNC(&optman.include_paths, free);
     SL_DESTROY_FUNC(&optman.link_opts, free);
     SL_DESTROY_FUNC(&optman.src_files, free);
+    SL_DESTROY_FUNC(&optman.asm_files, free);
     SL_DESTROY_FUNC(&optman.obj_files, free);
     SL_DESTROY_FUNC(&optman.macros, optman_macro_node_destroy);
 }

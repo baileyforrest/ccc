@@ -178,6 +178,12 @@ const char *token_str(token_t token) {
     case STRING:        return "<string literal>";
     case INTLIT:        return "<integer literal>";
     case FLOATLIT:      return "<float literal>";
+
+    case VA_LIST:       return "__builtin_va_list";
+    case VA_START:      return "__builtin_va_start";
+    case VA_ARG:        return "__builtin_va_arg";
+    case VA_END:        return "__builtin_va_end";
+    case VA_COPY:       return "__builtin_va_copy";
     }
     assert(false);
     return NULL;

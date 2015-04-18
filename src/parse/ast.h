@@ -32,11 +32,13 @@
 #include "util/util.h"
 
 // Forward declarations
-struct stmt_t;
-struct type_t;
-struct gdecl_t;
-struct decl_t;
-struct ir_label_t;
+// TODO0: Remove struct qualified types below
+typedef struct type_t type_t;
+typedef struct expr_t expr_t;
+typedef struct stmt_t stmt_t;
+typedef struct decl_t decl_t;
+typedef struct gdecl_t gdecl_t;
+typedef struct ir_label_t ir_label_t;
 
 #define TYPE_IS_NUMERIC(test)                                       \
     ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_DOUBLE)
@@ -96,12 +98,14 @@ typedef enum basic_type_t {
     TYPE_FUNC,    /**< Function */
     TYPE_ARR,     /**< Array */
     TYPE_PTR,     /**< Pointer */
+
+    TYPE_VA_LIST, /**< va_list */
 } basic_type_t;
 
 /**
  * Tagged union representing a type
  */
-typedef struct type_t {
+struct type_t {
     sl_link_t link;                /**< Storage Link */
     fmark_t mark;                  /**< File mark */
     basic_type_t type;             /**< Basic type */
@@ -147,7 +151,7 @@ typedef struct type_t {
             type_mod_t type_mod;   /**< Modifiers */
         } ptr;
     };
-} type_t;
+};
 
 /**
  * Types of operations
@@ -211,12 +215,16 @@ typedef enum expr_type_t {
     EXPR_ARR_IDX,     /**< Array Index */
     EXPR_INIT_LIST,   /**< Initializer list */
     EXPR_DESIG_INIT,  /**< Designated initializer */
+    EXPR_VA_START,    /**< __builtin_va_start */
+    EXPR_VA_ARG,      /**< __builtin_va_arg */
+    EXPR_VA_END,      /**< __builtin_va_end */
+    EXPR_VA_COPY,     /**< __builtin_va_copy */
 } expr_type_t;
 
 /**
  * Tagged union for expressions
  */
-typedef struct expr_t {
+struct expr_t {
     sl_link_t link;                 /**< Storage link */
     fmark_t mark;                   /**< File mark */
     expr_type_t type;               /**< Expression type */
@@ -302,8 +310,28 @@ typedef struct expr_t {
             struct expr_t *val;
             len_str_t *name;
         } desig_init;
+
+        struct {
+            expr_t *ap;
+            expr_t *last;
+        } vastart;
+
+        struct {
+            expr_t *ap;
+            decl_t *type;
+        } vaarg;
+
+        struct {
+            expr_t *ap;
+        } vaend;
+
+        struct {
+            expr_t *dest;
+            expr_t *src;
+        } vacopy;
+
     };
-} expr_t;
+};
 
 /**
  * One declaration on a given type.
@@ -321,12 +349,12 @@ typedef struct decl_node_t {
 /**
  * A declaration
  */
-typedef struct decl_t {
+struct decl_t {
     sl_link_t link; /**< Storage link */
     fmark_t mark;   /**< File mark */
     type_t *type;   /**< Type of variable */
     slist_t decls;  /**< List of declarations (decl_node_t) */
-} decl_t;
+};
 
 
 /**
@@ -365,7 +393,7 @@ typedef enum stmt_type_t {
 /**
  * Tagged union representing a statement
  */
-typedef struct stmt_t {
+struct stmt_t {
     sl_link_t link;                    /**< Storage link */
     fmark_t mark;                      /**< File mark */
     stmt_type_t type;                  /**< Type of statement */
@@ -450,7 +478,7 @@ typedef struct stmt_t {
             expr_t *expr;              /**< Expression to execute */
         } expr;
     };
-} stmt_t;
+};
 
 /**
  * Global declaration
@@ -464,7 +492,7 @@ typedef enum gdecl_type_t {
 /**
  * Global declaration
  */
-typedef struct gdecl_t {
+struct gdecl_t {
     sl_link_t link;              /**< Storage Link */
     fmark_t mark;                /**< File mark */
     gdecl_type_t type;           /**< Type of gdecl */
@@ -476,7 +504,7 @@ typedef struct gdecl_t {
             slist_t gotos;       /**< Goto statements in function */
         } fdefn;
     };
-} gdecl_t;
+};
 
 
 /**

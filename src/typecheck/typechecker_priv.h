@@ -176,6 +176,15 @@ bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr);
 bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr);
 
 /**
+ * Typechecks expression, and makes sure its a va_list type
+ *
+ * @param tcs The typechecking state
+ * @param expr The expression to check
+ * @return true if the node typechecks, false otherwise
+ */
+bool typecheck_expr_va_list(tc_state_t *tcs, expr_t *expr);
+
+/**
  * Typechecks a trans_unit_t.
  *
  * @param tcs The typechecking state

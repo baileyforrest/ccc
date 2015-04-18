@@ -126,25 +126,30 @@ typedef enum token_t {
 
     // Built in
     OFFSETOF,      // __builtin_offsetof
+    VA_LIST,       // __builtin_va_list
+    VA_START,      // __builtin_va_start
+    VA_ARG,        // __builtin_va_arg
+    VA_END,        // __builtin_va_end
+    VA_COPY,       // __builtin_va_copy
 
     // Types
-    VOID,     // void
+    VOID,          // void
 
-    CHAR,     // char
-    SHORT,    // short
-    INT,      // int
-    LONG,     // long
-    UNSIGNED, // unsigned
-    SIGNED,   // signed
+    CHAR,          // char
+    SHORT,         // short
+    INT,           // int
+    LONG,          // long
+    UNSIGNED,      // unsigned
+    SIGNED,        // signed
 
-    DOUBLE,   // double
-    FLOAT,    // float
+    DOUBLE,        // double
+    FLOAT,         // float
 
     // Other
-    ID,       // identifier
-    STRING,   // string
-    INTLIT,   // Integral literal
-    FLOATLIT, // Float literal
+    ID,            // identifier
+    STRING,        // string
+    INTLIT,        // Integral literal
+    FLOATLIT,      // Float literal
 } token_t;
 
 typedef struct symtab_entry_t symtab_entry_t; // Forward definition
