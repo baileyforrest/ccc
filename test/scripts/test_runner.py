@@ -79,7 +79,8 @@ def main():
         pool = multiprocessing.Pool(processes=jobs)
         passed_tests = sum(pool.map(process_file, src_files))
 
-    print("Results: Passed %d/%d" % (passed_tests, num_tests))
+    if num_tests > 1:
+        print("Results: Passed %d/%d" % (passed_tests, num_tests))
 
     if passed_tests != num_tests:
         sys.exit(1)

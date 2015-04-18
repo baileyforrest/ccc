@@ -1,7 +1,7 @@
 #!/bin/bash
 
 RUNNER=./test/scripts/test_runner.py
-CC=gcc
+CC="clang -std=c11"
 FAIL_DIR=./test/filtered
 
 mkdir -p $FAIL_DIR
