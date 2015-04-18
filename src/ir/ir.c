@@ -47,9 +47,12 @@ ir_type_t ir_type_float = IR_FLOAT_LIT(IR_FLOAT_FLOAT);
 ir_type_t ir_type_double = IR_FLOAT_LIT(IR_FLOAT_DOUBLE);
 ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
-void ir_print(FILE *stream, ir_trans_unit_t *irtree) {
+void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name) {
     assert(stream != NULL);
     assert(irtree != NULL);
+    assert(module_name != NULL);
+
+    fprintf(stream, "; ModuleID = '%s'\n", module_name);
 
     ir_trans_unit_print(stream, irtree);
 }

@@ -45,6 +45,7 @@ typedef enum long_opt_idx_t {
     LOPT_DUMP_TOKENS,
     LOPT_DUMP_AST,
     LOPT_DUMP_IR,
+    LOPT_EMIT_LLVM,
     LOPT_NUM_ITEMS,
 } long_opt_idx_t;
 
@@ -60,10 +61,13 @@ status_t optman_init(int argc, char **argv) {
     sl_init(&optman.src_files, offsetof(len_str_node_t, link));
     sl_init(&optman.obj_files, offsetof(len_str_node_t, link));
     sl_init(&optman.macros, offsetof(macro_node_t, link));
-    optman.warn_opts = 0;
     optman.dump_opts = 0;
+    optman.warn_opts = 0;
     optman.olevel = 0;
     optman.std = DEFAULT_STD;
+    optman.misc = 0;
+    optman.pp_deps = 0;
+    optman.output = 0;
 
     return optman_parse(argc, argv);
 }
@@ -98,12 +102,13 @@ static status_t optman_parse(int argc, char **argv) {
             { "dump_tokens", no_argument      , 0, 0 },
             { "dump_ast"   , no_argument      , 0, 0 },
             { "dump_ir"    , no_argument      , 0, 0 },
+            { "emit-llvm"  , no_argument      , 0, 0 },
 
             { 0            , 0                , 0, 0 } // Terminator
         };
 
         int c = getopt_long_only(argc, argv,
-                                 "W:O:l:I:o:M::D:Scg",
+                                 "W:O:l:I:o:M::D:Sscg",
                                  long_options, &opt_idx);
 
         if (c == -1) {
@@ -141,6 +146,9 @@ static status_t optman_parse(int argc, char **argv) {
                 break;
             case LOPT_DUMP_IR:
                 optman.dump_opts |= DUMP_IR;
+                break;
+            case LOPT_EMIT_LLVM:
+                optman.output_opts |= OUTPUT_EMIT_LLVM;
                 break;
             default:
                 break;
@@ -221,15 +229,16 @@ static status_t optman_parse(int argc, char **argv) {
         }
 
         case 's': // Stop after ASM
-            optman.misc |= MISC_STOP_ASM;
+        case 'S': // Stop after ASM
+            optman.output_opts |= OUTPUT_ASM;
             break;
 
         case 'c': // Don't link
-            optman.misc |= MISC_STOP_OBJ;
+            optman.output_opts |= OUTPUT_OBJ;
             break;
 
         case 'g': // Create debug info
-            optman.misc |= MISC_DBG_SYM;
+            optman.output_opts |= OUTPUT_DBG_SYM;
             break;
 
         case '?':

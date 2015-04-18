@@ -20,6 +20,9 @@
  * Program entry point
  */
 
+#include <string.h>
+#include <errno.h>
+
 #include "manager.h"
 #include "optman.h"
 
@@ -81,19 +84,43 @@ int main(int argc, char **argv) {
         }
 
         ir_trans_unit_t *ir = trans_translate(ast);
+        ast_destroy(ast); // Don't need ast after translation
 
         if (optman.dump_opts & DUMP_IR) {
-            FILE *stream = stdout;
-            fprintf(stream, "; ModuleID = '%s'\n", node->str.str);
-            ir_print(stream, ir);
+            ir_print(stdout, ir, node->str.str);
         }
 
+        if (optman.output_opts & OUTPUT_ASM &&
+            optman.output_opts & OUTPUT_EMIT_LLVM) {
+            FILE *output = fopen(optman.output, "w");
+            if (output == NULL) {
+                logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
+                           strerror(errno));
+                goto src_fail1;
+            }
+
+            ir_print(output, ir, node->str.str);
+            if (EOF == fclose(output)) {
+                logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
+                           strerror(errno));
+                goto src_fail1;
+            }
+
+        }
+
+        ir_trans_unit_destroy(ir);
+
+    src_done0:
+        man_destroy(&manager);
+
+        continue;
+
+    src_fail1:
         ir_trans_unit_destroy(ir);
 
     src_fail0:
         ast_destroy(ast);
 
-    src_done0:
         man_destroy(&manager);
     }
 

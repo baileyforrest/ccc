@@ -71,9 +71,7 @@ typedef enum std_t {
  * Misc flags
  */
 typedef enum misc_flags_t {
-    MISC_STOP_ASM = 1 << 0, // -S Stop after asm generated
-    MISC_STOP_OBJ = 1 << 1, // -c Stop after object files generated
-    MISC_DBG_SYM  = 1 << 2, // -g Generate debug symbols
+    MISC_MISC = 1 << 0, // TODO2: Remove if unused
 } misc_flags_t;
 
 /**
@@ -84,6 +82,13 @@ typedef enum pp_dep_opts_t {
     PP_DEP_MMD = 1 << 1, // -MMD Generate dependencies for non system headers
 } pp_dep_opts_t;
 
+typedef enum output_opts_t {
+    OUTPUT_EMIT_LLVM = 1 << 0, // -emit-llvm Emit llvm ir
+    OUTPUT_ASM       = 1 << 1, // -S Stop after asm generated
+    OUTPUT_OBJ       = 1 << 2, // -c Stop after object files generated
+    OUTPUT_DBG_SYM   = 1 << 3, // -g Generate debug symbols
+} output_opts_t;
+
 typedef struct macro_node_t {
     sl_link_t link;
     pp_macro_t *macro;
@@ -93,20 +98,21 @@ typedef struct macro_node_t {
  * The Option manager. Contains flags/lists from the command line parameters.
  */
 typedef struct optman_t {
-    char *exec_name;       /**< Name of the executable */
-    char *output;          /**< Name of the output file */
-    slist_t include_paths; /**< Search path additions with -I flag */
-    slist_t link_opts;     /**< Linker libraries */
-    slist_t src_files;     /**< C files */
-    slist_t asm_files;     /**< Assember files */
-    slist_t obj_files;     /**< All other files assumed for linker */
-    slist_t macros;        /**< Parameter defined macros */
-    dump_opts_t dump_opts; /**< Dump options */
-    warn_opts_t warn_opts; /**< Warn options */
-    olevel_t olevel;       /**< Optimization level */
-    std_t std;             /**< Standard used */
-    misc_flags_t misc;     /**< Misc flags */
-    pp_dep_opts_t pp_deps; /**< Preprocessor dependency ops */
+    char *exec_name;           /**< Name of the executable */
+    char *output;              /**< Name of the output file */
+    slist_t include_paths;     /**< Search path additions with -I flag */
+    slist_t link_opts;         /**< Linker libraries */
+    slist_t src_files;         /**< C files */
+    slist_t asm_files;         /**< Assember files */
+    slist_t obj_files;         /**< All other files assumed for linker */
+    slist_t macros;            /**< Parameter defined macros */
+    dump_opts_t dump_opts;     /**< Dump options */
+    warn_opts_t warn_opts;     /**< Warn options */
+    olevel_t olevel;           /**< Optimization level */
+    std_t std;                 /**< Standard used */
+    misc_flags_t misc;         /**< Misc flags */
+    pp_dep_opts_t pp_deps;     /**< Preprocessor dependency ops */
+    output_opts_t output_opts; /**< Output options */
 } optman_t;
 
 /**

@@ -75,6 +75,8 @@ def main():
         is_except = True
     elif header[1] == "noreturn":
         is_noreturn = True
+    else:
+        usage()
 
     timeout_remain = TIMEOUT
 
@@ -137,6 +139,9 @@ def main():
             fail(src_name, "Returned %d expected %d" % retval, return_val)
         else:
             success(src_name, verbose)
+
+    # Shouldn't get here
+    assert(false)
 
 # Run main
 main()
