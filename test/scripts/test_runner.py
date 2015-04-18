@@ -18,7 +18,6 @@ DEV_NULL = open(os.devnull, 'w')
 
 NUM_PROCS = 4
 
-failure = False
 verbose = False
 llvm = False
 compiler_opts = None
@@ -36,11 +35,9 @@ def usage():
     sys.exit(-1)
 
 def fail(src_path, msg):
-    global failure
-    failure = True
     print("FAIL: " + src_path + " " + msg)
 
-def success(src_path, verbose):
+def success(src_path):
     if verbose:
         print("PASS: " + src_path)
 
@@ -72,17 +69,20 @@ def main():
     if not os.path.exists(TEMP_DIR):
         os.makedirs(TEMP_DIR)
 
+    num_tests = len(src_files)
+    passed_tests = 0
 
     if jobs == 1:
         for src_path in src_files:
-            process_file(src_path)
+            passed_tests += process_file(src_path)
     else:
         pool = multiprocessing.Pool(processes=jobs)
-        pool.map(process_file, src_files)
+        passed_tests = sum(pool.map(process_file, src_files))
 
-    if failure:
+    print("Results: Passed %d/%d" % (passed_tests, num_tests))
+
+    if passed_tests != num_tests:
         sys.exit(1)
-
 
 def process_file(src_path):
     temp_files = []
@@ -98,7 +98,7 @@ def process_file(src_path):
 
         if len(header) < 2 or header[0] != HEADER_STR:
             fail(src_path, "Invalid header")
-            return
+            return 0
 
         is_return = False
         return_val = 0
@@ -109,7 +109,7 @@ def process_file(src_path):
         if header[1] == "return":
             if len(header) < 3:
                 fail(src_path, "Invalid header")
-                return
+                return 0
             is_return = True
             return_val = int(header[2])
         elif header[1] == "error":
@@ -120,7 +120,7 @@ def process_file(src_path):
             is_noreturn = True
         else:
             fail(src_path, "Invalid header")
-            return
+            return 0
 
         timeout_remain = TIMEOUT
 
@@ -140,7 +140,7 @@ def process_file(src_path):
                         stderr=subprocess.STDOUT)
             except subprocess.TimeoutExpired:
                 fail(src_path, "Compile timed out")
-                return
+                return 0
         else:
             outname = TEMP_DIR + src_name
             temp_files.append(outname)
@@ -156,7 +156,7 @@ def process_file(src_path):
                         stderr=subprocess.STDOUT)
             except subprocess.TimeoutExpired:
                 fail(src_path, "Compile timed out")
-                return
+                return 0
 
         end = time.clock()
 
@@ -166,13 +166,14 @@ def process_file(src_path):
         if is_error:
             if retval == 0:
                 fail(src_path, "Compilation unexpectedly suceeded")
+                return 0
             else:
-                success(src_path, verbose)
-            return
+                success(src_path)
+                return 1
 
         if retval != 0:
             fail(src_path, "failed to compile")
-            return
+            return 0
 
         if llvm:
             exec_name = TEMP_DIR + src_name
@@ -180,7 +181,7 @@ def process_file(src_path):
             retval = subprocess.call([CLANG, outname, RUNTIME, "-o", exec_name])
             if retval != 0:
                 fail(src_path, "failed to create valid llvm ir")
-                return
+                return 0
             outname = exec_name
 
         try:
@@ -188,21 +189,23 @@ def process_file(src_path):
                                             universal_newlines=True)
         except subprocess.TimeoutExpired:
             if is_noreturn:
-                success(src_path, verbose)
+                success(src_path)
+                return 1
             else:
                 fail(src_path, "Executable timed out")
-            return
+                return 0
 
         except subprocess.CalledProcessError:
             if is_except:
-                success(src_path, verbose)
+                success(src_path)
+                return 1
             else:
                 fail(src_path, "Unexpected exception")
-            return
+                return 0
 
         if is_except:
             fail(src_path, "Expected exception")
-            return
+            return 0
 
         # Return value is last line of output
         lines = lines.split("\n")
@@ -214,9 +217,10 @@ def process_file(src_path):
         if is_return:
             if return_val != retval:
                 fail(src_path, "Returned %d expected %d" % (retval, return_val))
+                return 0
             else:
-                success(src_path, verbose)
-            return
+                success(src_path)
+                return 1
 
         # Shouldn't get here
         assert(False)
