@@ -6,7 +6,8 @@ import subprocess
 import time
 import multiprocessing
 
-RUNTIME = "./test/util/runtime.c"
+RUNTIME_DIR = "./test/runtime/"
+RUNTIME = os.path.join(RUNTIME_DIR, "runtime.c")
 HEADER_STR = "//test"
 TEMP_DIR = "/tmp/ccc/"
 LLVM_SUFFIX = "ll"
@@ -80,7 +81,7 @@ def main():
         passed_tests = sum(pool.map(process_file, src_files))
 
     if num_tests > 1:
-        print("Results: Passed %d/%d" % (passed_tests, num_tests))
+        sys.stderr.write("Results: Passed %d/%d\n" % (passed_tests, num_tests))
 
     if passed_tests != num_tests:
         sys.exit(1)
@@ -132,11 +133,13 @@ def process_file(src_path):
             try:
                 if verbose and not is_error:
                     retval = subprocess.call(
-                        compiler_opts + ["-o", outname, src_path],
+                        compiler_opts + ["-I", RUNTIME_DIR] +
+                        ["-o", outname, src_path],
                         timeout=timeout_remain)
                 else:
                     retval = subprocess.call(
-                        compiler_opts + ["-o", outname, src_path],
+                        compiler_opts + ["-I", RUNTIME_DIR] +
+                        ["-o", outname, src_path],
                         timeout=timeout_remain, stdout=DEV_NULL,
                         stderr=subprocess.STDOUT)
             except subprocess.TimeoutExpired:
@@ -148,11 +151,13 @@ def process_file(src_path):
             try:
                 if verbose and not is_error:
                     retval = subprocess.call(
-                        compiler_opts + ["-o", outname, src_path, RUNTIME],
+                        compiler_opts + ["-I", RUNTIME_DIR] +
+                        ["-o", outname, src_path, RUNTIME],
                         timeout=timeout_remain)
                 else:
                     retval = subprocess.call(
-                        compiler_opts + ["-o", outname, src_path, RUNTIME],
+                        compiler_opts + ["-I", RUNTIME_DIR] +
+                        ["-o", outname, src_path, RUNTIME],
                         timeout=timeout_remain, stdout=DEV_NULL,
                         stderr=subprocess.STDOUT)
             except subprocess.TimeoutExpired:
