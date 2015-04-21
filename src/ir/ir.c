@@ -692,7 +692,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         }
         break;
     case IR_EXPR_LOAD:
-        // TODO0: Maybe remove hard coded pointer from this and store
         fprintf(stream, "load ");
         ir_type_print(stream, expr->load.type, NULL);
         fprintf(stream, "* ");

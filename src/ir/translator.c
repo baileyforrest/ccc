@@ -81,7 +81,9 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             entry->var.expr = name;
             entry->var.access = name;
 
-            ir_expr_t *temp = ir_temp_create(ts->func, name->var.type,
+            ir_type_t *ptr_type = ir_type_create(IR_TYPE_PTR);
+            ptr_type->ptr.base = name->var.type;
+            ir_expr_t *temp = ir_temp_create(ts->func, ptr_type,
                                              ts->func->func.next_temp++);
             ir_stmt_t *stmt = ir_stmt_create(IR_STMT_ASSIGN);
             stmt->assign.dest = temp;
@@ -483,19 +485,24 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         // Must be valid if typechecked
         assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
 
-        // Load var into a temp
-        ir_expr_t *temp = ir_temp_create(ts->func, ir_expr_type(entry->var.access),
-                                         ts->func->func.next_temp++);
-        ir_expr_t *load = ir_expr_create(IR_EXPR_LOAD);
-        load->load.type = ir_expr_type(entry->var.access);
-        load->load.ptr = entry->var.access;
+        if (ir_expr_type(entry->var.access)->type == IR_TYPE_PTR) {
+            // Load var into a temp
+            ir_expr_t *temp = ir_temp_create(ts->func,
+                                             ir_expr_type(entry->var.access),
+                                             ts->func->func.next_temp++);
+            ir_expr_t *load = ir_expr_create(IR_EXPR_LOAD);
+            load->load.type = ir_expr_type(entry->var.access)->ptr.base;
+            load->load.ptr = entry->var.access;
 
-        ir_stmt_t *assign = ir_stmt_create(IR_STMT_ASSIGN);
-        assign->assign.dest = temp;
-        assign->assign.src = load;
-        sl_append(ir_stmts, &assign->link);
+            ir_stmt_t *assign = ir_stmt_create(IR_STMT_ASSIGN);
+            assign->assign.dest = temp;
+            assign->assign.src = load;
+            sl_append(ir_stmts, &assign->link);
 
-        return temp;
+            return temp;
+        } else {
+            return entry->var.access;
+        }
     }
     case EXPR_ASSIGN: {
         if (expr->assign.op == OP_NOP) {
@@ -633,15 +640,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_CALL: {
         ir_expr_t *call = ir_expr_create(IR_EXPR_CALL);
         call->call.func_sig = trans_type(ts, expr->call.func->etype);
-        if (expr->call.func->type == EXPR_VAR) {
-            ir_symtab_entry_t *entry =
-                ir_symtab_lookup(&ts->tunit->globals,
-                                 expr->call.func->var_id);
-            assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
-            call->call.func_ptr = entry->var.access;
-        } else {
-            call->call.func_ptr = trans_expr(ts, expr->call.func, ir_stmts);
-        }
+        call->call.func_ptr = trans_expr(ts, expr->call.func, ir_stmts);
 
         SL_FOREACH(cur, &expr->call.params) {
             expr_t *param = GET_ELEM(&expr->call.params, cur);
@@ -1215,7 +1214,9 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
 void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
     bool global = ts->func == NULL;
     ir_expr_t *name = ir_expr_create(IR_EXPR_VAR);
-    name->var.type = trans_type(ts, node->type);
+    ir_type_t *ptr_type = ir_type_create(IR_TYPE_PTR);
+    ptr_type->ptr.base = trans_type(ts, node->type);
+    name->var.type = ptr_type;
     name->var.name.str = node->id->str;
     name->var.name.len = node->id->len;
     name->var.local = !global;
@@ -1238,7 +1239,7 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
     } else {
         slist_t *allocs = &ts->func->func.allocs;
         ir_expr_t *src = ir_expr_create(IR_EXPR_ALLOCA);
-        src->alloca.type = name->var.type;
+        src->alloca.type = name->var.type->ptr.base;
         src->alloca.nelem_type = NULL;
         src->alloca.align = ast_type_align(node->type);
         stmt->assign.src = src;
