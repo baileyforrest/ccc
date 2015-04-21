@@ -58,11 +58,49 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         assert(ts->func == NULL); // Nested functions not allowed
         ts->func = ir_gdecl;
 
-        // Set to NULL so trans_type knows function's type is being processed
-        ir_gdecl->func.type = NULL;
         ir_gdecl->func.type = trans_type(ts, node->type);
         ir_gdecl->func.name.str = node->id->str;
         ir_gdecl->func.name.len = node->id->len;
+
+        assert(node->type->type == TYPE_FUNC);
+        SL_FOREACH(cur, &node->type->func.params) {
+            decl_t *decl = GET_ELEM(&node->type->func.params, cur);
+            decl_node_t *node = sl_head(&decl->decls);
+            assert(node != NULL);
+
+            // Put function parameters in symbol table
+            ir_expr_t *name = ir_expr_create(IR_EXPR_VAR);
+            name->var.type = trans_type(ts, node->type);
+            name->var.name.str = node->id->str;
+            name->var.name.len = node->id->len;
+            name->var.local = true;
+            ir_symtab_t *symtab = &ts->func->func.locals;
+            ir_symtab_entry_t *entry =
+                ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR, node->id);
+
+            entry->var.expr = name;
+            entry->var.access = name;
+
+            ir_expr_t *temp = ir_temp_create(ts->func, name->var.type,
+                                             ts->func->func.next_temp++);
+            ir_stmt_t *stmt = ir_stmt_create(IR_STMT_ASSIGN);
+            stmt->assign.dest = temp;
+            stmt->assign.src = ir_expr_create(IR_EXPR_ALLOCA);
+            stmt->assign.src->alloca.type = name->var.type;
+            stmt->assign.src->alloca.nelem_type = NULL;
+            stmt->assign.src->alloca.align = ast_type_align(node->type);
+            sl_append(&ts->func->func.allocs, &stmt->link);
+            entry->var.access = temp;
+            status_t status = ir_symtab_insert(symtab, entry);
+            assert(status == CCC_OK);
+            sl_append(&ts->func->func.params, &name->link);
+
+            ir_stmt_t *store = ir_stmt_create(IR_STMT_STORE);
+            store->store.type = name->var.type;
+            store->store.val = name;
+            store->store.ptr = temp;
+            sl_append(&ts->func->func.body, &store->link);
+        }
 
         ir_expr_t *name = ir_expr_create(IR_EXPR_VAR);
         name->var.type = ir_gdecl->func.type;
@@ -1286,53 +1324,12 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         ir_type = ir_type_create(IR_TYPE_FUNC);
         ir_type->func.type = trans_type(ts, type->func.type);
         ir_type->func.varargs = type->func.varargs;
-        bool cur_func = ts->func->func.type == NULL;
-        if (cur_func) {
-            ts->func->func.type = ir_type;
-        }
 
         SL_FOREACH(cur, &type->func.params) {
             decl_t *decl = GET_ELEM(&type->func.params, cur);
             decl_node_t *node = sl_head(&decl->decls);
             type_t *ptype = node == NULL ? decl->type : node->type;
             ir_type_t *param_type = trans_type(ts, ptype);
-
-            // If we're translating the type for the current function, put the
-            // parameters in the local symbol table
-            if (cur_func) {
-                assert(node != NULL);
-                ir_expr_t *name = ir_expr_create(IR_EXPR_VAR);
-                name->var.type = param_type;
-                name->var.name.str = node->id->str;
-                name->var.name.len = node->id->len;
-                name->var.local = true;
-                ir_symtab_t *symtab = &ts->func->func.locals;
-                ir_symtab_entry_t *entry =
-                    ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR, node->id);
-
-                entry->var.expr = name;
-                entry->var.access = name;
-
-                ir_expr_t *temp = ir_temp_create(ts->func, name->var.type,
-                                                 ts->func->func.next_temp++);
-                ir_stmt_t *stmt = ir_stmt_create(IR_STMT_ASSIGN);
-                stmt->assign.dest = temp;
-                stmt->assign.src = ir_expr_create(IR_EXPR_ALLOCA);
-                stmt->assign.src->alloca.type = name->var.type;
-                stmt->assign.src->alloca.nelem_type = NULL;
-                stmt->assign.src->alloca.align = ast_type_align(ptype);
-                sl_append(&ts->func->func.allocs, &stmt->link);
-                entry->var.access = temp;
-                status_t status = ir_symtab_insert(symtab, entry);
-                assert(status == CCC_OK);
-                sl_append(&ts->func->func.params, &name->link);
-
-                ir_stmt_t *store = ir_stmt_create(IR_STMT_STORE);
-                store->store.type = name->var.type;
-                store->store.val = name;
-                store->store.ptr = temp;
-                sl_append(&ts->func->func.body, &store->link);
-            }
             sl_append(&ir_type->func.params, &param_type->link);
         }
 
