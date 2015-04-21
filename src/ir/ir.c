@@ -32,12 +32,12 @@
 #define TRIPLE "x86_64-unknown-linux-gnu"
 
 #define IR_INT_LIT(width)                                   \
-    { SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
+    { SL_LINK_LIT, SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
 
 #define IR_FLOAT_LIT(type)                                      \
-    { SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
+    { SL_LINK_LIT, SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
 
-ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, { } };
+ir_type_t ir_type_void = { SL_LINK_LIT, SL_LINK_LIT, IR_TYPE_VOID, { } };
 ir_type_t ir_type_i1 = IR_INT_LIT(1);
 ir_type_t ir_type_i8 = IR_INT_LIT(8);
 ir_type_t ir_type_i16 = IR_INT_LIT(16);
@@ -126,7 +126,8 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
     return label;
 }
 
-ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num) {
+ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
+                          ir_type_t *type, int num) {
     assert(num >= 0);
     assert(func->type == IR_GDECL_FUNC);
 
@@ -141,6 +142,7 @@ ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num) {
     temp->var.name.len = len;
     strcpy(temp->var.name.str, buf);
     temp->var.local = true;
+    sl_append(&tunit->exprs, &temp->heap_link);
 
     ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,
                                                       &temp->var.name);
@@ -155,6 +157,9 @@ ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num) {
 ir_trans_unit_t *ir_trans_unit_create(void) {
     ir_trans_unit_t *tunit = emalloc(sizeof(ir_trans_unit_t));
     sl_init(&tunit->gdecls, offsetof(ir_gdecl_t, link));
+    sl_init(&tunit->stmts, offsetof(ir_stmt_t, heap_link));
+    sl_init(&tunit->exprs, offsetof(ir_expr_t, heap_link));
+    sl_init(&tunit->types, offsetof(ir_type_t, heap_link));
     ir_symtab_init(&tunit->globals);
 
     static const ht_params_t ht_params = {
@@ -191,9 +196,11 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     return gdecl;
 }
 
-ir_stmt_t *ir_stmt_create(ir_stmt_type_t type) {
+ir_stmt_t *ir_stmt_create(ir_trans_unit_t *tunit, ir_stmt_type_t type) {
     ir_stmt_t *stmt = emalloc(sizeof(ir_stmt_t));
     stmt->type = type;
+    sl_append(&tunit->stmts, &stmt->heap_link);
+
     switch (stmt->type) {
     case IR_STMT_LABEL:
     case IR_STMT_RET:
@@ -215,9 +222,10 @@ ir_stmt_t *ir_stmt_create(ir_stmt_type_t type) {
     return stmt;
 }
 
-ir_expr_t *ir_expr_create(ir_expr_type_t type) {
+ir_expr_t *ir_expr_create(ir_trans_unit_t *tunit, ir_expr_type_t type) {
     ir_expr_t *expr = emalloc(sizeof(ir_expr_t));
     expr->type = type;
+    sl_append(&tunit->exprs, &expr->heap_link);
 
     switch (type) {
     case IR_EXPR_VAR:
@@ -249,9 +257,10 @@ ir_expr_t *ir_expr_create(ir_expr_type_t type) {
     return expr;
 }
 
-ir_type_t *ir_type_create(ir_type_type_t type) {
+ir_type_t *ir_type_create(ir_trans_unit_t *tunit, ir_type_type_t type) {
     ir_type_t *ir_type = emalloc(sizeof(ir_type_t));
     ir_type->type = type;
+    sl_append(&tunit->types, &ir_type->heap_link);
 
     switch (type) {
     case IR_TYPE_VOID:
@@ -281,28 +290,12 @@ ir_type_t *ir_type_create(ir_type_type_t type) {
 void ir_type_destroy(ir_type_t *type) {
     switch (type->type) {
     case IR_TYPE_VOID:
+    case IR_TYPE_FUNC:
     case IR_TYPE_INT:
     case IR_TYPE_FLOAT:
-        // These types are allocated statically
-        return;
-    default:
-        break;
-    }
-
-    switch (type->type) {
-    case IR_TYPE_FUNC:
-        ir_type_destroy(type->func.type);
-        SL_DESTROY_FUNC(&type->func.params, ir_type_destroy);
-        break;
     case IR_TYPE_PTR:
-        ir_type_destroy(type->ptr.base);
-        break;
     case IR_TYPE_ARR:
-        ir_type_destroy(type->arr.elem_type);
-        break;
     case IR_TYPE_STRUCT:
-        SL_DESTROY_FUNC(&type->struct_params.types, ir_type_destroy);
-        break;
     case IR_TYPE_OPAQUE:
         break;
     default:
@@ -311,29 +304,17 @@ void ir_type_destroy(ir_type_t *type) {
     free(type);
 }
 
-void ir_type_expr_pair_destroy(ir_type_expr_pair_t *pair) {
-    ir_type_destroy(pair->type);
-    ir_expr_destroy(pair->expr);
-    free(pair);
-}
-
-void ir_expr_label_pair_destroy(ir_expr_label_pair_t *pair) {
-    ir_expr_destroy(pair->expr);
-    free(pair);
-}
-
-void ir_expr_var_destroy(ir_expr_t *expr) {
-    assert(expr->type == IR_EXPR_VAR);
-
-    ir_type_destroy(expr->var.type);
-    free(expr);
-}
-
 void ir_expr_destroy(ir_expr_t *expr) {
     switch (expr->type) {
     case IR_EXPR_VAR:
-        // Variables are stored in symtab
-        return;
+    case IR_EXPR_BINOP:
+    case IR_EXPR_ALLOCA:
+    case IR_EXPR_LOAD:
+    case IR_EXPR_CONVERT:
+    case IR_EXPR_ICMP:
+    case IR_EXPR_FCMP:
+    case IR_EXPR_SELECT:
+        break;
     case IR_EXPR_CONST:
         switch (expr->const_params.ctype) {
         case IR_CONST_BOOL:
@@ -341,78 +322,26 @@ void ir_expr_destroy(ir_expr_t *expr) {
         case IR_CONST_FLOAT:
         case IR_CONST_NULL:
         case IR_CONST_ZERO:
+        case IR_CONST_ARR:
             break;
         case IR_CONST_STRUCT:
-            SL_DESTROY_FUNC(&expr->const_params.struct_val,
-                            ir_type_expr_pair_destroy);
-            break;
-        case IR_CONST_ARR:
-            SL_DESTROY_FUNC(&expr->const_params.struct_val,
-                            ir_expr_destroy);
+            SL_DESTROY_FUNC(&expr->const_params.struct_val, free);
             break;
         default:
             assert(false);
         }
         break;
-    case IR_EXPR_BINOP:
-        ir_type_destroy(expr->binop.type);
-        ir_expr_destroy(expr->binop.expr1);
-        ir_expr_destroy(expr->binop.expr2);
-        break;
-    case IR_EXPR_ALLOCA:
-        ir_type_destroy(expr->alloca.type);
-        if (expr->alloca.nelem_type != NULL) {
-            ir_type_destroy(expr->alloca.nelem_type);
-        }
-        break;
-    case IR_EXPR_LOAD:
-        // Don't destroy if we're loading from variable, because these are
-        // stored in typetable
-        // TODO0: Change type ownership to avoid this
-        if (expr->load.ptr->type != IR_EXPR_VAR) {
-            ir_type_destroy(expr->load.type);
-            ir_expr_destroy(expr->load.ptr);
-        }
-        break;
     case IR_EXPR_GETELEMPTR:
-        ir_type_destroy(expr->getelemptr.type);
-        ir_expr_destroy(expr->getelemptr.ptr_val);
-        SL_DESTROY_FUNC(&expr->getelemptr.idxs, ir_type_expr_pair_destroy);
-        break;
-    case IR_EXPR_CONVERT:
-        ir_type_destroy(expr->convert.src_type);
-        ir_expr_destroy(expr->convert.val);
-        ir_type_destroy(expr->convert.dest_type);
-        break;
-    case IR_EXPR_ICMP:
-        ir_type_destroy(expr->icmp.type);
-        ir_expr_destroy(expr->icmp.expr1);
-        ir_expr_destroy(expr->icmp.expr2);
-        break;
-    case IR_EXPR_FCMP:
-        ir_type_destroy(expr->fcmp.type);
-        ir_expr_destroy(expr->fcmp.expr1);
-        ir_expr_destroy(expr->fcmp.expr2);
+        SL_DESTROY_FUNC(&expr->getelemptr.idxs, free);
         break;
     case IR_EXPR_PHI:
-        ir_type_destroy(expr->phi.type);
-        SL_DESTROY_FUNC(&expr->phi.preds, ir_expr_label_pair_destroy);
-        break;
-    case IR_EXPR_SELECT:
-        ir_expr_destroy(expr->select.cond);
-        ir_type_destroy(expr->select.type);
-        ir_expr_destroy(expr->select.expr1);
-        ir_expr_destroy(expr->select.expr2);
+        SL_DESTROY_FUNC(&expr->phi.preds, free);
         break;
     case IR_EXPR_CALL:
-        ir_type_destroy(expr->call.func_sig);
-        ir_expr_destroy(expr->call.func_ptr);
-        SL_DESTROY_FUNC(&expr->call.arglist, ir_type_expr_pair_destroy);
+        SL_DESTROY_FUNC(&expr->call.arglist, free);
         break;
     case IR_EXPR_VAARG:
-        ir_type_destroy(expr->vaarg.va_list_type);
-        SL_DESTROY_FUNC(&expr->vaarg.arglist, ir_type_expr_pair_destroy);
-        ir_type_destroy(expr->vaarg.arg_type);
+        SL_DESTROY_FUNC(&expr->vaarg.arglist, free);
         break;
     default:
         assert(false);
@@ -423,36 +352,17 @@ void ir_expr_destroy(ir_expr_t *expr) {
 void ir_stmt_destroy(ir_stmt_t *stmt) {
     switch (stmt->type) {
     case IR_STMT_LABEL:
-        break;
+    case IR_STMT_ASSIGN:
+    case IR_STMT_STORE:
+    case IR_STMT_INTRINSIC_FUNC:
     case IR_STMT_RET:
-        ir_type_destroy(stmt->ret.type);
-        ir_expr_destroy(stmt->ret.val);
-        break;
     case IR_STMT_BR:
-        if (stmt->br.cond != NULL) {
-            ir_expr_destroy(stmt->br.cond);
-        }
         break;
     case IR_STMT_SWITCH:
-        ir_expr_destroy(stmt->switch_params.expr);
-        SL_DESTROY_FUNC(&stmt->switch_params.cases, ir_expr_label_pair_destroy);
+        SL_DESTROY_FUNC(&stmt->switch_params.cases, free);
         break;
     case IR_STMT_INDIR_BR:
-        ir_type_destroy(stmt->indirectbr.type);
-        ir_expr_destroy(stmt->indirectbr.addr);
         SL_DESTROY_FUNC(&stmt->indirectbr.labels, free);
-        break;
-    case IR_STMT_ASSIGN:
-        ir_expr_destroy(stmt->assign.dest);
-        ir_expr_destroy(stmt->assign.src);
-        break;
-    case IR_STMT_STORE:
-        ir_type_destroy(stmt->store.type);
-        ir_expr_destroy(stmt->store.val);
-        ir_expr_destroy(stmt->store.ptr);
-        break;
-    case IR_STMT_INTRINSIC_FUNC:
-        ir_type_destroy(stmt->intrinsic_func.func_sig);
         break;
     default:
         assert(false);
@@ -463,12 +373,8 @@ void ir_stmt_destroy(ir_stmt_t *stmt) {
 void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
-        SL_DESTROY_FUNC(&gdecl->gdata.stmts, ir_stmt_destroy);
         break;
     case IR_GDECL_FUNC:
-        // Don't destroy type, because its stored in global symbol table
-        SL_DESTROY_FUNC(&gdecl->func.allocs, ir_stmt_destroy);
-        SL_DESTROY_FUNC(&gdecl->func.body, ir_stmt_destroy);
         ir_symtab_destroy(&gdecl->func.locals);
         break;
     default:
@@ -482,6 +388,9 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
         return;
     }
     SL_DESTROY_FUNC(&trans_unit->gdecls, ir_gdecl_destroy);
+    SL_DESTROY_FUNC(&trans_unit->stmts, ir_stmt_destroy);
+    SL_DESTROY_FUNC(&trans_unit->exprs, ir_expr_destroy);
+    SL_DESTROY_FUNC(&trans_unit->types, ir_type_destroy);
     ir_symtab_destroy(&trans_unit->globals);
     HT_DESTROY_FUNC(&trans_unit->labels, free);
     free(trans_unit);

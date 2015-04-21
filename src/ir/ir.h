@@ -62,6 +62,7 @@ typedef enum ir_type_type_t {
 
 typedef struct ir_type_t ir_type_t;
 struct ir_type_t {
+    sl_link_t heap_link;
     sl_link_t link;
     ir_type_type_t type;
 
@@ -206,6 +207,7 @@ typedef enum ir_expr_type_t {
 } ir_expr_type_t;
 
 struct ir_expr_t {
+    sl_link_t heap_link;
     sl_link_t link;
     ir_expr_type_t type;
 
@@ -317,6 +319,7 @@ typedef enum ir_stmt_type_t {
 } ir_stmt_type_t;
 
 typedef struct ir_stmt_t {
+    sl_link_t heap_link;
     sl_link_t link;
     ir_stmt_type_t type;
 
@@ -401,6 +404,9 @@ typedef struct ir_gdecl_t {
 typedef struct ir_trans_unit_t {
     sl_link_t link;
     slist_t gdecls;
+    slist_t stmts;
+    slist_t exprs;
+    slist_t types;
     ir_symtab_t globals;
     htable_t labels;
 } ir_trans_unit_t;
@@ -427,31 +433,18 @@ ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str);
 
 ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num);
 
-ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num);
+ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
+                          ir_type_t *type, int num);
 
 ir_trans_unit_t *ir_trans_unit_create(void);
 
 ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type);
 
-ir_stmt_t *ir_stmt_create(ir_stmt_type_t type);
+ir_stmt_t *ir_stmt_create(ir_trans_unit_t *tunit, ir_stmt_type_t type);
 
-ir_expr_t *ir_expr_create(ir_expr_type_t type);
+ir_expr_t *ir_expr_create(ir_trans_unit_t *tunit, ir_expr_type_t type);
 
-ir_type_t *ir_type_create(ir_type_type_t type);
-
-void ir_type_destroy(ir_type_t *type);
-
-void ir_type_expr_pair_destroy(ir_type_expr_pair_t *pair);
-
-void ir_expr_label_pair_destroy(ir_expr_label_pair_t *pair);
-
-void ir_expr_var_destroy(ir_expr_t *expr);
-
-void ir_expr_destroy(ir_expr_t *expr);
-
-void ir_stmt_destroy(ir_stmt_t *stmt);
-
-void ir_gdecl_destroy(ir_gdecl_t *gdecl);
+ir_type_t *ir_type_create(ir_trans_unit_t *tunit, ir_type_type_t type);
 
 void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit);
 

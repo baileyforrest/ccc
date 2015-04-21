@@ -12,3 +12,4 @@ bin
 gcc_tests
 dump*
 temp*
+fail*
