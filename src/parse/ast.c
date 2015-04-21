@@ -996,7 +996,9 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
 
     case TYPE_MOD:
         ast_type_mod_print(type->mod.type_mod, dest, remain);
-        ast_type_print(type->mod.base, 0, dest, remain);
+        if (type->mod.base != NULL) {
+            ast_type_print(type->mod.base, 0, dest, remain);
+        }
         break;
 
     case TYPE_VA_LIST:

@@ -144,7 +144,8 @@ ir_expr_t *ir_temp_create(ir_gdecl_t *func, ir_type_t *type, int num) {
 
     ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,
                                                       &temp->var.name);
-    entry->var = temp;
+    entry->var.expr = temp;
+    entry->var.access = temp;
     status_t status = ir_symtab_insert(&func->func.locals, entry);
     assert(status == CCC_OK);
 
@@ -175,6 +176,7 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     case IR_GDECL_GDATA:
         break;
     case IR_GDECL_FUNC:
+        sl_init(&gdecl->func.params, offsetof(ir_expr_t, link));
         sl_init(&gdecl->func.allocs, offsetof(ir_stmt_t, link));
         sl_init(&gdecl->func.body, offsetof(ir_stmt_t, link));
         ir_symtab_init(&gdecl->func.locals);
@@ -364,8 +366,13 @@ void ir_expr_destroy(ir_expr_t *expr) {
         }
         break;
     case IR_EXPR_LOAD:
-        ir_type_destroy(expr->load.type);
-        ir_expr_destroy(expr->load.ptr);
+        // Don't destroy if we're loading from variable, because these are
+        // stored in typetable
+        // TODO0: Change type ownership to avoid this
+        if (expr->load.ptr->type != IR_EXPR_VAR) {
+            ir_type_destroy(expr->load.type);
+            ir_expr_destroy(expr->load.ptr);
+        }
         break;
     case IR_EXPR_GETELEMPTR:
         ir_type_destroy(expr->getelemptr.type);
@@ -459,7 +466,7 @@ void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
         SL_DESTROY_FUNC(&gdecl->gdata.stmts, ir_stmt_destroy);
         break;
     case IR_GDECL_FUNC:
-        ir_type_destroy(gdecl->func.type);
+        // Don't destroy type, because its stored in global symbol table
         SL_DESTROY_FUNC(&gdecl->func.allocs, ir_stmt_destroy);
         SL_DESTROY_FUNC(&gdecl->func.body, ir_stmt_destroy);
         ir_symtab_destroy(&gdecl->func.locals);
@@ -499,7 +506,19 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
     }
     case IR_GDECL_FUNC:
         fprintf(stream, "define ");
-        ir_type_print(stream, gdecl->func.type, &gdecl->func.name);
+        assert(gdecl->func.type->type == IR_TYPE_FUNC);
+        ir_type_print(stream, gdecl->func.type->func.type, NULL);
+        fprintf(stream, " @%.*s", (int)gdecl->func.name.len,
+                gdecl->func.name.str);
+        fprintf(stream, " (");
+        SL_FOREACH(cur, &gdecl->func.params) {
+            ir_expr_t *expr = GET_ELEM(&gdecl->func.params, cur);
+            ir_type_print(stream, ir_expr_type(expr), NULL);
+            fprintf(stream, " ");
+            ir_expr_print(stream, expr);
+        }
+        fprintf(stream, ")");
+
         fprintf(stream, " {\n");
         SL_FOREACH(cur, &gdecl->func.allocs) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->func.allocs, cur), true);
@@ -673,6 +692,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         }
         break;
     case IR_EXPR_LOAD:
+        // TODO0: Maybe remove hard coded pointer from this and store
         fprintf(stream, "load ");
         ir_type_print(stream, expr->load.type, NULL);
         fprintf(stream, "* ");
@@ -753,6 +773,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_type_t *func_sig = expr->call.func_sig;
         fprintf(stream, "call ");
         ir_type_print(stream, func_sig->func.type, NULL);
+        fprintf(stream, " ");
         ir_expr_print(stream, expr->call.func_ptr);
         fprintf(stream, " (");
 

@@ -28,7 +28,7 @@
 #include "parse/symtab.h"
 
 /** Size of lexer internal buffer */
-#define MAX_LEXEME_SIZE 4096
+#define MAX_LEXEME_SIZE 16384
 
 /**
  * Structure represerting a lexer

@@ -45,7 +45,7 @@ void ir_symtab_init(ir_symtab_t *symtab) {
 void ir_symtab_entry_destroy(ir_symtab_entry_t *entry) {
     switch (entry->type) {
     case IR_SYMTAB_ENTRY_VAR:
-        ir_expr_var_destroy(entry->var);
+        ir_expr_var_destroy(entry->var.expr);
         break;
     default:
         assert(false);

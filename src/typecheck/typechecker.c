@@ -1845,6 +1845,10 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         return retval;
 
     case TYPE_MOD:
+        // If there's a modifier without a base, then assume its int
+        if (type->mod.base == NULL) {
+            type->mod.base = tt_int;
+        }
         retval &= typecheck_type(tcs, type->mod.base);
         if (type->mod.type_mod & TMOD_SIGNED &&
             type->mod.type_mod & TMOD_UNSIGNED) {

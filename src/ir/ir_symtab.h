@@ -44,7 +44,10 @@ typedef struct ir_symtab_entry_t {
     len_str_t name;
 
     union {
-        ir_expr_t *var; /**< Expression initialized to. NULL if none */
+        struct {
+            ir_expr_t *expr; /**< Expression initialized to. NULL if none */
+            ir_expr_t *access; /**< Expression to access this variable */
+        } var;
     };
 } ir_symtab_entry_t;
 

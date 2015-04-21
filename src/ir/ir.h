@@ -387,6 +387,7 @@ typedef struct ir_gdecl_t {
         struct {
             ir_type_t *type;
             len_str_t name;
+            slist_t params; /**< (ir_expr_t) List of parameters (not owned) */
             slist_t allocs; /**< (ir_stmt_t) Empty if decl */
             slist_t body; /**< (ir_stmt_t) Empty if decl */
             ir_symtab_t locals;

@@ -170,7 +170,7 @@ def process_file(src_path):
         timeout_remain -= end - start
 
         if is_error:
-            if retval == 0:
+            if retval == 0 and not llvm:
                 fail(src_path, "Compilation unexpectedly suceeded")
                 return 0
             else:
@@ -186,8 +186,11 @@ def process_file(src_path):
             temp_files.append(exec_name)
             retval = subprocess.call([CLANG, outname, RUNTIME, "-o", exec_name])
             if retval != 0:
-                fail(src_path, "failed to create valid llvm ir")
-                return 0
+                if is_error:
+                    return 1
+                else:
+                    fail(src_path, "failed to create valid llvm ir")
+                    return 0
             outname = exec_name
 
         try:
