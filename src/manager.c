@@ -48,6 +48,7 @@ void man_init(manager_t *manager, htable_t *macros) {
                &manager->string_tab);
     manager->ast = NULL;
     manager->ir = NULL;
+    manager->parse_destroyed = false;
 }
 
 void man_destroy(manager_t *manager) {
@@ -55,17 +56,23 @@ void man_destroy(manager_t *manager) {
         return;
     }
 
-    lexer_destroy(&manager->lexer);
+    if (!manager->parse_destroyed) {
+        pp_destroy(&manager->pp);
+        lexer_destroy(&manager->lexer);
+        ast_destroy(manager->ast);
+    }
     st_destroy(&manager->string_tab);
     st_destroy(&manager->symtab);
-    pp_destroy(&manager->pp);
-    man_destroy_ast(manager);
     man_destroy_ir(manager);
 }
 
-void man_destroy_ast(manager_t *manager) {
+void man_destroy_parse(manager_t *manager) {
+    assert(!manager->parse_destroyed);
+    manager->parse_destroyed = true;
+
+    pp_destroy(&manager->pp);
+    lexer_destroy(&manager->lexer);
     ast_destroy(manager->ast);
-    manager->ast = NULL;
 }
 
 void man_destroy_ir(manager_t *manager) {

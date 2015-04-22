@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
         }
 
         ir_trans_unit_t *ir = man_translate(&manager);
-        man_destroy_ast(&manager); // Don't need ast after translation
+        man_destroy_parse(&manager); // Don't parse structures after translation
 
         if (optman.dump_opts & DUMP_IR) {
             ir_print(stdout, ir, node->str);

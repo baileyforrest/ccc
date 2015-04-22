@@ -36,11 +36,12 @@
  */
 typedef struct manager_t {
     preprocessor_t pp;
-    symtab_t symtab;
-    symtab_t string_tab;
     lexer_t lexer;
     trans_unit_t *ast;
+    symtab_t symtab;
+    symtab_t string_tab;
     ir_trans_unit_t *ir;
+    bool parse_destroyed;
 } manager_t;
 
 /**
@@ -61,14 +62,14 @@ void man_init(manager_t *manager, htable_t *macros);
 void man_destroy(manager_t *manager);
 
 /**
- * Destroy a compilation mananger's ast
+ * Destroy a compilation mananger parsing data structures
  *
- * Calling this is optional because destructor destroys ast. May be used to
+ * Calling this is optional because destructor destroys these. May be used to
  * reduce memory usage however.
  *
  * @param manager The compilation mananger to destroy ast
  */
-void man_destroy_ast(manager_t *manager);
+void man_destroy_parse(manager_t *manager);
 
 /**
  * Destroy a compilation mananger's ir
