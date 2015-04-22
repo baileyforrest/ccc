@@ -33,7 +33,8 @@
 #define PRIM_TYPE_FILE "<primitive_type>"
 
 #define TYPE_LITERAL(typename, type) \
-    { SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, typename, { } }
+    { SL_LINK_LIT, SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, \
+      typename, { } }
 
 static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
 static type_t stt_bool        = TYPE_LITERAL(TYPE_BOOL       , _Bool      );
@@ -49,7 +50,7 @@ static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 // TODO1: This isn't portable
 // size_t is unsigned long.
 static type_t stt_size_t = {
-    SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD,
+    SL_LINK_LIT, SL_LINK_LIT,{ NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD,
     { .mod = { TMOD_UNSIGNED, &stt_long } }
 };
 
@@ -119,7 +120,6 @@ void tt_init(typetab_t *tt, typetab_t *last) {
 }
 
 static void typetab_typedef_base_destroy(typedef_base_t *entry) {
-    ast_type_destroy(entry->type);
     free(entry);
 }
 
@@ -129,15 +129,9 @@ static void typetab_entry_destroy(typetab_entry_t *entry) {
         // Ignore primitive types, they are in static memory
         return;
     case TT_COMPOUND:
-        ast_type_protected_destroy(entry->type);
-        break;
     case TT_TYPEDEF:
-        ast_decl_node_type_destroy(entry->type);
-        break;
     case TT_VAR:
     case TT_ENUM_ID:
-        // Ignore variables, the type is in the decl node
-        // Also ignore ENUM_ID because the type is on the enum type
         break;
     default:
         assert(false);

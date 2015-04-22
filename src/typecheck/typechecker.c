@@ -1075,7 +1075,7 @@ fail:
     return retval;
 }
 
-bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type) {
+bool typecheck_decl(tc_state_t *tcs, decl_t *decl, type_type_t type) {
     bool retval = true;
 
     retval &= typecheck_type(tcs, decl->type);
@@ -1251,7 +1251,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         }
 
         if (decl_len >= 0 && decl_len < len) {
-            logger_log(&expr->arr_idx.index->mark, LOG_WARN,
+            logger_log(&expr->mark, LOG_WARN,
                        "excess elements in array initializer");
         }
         return retval;
@@ -1276,7 +1276,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
 }
 
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
-                         basic_type_t type) {
+                         type_type_t type) {
     bool retval = true;
     retval &= typecheck_type(tcs, decl_node->type);
     if (type == TYPE_VOID && decl_node->id != NULL) {
@@ -1473,16 +1473,16 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                 return false;
             }
             expr->etype = emalloc(sizeof(type_t));
-            memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
-            fmark_chain_inc_ref(expr->mark.last);
-
             // If we have a translation unit, save etypes on it because we'll
             // need them later
             if (tcs->tunit != NULL) {
-                sl_append(&tcs->tunit->etypes, &expr->etype->link);
+                sl_append(&tcs->tunit->types, &expr->etype->heap_link);
             } else {
-                sl_append(&tcs->etypes, &expr->etype->link);
+                sl_append(&tcs->etypes, &expr->etype->heap_link);
             }
+            memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
+            fmark_chain_inc_ref(expr->mark.last);
+
             expr->etype->type = TYPE_PTR;
             expr->etype->ptr.type_mod = TMOD_NONE;
             expr->etype->ptr.base = expr->unary.expr->etype;
@@ -1885,7 +1885,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         }
         // If this is only a function declaration, we don't want to add the
         // parameters to any symbol table
-        basic_type_t decl_type = save_tab == NULL ? TYPE_FUNC : TYPE_VOID;
+        type_type_t decl_type = save_tab == NULL ? TYPE_FUNC : TYPE_VOID;
         SL_FOREACH(cur, &type->func.params) {
             retval &= typecheck_decl(tcs, GET_ELEM(&type->func.params, cur),
                                      decl_type);

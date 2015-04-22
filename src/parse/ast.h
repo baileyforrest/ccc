@@ -20,7 +20,6 @@
  * AST Interface
  */
 // TODO1: Missing documentation
-// TODO0: Switch to same heap management policy as ir
 
 #ifndef _AST_H_
 #define _AST_H_
@@ -73,7 +72,7 @@ typedef enum type_mod_t {
  *
  * The order of the integral and pointer subgroups is important
  */
-typedef enum basic_type_t {
+typedef enum type_type_t {
     // Primitive types
     TYPE_VOID,
     TYPE_BOOL,
@@ -101,44 +100,45 @@ typedef enum basic_type_t {
     TYPE_PTR,     /**< Pointer */
 
     TYPE_VA_LIST, /**< va_list */
-} basic_type_t;
+} type_type_t;
 
 /**
  * Tagged union representing a type
  */
 struct type_t {
+    sl_link_t heap_link;         /**< Allocation Link */
     sl_link_t link;              /**< Storage Link */
     fmark_t mark;                /**< File mark */
-    basic_type_t type;           /**< Basic type */
+    type_type_t type;            /**< Type of type type */
 
     union {
         struct {                 /**< Struct/union params */
-            char *name;     /**< Name of struct/union, NULL if anon */
-            slist_t decls;       /**< List of struct/union definitions */
+            char *name;          /**< Name of struct/union, NULL if anon */
+            slist_t decls;       /**< (decl_t) List of struct/union decls */
         } struct_params;
 
         struct {
-            char *name;     /**< Name of struct/union, NULL if anon */
+            char *name;          /**< Name of struct/union, NULL if anon */
             type_t *type;        /**< Type of enum elements */
-            slist_t ids;         /**< List of enum ids/values (decl_node_t) */
+            slist_t ids;         /**< (decl_node_t) List of enum ids/values */
         } enum_params;
+
+        struct {                 /**< Typedef params */
+            char *name;          /**< Name of typedef type */
+            type_t *base;        /**< Base of typedef type */
+            type_type_t type;    /**< (struct/union/enum/void=regular) */
+        } typedef_params;
 
         struct {                 /**< Modified type params */
             type_mod_t type_mod; /**< Bitset of type modifiers */
             type_t *base;        /**< Base type */
         } mod;
 
-        struct {                 /**< Typedef params */
-            char *name;     /**< Name of typedef type */
-            type_t *base;        /**< Base of typedef type */
-            basic_type_t type;   /**< (struct/union/enum/void=regular) */
-        } typedef_params;
-
         type_t *paren_base;      /**< Type in parens */
 
         struct {                 /**< Function signature */
             type_t *type;        /**< Return type */
-            slist_t params;      /**< Paramater signature (decl list) */
+            slist_t params;      /**< (decl_t) Paramater signature */
             bool varargs;        /**< Whether or not function has VA */
         } func;
 
@@ -226,15 +226,15 @@ typedef enum expr_type_t {
  * Tagged union for expressions
  */
 struct expr_t {
+    sl_link_t heap_link;            /**< Allocation Link */
     sl_link_t link;                 /**< Storage link */
     fmark_t mark;                   /**< File mark */
     expr_type_t type;               /**< Expression type */
-    type_t *etype;                  /**< Not owned: type of the expression */
+    type_t *etype;                  /**< Type of the expression */
 
     union {
-        char *var_id;          /**< Variable identifier */
-
         expr_t *paren_base;         /**< Expression in parens */
+        char *var_id;               /**< Variable identifier */
 
         struct {                    /**< Assignment paramaters */
             expr_t *dest;           /**< Expression to assign to */
@@ -247,7 +247,7 @@ struct expr_t {
             union {                 /**< Constant value */
                 long long int_val;  /**< Int constant */
                 long double float_val; /**< Float constant */
-                char *str_val; /**< String constant */
+                char *str_val;      /**< String constant */
             };
         } const_val;
 
@@ -279,7 +279,7 @@ struct expr_t {
         } call;
 
         struct {                    /**< Compound expression */
-            slist_t exprs;          /**< List of expressions */
+            slist_t exprs;          /**< (expr_t) List of expressions */
         } cmpd;
 
         struct {                    /**< Sizeof and alignof paramaters */
@@ -289,7 +289,7 @@ struct expr_t {
 
         struct {                    /**< Offsetof parameters */
             decl_t *type;           /**< Type to get offsetof */
-            slist_t path;           /**< Names in offset path (char) */
+            slist_t path;           /**< (str_node_t) Names in offset path */
         } offsetof_params;
 
         struct {                    /**< Member access of a compound type */
@@ -340,21 +340,23 @@ struct expr_t {
  * e.g. int foo, *bar; foo and *bar are the decl nodes
  */
 typedef struct decl_node_t {
-    sl_link_t link; /**< Storage link */
-    fmark_t mark;   /**< File mark */
-    type_t *type;   /**< Type of variable */
-    char *id;  /**< Name of variable */
-    expr_t *expr;   /**< Expression to assign, bitfield bits for struct/union */
+    sl_link_t heap_link; /**< Allocation Link */
+    sl_link_t link;      /**< Storage link */
+    fmark_t mark;        /**< File mark */
+    type_t *type;        /**< Type of variable */
+    char *id;            /**< Name of variable */
+    expr_t *expr;        /**< Expression to assign, bitfield bits for struct/union */
 } decl_node_t;
 
 /**
  * A declaration
  */
 struct decl_t {
-    sl_link_t link; /**< Storage link */
-    fmark_t mark;   /**< File mark */
-    type_t *type;   /**< Type of variable */
-    slist_t decls;  /**< List of declarations (decl_node_t) */
+    sl_link_t heap_link; /**< Allocation Link */
+    sl_link_t link;      /**< Storage link */
+    fmark_t mark;        /**< File mark */
+    type_t *type;        /**< Type of variable */
+    slist_t decls;       /**< List of declarations (decl_node_t) */
 };
 
 
@@ -395,6 +397,7 @@ typedef enum stmt_type_t {
  * Tagged union representing a statement
  */
 struct stmt_t {
+    sl_link_t heap_link;          /**< Allocation Link */
     sl_link_t link;               /**< Storage link */
     fmark_t mark;                 /**< File mark */
     stmt_type_t type;             /**< Type of statement */
@@ -404,7 +407,7 @@ struct stmt_t {
 
         struct {                  /**< Label parameters */
             sl_link_t link;       /**< Link for label hash table */
-            char *label;     /**< Label value */
+            char *label;          /**< Label value */
             stmt_t *stmt;         /**< Statement labeled */
         } label;
 
@@ -429,8 +432,8 @@ struct stmt_t {
         struct {                  /**< Switch paramaters */
             expr_t *expr;         /**< Expression to switch on */
             stmt_t *stmt;         /**< Statement */
-            slist_t cases;        /**< Not Owned: List of cast params */
-            stmt_t *default_stmt; /**< Not Owned: Default statement */
+            slist_t cases;        /**< (stmt_t) List of cast params */
+            stmt_t *default_stmt; /**< Default statement */
         } switch_params;
 
         struct {                  /**< Do while paramaters */
@@ -458,11 +461,11 @@ struct stmt_t {
         } goto_params;
 
         struct {                  /**< Continue parameters */
-            stmt_t *parent;       /**< Not Owned: Loop to continue */
+            stmt_t *parent;       /**< Loop to continue */
         } continue_params;
 
         struct {                  /**< Break parameters */
-            stmt_t *parent;       /**< Not Owned: Parent statement */
+            stmt_t *parent;       /**< Parent statement */
         } break_params;
 
         struct {                  /**< Return paramaters */
@@ -493,6 +496,7 @@ typedef enum gdecl_type_t {
  * Global declaration
  */
 struct gdecl_t {
+    sl_link_t heap_link;     /**< Allocation Link */
     sl_link_t link;          /**< Storage Link */
     fmark_t mark;            /**< File mark */
     gdecl_type_t type;       /**< Type of gdecl */
@@ -511,12 +515,30 @@ struct gdecl_t {
  * Translation unit - Top level AST structure
  */
 typedef struct trans_unit_t {
-    sl_link_t link;    /**< Storage link */
-    fmark_t mark;      /**< File mark */
-    slist_t gdecls;    /**< List of gdecl in compilation unit */
-    typetab_t typetab; /**< Types defined at top level */
-    slist_t etypes;    /**< Evaluated types of the translation unit */
+    slist_t gdecls;     /**< List of gdecl in compilation unit */
+    typetab_t typetab;  /**< Types defined at top level */
+    slist_t gdecl_nodes; /**< (gdecl_t) */
+    slist_t stmts;      /**< (stmt_t) */
+    slist_t decls;      /**< (decl_t) */
+    slist_t decl_nodes; /**< (decl_node_t) */
+    slist_t exprs;      /**< (exprs_t) */
+    slist_t types;      /**< (types_t) */
 } trans_unit_t;
+
+type_t *ast_type_create(trans_unit_t *tunit, fmark_t *mark, type_type_t type);
+
+expr_t *ast_expr_create(trans_unit_t *tunit, fmark_t *mark, expr_type_t type);
+
+decl_node_t *ast_decl_node_create(trans_unit_t *tunit, fmark_t *mark);
+
+decl_t *ast_decl_create(trans_unit_t *tunit, fmark_t *mark);
+
+stmt_t *ast_stmt_create(trans_unit_t *tunit, fmark_t *mark, stmt_type_t type);
+
+gdecl_t *ast_gdecl_create(trans_unit_t *tunit, fmark_t *mark,
+                          gdecl_type_t type);
+
+trans_unit_t *ast_trans_unit_create(bool dummy);
 
 /**
  * Print an AST
@@ -602,74 +624,6 @@ type_t *ast_type_untypedef(type_t *type);
  */
 type_t *ast_type_unmod(type_t *type);
 
-
-/**
- * Destroys a type_t that is protected. A protected type is one that is shared
- * by multiple types. Namely, a named struct, union, or enum, primitive types
- *
- * @param type Object to destroy
- */
-void ast_type_protected_destroy(type_t *type);
-
-/**
- * Destroys a type_t that on a decl_node
- *
- * This distinction is necessary to avoid having the base type of a decl being
- * freed multiple times.
- *
- * @param type Object to destroy
- */
-void ast_decl_node_type_destroy(type_t *type);
-
-/**
- * Destroys a type_t that is not on a decl_node
- *
- * @param type Object to destroy
- */
-void ast_type_destroy(type_t *type);
-
-/**
- * Destroys a gdecl_t.
- *
- * @param gdecl Object to destroy
- */
-void ast_gdecl_destroy(gdecl_t *gdecl);
-
-/**
- * Destroys a expr_t.
- *
- * @param expr Object to destroy
- */
-void ast_expr_destroy(expr_t *expr);
-
-/**
- * Destroys a decl_node_t.
- *
- * @param decl_node Object to destroy
- */
-void ast_decl_node_destroy(decl_node_t *decl_node);
-
-/**
- * Destroys a decl_t.
- *
- * @param decl Object to destroy
- */
-void ast_decl_destroy(decl_t *decl);
-
-/**
- * Destroys a stmt_t.
- *
- * @param stmt Object to destroy
- */
-void ast_stmt_destroy(stmt_t *stmt);
-
-/**
- * Destroys a trans_unit_t.
- *
- * @param tras_unit Object to destroy
- */
-void ast_trans_unit_destroy(trans_unit_t *trans_unit);
-
 /**
  * Get a string of a type modifier
  *
@@ -681,10 +635,10 @@ const char *ast_type_mod_str(type_mod_t type_mod);
 /**
  * Get a string of a basic type
  *
- * @param type_mod The type to get string for
+ * @param type The type to get string for
  * @return Returns static string of basic type
  */
-const char *ast_basic_type_str(basic_type_t type);
+const char *ast_basic_type_str(type_type_t type);
 
 /**
  * Get a string of an operator

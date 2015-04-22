@@ -693,7 +693,6 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
         logger_log(&stream->mark, LOG_ERR,
                    "Failed to typecheck and parse conditional in #%s",
                    directive);
-        goto fail2;
     }
 
     pp_cond_inst_t *head;
@@ -713,12 +712,9 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
         pp->ignore = true;
     }
 
-    ast_expr_destroy(expr);
     man_destroy(&manager);
     return status;
 
-fail2:
-    ast_expr_destroy(expr);
 fail1:
     man_destroy(&manager);
     return status;

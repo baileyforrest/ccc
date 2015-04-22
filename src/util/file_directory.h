@@ -36,6 +36,7 @@ typedef struct fmark_t {
     int col;                /**< Column number */
 } fmark_t;
 
+// TODO0: Remove this, change fmark allocation strategy
 typedef struct fmark_refcnt_t {
     fmark_t mark;
     int refcnt;

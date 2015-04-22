@@ -84,7 +84,8 @@ status_t man_parse(manager_t *manager, trans_unit_t **ast) {
 status_t man_parse_expr(manager_t *manager, expr_t **expr) {
     assert(manager != NULL);
     assert(expr != NULL);
-    return parser_parse_expr(&manager->lexer, expr);
+    manager->ast = ast_trans_unit_create(true);
+    return parser_parse_expr(&manager->lexer, manager->ast, expr);
 }
 
 ir_trans_unit_t *man_translate(manager_t *manager) {

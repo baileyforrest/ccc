@@ -220,7 +220,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt);
  *     TYPE_STRUCT, TYPE_UNION, or TYPE_ENUM
  * @return true if the node type checks, false otherwise
  */
-bool typecheck_decl(tc_state_t *tcs, decl_t *decl, basic_type_t type);
+bool typecheck_decl(tc_state_t *tcs, decl_t *decl, type_type_t type);
 
 /**
  * Typechecks a type being assigned to an init list
@@ -242,7 +242,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr);
  * @return true if the node type checks, false otherwise
  */
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
-                         basic_type_t type);
+                         type_type_t type);
 
 /**
  * Typechecks a expr_t.

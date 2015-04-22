@@ -37,10 +37,11 @@
  * Container for lexer containing lex context
  */
 typedef struct lex_wrap_t {
-    lexer_t *lexer;                  /*< Lexer */
-    typetab_t *typetab;              /*< Type table on top of stack */
-    lexeme_t lexemes[LEX_LOOKAHEAD]; /*< Ring buffer of lexemes */
-    int lex_idx;                     /*< Index of current lexeme */
+    trans_unit_t *tunit;             /**< Current tranlation unit */
+    lexer_t *lexer;                  /**< Lexer */
+    typetab_t *typetab;              /**< Type table on top of stack */
+    lexeme_t lexemes[LEX_LOOKAHEAD]; /**< Ring buffer of lexemes */
+    int lex_idx;                     /**< Index of current lexeme */
 } lex_wrap_t;
 
 /**
@@ -92,20 +93,6 @@ typedef struct lex_wrap_t {
             goto fail;                                                  \
         }                                                               \
         LEX_ADVANCE(wrap);                                              \
-    } while (0)
-
-/**
- * Allocate an AST node, handling error properly if allocation fails
- *
- * @param Current lex state
- * @param loc lvalue to store new type
- * @param type The type to allocate
- */
-#define ALLOC_NODE(lex, loc, type)                                  \
-    do {                                                            \
-        loc = emalloc(sizeof(type));                                \
-        memcpy(&(loc)->mark, &LEX_CUR(lex).mark, sizeof(fmark_t));  \
-        fmark_chain_inc_ref((loc)->mark.last);                      \
     } while (0)
 
 #define DECL_SPEC_STORAGE_CLASS \

@@ -25,6 +25,48 @@
 
 #define PRINT_BUF_SIZE 4096
 
+/**
+ * Destroys a type_t that is not on a decl_node
+ *
+ * @param type Object to destroy
+ */
+void ast_type_destroy(type_t *type);
+
+/**
+ * Destroys a expr_t.
+ *
+ * @param expr Object to destroy
+ */
+void ast_expr_destroy(expr_t *expr);
+
+/**
+ * Destroys a decl_node_t.
+ *
+ * @param decl_node Object to destroy
+ */
+void ast_decl_node_destroy(decl_node_t *decl_node);
+
+/**
+ * Destroys a decl_t.
+ *
+ * @param decl Object to destroy
+ */
+void ast_decl_destroy(decl_t *decl);
+
+/**
+ * Destroys a stmt_t.
+ *
+ * @param stmt Object to destroy
+ */
+void ast_stmt_destroy(stmt_t *stmt);
+
+/**
+ * Destroys a gdecl_t.
+ *
+ * @param gdecl Object to destroy
+ */
+void ast_gdecl_destroy(gdecl_t *gdecl);
+
 void ast_directed_print(char **buf, size_t *remain, const char *fmt, ...);
 
 /**
@@ -56,7 +98,7 @@ void ast_stmt_print(stmt_t *stmt, int indent);
  * @param type if TYPE_STRUCT or TYPE_UNION will print decl_node expression as
  *     bit fields
  */
-void ast_decl_print(decl_t *decl, basic_type_t type, int indent, char **dest,
+void ast_decl_print(decl_t *decl, type_type_t type, int indent, char **dest,
                     size_t *remain);
 
 /**

@@ -40,9 +40,11 @@ status_t parser_parse(lexer_t *lexer, trans_unit_t **result);
  * Parses input from a lexer into an expression
  *
  * @param lexer Lexer to parse tokens from
+ * @param tunit Dummy tranlation unit
  * @param result The parsed expression
  * @return CCC_OK on success, error code on error
  */
-status_t parser_parse_expr(lexer_t *lexer, expr_t **result);
+status_t parser_parse_expr(lexer_t *lexer, trans_unit_t *tunit,
+                           expr_t **result);
 
 #endif /* _PARSER_H_ */
