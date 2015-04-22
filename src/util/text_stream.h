@@ -72,26 +72,6 @@ void ts_init(tstream_t *ts, char *start, char *end,
              char *file, char *line_start, fmark_t *last,
              int line, int col);
 
-#define TS_COPY_DEEP true
-#define TS_COPY_SHALLOW false
-
-/**
- * Creates a deep copy of the src stream. (All file marks in the chain are
- * allocated)
- *
- * @param dest Destination
- * @param src Source
- */
-void ts_copy(tstream_t *dest, const tstream_t *src, bool deep);
-
-/**
- * Destroys a text stream. This function should only be called on a deep copy
- * created with ts_copy.
- *
- * @param ts Text stream to destroy
- */
-void ts_destroy(tstream_t *ts);
-
 /**
  * Returns the a pointer to the current location in the text stream
  *

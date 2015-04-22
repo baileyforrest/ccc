@@ -342,8 +342,8 @@ status_t pp_directive_define(preprocessor_t *pp) {
             if (!redefined) {
                 tstream_t cur_stream;
                 tstream_t new_stream;
-                ts_copy(&cur_stream, &cur_macro->stream, TS_COPY_SHALLOW);
-                ts_copy(&new_stream, &new_macro->stream, TS_COPY_SHALLOW);
+                memcpy(&cur_stream, &cur_macro->stream, sizeof(tstream_t));
+                memcpy(&new_stream, &new_macro->stream, sizeof(tstream_t));
 
                 while (ts_cur(&cur_stream) != EOF) {
                     bool is_space_cur = (ts_cur(&cur_stream) == '\\' &&
@@ -496,7 +496,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     cur = ts_location(stream);
 
     // Set macro to start at this location on the stream
-    ts_copy((tstream_t *)&new_macro->stream, stream, TS_COPY_SHALLOW);
+    memcpy((tstream_t *)&new_macro->stream, stream, sizeof(tstream_t));
 
     char *macro_end = NULL;
 
@@ -668,11 +668,11 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
     tstream_t lookahead;
 
     // Find the end of the line
-    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+    memcpy(&lookahead, stream, sizeof(tstream_t));
     ts_skip_line(&lookahead, NULL);
     char *end = lookahead.cur;
 
-    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+    memcpy(&lookahead, stream, sizeof(tstream_t));
     lookahead.end = end;
     lookahead.last = 0;
 
@@ -781,7 +781,7 @@ status_t pp_directive_error_helper(preprocessor_t *pp, bool is_err) {
     tstream_t *stream = &file->stream;
     tstream_t lookahead;
 
-    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+    memcpy(&lookahead, stream, sizeof(tstream_t));
     size_t len = ts_skip_line(&lookahead, NULL);
 
     log_type_t log_type = is_err ? LOG_ERR : LOG_WARN;

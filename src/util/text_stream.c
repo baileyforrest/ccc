@@ -44,17 +44,6 @@ void ts_init(tstream_t *ts, char *start, char *end, char *file,
     ts->mark.col = col;
 }
 
-// TODO0: Remove function if deep unused
-void ts_copy(tstream_t *dest, const tstream_t *src, bool deep) {
-    (void)deep;
-    memcpy(dest, src, sizeof(tstream_t));
-}
-
-// TODO0: Remove function if usued
-void ts_destroy(tstream_t *ts) {
-    (void)ts;
-}
-
 int ts_advance(tstream_t *ts) {
     ts->last = ts_cur(ts);
     if (ts->cur == ts->end) {

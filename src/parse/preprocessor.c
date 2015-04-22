@@ -264,7 +264,7 @@ fail:
 
 void pp_map_stream(preprocessor_t *pp, tstream_t *src) {
     pp_macro_inst_t *macro = pp_macro_inst_create(NULL);
-    ts_copy(&macro->stream, src, TS_COPY_SHALLOW);
+    memcpy(&macro->stream, src, sizeof(tstream_t));
     sl_prepend(&pp->macro_insts, &macro->link);
 }
 
@@ -314,7 +314,7 @@ pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro) {
 
     // Shallow copy because macro already has a copy of its fmarks
     if (macro != NULL) {
-        ts_copy(&macro_inst->stream, &macro->stream, TS_COPY_SHALLOW);
+        memcpy(&macro_inst->stream, &macro->stream, sizeof(tstream_t));
     }
     macro_inst->macro = macro;
 
@@ -535,7 +535,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
 
     tstream_t lookahead;
-    ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+    memcpy(&lookahead, stream, sizeof(tstream_t));
 
     bool concat = false;
     // Handle concatenation
@@ -557,13 +557,13 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
         if (concat) {
             // Set stream to new location
-            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+            memcpy(stream, &lookahead, sizeof(tstream_t));
             cur_char = ts_cur(stream);
             last_char = ts_last(stream);
             next_char = ts_next(stream);
         } else {
             // Need to reset lookahad
-            ts_copy(&lookahead, stream, TS_COPY_SHALLOW);
+            memcpy(&lookahead, stream, sizeof(tstream_t));
         }
     }
 
@@ -626,7 +626,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             }
 
             pp_param_inst_t *param_inst = emalloc(sizeof(pp_param_inst_t));
-            ts_copy(&param_inst->stream, stream, TS_COPY_SHALLOW);
+            memcpy(&param_inst->stream, stream, sizeof(tstream_t));
             param_inst->stream.cur = param->raw_val.str;
             param_inst->stream.end = param->raw_val.str + param->raw_val.len;
             param_inst->stringify = true;
@@ -673,10 +673,10 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         // Found a parameter
         if (param != NULL) {
             // Skip over parameter name
-            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+            memcpy(stream, &lookahead, sizeof(tstream_t));
 
             pp_param_inst_t *param_inst = emalloc(sizeof(pp_param_inst_t));
-            ts_copy(&param_inst->stream, &lookahead, TS_COPY_SHALLOW);
+            memcpy(&param_inst->stream, &lookahead, sizeof(tstream_t));
 
             // Check if there's a concatenation after the parameter
             if (!concat) {
@@ -718,7 +718,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     if (macro == NULL) { // No macro found
         if (pp->pp_if) { // In preprecessor conditional
             // Skip past end of parameter
-            ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+            memcpy(stream, &lookahead, sizeof(tstream_t));
 
             // Replace undefined macros with 0
             return '0';
@@ -749,7 +749,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     case MACRO_LINE:
     case MACRO_DATE:
     case MACRO_TIME:
-        ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+        memcpy(stream, &lookahead, sizeof(tstream_t));
         return pp_handle_special_macro(pp, stream, macro);
     case MACRO_DEFINED:
         return pp_handle_defined(pp, &lookahead, stream);
@@ -794,7 +794,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 ts_skip_ws_and_comment(&lookahead);
                 num_params++;
                 tstream_t cur_param;
-                ts_copy(&cur_param, &lookahead, TS_COPY_SHALLOW);
+                memcpy(&cur_param, &lookahead, sizeof(tstream_t));
                 int num_parens = 0;
                 char *space_start = NULL;
                 while (!ts_end(&lookahead)) {
@@ -921,7 +921,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     sl_prepend(&pp->macro_insts, &new_macro_inst->link);
 
     // Set current to the end of the macro and params
-    ts_copy(stream, &lookahead, TS_COPY_SHALLOW);
+    memcpy(stream, &lookahead, sizeof(tstream_t));
     return -(int)CCC_RETRY;
 
 fail:
@@ -989,7 +989,7 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     }
     buf[len] = '\0';
 
-    ts_copy(&macro_inst->stream, stream, TS_COPY_SHALLOW);
+    memcpy(&macro_inst->stream, stream, sizeof(tstream_t));
     if (quotes) {
         macro_inst->stream.cur = pp->macro_buf;
     } else {
@@ -1015,7 +1015,7 @@ int pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
     if (len == 0) {
         logger_log(&stream->mark, LOG_ERR,
                    "operator \"defined\" requires an identifier");
-        ts_copy(stream, lookahead, TS_COPY_SHALLOW);
+        memcpy(stream, lookahead, sizeof(tstream_t));
         return -(int)CCC_ESYNTAX;
     }
     len_str_t lookup = { start, len };
@@ -1024,13 +1024,13 @@ int pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
         if (ts_cur(lookahead) != ')') {
             logger_log(&stream->mark, LOG_ERR,
                        "missing ')' after \"defined\"");
-            ts_copy(stream, lookahead, TS_COPY_SHALLOW);
+            memcpy(stream, lookahead, sizeof(tstream_t));
             return -(int)CCC_ESYNTAX;
         }
         ts_advance(lookahead);
     }
 
-    ts_copy(stream, lookahead, TS_COPY_SHALLOW);
+    memcpy(stream, lookahead, sizeof(tstream_t));
 
     return macro == NULL ? '0' : '1';
 }
