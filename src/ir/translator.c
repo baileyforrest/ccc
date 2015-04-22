@@ -495,9 +495,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
 
         if (ir_expr_type(entry->var.access)->type == IR_TYPE_PTR) {
+            ir_type_t *type = ir_expr_type(entry->var.access)->ptr.base;
             // Load var into a temp
-            ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func,
-                                             ir_expr_type(entry->var.access),
+            ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
                                              ts->func->func.next_temp++);
             ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
             load->load.type = ir_expr_type(entry->var.access)->ptr.base;
