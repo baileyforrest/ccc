@@ -91,14 +91,14 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
         return;
     }
 
-    fprintf(stderr, "%s:%d:%d %s ", mark->file->str, mark->line, mark->col,
+    fprintf(stderr, "%s:%d:%d %s ", mark->filename, mark->line, mark->col,
             header);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     logger_log_line(mark);
 
     for (fmark_t *cur = mark->last; cur != NULL; cur = cur->last) {
-        fprintf(stderr, "%s:%d:%d note: %s\n", cur->file->str, cur->line,
+        fprintf(stderr, "%s:%d:%d note: %s\n", cur->filename, cur->line,
                 cur->col, "In expansion of macro");
         logger_log_line(cur);
     }

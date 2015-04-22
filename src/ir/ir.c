@@ -88,15 +88,14 @@ ir_type_t *ir_expr_type(ir_expr_t *expr) {
     return NULL;
 }
 
-ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str) {
-    ir_label_t *label = ht_lookup(&tunit->labels, str);
+ir_label_t *ir_label_create(ir_trans_unit_t *tunit, char *str) {
+    ir_label_t *label = ht_lookup(&tunit->labels, &str);
     if (label != NULL) {
         return label;
     }
 
     label = emalloc(sizeof(ir_label_t));
-    label->name.str = str->str;
-    label->name.len = str->len;
+    label->name = str;
     status_t status = ht_insert(&tunit->labels, &label->link);
     assert(status == CCC_OK);
 
@@ -108,18 +107,15 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
     char buf[MAX_LABEL_LEN];
     snprintf(buf, sizeof(buf), ANON_LABEL_PREFIX "%d", num);
     buf[sizeof(buf) - 1] = '\0';
-    size_t len = strlen(buf);
-    len_str_t lookup = { buf, len };
-    ir_label_t *label = ht_lookup(&tunit->labels, &lookup);
+    ir_label_t *label = ht_lookup(&tunit->labels, &buf);
     if (label != NULL) {
         return label;
     }
 
     // Allocate the label and its string in one chunk
-    label = emalloc(sizeof(ir_label_t) + len + 1);
-    label->name.str = (char *)label + sizeof(*label);
-    label->name.len = len;
-    strcpy(label->name.str, buf);
+    label = emalloc(sizeof(ir_label_t) + strlen(buf) + 1);
+    label->name = (char *)label + sizeof(*label);
+    strcpy(label->name, buf);
     status_t status = ht_insert(&tunit->labels, &label->link);
     assert(status == CCC_OK);
 
@@ -138,14 +134,13 @@ ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
     ir_expr_t *temp = emalloc(sizeof(ir_expr_t) + len + 1);
     temp->type = IR_EXPR_VAR;
     temp->var.type = type;
-    temp->var.name.str = (char *)temp + sizeof(*temp);
-    temp->var.name.len = len;
-    strcpy(temp->var.name.str, buf);
+    temp->var.name = (char *)temp + sizeof(*temp);
+    strcpy(temp->var.name, buf);
     temp->var.local = true;
     sl_append(&tunit->exprs, &temp->heap_link);
 
     ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,
-                                                      &temp->var.name);
+                                                      temp->var.name);
     entry->var.expr = temp;
     entry->var.access = temp;
     status_t status = ir_symtab_insert(&func->func.locals, entry);
@@ -166,8 +161,8 @@ ir_trans_unit_t *ir_trans_unit_create(void) {
         0,                          // Size estimate
         offsetof(ir_label_t, name), // Offset of key
         offsetof(ir_label_t, link), // Offset of ht link
-        strhash,                    // Hash function
-        vstrcmp,                    // void string compare
+        ind_str_hash,               // Hash function
+        ind_str_eq,                 // void string compare
     };
 
     ht_init(&tunit->labels, &ht_params);
@@ -417,8 +412,7 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         fprintf(stream, "define ");
         assert(gdecl->func.type->type == IR_TYPE_FUNC);
         ir_type_print(stream, gdecl->func.type->func.type, NULL);
-        fprintf(stream, " @%.*s", (int)gdecl->func.name.len,
-                gdecl->func.name.str);
+        fprintf(stream, " @%s", gdecl->func.name);
         fprintf(stream, " (");
         SL_FOREACH(cur, &gdecl->func.params) {
             ir_expr_t *expr = GET_ELEM(&gdecl->func.params, cur);
@@ -448,8 +442,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
     }
     switch (stmt->type) {
     case IR_STMT_LABEL:
-        fprintf(stream, "%.*s:", (int)stmt->label->name.len,
-                stmt->label->name.str);
+        fprintf(stream, "%s:", stmt->label->name);
         break;
     case IR_STMT_RET:
         fprintf(stream, "ret ");
@@ -460,15 +453,12 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
     case IR_STMT_BR:
         fprintf(stream, "br ");
         if (stmt->br.cond == NULL) {
-            fprintf(stream, "label %%%.*s", (int)stmt->br.uncond->name.len,
-                    stmt->br.uncond->name.str);
+            fprintf(stream, "label %%%s", stmt->br.uncond->name);
         } else {
             fprintf(stream, " i1 ");
             ir_expr_print(stream, stmt->br.cond);
-            fprintf(stream, ", label %%%.*s, label %%%.*s",
-                    (int)stmt->br.if_true->name.len, stmt->br.if_true->name.str,
-                    (int)stmt->br.if_false->name.len,
-                    stmt->br.if_false->name.str);
+            fprintf(stream, ", label %%%s, label %%%s",
+                    stmt->br.if_true->name, stmt->br.if_false->name);
         }
         break;
     case IR_STMT_SWITCH:
@@ -476,17 +466,15 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         ir_type_print(stream, &SWITCH_VAL_TYPE, NULL);
         fprintf(stream, " ");
         ir_expr_print(stream, stmt->switch_params.expr);
-        fprintf(stream, ", label %%%.*s [ ",
-                (int)stmt->switch_params.default_case->name.len,
-                stmt->switch_params.default_case->name.str);
+        fprintf(stream, ", label %%%s [ ",
+                stmt->switch_params.default_case->name);
         SL_FOREACH(cur, &stmt->switch_params.cases) {
             ir_expr_label_pair_t *pair =
                 GET_ELEM(&stmt->switch_params.cases, cur);
             ir_type_print(stream, &SWITCH_VAL_TYPE, NULL);
             ir_expr_print(stream, pair->expr);
             fprintf(stream, " ");
-            fprintf(stream, ", label %%%.*s ",
-                    (int)pair->label->name.len, pair->label->name.str);
+            fprintf(stream, ", label %%%s ", pair->label->name);
         }
         fprintf(stream, "]");
         break;
@@ -521,7 +509,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     switch (expr->type) {
     case IR_EXPR_VAR:
         expr->var.local ? fprintf(stream, "%%") : fprintf(stream, "@");
-        fprintf(stream, "%.*s", (int)expr->var.name.len, expr->var.name.str);
+        fprintf(stream, "%s", expr->var.name);
         break;
     case IR_EXPR_CONST:
         switch (expr->const_params.ctype) {
@@ -655,8 +643,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             ir_expr_label_pair_t *pair = GET_ELEM(&expr->phi.preds, cur);
             fprintf(stream, "[ ");
             ir_expr_print(stream, pair->expr);
-            fprintf(stream, ", %%%.*s",
-                    (int)pair->label->name.len, pair->label->name.str);
+            fprintf(stream, ", %%%s", pair->label->name);
             fprintf(stream, " ]");
             if (pair != sl_tail(&expr->phi.preds)) {
                 fprintf(stream, ", ");
@@ -705,7 +692,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     }
 }
 
-void ir_type_print(FILE *stream, ir_type_t *type, len_str_t *func_name) {
+void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
     switch (type->type) {
     case IR_TYPE_VOID:
         fprintf(stream, "void");
@@ -713,7 +700,7 @@ void ir_type_print(FILE *stream, ir_type_t *type, len_str_t *func_name) {
     case IR_TYPE_FUNC:
         ir_type_print(stream, type->func.type, NULL);
         if (func_name != NULL) {
-            fprintf(stream, " @%.*s", (int)func_name->len, func_name->str);
+            fprintf(stream, " @%s", func_name);
         }
         fprintf(stream, " (");
         SL_FOREACH(cur, &type->func.params) {

@@ -36,10 +36,10 @@ void token_print(lexeme_t *token) {
     switch (token->type) {
         // Other
     case ID:
-        printf("%s", token->tab_entry->key.str);
+        printf("%s", token->tab_entry->key);
         break;
     case STRING:
-        printf("\"%s\"", token->tab_entry->key.str);
+        printf("\"%s\"", token->tab_entry->key);
         break;
     case INTLIT:
         printf("%lld", token->int_params.int_val);

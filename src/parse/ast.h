@@ -20,6 +20,7 @@
  * AST Interface
  */
 // TODO1: Missing documentation
+// TODO0: Switch to same heap management policy as ir
 
 #ifndef _AST_H_
 #define _AST_H_
@@ -112,12 +113,12 @@ struct type_t {
 
     union {
         struct {                 /**< Struct/union params */
-            len_str_t *name;     /**< Name of struct/union, NULL if anon */
+            char *name;     /**< Name of struct/union, NULL if anon */
             slist_t decls;       /**< List of struct/union definitions */
         } struct_params;
 
         struct {
-            len_str_t *name;     /**< Name of struct/union, NULL if anon */
+            char *name;     /**< Name of struct/union, NULL if anon */
             type_t *type;        /**< Type of enum elements */
             slist_t ids;         /**< List of enum ids/values (decl_node_t) */
         } enum_params;
@@ -128,7 +129,7 @@ struct type_t {
         } mod;
 
         struct {                 /**< Typedef params */
-            len_str_t *name;     /**< Name of typedef type */
+            char *name;     /**< Name of typedef type */
             type_t *base;        /**< Base of typedef type */
             basic_type_t type;   /**< (struct/union/enum/void=regular) */
         } typedef_params;
@@ -231,7 +232,7 @@ struct expr_t {
     type_t *etype;                  /**< Not owned: type of the expression */
 
     union {
-        len_str_t *var_id;          /**< Variable identifier */
+        char *var_id;          /**< Variable identifier */
 
         expr_t *paren_base;         /**< Expression in parens */
 
@@ -246,7 +247,7 @@ struct expr_t {
             union {                 /**< Constant value */
                 long long int_val;  /**< Int constant */
                 long double float_val; /**< Float constant */
-                len_str_t *str_val; /**< String constant */
+                char *str_val; /**< String constant */
             };
         } const_val;
 
@@ -288,12 +289,12 @@ struct expr_t {
 
         struct {                    /**< Offsetof parameters */
             decl_t *type;           /**< Type to get offsetof */
-            slist_t path;           /**< Names in offset path (len_str_t) */
+            slist_t path;           /**< Names in offset path (char) */
         } offsetof_params;
 
         struct {                    /**< Member access of a compound type */
             expr_t *base;           /**< Expression to get type */
-            len_str_t *name;        /**< Name of member */
+            char *name;        /**< Name of member */
             oper_t op;              /**< Operation (., ->) */
         } mem_acc;
 
@@ -308,7 +309,7 @@ struct expr_t {
 
         struct {
             expr_t *val;
-            len_str_t *name;
+            char *name;
         } desig_init;
 
         struct {
@@ -342,7 +343,7 @@ typedef struct decl_node_t {
     sl_link_t link; /**< Storage link */
     fmark_t mark;   /**< File mark */
     type_t *type;   /**< Type of variable */
-    len_str_t *id;  /**< Name of variable */
+    char *id;  /**< Name of variable */
     expr_t *expr;   /**< Expression to assign, bitfield bits for struct/union */
 } decl_node_t;
 
@@ -403,7 +404,7 @@ struct stmt_t {
 
         struct {                  /**< Label parameters */
             sl_link_t link;       /**< Link for label hash table */
-            len_str_t *label;     /**< Label value */
+            char *label;     /**< Label value */
             stmt_t *stmt;         /**< Statement labeled */
         } label;
 
@@ -453,7 +454,7 @@ struct stmt_t {
 
         struct {                  /**< Goto parameters */
             sl_link_t link;       /**< Link for GOTO list */
-            len_str_t *label;     /**< Label to goto */
+            char *label;     /**< Label to goto */
         } goto_params;
 
         struct {                  /**< Continue parameters */
@@ -571,7 +572,7 @@ size_t ast_type_offset(type_t *type, slist_t *path);
  * @param name Name of the member
  * @return Returns the member number or -1 if it doesn't exist
  */
-size_t ast_get_member_num(type_t *type, len_str_t *name);
+size_t ast_get_member_num(type_t *type, char *name);
 
 /**
  * Finds the type of a member in a struct or union type
@@ -582,7 +583,7 @@ size_t ast_get_member_num(type_t *type, len_str_t *name);
  * @param mem_num location to store the member number, NULL if not needed
  * @return Return the type of the member, of NULL if doesn't exist
  */
-type_t *ast_type_find_member(type_t *type, len_str_t *name, size_t *offset,
+type_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
                              size_t *mem_num);
 
 /**

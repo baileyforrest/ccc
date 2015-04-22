@@ -41,7 +41,7 @@ typedef enum ir_symtab_entry_type_t {
 typedef struct ir_symtab_entry_t {
     sl_link_t link;
     ir_symtab_entry_type_t type;
-    len_str_t name;
+    char *name;
 
     union {
         struct {
@@ -57,10 +57,10 @@ void ir_symtab_init(ir_symtab_t *symtab);
 void ir_symtab_destroy(ir_symtab_t *symtab);
 
 ir_symtab_entry_t *ir_symtab_entry_create(ir_symtab_entry_type_t type,
-                                          len_str_t *name);
+                                          char *name);
 
 status_t ir_symtab_insert(ir_symtab_t *symtab, ir_symtab_entry_t *entry);
 
-ir_symtab_entry_t *ir_symtab_lookup(ir_symtab_t *symtab, len_str_t *name);
+ir_symtab_entry_t *ir_symtab_lookup(ir_symtab_t *symtab, char *name);
 
 #endif /* _IR_SYMTAB_H_ */

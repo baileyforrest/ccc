@@ -38,8 +38,6 @@
 #define DEFAULT_OUTPUT_NAME "a.out"
 #define DEFAULT_STD STD_C11
 
-static len_str_t s_command_line_file = LEN_STR_LIT(COMMAND_LINE_FILENAME);
-
 typedef enum long_opt_idx_t {
     LOPT_STD = 0,
     LOPT_DUMP_TOKENS,
@@ -57,9 +55,9 @@ status_t optman_init(int argc, char **argv) {
     optman.exec_name = NULL;
     optman.output = DEFAULT_OUTPUT_NAME;
     sl_init(&optman.include_paths, offsetof(len_str_node_node_t, link));
-    sl_init(&optman.link_opts, offsetof(len_str_node_t, link));
-    sl_init(&optman.src_files, offsetof(len_str_node_t, link));
-    sl_init(&optman.obj_files, offsetof(len_str_node_t, link));
+    sl_init(&optman.link_opts, offsetof(str_node_t, link));
+    sl_init(&optman.src_files, offsetof(str_node_t, link));
+    sl_init(&optman.obj_files, offsetof(str_node_t, link));
     sl_init(&optman.macros, offsetof(macro_node_t, link));
     optman.dump_opts = 0;
     optman.warn_opts = 0;
@@ -183,9 +181,8 @@ static status_t optman_parse(int argc, char **argv) {
             break;
 
         case 'l': { // Link options
-            len_str_node_t *node = emalloc(sizeof(len_str_node_t));
-            node->str.str = optarg;
-            node->str.len = strlen(optarg);
+            str_node_t *node = emalloc(sizeof(str_node_t));
+            node->str = optarg;
             sl_append(&optman.link_opts, &node->link);
             break;
         }
@@ -216,7 +213,7 @@ static status_t optman_parse(int argc, char **argv) {
             macro_node_t *node = emalloc(sizeof(macro_node_t));
             tstream_t stream;
             ts_init(&stream, optarg, optarg + strlen(optarg),
-                    &s_command_line_file, COMMAND_LINE_FILENAME, NULL, 0, 0);
+                    COMMAND_LINE_FILENAME, COMMAND_LINE_FILENAME, NULL, 0, 0);
 
             if (CCC_OK !=
                 (status =
@@ -262,9 +259,8 @@ static status_t optman_parse(int argc, char **argv) {
         printf("No param: %s\n", param);
 #endif /* DEBUG_PARAMS */
 
-        len_str_node_t *node = emalloc(sizeof(len_str_node_t));
-        node->str.str = param;
-        node->str.len = len;
+        str_node_t *node = emalloc(sizeof(str_node_t));
+        node->str = param;
 
         switch (param[len - 1]) {
         case 'c':

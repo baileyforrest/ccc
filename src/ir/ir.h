@@ -38,7 +38,7 @@
 
 typedef struct ir_label_t {
     sl_link_t link;
-    len_str_t name;
+    char *name;
 } ir_label_t;
 
 
@@ -214,7 +214,7 @@ struct ir_expr_t {
     union {
         struct {
             ir_type_t *type;
-            len_str_t name;
+            char *name;
             bool local;
         } var;
 
@@ -368,7 +368,7 @@ typedef struct ir_stmt_t {
 
         struct {
             ir_type_t *func_sig;
-            len_str_t name;
+            char *name;
         } intrinsic_func;
     };
 } ir_stmt_t;
@@ -389,7 +389,7 @@ typedef struct ir_gdecl_t {
 
         struct {
             ir_type_t *type;
-            len_str_t name;
+            char *name;
             slist_t params; /**< (ir_expr_t) List of parameters (not owned) */
             slist_t allocs; /**< (ir_stmt_t) Empty if decl */
             slist_t body; /**< (ir_stmt_t) Empty if decl */
@@ -429,7 +429,7 @@ void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name);
 
 ir_type_t *ir_expr_type(ir_expr_t *expr);
 
-ir_label_t *ir_label_create(ir_trans_unit_t *tunit, len_str_t *str);
+ir_label_t *ir_label_create(ir_trans_unit_t *tunit, char *str);
 
 ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num);
 

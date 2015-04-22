@@ -363,9 +363,10 @@ static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result) {
         }
     }
     lexer->next_char = cur;
+    lexer->lexbuf[len] = '\0';
 
     if (CCC_OK !=
-        (status = st_lookup(lexer->symtab, lexer->lexbuf, len, ID,
+        (status = st_lookup(lexer->symtab, lexer->lexbuf, ID,
                             &result->tab_entry))) {
         logger_log(&result->mark, LOG_ERR, "Failed to add identifier!");
         status = CCC_ESYNTAX;
@@ -565,9 +566,10 @@ static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
             }
         }
     }
+    lexer->lexbuf[len] = '\0';
 
     if (CCC_OK !=
-        (status = st_lookup(lexer->symtab, lexer->lexbuf, len, STRING,
+        (status = st_lookup(lexer->symtab, lexer->lexbuf, STRING,
                             &result->tab_entry))) {
         logger_log(&result->mark, LOG_ERR, "Failed to add String!");
         status = CCC_ESYNTAX;

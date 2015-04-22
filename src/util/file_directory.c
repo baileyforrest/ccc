@@ -100,8 +100,8 @@ void fdir_init(void) {
         0,                                // No Size estimate
         offsetof(fdir_entry_t, filename), // Offset of key
         offsetof(fdir_entry_t, link),     // Offset of ht link
-        strhash,                          // Hash function
-        vstrcmp,                          // void string compare
+        ind_str_hash,                     // Hash function
+        ind_str_eq,                       // void string compare
     };
 
     ht_init(&s_fdir.table, &s_params);
@@ -130,26 +130,23 @@ void fdir_destroy(void) {
     HT_DESTROY_FUNC(&s_fdir.table, fdir_entry_destroy);
 }
 
-status_t fdir_insert(const char *filename, size_t len, fdir_entry_t **result) {
+status_t fdir_insert(const char *filename, fdir_entry_t **result) {
     status_t status = CCC_OK;
 
-    len_str_t lookup = { (char *)filename, len };
-    fdir_entry_t *entry = ht_lookup(&s_fdir.table, &lookup);
+    fdir_entry_t *entry = ht_lookup(&s_fdir.table, &filename);
     if (entry != NULL) {
         goto done;
     }
 
     // Allocate the entry and name string in one region
-    entry = emalloc(sizeof(fdir_entry_t) + len + 1);
+    entry = emalloc(sizeof(fdir_entry_t) + strlen(filename) + 1);
     // Initialize to safe values for destructor
     entry->buf = MAP_FAILED;
     entry->fd = -1;
 
-    entry->filename.str = (char *)entry + sizeof(*entry);
-    entry->filename.len = len;
+    entry->filename = (char *)entry + sizeof(*entry);
 
-    strncpy(entry->filename.str, filename, len);
-    entry->filename.str[len] = '\0';
+    strcpy(entry->filename, filename);
 
     if (-1 == (entry->fd = open(filename, O_RDONLY, 0))) {
         status = CCC_FILEERR;
@@ -183,7 +180,6 @@ fail:
     return status;
 }
 
-fdir_entry_t *fdir_lookup(const char *filename, size_t len) {
-    len_str_t lookup = { (char *)filename, len };
-    return ht_lookup(&s_fdir.table, &lookup);
+fdir_entry_t *fdir_lookup(const char *filename) {
+    return ht_lookup(&s_fdir.table, &filename);
 }

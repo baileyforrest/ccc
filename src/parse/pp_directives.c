@@ -213,8 +213,8 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
         last = next;
     }
 
-    len_str_t cur_path = { file->stream.mark.file->str,
-                           file->stream.mark.file->len };
+    len_str_t cur_path = { file->stream.mark.filename,
+                           strlen(file->stream.mark.filename) };
     while (cur_path.len > 0 && cur_path.str[cur_path.len - 1] != '/') {
         cur_path.len--;
     }
@@ -272,7 +272,7 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
         // File accessible
         pp_file_t *pp_file;
-        status_t status = pp_map_file(path_buf, len, &pp_file);
+        status_t status = pp_map_file(path_buf, &pp_file);
         if (CCC_OK != status) {
             goto fail;
         }
@@ -332,7 +332,7 @@ status_t pp_directive_define(preprocessor_t *pp) {
                 len_str_node_t *cur_param = GET_ELEM(&cur_macro->params, cur);
                 len_str_node_t *new_param = GET_ELEM(&new_macro->params, new);
 
-                if (!vstrcmp(&cur_param->str, &new_param->str)) {
+                if (!len_str_eq(&cur_param->str, &new_param->str)) {
                     redefined = true;
                     break;
                 }
@@ -855,19 +855,17 @@ status_t pp_directive_line(preprocessor_t *pp) {
             goto fail;
         }
         len -= 2; // -2 for quotes
-        len_str_t *new_filename = emalloc(sizeof(len_str_t) + len + 1);
-        new_filename->str = (char *)new_filename + sizeof(*new_filename);
-        new_filename->len = len;
+        char *new_filename = emalloc(len + 1);
         // Copy filename + 1 so we don't copy the quote
-        strncpy(new_filename->str, filename + 1, len);
-        new_filename->str[len] = '\0';
+        strncpy(new_filename, filename + 1, len);
+        new_filename[len] = '\0';
 
         if (file->owns_name) { // Free the old new_filename if it owns it
-            free(file->stream.mark.file);
+            free(file->stream.mark.filename);
         } else {
             file->owns_name = true;
         }
-        file->stream.mark.file = new_filename;
+        file->stream.mark.filename = new_filename;
         file->stream.mark.line = line_num;
         break;
     }

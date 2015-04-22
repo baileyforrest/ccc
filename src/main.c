@@ -46,35 +46,35 @@ int main(int argc, char **argv) {
     }
 
     SL_FOREACH(cur, &optman.src_files) {
-        len_str_node_t *node = GET_ELEM(&optman.src_files, cur);
+        str_node_t *node = GET_ELEM(&optman.src_files, cur);
         manager_t manager;
 
         man_init(&manager, NULL);
 
-        if (CCC_OK != (status = pp_open(&manager.pp, node->str.str))) {
+        if (CCC_OK != (status = pp_open(&manager.pp, node->str))) {
             man_destroy(&manager);
             goto fail1;
         }
 
         if (optman.dump_opts & DUMP_TOKENS) {
-            printf("//@ Tokens %s\n", node->str.str);
+            printf("//@ Tokens %s\n", node->str);
             man_dump_tokens(&manager);
             goto src_done0;
         }
 
         trans_unit_t *ast;
         if (CCC_OK != (status = man_parse(&manager, &ast))) {
-            logger_log(NULL, LOG_ERR, "Failed to parse %s", node->str.str);
+            logger_log(NULL, LOG_ERR, "Failed to parse %s", node->str);
             goto src_done0;
         }
 
         if (optman.dump_opts & DUMP_AST) {
-            printf("//@ AST %s\n", node->str.str);
+            printf("//@ AST %s\n", node->str);
             ast_print(ast);
         }
 
         if (!typecheck_ast(ast)) {
-            logger_log(NULL, LOG_ERR, "Failed to typecheck %s", node->str.str);
+            logger_log(NULL, LOG_ERR, "Failed to typecheck %s", node->str);
             goto src_done0;
         }
 
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
         man_destroy_ast(&manager); // Don't need ast after translation
 
         if (optman.dump_opts & DUMP_IR) {
-            ir_print(stdout, ir, node->str.str);
+            ir_print(stdout, ir, node->str);
         }
 
         if (optman.output_opts & OUTPUT_ASM &&
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
                 goto src_done0;
             }
 
-            ir_print(output, ir, node->str.str);
+            ir_print(output, ir, node->str);
             if (EOF == fclose(output)) {
                 logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
                            strerror(errno));

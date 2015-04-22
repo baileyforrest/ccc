@@ -26,10 +26,10 @@
 
 #include "util/logger.h"
 
-extern uint32_t strhash(const void *vstr);
-extern uint32_t ind_strhash(const void *vstr);
-extern bool vstrcmp(const void *vstr1, const void *vstr2);
-extern bool ind_vstrcmp(const void *vstr1, const void *vstr2);
+extern uint32_t ind_str_hash(const void *vstr);
+extern bool ind_str_eq(const void *vstr1, const void *vstr2);
+extern uint32_t len_str_hash(const void *vstr);
+extern bool len_str_eq(const void *vstr1, const void *vstr2);
 
 static const char *const mem_err = "out of memory, giving up";
 

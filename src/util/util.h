@@ -61,8 +61,8 @@
  * String with length attached
  */
 typedef struct len_str_t {
-    char *str; /**< String. Possibly non null terminated */
-    size_t len;      /**< Length of the string (not including NULL) */
+    char *str;  /**< String. Possibly non null terminated */
+    size_t len; /**< Length of the string (not including NULL) */
 } len_str_t;
 
 /**
@@ -72,7 +72,6 @@ typedef struct len_str_t {
  */
 #define LEN_STR_LIT(str) { str, sizeof(str) - 1 }
 
-
 /**
  * String slist node
  */
@@ -80,6 +79,14 @@ typedef struct len_str_node_t {
     sl_link_t link; /**< Singly linked list node */
     len_str_t str;  /**< Stored string object */
 } len_str_node_t;
+
+/**
+ * String slist node
+ */
+typedef struct str_node_t {
+    sl_link_t link; /**< Singly linked list node */
+    char *str;      /**< Stored string object */
+} str_node_t;
 
 /**
  * Structure for storage of len_str_node_t
@@ -121,9 +128,43 @@ void *erealloc(void *ptr, size_t size);
  *
  * Source: http://www.cse.yorku.ca/~oz/hash.html
  *
+ * @param vstr The char * to hash
+ */
+inline uint32_t ind_str_hash(const void *vstr) {
+    const char *str = *(const char **)vstr;
+    uint32_t hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    }
+
+    return hash;
+}
+
+/**
+ * String compare with void pointers to be compatible with the hash table
+ * interface
+ *
+ * @param vstr1 First string
+ * @param vstr2 Second string
+ */
+inline bool ind_str_eq(const void *vstr1, const void *vstr2) {
+    const char *str1 = *(const char **)vstr1;
+    const char *str2 = *(const char **)vstr2;
+
+    return strcmp(str1, str2) == 0;
+}
+
+/**
+ * djb2 String hash function for len_str_t.
+ * Must be void * for hashtable interface
+ *
+ * Source: http://www.cse.yorku.ca/~oz/hash.html
+ *
  * @param vstr The len_str_t to hash
  */
-inline uint32_t strhash(const void *vstr) {
+inline uint32_t len_str_hash(const void *vstr) {
     const len_str_t *len_str = (const len_str_t *)vstr;
     const char *str = len_str->str;
     size_t len = len_str->len;
@@ -138,23 +179,13 @@ inline uint32_t strhash(const void *vstr) {
 }
 
 /**
- * Same as str_hash, except the keys are pointers to a len_str_t
- *
- * @param vstrp Pointer to the len_str_t to hash
- */
-inline uint32_t ind_strhash(const void *vstrp) {
-    const len_str_t **len_strp = (const len_str_t **)vstrp;
-    return strhash(*len_strp);
-}
-
-/**
  * String compare with void pointers to be compatible with the hash table
  * interface
  *
  * @param vstr1 First string
  * @param vstr2 Second string
  */
-inline bool vstrcmp(const void *vstr1, const void *vstr2) {
+inline bool len_str_eq(const void *vstr1, const void *vstr2) {
     const len_str_t *str1 = (const len_str_t *)vstr1;
     const len_str_t *str2 = (const len_str_t *)vstr2;
 
@@ -163,18 +194,6 @@ inline bool vstrcmp(const void *vstr1, const void *vstr2) {
     }
 
     return strncmp(str1->str, str2->str, str1->len) == 0;
-}
-
-/**
- * Same as vstrcmp, except the keys are pointers to a len_str_t
- *
- * @param vstrp1 Pointer to first string
- * @param vstrp2 Pointer to second string
- */
-inline bool ind_vstrcmp(const void *vstrp1, const void *vstrp2) {
-    const len_str_t **strp1 = (const len_str_t **)vstrp1;
-    const len_str_t **strp2 = (const len_str_t **)vstrp2;
-    return vstrcmp(*strp1, *strp2);
 }
 
 #define ASCII_LOWER \

@@ -861,9 +861,8 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
                                       &goto_stmt->goto_params.label);
             if (label == NULL) {
                 logger_log(&goto_stmt->mark, LOG_ERR,
-                           "label %.*s used but not defined",
-                           goto_stmt->goto_params.label->len,
-                           goto_stmt->goto_params.label->str);
+                           "label %s used but not defined",
+                           goto_stmt->goto_params.label);
                 retval = false;
             }
         }
@@ -1144,16 +1143,15 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 if (node == NULL) {
                     RESET_NODE();
                 }
-                if (!vstrcmp(node->id, elem->desig_init.name)) {
-                    while (!vstrcmp(node->id, elem->desig_init.name)) {
+                if (strcmp(node->id, elem->desig_init.name) != 0) {
+                    while (strcmp(node->id, elem->desig_init.name) != 0) {
                         ADVANCE_NODE();
                         while (node == NULL) {
                             if (decl == NULL) {
                                 logger_log(&expr->mark, LOG_ERR,
-                                           "unknown field %.*s specified in"
+                                           "unknown field %s specified in"
                                            "initializer",
-                                           elem->desig_init.name->len,
-                                           elem->desig_init.name->str);
+                                           elem->desig_init.name);
                                 return false;
                             }
                             type_t *decl_type = ast_type_unmod(decl->type);
@@ -1325,8 +1323,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                     (entry->var_defined && !is_decl) ||
                     !typecheck_type_equal(cmp_type, decl_node->type)) {
                     logger_log(&decl_node->mark, LOG_ERR,
-                               "Redefined symbol %.*s",
-                               decl_node->id->len, decl_node->id->str);
+                               "Redefined symbol %s", decl_node->id);
                     return false;
                 }
             }
@@ -1368,8 +1365,8 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
             type = ast_type_unmod(type);
             if (!TYPE_IS_INTEGRAL(type)) {
                 logger_log(&decl_node->mark, LOG_ERR,
-                           "bit-field '%.*s' width not an integer constant",
-                           decl_node->id->len, decl_node->id->str);
+                           "bit-field '%s' width not an integer constant",
+                           decl_node->id);
                 return false;
             }
             break;
@@ -1400,8 +1397,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
         if (entry == NULL ||
             (entry->entry_type != TT_VAR && entry->entry_type != TT_ENUM_ID)) {
-            logger_log(&expr->mark, LOG_ERR, "'%.*s' undeclared.",
-                       expr->var_id->len, expr->var_id->str);
+            logger_log(&expr->mark, LOG_ERR, "'%s' undeclared.", expr->var_id);
             return false;
         }
         if (constant == TC_CONST && entry->entry_type == TT_VAR) {
@@ -1616,27 +1612,26 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
         compound = ast_type_unmod(compound);
-        len_str_node_t *head = sl_head(&expr->offsetof_params.path);
+        str_node_t *head = sl_head(&expr->offsetof_params.path);
         switch (compound->type) {
         case TYPE_STRUCT:
         case TYPE_UNION:
             break;
         default:
             logger_log(&expr->mark, LOG_ERR,
-                       "request for member '%.*s' in something not a structure "
-                       "or union", head->str.len, head->str.str);
+                       "request for member '%s' in something not a structure "
+                       "or union", head->str);
             return false;
         }
 
         SL_FOREACH(cur, &expr->offsetof_params.path) {
-            len_str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
-            type_t *mem_type = ast_type_find_member(compound, &node->str,
+            str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
+            type_t *mem_type = ast_type_find_member(compound, node->str,
                                                     NULL, NULL);
             if (mem_type == NULL) {
                 logger_log(&expr->mark, LOG_ERR,
-                           "compound type has no member '%.*s'",
-                           node->str.len,
-                           node->str.str);
+                           "compound type has no member '%s'",
+                           node->str);
                 return false;
             }
         }
@@ -1669,9 +1664,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             // FALL THROUGH
         default:
             logger_log(&expr->mark, LOG_ERR,
-                       "request for member '%.*s' in something not a structure "
-                       "or union", expr->mem_acc.name->len,
-                       expr->mem_acc.name->str);
+                       "request for member '%s' in something not a structure "
+                       "or union", expr->mem_acc.name);
             return false;
         }
         type_t *mem_type =
@@ -1680,8 +1674,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             expr->etype = mem_type;
             return true;
         }
-        logger_log(&expr->mark, LOG_ERR, "compound type has no member '%.*s'",
-                   expr->mem_acc.name->len, expr->mem_acc.name->str);
+        logger_log(&expr->mark, LOG_ERR, "compound type has no member '%s'",
+                   expr->mem_acc.name);
         return false;
     }
 
@@ -1741,7 +1735,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             if (last_param != NULL) {
                 decl_node_t *last_param_node = sl_tail(&last_param->decls);
                 assert(last_param_node != NULL);
-                if (vstrcmp(expr->vastart.last->var_id, last_param_node->id)) {
+                if (strcmp(expr->vastart.last->var_id, last_param_node->id) ==
+                    0) {
                     failed = false;
                 }
             }
@@ -1822,9 +1817,8 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                  tt_insert(tcs->typetab, type->enum_params.type, TT_ENUM_ID,
                            node->id, &entry))) {
                 if (status == CCC_DUPLICATE) {
-                    logger_log(&node->mark, LOG_ERR,
-                               "Redefined symbol %.*s", node->id->len,
-                               node->id->str);
+                    logger_log(&node->mark, LOG_ERR, "Redefined symbol %s",
+                               node->id);
                 }
                 return false;
             }

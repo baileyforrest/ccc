@@ -47,7 +47,7 @@ typedef enum tt_type_t {
 
 typedef struct typetab_entry_t {
     sl_link_t link;
-    len_str_t *key;
+    char *key;
     tt_type_t entry_type;
     struct type_t *type;
     union {
@@ -124,7 +124,7 @@ status_t tt_insert_typedef(typetab_t *tt, struct decl_t *decl,
  * @return CCC_OK on success, error code on error
  */
 status_t tt_insert(typetab_t *tt, struct type_t *type, tt_type_t tt_type,
-                   len_str_t *name, typetab_entry_t **entry);
+                   char *name, typetab_entry_t **entry);
 
 /**
  * Looks up a type in the type table
@@ -133,7 +133,7 @@ status_t tt_insert(typetab_t *tt, struct type_t *type, tt_type_t tt_type,
  * @param key Key to lookup with
  * @return Returns pointer to type table entry, or NULL if it doesn't exist
  */
-typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key);
+typetab_entry_t *tt_lookup(typetab_t *tt, char *key);
 
 /**
  * Looks up a compound type in the type table
@@ -142,6 +142,6 @@ typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key);
  * @param key Key to lookup with
  * @return Returns pointer to type table entry, or NULL if it doesn't exist
  */
-typetab_entry_t *tt_lookup_compound(typetab_t *tt, len_str_t *key);
+typetab_entry_t *tt_lookup_compound(typetab_t *tt, char *key);
 
 #endif /* _TYPE_TABLE_H_ */

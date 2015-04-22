@@ -30,25 +30,10 @@
 #include "util/logger.h"
 #include "util/util.h"
 
-static len_str_t s_prim_filename = LEN_STR_LIT("<primitive_type>");
+#define PRIM_TYPE_FILE "<primitive_type>"
 
 #define TYPE_LITERAL(typename, type) \
-    { SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, typename, { } }
-
-static len_str_t void_str        = LEN_STR_LIT("void");
-static len_str_t bool_str        = LEN_STR_LIT("_Bool");
-static len_str_t char_str        = LEN_STR_LIT("char");
-static len_str_t short_str       = LEN_STR_LIT("short");
-static len_str_t int_str         = LEN_STR_LIT("int");
-static len_str_t long_str        = LEN_STR_LIT("long");
-static len_str_t long_long_str   = LEN_STR_LIT("long long");
-static len_str_t float_str       = LEN_STR_LIT("float");
-static len_str_t double_str      = LEN_STR_LIT("double");
-static len_str_t long_double_str = LEN_STR_LIT("long double");
-
-static len_str_t size_t_str      = LEN_STR_LIT("____size_t__");
-
-static len_str_t va_list_str = LEN_STR_LIT("__builtin_va_list");
+    { SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, typename, { } }
 
 static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
 static type_t stt_bool        = TYPE_LITERAL(TYPE_BOOL       , _Bool      );
@@ -64,7 +49,7 @@ static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 // TODO1: This isn't portable
 // size_t is unsigned long.
 static type_t stt_size_t = {
-    SL_LINK_LIT, { NULL, &s_prim_filename, "\n", 0, 0 }, TYPE_MOD,
+    SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD,
     { .mod = { TMOD_UNSIGNED, &stt_long } }
 };
 
@@ -86,25 +71,25 @@ type_t * const tt_size_t = &stt_size_t;
 
 type_t * const tt_va_list = &stt_va_list;
 
-#define TYPE_TAB_LITERAL_ENTRY(type) \
-    { SL_LINK_LIT, &type##_str, TT_PRIM , &stt_ ## type, { } }
+#define TYPE_TAB_LITERAL_ENTRY(type, type_str)                  \
+    { SL_LINK_LIT, type_str, TT_PRIM , &stt_ ## type, { } }
 
 /**
  * Table of primative types
  */
 static typetab_entry_t s_prim_types[] = {
-    TYPE_TAB_LITERAL_ENTRY(void),
-    TYPE_TAB_LITERAL_ENTRY(bool),
-    TYPE_TAB_LITERAL_ENTRY(char),
-    TYPE_TAB_LITERAL_ENTRY(short),
-    TYPE_TAB_LITERAL_ENTRY(int),
-    TYPE_TAB_LITERAL_ENTRY(long),
-    TYPE_TAB_LITERAL_ENTRY(long_long),
-    TYPE_TAB_LITERAL_ENTRY(float),
-    TYPE_TAB_LITERAL_ENTRY(double),
-    TYPE_TAB_LITERAL_ENTRY(long_double),
-    TYPE_TAB_LITERAL_ENTRY(size_t),
-    TYPE_TAB_LITERAL_ENTRY(va_list),
+    TYPE_TAB_LITERAL_ENTRY(void,        "void"),
+    TYPE_TAB_LITERAL_ENTRY(bool,        "_Bool"),
+    TYPE_TAB_LITERAL_ENTRY(char,        "char"),
+    TYPE_TAB_LITERAL_ENTRY(short,       "short"),
+    TYPE_TAB_LITERAL_ENTRY(int,         "int"),
+    TYPE_TAB_LITERAL_ENTRY(long,        "long"),
+    TYPE_TAB_LITERAL_ENTRY(long_long,   "long long"),
+    TYPE_TAB_LITERAL_ENTRY(float,       "float"),
+    TYPE_TAB_LITERAL_ENTRY(double,      "double"),
+    TYPE_TAB_LITERAL_ENTRY(long_double, "long double"),
+    TYPE_TAB_LITERAL_ENTRY(size_t,      "____size_t__"),
+    TYPE_TAB_LITERAL_ENTRY(va_list,     "__builtin_va_list"),
 };
 
 void tt_init(typetab_t *tt, typetab_t *last) {
@@ -117,8 +102,8 @@ void tt_init(typetab_t *tt, typetab_t *last) {
         0,                               // Size estimate
         offsetof(typetab_entry_t, key),  // Offset of key
         offsetof(typetab_entry_t, link), // Offset of ht link
-        ind_strhash,                     // Hash function
-        ind_vstrcmp,                     // void string compare
+        ind_str_hash,                        // Hash function
+        ind_str_eq                           // void string compare
     };
 
     ht_init(&tt->types, &params);
@@ -209,8 +194,8 @@ fail:
     return status;
 }
 
-status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type,
-                   len_str_t *name, typetab_entry_t **entry) {
+status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type, char *name,
+                   typetab_entry_t **entry) {
     assert(tt != NULL);
     assert(type != NULL);
     assert(name != NULL);
@@ -242,7 +227,7 @@ fail:
     return status;
 }
 
-typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key) {
+typetab_entry_t *tt_lookup(typetab_t *tt, char *key) {
     for (;tt != NULL; tt = tt->last) {
         typetab_entry_t *result;
         if (NULL != (result = ht_lookup(&tt->types, &key))) {
@@ -253,7 +238,7 @@ typetab_entry_t *tt_lookup(typetab_t *tt, len_str_t *key) {
     return NULL;
 }
 
-typetab_entry_t *tt_lookup_compound(typetab_t *tt, len_str_t *key) {
+typetab_entry_t *tt_lookup_compound(typetab_t *tt, char *key) {
     for (;tt != NULL; tt = tt->last) {
         typetab_entry_t *result;
         if (NULL != (result = ht_lookup(&tt->compound_types, &key))) {

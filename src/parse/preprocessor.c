@@ -39,11 +39,9 @@
 #include "util/text_stream.h"
 #include "util/util.h"
 
-static len_str_t s_built_in_file = LEN_STR_LIT(BUILT_IN_FILENAME);
-
 #define PREDEF_MACRO_LIT(name, word, type)                              \
     { SL_LINK_LIT, LEN_STR_LIT(name),                                   \
-      TSTREAM_LIT(word, NULL, &s_built_in_file, BUILT_IN_FILENAME, 0, 0), \
+      TSTREAM_LIT(word, NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 0, 0), \
       SLIST_LIT(offsetof(len_str_node_t, link)), -1, type }
 
 static pp_macro_t s_predef_macros[] = {
@@ -81,16 +79,16 @@ void pp_init(preprocessor_t *pp, htable_t *macros) {
         0,                                // No Size estimate
         offsetof(pp_macro_t, name),       // Offset of key
         offsetof(pp_macro_t, link),       // Offset of ht link
-        strhash,                          // Hash function
-        vstrcmp,                          // void string compare
+        len_str_hash,                     // Hash function
+        len_str_eq,                       // void string compare
     };
 
     static const ht_params_t directive_params = {
         0,                                // No Size estimate
         offsetof(pp_directive_t, key),    // Offset of key
         offsetof(pp_directive_t, link),   // Offset of ht link
-        strhash,                          // Hash function
-        vstrcmp,                          // void string compare
+        len_str_hash,                          // Hash function
+        len_str_eq,                          // void string compare
     };
 
     sl_init(&pp->file_insts, offsetof(pp_file_t, link));
@@ -124,7 +122,7 @@ void pp_init(preprocessor_t *pp, htable_t *macros) {
                 len_str_t *str = &s_predef_param_macros[i];
                 tstream_t stream;
                 ts_init(&stream, str->str, str->str + str->len,
-                        &s_built_in_file, BUILT_IN_FILENAME, NULL, 0, 0);
+                        BUILT_IN_FILENAME, BUILT_IN_FILENAME, NULL, 0, 0);
 
                 if (CCC_OK != pp_directive_define_helper(&stream, &node->macro,
                                                          false, NULL)) {
@@ -184,16 +182,15 @@ void pp_close(preprocessor_t *pp) {
  */
 status_t pp_open(preprocessor_t *pp, const char *filename) {
     status_t status = CCC_OK;
-    size_t len = strlen(filename);
     pp_file_t *pp_file;
     if (CCC_OK !=
-        (status = pp_map_file(filename, len, &pp_file))) {
+        (status = pp_map_file(filename, &pp_file))) {
         goto fail;
     }
 
     sl_prepend(&pp->file_insts, &pp_file->link);
 
-    fdir_entry_t *file = fdir_lookup(filename, len);
+    fdir_entry_t *file = fdir_lookup(filename);
     assert(file != NULL); // pp_map_file should add the file to the directory
 
 fail:
@@ -237,22 +234,22 @@ pp_file_t *pp_file_create(void) {
 
 void pp_file_destroy(pp_file_t *pp_file) {
     if (pp_file->owns_name) {
-        free(pp_file->stream.mark.file);
+        free(pp_file->stream.mark.filename);
     }
     SL_DESTROY_FUNC(&pp_file->cond_insts, free);
     free(pp_file);
 }
 
-status_t pp_map_file(const char *filename, size_t len, pp_file_t **result) {
+status_t pp_map_file(const char *filename, pp_file_t **result) {
     status_t status = CCC_OK;
     pp_file_t *pp_file = pp_file_create();
 
     fdir_entry_t *entry;
-    if (CCC_OK != (status = fdir_insert(filename, len, &entry))) {
+    if (CCC_OK != (status = fdir_insert(filename, &entry))) {
         goto fail;
     }
 
-    ts_init(&pp_file->stream, entry->buf, entry->end, &entry->filename,
+    ts_init(&pp_file->stream, entry->buf, entry->end, entry->filename,
             entry->buf, NULL, 1, 1);
 
     *result = pp_file;
@@ -307,8 +304,8 @@ pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro) {
         0,                                   // No size hint
         offsetof(pp_param_map_elem_t, key),  // Key offset
         offsetof(pp_param_map_elem_t, link), // HT link offset
-        strhash,                             // String Hash function
-        vstrcmp                              // void string compare
+        len_str_hash,                        // String Hash function
+        len_str_eq                           // void string compare
     };
 
     ht_init(&macro_inst->param_map, &pp_param_map_params);
@@ -959,8 +956,8 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     size_t len = 0;
     switch (macro->type) {
     case MACRO_FILE:
-        strncpy(buf, stream->mark.file->str, buf_size);
-        len = stream->mark.file->len;
+        strncpy(buf, stream->mark.filename, buf_size);
+        len = strlen(stream->mark.filename);
         break;
     case MACRO_LINE:
         quotes = false; // Line number is an integer

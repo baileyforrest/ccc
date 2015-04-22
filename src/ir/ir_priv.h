@@ -31,7 +31,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent);
 
 void ir_expr_print(FILE *stream, ir_expr_t *expr);
 
-void ir_type_print(FILE *stream, ir_type_t *type, len_str_t *func_name);
+void ir_type_print(FILE *stream, ir_type_t *type, char *func_name);
 
 const char *ir_oper_str(ir_oper_t op);
 

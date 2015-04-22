@@ -30,7 +30,7 @@
  */
 typedef struct fmark_t {
     struct fmark_t *last;   /**< Last mark in stack */
-    len_str_t *file;        /**< Filename */
+    char *filename;   /**< Filename */
     const char *line_start; /**< Start of current line */
     int line;               /**< Line number */
     int col;                /**< Column number */
@@ -91,11 +91,11 @@ void fmark_chain_free(fmark_t *mark);
  * Contains a filename and buffer of file contents
  */
 typedef struct fdir_entry_t {
-    sl_link_t link;     /**< List link */
-    len_str_t filename; /**< Filename */
-    char *buf;          /**< Buffer of file */
-    char *end;          /**< Max location */
-    int fd;             /**< File descriptor of open file */
+    sl_link_t link; /**< List link */
+    char *filename; /**< Filename */
+    char *buf;      /**< Buffer of file */
+    char *end;      /**< Max location */
+    int fd;         /**< File descriptor of open file */
 } fdir_entry_t;
 
 /**
@@ -114,22 +114,20 @@ void fdir_destroy(void);
  * @param filename Name of the file to add. Note that this function will
  *     reallocate its own copy of the same string.
  *
- * @param len of the filename
  * @param result Location to store file name. Result points to a null terminated
  *     string
  *
  * @return CCC_OK on success, error code on failure
  */
-status_t fdir_insert(const char *filename, size_t len, fdir_entry_t **result);
+status_t fdir_insert(const char *filename, fdir_entry_t **result);
 
 /**
  * Retrieves the file entry with given filename
  *
  * @param filename Name of the file to lookup
- * @param len of the filename
  * @return Returns the file directory entry of the file if successful, NULL on
  *     failure
  */
-fdir_entry_t *fdir_lookup(const char *filename, size_t len);
+fdir_entry_t *fdir_lookup(const char *filename);
 
 #endif /* _FILE_DIRECTORY_H_ */

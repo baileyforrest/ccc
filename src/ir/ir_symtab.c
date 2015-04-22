@@ -35,8 +35,8 @@ void ir_symtab_init(ir_symtab_t *symtab) {
         0,                                 // Size estimate
         offsetof(ir_symtab_entry_t, name), // Offset of key
         offsetof(ir_symtab_entry_t, link), // Offset of ht link
-        strhash,                           // Hash function
-        vstrcmp,                           // void string compare
+        ind_str_hash,                      // Hash function
+        ind_str_eq,                        // void string compare
     };
 
     ht_init(&symtab->table, &ht_params);
@@ -57,10 +57,10 @@ void ir_symtab_destroy(ir_symtab_t *symtab) {
 }
 
 ir_symtab_entry_t *ir_symtab_entry_create(ir_symtab_entry_type_t type,
-                                          len_str_t *name) {
+                                          char *name) {
     ir_symtab_entry_t *entry = emalloc(sizeof(*entry));
     entry->type = type;
-    memcpy(&entry->name, name, sizeof(len_str_t));
+    entry->name = name;
     return entry;
 }
 
@@ -68,6 +68,6 @@ status_t ir_symtab_insert(ir_symtab_t *symtab, ir_symtab_entry_t *entry) {
     return ht_insert(&symtab->table, &entry->link);
 }
 
-ir_symtab_entry_t *ir_symtab_lookup(ir_symtab_t *symtab, len_str_t *name) {
-    return ht_lookup(&symtab->table, name);
+ir_symtab_entry_t *ir_symtab_lookup(ir_symtab_t *symtab, char *name) {
+    return ht_lookup(&symtab->table, &name);
 }

@@ -59,8 +59,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         ts->func = ir_gdecl;
 
         ir_gdecl->func.type = trans_type(ts, node->type);
-        ir_gdecl->func.name.str = node->id->str;
-        ir_gdecl->func.name.len = node->id->len;
+        ir_gdecl->func.name = node->id;
 
         assert(node->type->type == TYPE_FUNC);
         SL_FOREACH(cur, &node->type->func.params) {
@@ -71,8 +70,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             // Put function parameters in symbol table
             ir_expr_t *name = ir_expr_create(ts->tunit, IR_EXPR_VAR);
             name->var.type = trans_type(ts, node->type);
-            name->var.name.str = node->id->str;
-            name->var.name.len = node->id->len;
+            name->var.name = node->id;
             name->var.local = true;
             ir_symtab_t *symtab = &ts->func->func.locals;
             ir_symtab_entry_t *entry =
@@ -106,8 +104,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
 
         ir_expr_t *name = ir_expr_create(ts->tunit, IR_EXPR_VAR);
         name->var.type = ir_gdecl->func.type;
-        name->var.name.str = node->id->str;
-        name->var.name.len = node->id->len;
+        name->var.name = node->id;
         name->var.local = false;
         ir_symtab_t *symtab = &ts->tunit->globals;
         ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,
@@ -1217,8 +1214,7 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
     ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
     ptr_type->ptr.base = trans_type(ts, node->type);
     name->var.type = ptr_type;
-    name->var.name.str = node->id->str;
-    name->var.name.len = node->id->len;
+    name->var.name = node->id;
     name->var.local = !global;
     ir_symtab_t *symtab = global ? &ts->tunit->globals : &ts->func->func.locals;
     ir_symtab_entry_t *entry = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR,

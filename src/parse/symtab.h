@@ -42,9 +42,9 @@ typedef struct symtab_t {
  * Type and value of a string lexeme
  */
 typedef struct symtab_entry_t {
-    sl_link_t link;   /**< Hashtable link */
-    len_str_t key;    /**< Hashtable key value */
-    token_t type;     /**< Denotes the type of the symbol table entry */
+    sl_link_t link; /**< Hashtable link */
+    char *key;      /**< Hashtable key value */
+    token_t type;   /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;
 
 #define IS_SYM true
@@ -74,12 +74,11 @@ void st_destroy(symtab_t *table);
  *
  * @param table The table to lookup
  * @param str The string to lookup and or add
- * @param len The length of the string to looku and or add
  * @param type The type of entry to add if it doesn't already exist
  * @param Pointer to an entry pointer if success, otherwise unchanged
  * @return CCC_OK on success, error code on failure
  */
-status_t st_lookup(symtab_t *table, char *str, size_t len, token_t type,
+status_t st_lookup(symtab_t *table, char *str, token_t type,
                    symtab_entry_t **entry);
 
 

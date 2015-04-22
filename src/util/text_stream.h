@@ -69,7 +69,7 @@ typedef struct tstream_t {
  * @param col Current column number
  */
 void ts_init(tstream_t *ts, char *start, char *end,
-             len_str_t *file, char *line_start, fmark_t *last,
+             char *file, char *line_start, fmark_t *last,
              int line, int col);
 
 #define TS_COPY_DEEP true

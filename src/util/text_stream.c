@@ -31,14 +31,13 @@ extern inline bool ts_end(tstream_t *ts);
 extern inline int ts_next(tstream_t *ts);
 extern inline int ts_last(tstream_t *ts);
 
-void ts_init(tstream_t *ts, char *start, char *end,
-             len_str_t *file, char *line_start, fmark_t *last,
-             int line, int col) {
+void ts_init(tstream_t *ts, char *start, char *end, char *file,
+             char *line_start, fmark_t *last, int line, int col) {
     assert(ts != NULL);
     ts->cur = start;
     ts->end = end;
     ts->last = 0;
-    ts->mark.file = file;
+    ts->mark.filename = file;
     ts->mark.line_start = line_start;
     ts->mark.last = last;
     ts->mark.line = line;
