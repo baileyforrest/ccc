@@ -132,7 +132,6 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     } while (!done);
 
     pp_last_mark(lexer->pp, &result->mark);
-    result->mark.last = fmark_copy_chain(result->mark.last);
 
     int next;
     switch (cur) {

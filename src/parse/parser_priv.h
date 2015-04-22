@@ -66,7 +66,6 @@ typedef struct lex_wrap_t {
  */
 #define LEX_ADVANCE(wrap)                                               \
     do {                                                                \
-        fmark_chain_free(LEX_CUR(wrap).mark.last);                      \
         if (CCC_OK !=                                                   \
             (status = lexer_next_token((wrap)->lexer,                   \
                                        &LEX_CUR(wrap)))) {              \
@@ -88,7 +87,6 @@ typedef struct lex_wrap_t {
             logger_log(&LEX_CUR(wrap).mark, LOG_ERR,                    \
                        "expected '%s' before '%s' token",               \
                        token_str(token), token_str(cur));               \
-            fmark_chain_free(LEX_CUR(wrap).mark.last);                  \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \

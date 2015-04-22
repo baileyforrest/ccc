@@ -1481,7 +1481,6 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                 sl_append(&tcs->etypes, &expr->etype->heap_link);
             }
             memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
-            fmark_chain_inc_ref(expr->mark.last);
 
             expr->etype->type = TYPE_PTR;
             expr->etype->ptr.type_mod = TMOD_NONE;

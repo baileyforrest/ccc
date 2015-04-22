@@ -39,6 +39,7 @@ typedef struct preprocessor_t {
     slist_t file_insts;   /**< Stack of instances of open files */
     slist_t macro_insts;  /**< Stack of paramaters and strings mappings */
     slist_t search_path;  /**< #include search path */
+    slist_t fmarks;       /**< (fmark_node_t) Allocated fmarks */
     htable_t macros;      /**< Macro table */
     htable_t directives;  /**< Preprocessor directives */
 

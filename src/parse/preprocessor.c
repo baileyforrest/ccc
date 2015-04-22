@@ -94,6 +94,7 @@ void pp_init(preprocessor_t *pp, htable_t *macros) {
     sl_init(&pp->file_insts, offsetof(pp_file_t, link));
     sl_init(&pp->macro_insts, offsetof(pp_macro_inst_t, link));
     sl_init(&pp->search_path, offsetof(len_str_node_t, link));
+    sl_init(&pp->fmarks, offsetof(fmark_node_t, link));
 
     ht_init(&pp->directives, &directive_params);
 
@@ -165,6 +166,7 @@ void pp_init(preprocessor_t *pp, htable_t *macros) {
 void pp_destroy(preprocessor_t *pp) {
     SL_DESTROY_FUNC(&pp->file_insts, pp_file_destroy);
     SL_DESTROY_FUNC(&pp->macro_insts, pp_macro_inst_destroy);
+    SL_DESTROY_FUNC(&pp->fmarks, free);
 
     if (!pp->pp_if) {
         HT_DESTROY_FUNC(&pp->macros, pp_macro_destroy);
@@ -451,7 +453,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     if (stringify) {
         return '"';
     }
-    pp_file_t *file_inst = sl_tail(&pp->file_insts);
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
 
     // Finished processing all files
@@ -770,18 +771,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     int error;
     pp_macro_inst_t *new_macro_inst = pp_macro_inst_create(macro);
 
-    // TODO1: Enable this after fixed
-    (void)file_inst;
-    /*
-    if (param_inst != NULL) {
-        new_macro_inst->stream.mark.last = &param_inst->stream.mark;
-    } else if (macro_inst != NULL) {
-        new_macro_inst->stream.mark.last = &macro_inst->stream.mark;
-    } else {
-        new_macro_inst->stream.mark.last = &file_inst->stream.mark;
-    }
-    */
-
     // -1 means non function style macro
     if (macro->num_params >= 0) {
         ts_advance(&lookahead); // Skip the paren
@@ -923,6 +912,10 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             }
         }
     }
+    fmark_node_t *mark_node = emalloc(sizeof(fmark_node_t));
+    memcpy(&mark_node->mark, &stream->mark, sizeof(fmark_t));
+    new_macro_inst->stream.mark.last = &mark_node->mark;
+    sl_append(&pp->fmarks, &mark_node->link);
 
     // Add new macro instance to the stack
     sl_prepend(&pp->macro_insts, &new_macro_inst->link);

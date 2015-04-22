@@ -1,21 +1,21 @@
 /*
-  Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
-
-  This file is part of CCC.
-
-  CCC is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  CCC is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with CCC.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
+ *
+ * This file is part of CCC.
+ *
+ * CCC is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * CCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
+ */
 /**
  * Interface for holding information about source files
  */
@@ -30,17 +30,16 @@
  */
 typedef struct fmark_t {
     struct fmark_t *last;   /**< Last mark in stack */
-    char *filename;   /**< Filename */
+    char *filename;         /**< Filename */
     const char *line_start; /**< Start of current line */
     int line;               /**< Line number */
     int col;                /**< Column number */
 } fmark_t;
 
-// TODO0: Remove this, change fmark allocation strategy
-typedef struct fmark_refcnt_t {
+typedef struct fmark_node_t {
+    sl_link_t link;
     fmark_t mark;
-    int refcnt;
-} fmark_refcnt_t;
+} fmark_node_t;
 
 /**
  * Name of "file" for built in objects
@@ -63,28 +62,6 @@ typedef struct fmark_refcnt_t {
  */
 #define FMARK_LIT(last, file, line_start, line, col) \
     { last, file, line, line, col }
-
-/**
- * Copy a mark chain
- *
- * @param mark Mark chain to copy
- * @return copied mark chain
- */
-fmark_t *fmark_copy_chain(fmark_t *mark);
-
-/**
- * Increments the refcount of an fmark chain
- *
- * @param mark Head of mark chain to increase refcount
- */
-void fmark_chain_inc_ref(fmark_t *mark);
-
-/**
- * Free a mark chain
- *
- * @param mark Head of mark chain to free
- */
-void fmark_chain_free(fmark_t *mark);
 
 /**
  * File directory entry.
