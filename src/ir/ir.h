@@ -33,6 +33,7 @@
 #include "util/htable.h"
 #include "util/slist.h"
 #include "util/util.h"
+#include "util/vector.h"
 
 #include "ir/ir_symtab.h"
 
@@ -63,13 +64,13 @@ typedef enum ir_type_type_t {
 typedef struct ir_type_t ir_type_t;
 struct ir_type_t {
     sl_link_t heap_link;
-    sl_link_t link;
+    // No storage link because there are static types
     ir_type_type_t type;
 
     union {
         struct {
             ir_type_t *type;
-            slist_t params; /**< (ir_type_t) */
+            vec_t params; /**< (ir_type_t) */
             bool varargs;
         } func;
 
@@ -91,7 +92,7 @@ struct ir_type_t {
         } arr;
 
         struct {
-            slist_t types; /**< Types in the structure (ir_type_t) */
+            vec_t types; /**< (ir_type_t) Types in the structure */
         } struct_params;
     };
 };

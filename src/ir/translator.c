@@ -1288,7 +1288,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             SL_FOREACH(cur_node, &decl->decls) {
                 decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
                 ir_type_t *node_type = trans_type(ts, node->type);
-                sl_append(&ir_type->struct_params.types, &node_type->link);
+                vec_push_back(&ir_type->struct_params.types, node_type);
             }
 
             // Add anonymous struct and union members to the struct
@@ -1296,7 +1296,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
                 (decl->type->type == TYPE_STRUCT ||
                  decl->type->type == TYPE_UNION)) {
                 ir_type_t *decl_type = trans_type(ts, decl->type);
-                sl_append(&ir_type->struct_params.types, &decl_type->link);
+                vec_push_back(&ir_type->struct_params.types, decl_type);
             }
         }
         return ir_type;
@@ -1339,7 +1339,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             decl_node_t *node = sl_head(&decl->decls);
             type_t *ptype = node == NULL ? decl->type : node->type;
             ir_type_t *param_type = trans_type(ts, ptype);
-            sl_append(&ir_type->func.params, &param_type->link);
+            vec_push_back(&ir_type->func.params, param_type);
         }
 
         return ir_type;
@@ -1356,7 +1356,13 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         return ir_type;
     case TYPE_PTR:
         ir_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ir_type->ptr.base = trans_type(ts, type->ptr.base);
+
+        // LLVM IR doesn't allowe void*, so convert void* to i8*
+        if (ast_type_unmod(type->ptr.base)->type == TYPE_VOID) {
+            ir_type->ptr.base = &ir_type_i8;
+        } else {
+            ir_type->ptr.base = trans_type(ts, type->ptr.base);
+        }
         return ir_type;
     default:
         assert(false);

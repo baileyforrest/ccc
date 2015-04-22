@@ -29,12 +29,12 @@
 #define ANON_LABEL_PREFIX "BB"
 
 #define IR_INT_LIT(width)                                   \
-    { SL_LINK_LIT, SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
+    { SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
 
 #define IR_FLOAT_LIT(type)                                      \
-    { SL_LINK_LIT, SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
+    { SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
 
-ir_type_t ir_type_void = { SL_LINK_LIT, SL_LINK_LIT, IR_TYPE_VOID, { } };
+ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, { } };
 ir_type_t ir_type_i1 = IR_INT_LIT(1);
 ir_type_t ir_type_i8 = IR_INT_LIT(8);
 ir_type_t ir_type_i16 = IR_INT_LIT(16);
@@ -255,10 +255,10 @@ ir_type_t *ir_type_create(ir_trans_unit_t *tunit, ir_type_type_t type) {
         break;
 
     case IR_TYPE_FUNC:
-        sl_init(&ir_type->func.params, offsetof(ir_type_t, link));
+        vec_init(&ir_type->func.params, 0);
         break;
     case IR_TYPE_STRUCT:
-        sl_init(&ir_type->struct_params.types, offsetof(ir_type_t, link));
+        vec_init(&ir_type->struct_params.types, 0);
         break;
 
     case IR_TYPE_PTR:
@@ -274,13 +274,17 @@ ir_type_t *ir_type_create(ir_trans_unit_t *tunit, ir_type_type_t type) {
 
 void ir_type_destroy(ir_type_t *type) {
     switch (type->type) {
-    case IR_TYPE_VOID:
     case IR_TYPE_FUNC:
+        vec_destroy(&type->func.params);
+        break;
+    case IR_TYPE_STRUCT:
+        vec_destroy(&type->struct_params.types);
+        break;
+    case IR_TYPE_VOID:
     case IR_TYPE_INT:
     case IR_TYPE_FLOAT:
     case IR_TYPE_PTR:
     case IR_TYPE_ARR:
-    case IR_TYPE_STRUCT:
     case IR_TYPE_OPAQUE:
         break;
     default:

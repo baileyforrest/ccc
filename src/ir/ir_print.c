@@ -357,10 +357,10 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
             fprintf(stream, " @%s", func_name);
         }
         fprintf(stream, " (");
-        SL_FOREACH(cur, &type->func.params) {
-            ir_type_t *arg = GET_ELEM(&type->func.params, cur);
+        VEC_FOREACH(cur, &type->func.params) {
+            ir_type_t *arg = vec_get(&type->func.params, cur);
             ir_type_print(stream, arg, NULL);
-            if (arg != sl_tail(&type->func.params)) {
+            if (cur != vec_size(&type->func.params) - 1) {
                 fprintf(stream, ", ");
             }
         }
@@ -383,10 +383,10 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
         break;
     case IR_TYPE_STRUCT: {
         fprintf(stream, "type { ");
-        SL_FOREACH(cur, &type->struct_params.types) {
-            ir_type_t *elem = GET_ELEM(&type->struct_params.types, cur);
+        VEC_FOREACH(cur, &type->struct_params.types) {
+            ir_type_t *elem = vec_get(&type->struct_params.types, cur);
             ir_type_print(stream, elem, NULL);
-            if (elem != sl_head(&type->struct_params.types)) {
+            if (cur != vec_size(&type->struct_params.types) - 1) {
                 fprintf(stream, ", ");
             }
         }

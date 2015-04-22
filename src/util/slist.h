@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 /**
  * Singly linked list interface
  */
@@ -98,7 +97,7 @@ void sl_destroy(slist_t *slist);
             next = cur->next;                                       \
             (func)(GET_ELEM((slist), cur));                         \
         }                                                           \
-        sl_destroy((slist));                                        \
+        sl_destroy(slist);                                          \
     } while (0)
 
 /**

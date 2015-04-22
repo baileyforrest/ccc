@@ -22,14 +22,15 @@ OBJS := $(SOURCES:$(SRC)/%.c=$(BUILD_DIR)/%.o)
 # Set the dependency files that will be used to add header dependencies
 DEPS := $(OBJS:.o=.d)
 
-all: $(DEST)/$(BIN_NAME)
+all: dirs
+	@$(MAKE) $(DEST)/$(BIN_NAME) --no-print-directory
 
 # Create the directories used in the build
 .PHONY: dirs
 dirs:
 	@mkdir -p $(dir $(OBJS))
 
-$(DEST)/$(BIN_NAME): dirs $(OBJS)
+$(DEST)/$(BIN_NAME): $(OBJS)
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
 .PHONY: clean

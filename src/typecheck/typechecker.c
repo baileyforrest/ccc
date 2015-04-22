@@ -29,7 +29,7 @@
 #include "util/logger.h"
 
 void tc_state_init(tc_state_t *tcs) {
-    sl_init(&tcs->etypes, offsetof(type_t, link));
+    sl_init(&tcs->etypes, offsetof(type_t, heap_link));
     tcs->tunit = NULL;
     tcs->typetab = NULL;
     tcs->func = NULL;

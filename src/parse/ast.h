@@ -107,7 +107,7 @@ typedef enum type_type_t {
  */
 struct type_t {
     sl_link_t heap_link;         /**< Allocation Link */
-    sl_link_t link;              /**< Storage Link */ // TODO0: Make sure static types don't end up multiple places
+    // No storage link because there are static types
     fmark_t mark;                /**< File mark */
     type_type_t type;            /**< Type of type type */
 

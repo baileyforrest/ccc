@@ -33,7 +33,7 @@
 #define PRIM_TYPE_FILE "<primitive_type>"
 
 #define TYPE_LITERAL(typename, type) \
-    { SL_LINK_LIT, SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, \
+    { SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, \
       typename, { } }
 
 static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
@@ -50,7 +50,7 @@ static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 // TODO1: This isn't portable
 // size_t is unsigned long.
 static type_t stt_size_t = {
-    SL_LINK_LIT, SL_LINK_LIT,{ NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD,
+    SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD,
     { .mod = { TMOD_UNSIGNED, &stt_long } }
 };
 
