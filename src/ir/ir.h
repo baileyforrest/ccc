@@ -375,6 +375,7 @@ typedef struct ir_stmt_t {
 
 typedef enum ir_gdecl_type_t {
     IR_GDECL_GDATA,
+    IR_GDECL_FUNC_DECL,
     IR_GDECL_FUNC,
 } ir_gdecl_type_t;
 
@@ -386,6 +387,11 @@ typedef struct ir_gdecl_t {
         struct {
             slist_t stmts; /**< (ir_stmt_t) Any initialization and the def */
         } gdata;
+
+        struct {
+            ir_type_t *type;
+            char *name;
+        } func_decl;
 
         struct {
             ir_type_t *type;

@@ -160,7 +160,10 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     ir_gdecl_t *gdecl = emalloc(sizeof(ir_gdecl_t));
     gdecl->type = type;
     switch (type) {
+    case IR_GDECL_FUNC_DECL:
+        break;
     case IR_GDECL_GDATA:
+        sl_init(&gdecl->gdata.stmts, offsetof(ir_stmt_t, link));
         break;
     case IR_GDECL_FUNC:
         sl_init(&gdecl->func.params, offsetof(ir_expr_t, link));
@@ -355,6 +358,7 @@ void ir_stmt_destroy(ir_stmt_t *stmt) {
 void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
+    case IR_GDECL_FUNC_DECL:
         break;
     case IR_GDECL_FUNC:
         ir_symtab_destroy(&gdecl->func.locals);

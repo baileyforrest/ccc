@@ -56,8 +56,13 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         }
         break;
     }
+    case IR_GDECL_FUNC_DECL: {
+        fprintf(stream, "declare ");
+        ir_type_print(stream, gdecl->func_decl.type, gdecl->func_decl.name);
+        break;
+    }
     case IR_GDECL_FUNC:
-        fprintf(stream, "define ");
+        fprintf(stream, "\ndefine ");
         assert(gdecl->func.type->type == IR_TYPE_FUNC);
         ir_type_print(stream, gdecl->func.type->func.type, NULL);
         fprintf(stream, " @%s", gdecl->func.name);
@@ -77,11 +82,12 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         SL_FOREACH(cur, &gdecl->func.body) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->func.body, cur), true);
         }
-        fprintf(stream, "}\n\n");
+        fprintf(stream, "}");
         break;
     default:
         assert(false);
     }
+    fprintf(stream, "\n");
 }
 
 void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {

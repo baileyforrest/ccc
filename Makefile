@@ -3,24 +3,24 @@
 
 BIN_NAME := ccc
 CC ?= cc
-DEBUG_FLAGS= -DDEBUG
-CFLAGS= -std=c11 -Wall -Wextra -Werror -g -O0
-LDFLAGS= -lm
+DEBUG_FLAGS = -DDEBUG
+CFLAGS = -std=c11 -Wall -Wextra -Werror -g -O0
+LDFLAGS = -lm
 
-SRC= src
-DEST= bin
-BUILD_DIR= $(DEST)/build
+SRC = src
+DEST = bin
+BUILD_DIR = $(DEST)/build
 
-INC= -I$(SRC)/
+INC = -I$(SRC)/
 
 
 # Find all source files in the source directory, sorted by most
 # recently modified
-SOURCES = $(shell find $(SRC)/ -name '*.c' -printf '%T@\t%p\n' \
+SOURCES := $(shell find $(SRC)/ -name '*.c' -printf '%T@\t%p\n' \
 					| sort -k 1nr | cut -f2-)
-OBJS= $(SOURCES:$(SRC)/%.c=$(BUILD_DIR)/%.o)
+OBJS := $(SOURCES:$(SRC)/%.c=$(BUILD_DIR)/%.o)
 # Set the dependency files that will be used to add header dependencies
-DEPS = $(OBJS:.o=.d)
+DEPS := $(OBJS:.o=.d)
 
 all: $(DEST)/$(BIN_NAME)
 

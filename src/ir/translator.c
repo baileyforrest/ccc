@@ -120,10 +120,22 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         break;
     }
     case GDECL_DECL: {
+        // Ignore typedefs
+        type_t *type = gdecl->decl->type;
+        if (type->type == TYPE_MOD && type->mod.type_mod & TMOD_TYPEDEF) {
+            return;
+        }
         SL_FOREACH(cur, &gdecl->decl->decls) {
+            ir_gdecl_t *ir_gdecl;
             decl_node_t *node = GET_ELEM(&gdecl->decl->decls, cur);
-            ir_gdecl_t *ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
-            trans_decl_node(ts, node, &ir_gdecl->gdata.stmts);
+            if (node->type->type == TYPE_FUNC) {
+                ir_gdecl = ir_gdecl_create(IR_GDECL_FUNC_DECL);
+                ir_gdecl->func_decl.name = node->id;
+                ir_gdecl->func_decl.type = trans_type(ts, node->type);
+            } else {
+                ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
+                trans_decl_node(ts, node, &ir_gdecl->gdata.stmts);
+            }
             sl_append(ir_gdecls, &ir_gdecl->link);
         }
         break;
@@ -1333,9 +1345,13 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         return ir_type;
     case TYPE_ARR:
         ir_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
-        long long size;
-        typecheck_const_expr_eval(ts->typetab, type->arr.len, &size);
-        ir_type->arr.nelems = size;
+        if (type->arr.len != NULL) {
+            long long size;
+            typecheck_const_expr_eval(ts->typetab, type->arr.len, &size);
+            ir_type->arr.nelems = size;
+        } else {
+            ir_type->arr.nelems = 0;
+        }
         ir_type->arr.elem_type = trans_type(ts, type->arr.base);
         return ir_type;
     case TYPE_PTR:
