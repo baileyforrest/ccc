@@ -1131,37 +1131,47 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         // Do nothing
         return ir_expr;
 
+    case OP_BITNOT:
     case OP_UMINUS: {
+        bool is_bnot = expr->unary.op == OP_BITNOT;
         ir_type_t *type = ir_expr_type(ir_expr);
         ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
                                          ts->func->func.next_temp++);
-        ir_expr_t *sub = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
-        switch (type->type) {
-        case IR_TYPE_INT:
-            sub->binop.op = IR_OP_SUB;
-            break;
-        case IR_TYPE_FLOAT:
-            sub->binop.op = IR_OP_FSUB;
-            break;
-        default:
-            assert(false); // Nothing else is allowed for unary minus
-            return NULL;
+        ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+        if (is_bnot) {
+            assert(type->type == IR_TYPE_INT);
+            op_expr->binop.op = IR_OP_XOR;
+        } else {
+            switch (type->type) {
+            case IR_TYPE_INT:
+                op_expr->binop.op = IR_OP_SUB;
+                break;
+            case IR_TYPE_FLOAT:
+                op_expr->binop.op = IR_OP_FSUB;
+                break;
+            default:
+                assert(false); // Nothing else is allowed for unary minus
+                return NULL;
+            }
         }
-        ir_expr_t *zero = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        zero->const_params.ctype = IR_CONST_INT;
-        zero->const_params.type = type;
-        zero->const_params.int_val = 0;
-        sub->binop.expr1 = zero;
-        sub->binop.expr2 = ir_expr;
-        sub->binop.type = type;
+        ir_expr_t *other = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+        other->const_params.ctype = IR_CONST_INT;
+        other->const_params.type = type;
+        if (is_bnot) {
+            other->const_params.int_val = -1;
+        } else {
+            other->const_params.int_val = 0;
+        }
+        op_expr->binop.expr1 = other;
+        op_expr->binop.expr2 = ir_expr;
+        op_expr->binop.type = type;
 
         ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         assign->assign.dest = temp;
-        assign->assign.src = sub;
+        assign->assign.src = op_expr;
         sl_append(ir_stmts, &assign->link);
         return temp;
     }
-    case OP_BITNOT:
     case OP_LOGICNOT:
     default:
         break;
