@@ -27,18 +27,16 @@
 #include "parse/token.h"
 #include "parse/symtab.h"
 
-/** Size of lexer internal buffer */
-#define MAX_LEXEME_SIZE 16384
-
 /**
  * Structure represerting a lexer
  */
 typedef struct lexer_t {
-    preprocessor_t *pp;           /**< Preprocessor to get characters from */
-    symtab_t *symtab;             /**< Symbol table */
-    symtab_t *string_tab;         /**< String table */
-    char lexbuf[MAX_LEXEME_SIZE]; /**< Temporary work buffer */
-    int next_char;                /**< Next buffered character */
+    preprocessor_t *pp;   /**< Preprocessor to get characters from */
+    symtab_t *symtab;     /**< Symbol table */
+    symtab_t *string_tab; /**< String table */
+    char *lexbuf;         /**< Temporary work buffer */
+    size_t lexbuf_size;   /**< Size of lexbuf */
+    int next_char;        /**< Next buffered character */
 } lexer_t;
 
 /**
