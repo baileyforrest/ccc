@@ -834,18 +834,10 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
         // TODO0: This
         assert(false);
         break;
-    case EXPR_UNARY:
-        switch (dest->unary.op) {
-        case OP_PREINC:
-        case OP_POSTINC:
-        case OP_PREDEC:
-        case OP_POSTDEC:
-        case OP_DEREF:
-            // TODO0: This
-        default:
-            assert(false);
-        }
+    case EXPR_UNARY: {
+        ptr = trans_unaryop(ts, dest, ir_stmts);
         break;
+    }
     case EXPR_CMPD: {
         // TODO0: This
         assert(false);
@@ -1123,12 +1115,49 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     assert(expr->type == EXPR_UNARY);
     ir_expr_t *ir_expr = trans_expr(ts, expr->unary.expr, ir_stmts);
+    ir_type_t *type = ir_expr_type(ir_expr);
     oper_t op = expr->unary.op;
     switch (op) {
     case OP_PREINC:
     case OP_PREDEC:
     case OP_POSTINC:
-    case OP_POSTDEC:
+    case OP_POSTDEC: {
+        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
+                                         ts->func->func.next_temp++);
+        ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+
+        switch (op) {
+        case OP_PREINC:
+        case OP_POSTINC: op_expr->binop.op = IR_OP_ADD; break;
+        case OP_PREDEC:
+        case OP_POSTDEC: op_expr->binop.op = IR_OP_ADD; break;
+        default: assert(false);
+        }
+        ir_expr_t *other = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+        other->const_params.ctype = IR_CONST_INT;
+        other->const_params.type = type;
+        other->const_params.int_val = 1;
+        op_expr->binop.expr1 = ir_expr;
+        op_expr->binop.expr2 = other;
+        op_expr->binop.type = type;
+
+        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+        assign->assign.dest = temp;
+        assign->assign.src = op_expr;
+        sl_append(ir_stmts, &assign->link);
+
+        trans_assign(ts, expr->unary.expr, temp, ir_stmts);
+
+        switch (op) {
+        case OP_PREINC:
+        case OP_PREDEC:  return temp;
+        case OP_POSTINC:
+        case OP_POSTDEC: return ir_expr;
+        default: break;
+        }
+        assert(false);
+        return NULL;
+    }
     case OP_ADDR:
     case OP_DEREF:
 
@@ -1144,7 +1173,6 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case OP_BITNOT:
     case OP_UMINUS: {
         bool is_bnot = op == OP_BITNOT;
-        ir_type_t *type = ir_expr_type(ir_expr);
         ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
                                          ts->func->func.next_temp++);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
