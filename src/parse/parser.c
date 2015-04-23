@@ -119,6 +119,7 @@ int par_get_binary_prec(oper_t op) {
     case OP_BITOR:    return 3;
     case OP_LOGICAND: return 2;
     case OP_LOGICOR:  return 1;
+    case OP_NOP:      return 0;
     default:
         assert(false);
     }
@@ -699,7 +700,8 @@ status_t par_struct_declarator(lex_wrap_t *lex, decl_t *decl) {
 
     if (LEX_CUR(lex).type == COLON) {
         LEX_ADVANCE(lex);
-        if (CCC_OK != (status = par_oper_expression(lex, NULL, &dnode->expr))) {
+        if (CCC_OK != (status = par_oper_expression(lex, OP_NOP, NULL,
+                                                    &dnode->expr))) {
             goto fail;
         }
     }
@@ -889,7 +891,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
                 LEX_ADVANCE(lex);
             } else {
                 if (CCC_OK !=
-                    (status = par_oper_expression(lex, NULL,
+                    (status = par_oper_expression(lex, OP_NOP, NULL,
                                                   &arr_type->arr.len))) {
                     goto fail;
                 }
@@ -943,7 +945,8 @@ fail:
     return status;
 }
 
-status_t par_oper_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
+status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
+                             expr_t **result) {
     status_t status = CCC_OK;
     expr_t *new_node = NULL; // Newly allocated expression
 
@@ -1089,8 +1092,13 @@ status_t par_oper_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
             new_node->bin.expr2 = right;
-            new_left = true;
-            left = new_node;
+
+            // If previous operation has greater or equal precedence to op2,
+            // then just return here so left associativity is preserved
+            if (par_get_binary_prec(prev_op) >= par_get_binary_prec(op2)) {
+                *result = new_node;
+                return CCC_OK;
+            }
         } else {
             // op2 has greater precedence, parse expression with right as the
             // left side, then combine with the current left
@@ -1102,13 +1110,14 @@ status_t par_oper_expression(lex_wrap_t *lex, expr_t *left, expr_t **result) {
 
             if (CCC_OK !=
                 (status =
-                 par_oper_expression(lex, right, &new_node->bin.expr2))) {
+                 par_oper_expression(lex, op1, right, &new_node->bin.expr2))) {
                 goto fail;
             }
 
-            *result = new_node;
-            return CCC_OK;
         }
+
+        new_left = true;
+        left = new_node;
     }
 
 fail:
@@ -1563,7 +1572,8 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t **result) {
         }
 
     } else {
-        if (CCC_OK != (status = par_oper_expression(lex, left, &expr))) {
+        if (CCC_OK !=
+            (status = par_oper_expression(lex, OP_NOP, left, &expr))) {
             goto fail;
         }
     }
@@ -1722,7 +1732,8 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     // Parse enum value if there is one
     if (LEX_CUR(lex).type == ASSIGN) {
         LEX_ADVANCE(lex);
-        if (CCC_OK != (status = par_oper_expression(lex, NULL, &node->expr))) {
+        if (CCC_OK !=
+            (status = par_oper_expression(lex, OP_NOP, NULL, &node->expr))) {
             goto fail;
         }
     }
@@ -1939,7 +1950,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
 
         if (CCC_OK !=
             (status =
-             par_oper_expression(lex, NULL, &stmt->case_params.val))) {
+             par_oper_expression(lex, OP_NOP, NULL, &stmt->case_params.val))) {
             goto fail;
         }
         LEX_MATCH(lex, COLON);

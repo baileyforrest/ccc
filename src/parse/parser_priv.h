@@ -320,7 +320,8 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
  * @param result Location where the parsed expression shourd be stored
  * @return CCC_OK on success, error code on error
  */
-status_t par_oper_expression(lex_wrap_t *lex, expr_t *left, expr_t **result);
+status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
+                             expr_t **result);
 
 /**
  * Parses a unary expression.
