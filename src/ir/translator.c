@@ -553,6 +553,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_expr->const_params.ctype = IR_CONST_ARR;
         ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
         // TODO0: Create a global string, change str_val to point to that
+        assert(false);
         return ir_expr;
     }
     case EXPR_BIN: {
@@ -571,8 +572,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         return temp;
     }
     case EXPR_UNARY:
-        // TODO0 : This
-        return NULL;
+        return trans_unaryop(ts, expr, ir_stmts);
+
     case EXPR_COND: {
         ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
@@ -735,6 +736,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_expr_t *pointer = trans_expr(ts, expr->mem_acc.base, ir_stmts);
         if (expr->mem_acc.op == OP_ARROW) {
             // TODO0: Handle this
+            assert(false);
         } else {
             assert(expr->mem_acc.op = OP_DOT);
         }
@@ -796,6 +798,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case EXPR_INIT_LIST:
     case EXPR_DESIG_INIT:
         // TODO0: Create global data and copy it in
+        assert(false);
     default:
         assert(false);
     }
@@ -820,6 +823,9 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
     }
 
     case EXPR_MEM_ACC:
+        // TODO0: This
+        assert(false);
+        break;
     case EXPR_ARR_IDX:
         // TODO0: This
         assert(false);
@@ -1108,6 +1114,61 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         *left_loc = left_expr;
     }
     return op_expr;
+}
+
+ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
+    assert(expr->type == EXPR_UNARY);
+    ir_expr_t *ir_expr = trans_expr(ts, expr->unary.expr, ir_stmts);
+    switch (expr->unary.op) {
+    case OP_PREINC:
+    case OP_PREDEC:
+    case OP_POSTINC:
+    case OP_POSTDEC:
+    case OP_ADDR:
+    case OP_DEREF:
+
+    case OP_UPLUS:
+        // Do nothing
+        return ir_expr;
+
+    case OP_UMINUS: {
+        ir_type_t *type = ir_expr_type(ir_expr);
+        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
+                                         ts->func->func.next_temp++);
+        ir_expr_t *sub = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+        switch (type->type) {
+        case IR_TYPE_INT:
+            sub->binop.op = IR_OP_SUB;
+            break;
+        case IR_TYPE_FLOAT:
+            sub->binop.op = IR_OP_FSUB;
+            break;
+        default:
+            assert(false); // Nothing else is allowed for unary minus
+            return NULL;
+        }
+        ir_expr_t *zero = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+        zero->const_params.ctype = IR_CONST_INT;
+        zero->const_params.type = type;
+        zero->const_params.int_val = 0;
+        sub->binop.expr1 = zero;
+        sub->binop.expr2 = ir_expr;
+        sub->binop.type = type;
+
+        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+        assign->assign.dest = temp;
+        assign->assign.src = sub;
+        sl_append(ir_stmts, &assign->link);
+        return temp;
+    }
+    case OP_BITNOT:
+    case OP_LOGICNOT:
+    default:
+        break;
+    }
+    // TODO0 : This
+    assert(false);
+    return NULL;
 }
 
 ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
