@@ -1114,10 +1114,41 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 
 ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     assert(expr->type == EXPR_UNARY);
+    oper_t op = expr->unary.op;
+    if (op == OP_ADDR) {
+        expr_t *addr_of = expr->unary.expr;
+        // ir_expr may not need to be generated, so handle this first
+
+        // Variables are stored as addresses
+        if (addr_of->type == EXPR_VAR) {
+            ir_symtab_entry_t *entry = ir_symtab_lookup(&ts->func->func.locals,
+                                                        addr_of->var_id);
+            if (entry == NULL) {
+                entry = ir_symtab_lookup(&ts->tunit->globals,
+                                         addr_of->var_id);
+            }
+
+            // Must be valid if typechecked
+            assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
+            assert(ir_expr_type(entry->var.access)->type == IR_TYPE_PTR);
+            return entry->var.access;
+        }
+
+        // TODO0: Handle other cases
+        assert(false);
+    }
     ir_expr_t *ir_expr = trans_expr(ts, expr->unary.expr, ir_stmts);
     ir_type_t *type = ir_expr_type(ir_expr);
-    oper_t op = expr->unary.op;
     switch (op) {
+    case OP_UPLUS:
+        // Do nothing
+        return ir_expr;
+
+    case OP_ADDR:
+        // Handled above
+        assert(false);
+        return NULL;
+
     case OP_PREINC:
     case OP_PREDEC:
     case OP_POSTINC:
@@ -1158,12 +1189,20 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         assert(false);
         return NULL;
     }
-    case OP_ADDR:
-    case OP_DEREF:
+    case OP_DEREF: {
+        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
+                                         ts->func->func.next_temp++);
+        ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
+        assert(type->type == IR_TYPE_PTR);
+        load->load.type = type->ptr.base;
+        load->load.ptr = ir_expr;
 
-    case OP_UPLUS:
-        // Do nothing
-        return ir_expr;
+        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+        assign->assign.dest = temp;
+        assign->assign.src = load;
+        sl_append(ir_stmts, &assign->link);
+        return temp;
+    }
 
     case OP_LOGICNOT:
         // Convert expression to bool, then do a bitwise not
@@ -1210,10 +1249,8 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         sl_append(ir_stmts, &assign->link);
         return temp;
     }
-    default:
-        break;
+    default: break;
     }
-    // TODO0 : This
     assert(false);
     return NULL;
 }
