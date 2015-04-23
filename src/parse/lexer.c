@@ -40,6 +40,14 @@
 /** 1.5 Growth rate */
 #define LEXBUF_NEW_SIZE(lexer) (lexer->lexbuf_size + (lexer->lexbuf_size >> 1))
 
+#define LEXBUF_TEST_GROW(lexer, len)                                    \
+    do {                                                                \
+        if (len == lexer->lexbuf_size) {                                \
+            lexer->lexbuf_size = LEXBUF_NEW_SIZE(lexer);                \
+            lexer->lexbuf = erealloc(lexer->lexbuf, lexer->lexbuf_size); \
+        }                                                               \
+    } while (0)
+
 /**
  * Gets next character from preprocessor ignoring errors
  *
@@ -340,10 +348,8 @@ static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result) {
 
     bool done = false;
     while (!done) {
-        if (len == lexer->lexbuf_size) {
-            lexer->lexbuf_size = LEXBUF_NEW_SIZE(lexer);
-            lexer->lexbuf = erealloc(lexer->lexbuf, lexer->lexbuf_size);
-        }
+        LEXBUF_TEST_GROW(lexer, len);
+
         NEXT_CHAR_NOERR(lexer, cur);
         switch (cur) {
         case ASCII_LOWER:
@@ -435,11 +441,8 @@ static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
                     break;
                 }
             case OCT_DIGIT:
-                if (offset < lexer->lexbuf_size - 1) {
-                    lexer->lexbuf[offset++] = cur;
-                } else if (!overflow) {
-                    overflow = true;
-                }
+                LEXBUF_TEST_GROW(lexer, offset);
+                lexer->lexbuf[offset++] = cur;
                 break;
             default:
                 lexer->next_char = cur;
@@ -536,10 +539,8 @@ static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
 
     bool done = false;
     do {
-        if (len == lexer->lexbuf_size) {
-            lexer->lexbuf_size = LEXBUF_NEW_SIZE(lexer);
-            lexer->lexbuf = erealloc(lexer->lexbuf, lexer->lexbuf_size);
-        }
+        LEXBUF_TEST_GROW(lexer, len);
+
         NEXT_CHAR_NOERR(lexer, cur);
 
         // Reached the end, an unescaped quote
@@ -619,7 +620,8 @@ static status_t lex_number(lexer_t *lexer, bool neg, int cur,
     int last = -1;
     bool done = false;
     bool err = false;
-    while (!done && !err && offset < lexer->lexbuf_size) {
+    while (!done && !err) {
+        LEXBUF_TEST_GROW(lexer, offset);
         switch (cur) {
         case 'e':
         case 'E':
