@@ -121,6 +121,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         NEXT_CHAR_NOERR(lexer, cur);
         switch (cur) {
         case '\n':
+        case '\r':
         case ' ':
         case '\t':
         case '\f':
