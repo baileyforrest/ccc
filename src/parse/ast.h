@@ -469,6 +469,7 @@ struct stmt_t {
         } break_params;
 
         struct {                  /**< Return paramaters */
+            type_t *type;         /**< Return type for the function */
             expr_t *expr;         /**< Expression to return */
         } return_params;
 

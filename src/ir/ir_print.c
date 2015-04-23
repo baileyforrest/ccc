@@ -279,7 +279,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_type_print(stream, expr->icmp.type, NULL);
         fprintf(stream, " ");
         ir_expr_print(stream, expr->icmp.expr1);
-        fprintf(stream, " ");
+        fprintf(stream, ", ");
         ir_expr_print(stream, expr->icmp.expr2);
         break;
     case IR_EXPR_FCMP:
@@ -287,7 +287,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_type_print(stream, expr->fcmp.type, NULL);
         fprintf(stream, " ");
         ir_expr_print(stream, expr->fcmp.expr1);
-        fprintf(stream, " ");
+        fprintf(stream, ", ");
         ir_expr_print(stream, expr->fcmp.expr2);
         break;
     case IR_EXPR_PHI: {

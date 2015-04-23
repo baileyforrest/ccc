@@ -1046,6 +1046,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
                 typecheck_type_assignable(&stmt->mark,
                                           func_sig->type->func.type,
                                           stmt->return_params.expr->etype);
+            stmt->return_params.type = func_sig->type->func.type;
         }
         return retval;
     }
@@ -1489,6 +1490,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case OP_DEREF:
             assert(expr->unary.expr->etype->type == TYPE_PTR);
             expr->etype = expr->unary.expr->etype->ptr.base;
+            break;
+        case OP_LOGICNOT:
+            expr->etype = tt_bool;
             break;
         default:
             expr->etype = expr->unary.expr->etype;

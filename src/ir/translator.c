@@ -453,7 +453,11 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         assert(ts->func->type == IR_GDECL_FUNC &&
                ts->func->func.type->type == IR_TYPE_FUNC);
         ir_stmt->ret.type = ts->func->func.type->func.type;
-        ir_stmt->ret.val = trans_expr(ts, stmt->return_params.expr, ir_stmts);
+        ir_expr_t *ret_val = trans_expr(ts, stmt->return_params.expr, ir_stmts);
+        ir_stmt->ret.val =
+            trans_type_conversion(ts, stmt->return_params.type,
+                                  stmt->return_params.expr->etype, ret_val,
+                                  ir_stmts);
         sl_append(ir_stmts, &ir_stmt->link);
         break;
     }
@@ -1119,7 +1123,8 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     assert(expr->type == EXPR_UNARY);
     ir_expr_t *ir_expr = trans_expr(ts, expr->unary.expr, ir_stmts);
-    switch (expr->unary.op) {
+    oper_t op = expr->unary.op;
+    switch (op) {
     case OP_PREINC:
     case OP_PREDEC:
     case OP_POSTINC:
@@ -1131,9 +1136,14 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         // Do nothing
         return ir_expr;
 
+    case OP_LOGICNOT:
+        // Convert expression to bool, then do a bitwise not
+        ir_expr = trans_expr_bool(ts, ir_expr, ir_expr_type(ir_expr), ir_stmts);
+        op = OP_BITNOT;
+        // FALL THROUGH
     case OP_BITNOT:
     case OP_UMINUS: {
-        bool is_bnot = expr->unary.op == OP_BITNOT;
+        bool is_bnot = op == OP_BITNOT;
         ir_type_t *type = ir_expr_type(ir_expr);
         ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
                                          ts->func->func.next_temp++);
@@ -1172,7 +1182,6 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         sl_append(ir_stmts, &assign->link);
         return temp;
     }
-    case OP_LOGICNOT:
     default:
         break;
     }
