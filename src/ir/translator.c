@@ -469,8 +469,22 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     case STMT_COMPOUND: {
         typetab_t *typetab_save = ts->typetab;
         ts->typetab = &stmt->compound.typetab;
+        bool ignore_until_label = false;
+
         SL_FOREACH(cur, &stmt->compound.stmts) {
             stmt_t *cur_stmt = GET_ELEM(&stmt->compound.stmts, cur);
+            if (ignore_until_label) {
+                if (cur_stmt->type == STMT_LABEL) {
+                    ignore_until_label = false;
+                } else {
+                    continue;
+                }
+            }
+            // If we encounter a return statement, ignore all statements until
+            // a labeled statement
+            if (cur_stmt->type == STMT_RETURN) {
+                ignore_until_label = true;
+            }
             trans_stmt(ts, cur_stmt, ir_stmts);
         }
         ts->typetab = typetab_save;
