@@ -184,7 +184,13 @@ def process_file(src_path):
         if llvm:
             exec_name = TEMP_DIR + src_name
             temp_files.append(exec_name)
-            retval = subprocess.call([CLANG, outname, RUNTIME, "-o", exec_name])
+            if verbose:
+                retval = subprocess.call([CLANG, outname, RUNTIME, "-o",
+                                          exec_name])
+            else:
+                retval = subprocess.call([CLANG, outname, RUNTIME, "-o",
+                                          exec_name], stdout=DEV_NULL,
+                                         stderr=subprocess.STDOUT)
             if retval != 0:
                 if is_error:
                     return 1
