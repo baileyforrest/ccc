@@ -1272,13 +1272,23 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             assert(false);
         }
         LEX_ADVANCE(lex);
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_UNARY);
-        base->unary.op = op;
-        if (CCC_OK !=
-            (status = par_cast_expression(lex, &base->unary.expr))) {
-            goto fail;
-        }
 
+        if (op == OP_UMINUS && LEX_CUR(lex).type == INTLIT) {
+            // Handle unary minus of integer literals differently
+            if (CCC_OK != (status = par_primary_expression(lex, &base))) {
+                goto fail;
+            }
+            assert(base->type == EXPR_CONST_INT);
+            base->const_val.int_val =
+                -(unsigned long long)base->const_val.int_val;
+        } else {
+            base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_UNARY);
+            base->unary.op = op;
+            if (CCC_OK !=
+                (status = par_cast_expression(lex, &base->unary.expr))) {
+                goto fail;
+            }
+        }
         break;
     }
     default:
