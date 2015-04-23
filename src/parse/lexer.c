@@ -187,9 +187,11 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         case '-': result->type = DEC; break;
         case '=': result->type = MINUSEQ; break;
         case '>': result->type = DEREF; break;
+            /* TODO0: Handle negatives elsewhere
         case ASCII_DIGIT: // Negative number
             status = lex_number(lexer, true, next, result);
             break;
+            */
         default:
             result->type = MINUS;
             lexer->next_char = next;
