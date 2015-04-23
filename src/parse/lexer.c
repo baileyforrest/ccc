@@ -131,21 +131,13 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     status_t status = CCC_OK;
 
     int cur;
-    bool done = false;
-    do { // Repeat loop until we find a token
+
+    do { // Skip spaces and backlash
         NEXT_CHAR_NOERR(lexer, cur);
-        switch (cur) {
-        case '\n':
-        case '\r':
-        case ' ':
-        case '\t':
-        case '\f':
-        case '\\':
+        if (!(isspace(cur) || cur == '\\')) {
             break;
-        default:
-            done = true;
         }
-    } while (!done);
+    } while (true);
 
     pp_last_mark(lexer->pp, &result->mark);
 
