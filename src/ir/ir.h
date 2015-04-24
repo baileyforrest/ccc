@@ -398,8 +398,8 @@ typedef struct ir_gdecl_t {
             ir_type_t *type;
             char *name;
             slist_t params; /**< (ir_expr_t) List of parameters (not owned) */
-            slist_t allocs; /**< (ir_stmt_t) Empty if decl */
-            slist_t body; /**< (ir_stmt_t) Empty if decl */
+            slist_t prefix; /**< (ir_stmt_t) List of prefix statements */
+            slist_t body; /**< (ir_stmt_t) */
             ir_symtab_t locals;
             int next_temp; /**< Next temp name */
             int next_label; /**< Next label name */

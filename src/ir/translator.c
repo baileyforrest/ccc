@@ -109,7 +109,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             stmt->assign.src->alloca.type = name->var.type;
             stmt->assign.src->alloca.nelem_type = NULL;
             stmt->assign.src->alloca.align = ast_type_align(node->type);
-            sl_append(&ts->func->func.allocs, &stmt->link);
+            sl_append(&ts->func->func.prefix, &stmt->link);
             entry->var.access = temp;
             status_t status = ir_symtab_insert(symtab, entry);
             assert(status == CCC_OK);
@@ -136,7 +136,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
 
         ir_stmt_t *start_label = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         start_label->label = trans_numlabel_create(ts);
-        sl_prepend(&ir_gdecl->func.allocs, &start_label->link);
+        sl_prepend(&ir_gdecl->func.prefix, &start_label->link);
         trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
         sl_append(ir_gdecls, &ir_gdecl->link);
         ts->func = NULL;
@@ -1406,7 +1406,7 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
         stmt->assign.src = src;
         sl_append(ir_stmts, &stmt->link);
     } else {
-        slist_t *allocs = &ts->func->func.allocs;
+        slist_t *allocs = &ts->func->func.prefix;
         ir_expr_t *src = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
         src->alloca.type = name->var.type->ptr.base;
         src->alloca.nelem_type = NULL;

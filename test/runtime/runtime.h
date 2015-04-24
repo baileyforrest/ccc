@@ -35,8 +35,8 @@ void *calloc(unsigned long nmemb, unsigned long size);
      : __assert_fail (__STRING(expr), __FILE__, __LINE__, __func__))
 
 #define bool _Bool
-#define true 0
-#define false 1
+#define true 1
+#define false 0
 #define NULL ((void *)0);
 
 #define alloc(type) calloc(1, sizeof(type))

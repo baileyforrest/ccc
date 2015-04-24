@@ -76,8 +76,8 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         fprintf(stream, ")");
 
         fprintf(stream, " {\n");
-        SL_FOREACH(cur, &gdecl->func.allocs) {
-            ir_stmt_print(stream, GET_ELEM(&gdecl->func.allocs, cur), true);
+        SL_FOREACH(cur, &gdecl->func.prefix) {
+            ir_stmt_print(stream, GET_ELEM(&gdecl->func.prefix, cur), true);
         }
         SL_FOREACH(cur, &gdecl->func.body) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->func.body, cur), true);

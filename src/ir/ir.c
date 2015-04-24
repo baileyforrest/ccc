@@ -168,7 +168,7 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
         break;
     case IR_GDECL_FUNC:
         sl_init(&gdecl->func.params, offsetof(ir_expr_t, link));
-        sl_init(&gdecl->func.allocs, offsetof(ir_stmt_t, link));
+        sl_init(&gdecl->func.prefix, offsetof(ir_stmt_t, link));
         sl_init(&gdecl->func.body, offsetof(ir_stmt_t, link));
         ir_symtab_init(&gdecl->func.locals);
         gdecl->func.next_temp = 0;
