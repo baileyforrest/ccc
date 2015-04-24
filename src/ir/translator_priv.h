@@ -39,6 +39,8 @@ ir_label_t *trans_label_create(trans_state_t *ts, char *str);
 
 ir_label_t *trans_numlabel_create(trans_state_t *ts);
 
+ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type);
+
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
 
 void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);

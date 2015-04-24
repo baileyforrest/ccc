@@ -36,13 +36,18 @@ ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
 }
 
 ir_label_t *trans_numlabel_create(trans_state_t *ts) {
-    ir_label_t *label = ir_numlabel_create(ts->tunit,
-                                           ts->func->func.next_label++);
+    ir_label_t *label =
+        ir_numlabel_create(ts->tunit, ts->func->func.next_label++);
+
     ts->func->func.last_label = label;
 
     return label;
 }
 
+ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type) {
+    return ir_temp_create(ts->tunit, ts->func, type,
+                          ts->func->func.next_temp++);
+}
 
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
@@ -97,8 +102,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
 
             ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
             ptr_type->ptr.base = name->var.type;
-            ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, ptr_type,
-                                             ts->func->func.next_temp++);
+            ir_expr_t *temp = trans_temp_create(ts, ptr_type);
             ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
             stmt->assign.dest = temp;
             stmt->assign.src = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
@@ -532,8 +536,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             }
             ir_type_t *type = ir_expr_type(entry->var.access)->ptr.base;
             // Load var into a temp
-            ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                             ts->func->func.next_temp++);
+            ir_expr_t *temp = trans_temp_create(ts, type);
             ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
             load->load.type = ir_expr_type(entry->var.access)->ptr.base;
             load->load.ptr = entry->var.access;
@@ -562,8 +565,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                                          expr->assign.expr, expr->assign.op,
                                          expr->etype, ir_stmts, &dest);
 
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, type);
 
         ir_stmt_t *binop = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         binop->assign.dest = temp;
@@ -599,8 +601,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_expr_t *op_expr = trans_binop(ts, expr->bin.expr1, expr->bin.expr2,
                                          expr->bin.op, expr->etype, ir_stmts,
                                          NULL);
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, type);
 
         ir_stmt_t *binop = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         binop->assign.dest = temp;
@@ -614,8 +615,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
     case EXPR_COND: {
         ir_type_t *type = trans_type(ts, expr->etype);
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *expr1 = trans_expr(ts, false, expr->cond.expr1, ir_stmts);
         ir_label_t *if_true = trans_numlabel_create(ts);
         ir_label_t *if_false = trans_numlabel_create(ts);
@@ -701,8 +701,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
 
         ir_type_t *ret_type = call->call.func_sig->func.type;
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, ret_type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, ret_type);
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         ir_stmt->assign.dest = temp;
         ir_stmt->assign.src = call;
@@ -897,8 +896,7 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
     }
     bool is_float = type->type == IR_TYPE_FLOAT;
 
-    ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, &ir_type_i1,
-                                     ts->func->func.next_temp++);
+    ir_expr_t *temp = trans_temp_create(ts, &ir_type_i1);
     ir_expr_t *cmp;
     ir_expr_t *zero = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     zero->const_params.type = type;
@@ -1160,8 +1158,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case OP_PREDEC:
     case OP_POSTINC:
     case OP_POSTDEC: {
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
 
         switch (op) {
@@ -1197,8 +1194,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         return NULL;
     }
     case OP_DEREF: {
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         assert(type->type == IR_TYPE_PTR);
         load->load.type = type->ptr.base;
@@ -1219,8 +1215,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
     case OP_BITNOT:
     case OP_UMINUS: {
         bool is_bnot = op == OP_BITNOT;
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
-                                         ts->func->func.next_temp++);
+        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
         if (is_bnot) {
             assert(type->type == IR_TYPE_INT);
@@ -1271,8 +1266,7 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
 
     ir_type_t *dest_type = trans_type(ts, dest);
     ir_type_t *src_type = trans_type(ts, src);
-    ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, dest_type,
-                                     ts->func->func.next_temp++);
+    ir_expr_t *temp = trans_temp_create(ts, dest_type);
 
     ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     ir_convert_t convert_op;
