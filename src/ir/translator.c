@@ -189,6 +189,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
                                                ts->func->func.next_label++);
 
         ir_expr_t *cond = trans_expr(ts, false, stmt->if_params.expr, ir_stmts);
+        cond = trans_expr_bool(ts, cond, ir_stmts);
 
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = cond;
@@ -885,8 +886,12 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
 }
 
 
-ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr, ir_type_t *type,
+ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
                            slist_t *ir_stmts) {
+    ir_type_t *type = ir_expr_type(expr);
+    if (type->type == IR_TYPE_INT && type->int_params.width == 1) {
+        return expr;
+    }
     bool is_float = type->type == IR_TYPE_FLOAT;
 
     ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, &ir_type_i1,
@@ -1029,8 +1034,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 
         // Create left expression
         ir_expr_t *left_expr = trans_expr(ts, false, left, ir_stmts);
-        ir_expr_t *ir_expr =
-            trans_expr_bool(ts, left_expr, trans_type(ts, type), ir_stmts);
+        ir_expr_t *ir_expr = trans_expr_bool(ts, left_expr, ir_stmts);
 
         // First branch
         ir_label_t *block = ts->func->func.last_label;
@@ -1051,8 +1055,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         sl_append(ir_stmts, &ir_stmt->link);
 
         ir_expr = trans_expr(ts, false, right, ir_stmts);
-        ir_expr_t *right_val =
-            trans_expr_bool(ts, ir_expr, trans_type(ts, type), ir_stmts);
+        ir_expr_t *right_val = trans_expr_bool(ts, ir_expr, ir_stmts);
 
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
@@ -1216,7 +1219,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
 
     case OP_LOGICNOT:
         // Convert expression to bool, then do a bitwise not
-        ir_expr = trans_expr_bool(ts, ir_expr, ir_expr_type(ir_expr), ir_stmts);
+        ir_expr = trans_expr_bool(ts, ir_expr, ir_stmts);
         op = OP_BITNOT;
         // FALL THROUGH
     case OP_BITNOT:
