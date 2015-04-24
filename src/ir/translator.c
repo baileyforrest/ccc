@@ -623,14 +623,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
     case EXPR_COND: {
         ir_type_t *type = trans_type(ts, expr->etype);
-        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *expr1 = trans_expr(ts, false, expr->cond.expr1, ir_stmts);
         ir_label_t *if_true = trans_numlabel_create(ts);
         ir_label_t *if_false = trans_numlabel_create(ts);
         ir_label_t *after = trans_numlabel_create(ts);
 
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
-        ir_stmt->br.cond = expr1;
+        ir_stmt->br.cond = trans_expr_bool(ts, expr1, ir_stmts);
         ir_stmt->br.if_true = if_true;
         ir_stmt->br.if_false = if_false;
         sl_append(ir_stmts, &ir_stmt->link);
@@ -643,12 +642,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         // Expression
         ir_expr_t *expr2 = trans_expr(ts, false, expr->cond.expr2, ir_stmts);
-
-        // Assignment
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        ir_stmt->assign.dest = temp;
-        ir_stmt->assign.src = expr2;
-        sl_append(ir_stmts, &ir_stmt->link);
 
         // Jump to after
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
@@ -666,22 +659,36 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         // Expression
         ir_expr_t *expr3 = trans_expr(ts, false, expr->cond.expr3, ir_stmts);
 
-        // Assignment
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        ir_stmt->assign.dest = temp;
-        ir_stmt->assign.src = expr3;
-        sl_append(ir_stmts, &ir_stmt->link);
-
         // Jump to after
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = after;
         sl_append(ir_stmts, &ir_stmt->link);
 
-        // End label
+        // End
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
         sl_append(ir_stmts, &ir_stmt->link);
+
+        ir_expr_t *phi = ir_expr_create(ts->tunit, IR_EXPR_PHI);
+        phi->phi.type = type;
+
+        ir_expr_label_pair_t *pred = emalloc(sizeof(*pred));
+        pred->expr = expr2;
+        pred->label = if_true;
+        sl_append(&phi->phi.preds, &pred->link);
+
+        pred = emalloc(sizeof(*pred));
+        pred->expr = expr3;
+        pred->label = if_false;
+        sl_append(&phi->phi.preds, &pred->link);
+
+        ir_expr_t *temp = trans_temp_create(ts, type);
+
+        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+        assign->assign.dest = temp;
+        assign->assign.src = phi;
+        sl_append(ir_stmts, &assign->link);
 
         return temp;
     }
