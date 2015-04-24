@@ -94,7 +94,8 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
     char buf[MAX_LABEL_LEN];
     snprintf(buf, sizeof(buf), ANON_LABEL_PREFIX "%d", num);
     buf[sizeof(buf) - 1] = '\0';
-    ir_label_t *label = ht_lookup(&tunit->labels, &buf);
+    char *pbuf = buf;
+    ir_label_t *label = ht_lookup(&tunit->labels, &pbuf);
     if (label != NULL) {
         return label;
     }

@@ -1105,17 +1105,17 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         if (is_float) {
             cmp = ir_expr_create(ts->tunit, IR_EXPR_FCMP);
             cmp->fcmp.cond = cmp_type;
-            cmp->fcmp.type = trans_type(ts, type);
             left_expr = trans_expr(ts, false, left, ir_stmts);
             cmp->fcmp.expr1 = left_expr;
             cmp->fcmp.expr2 = trans_expr(ts, false, right, ir_stmts);
+            cmp->fcmp.type = ir_expr_type(left_expr);
         } else {
             cmp = ir_expr_create(ts->tunit, IR_EXPR_ICMP);
             cmp->icmp.cond = cmp_type;
-            cmp->icmp.type = trans_type(ts, type);
             left_expr = trans_expr(ts, false, left, ir_stmts);
             cmp->icmp.expr1 = left_expr;
             cmp->icmp.expr2 = trans_expr(ts, false, right, ir_stmts);;
+            cmp->icmp.type = ir_expr_type(left_expr);
         }
         if (left_loc != NULL) {
             *left_loc = left_expr;

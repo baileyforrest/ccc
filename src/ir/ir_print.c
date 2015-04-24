@@ -109,7 +109,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         if (stmt->br.cond == NULL) {
             fprintf(stream, "label %%%s", stmt->br.uncond->name);
         } else {
-            fprintf(stream, " i1 ");
+            fprintf(stream, "i1 ");
             ir_expr_print(stream, stmt->br.cond);
             fprintf(stream, ", label %%%s, label %%%s",
                     stmt->br.if_true->name, stmt->br.if_false->name);
