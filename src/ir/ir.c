@@ -171,8 +171,7 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
         sl_init(&gdecl->func.allocs, offsetof(ir_stmt_t, link));
         sl_init(&gdecl->func.body, offsetof(ir_stmt_t, link));
         ir_symtab_init(&gdecl->func.locals);
-        // Must start with 1, because %0 is for entry block label
-        gdecl->func.next_temp = 1;
+        gdecl->func.next_temp = 0;
         gdecl->func.next_label = 0;
         break;
     default:

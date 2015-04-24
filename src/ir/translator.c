@@ -28,6 +28,22 @@
 #include "util/util.h"
 #include "typecheck/typechecker.h"
 
+ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
+    ir_label_t *label = ir_label_create(ts->tunit, str);
+    ts->func->func.last_label = label;
+
+    return label;
+}
+
+ir_label_t *trans_numlabel_create(trans_state_t *ts) {
+    ir_label_t *label = ir_numlabel_create(ts->tunit,
+                                           ts->func->func.next_label++);
+    ts->func->func.last_label = label;
+
+    return label;
+}
+
+
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
 
@@ -114,6 +130,9 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         status_t status = ir_symtab_insert(symtab, entry);
         assert(status == CCC_OK);
 
+        ir_stmt_t *start_label = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+        start_label->label = trans_numlabel_create(ts);
+        sl_prepend(&ir_gdecl->func.allocs, &start_label->link);
         trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
         sl_append(ir_gdecls, &ir_gdecl->link);
         ts->func = NULL;
@@ -160,7 +179,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
 
     case STMT_LABEL: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
-        ir_stmt->label = ir_label_create(ts->tunit, stmt->label.label);
+        ir_stmt->label = trans_label_create(ts, stmt->label.label);
         sl_append(ir_stmts, &ir_stmt->link);
         trans_stmt(ts, stmt->label.stmt, ir_stmts);
         break;
@@ -181,12 +200,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     }
 
     case STMT_IF: {
-        ir_label_t *if_true = ir_numlabel_create(ts->tunit,
-                                                 ts->func->func.next_label++);
+        ir_label_t *if_true = trans_numlabel_create(ts);
         ir_label_t *if_false = stmt->if_params.false_stmt == NULL ?
-            NULL : ir_numlabel_create(ts->tunit, ts->func->func.next_label++);
-        ir_label_t *after = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
+            NULL : trans_numlabel_create(ts);
+        ir_label_t *after = trans_numlabel_create(ts);
 
         ir_expr_t *cond = trans_expr(ts, false, stmt->if_params.expr, ir_stmts);
         cond = trans_expr_bool(ts, cond, ir_stmts);
@@ -233,8 +250,8 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             trans_expr(ts, false, stmt->switch_params.expr, ir_stmts);
         SL_FOREACH(cur, &stmt->switch_params.cases) {
             stmt_t *cur_case = GET_ELEM(&stmt->switch_params.cases, cur);
-            ir_label_t *label = ir_numlabel_create(ts->tunit,
-                                                   ts->func->func.next_label++);
+            ir_label_t *label = trans_numlabel_create(ts);
+
             assert(cur_case->type == STMT_CASE);
             cur_case->case_params.label = label;
 
@@ -253,10 +270,8 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         }
 
         // Generate default label
-        ir_label_t *label = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
-        ir_label_t *after = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
+        ir_label_t *label = trans_numlabel_create(ts);
+        ir_label_t *after = trans_numlabel_create(ts);
 
         ir_label_t *break_save = ts->break_target;
         ts->break_target = after;
@@ -278,10 +293,8 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     }
 
     case STMT_DO: {
-        ir_label_t *body = ir_numlabel_create(ts->tunit,
-                                              ts->func->func.next_label++);
-        ir_label_t *after = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
+        ir_label_t *body = trans_numlabel_create(ts);
+        ir_label_t *after = trans_numlabel_create(ts);
         ir_label_t *break_save = ts->break_target;
         ir_label_t *continue_save = ts->continue_target;
         ts->break_target = after;
@@ -316,12 +329,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         break;
     }
     case STMT_WHILE: {
-        ir_label_t *cond = ir_numlabel_create(ts->tunit,
-                                              ts->func->func.next_label++);
-        ir_label_t *body = ir_numlabel_create(ts->tunit,
-                                              ts->func->func.next_label++);
-        ir_label_t *after = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
+        ir_label_t *cond = trans_numlabel_create(ts);
+        ir_label_t *body = trans_numlabel_create(ts);
+        ir_label_t *after = trans_numlabel_create(ts);
         ir_label_t *break_save = ts->break_target;
         ir_label_t *continue_save = ts->continue_target;
         ts->break_target = after;
@@ -366,12 +376,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         break;
     }
     case STMT_FOR: {
-        ir_label_t *cond = ir_numlabel_create(ts->tunit,
-                                              ts->func->func.next_label++);
-        ir_label_t *body = ir_numlabel_create(ts->tunit,
-                                              ts->func->func.next_label++);
-        ir_label_t *after = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
+        ir_label_t *cond = trans_numlabel_create(ts);
+        ir_label_t *body = trans_numlabel_create(ts);
+        ir_label_t *after = trans_numlabel_create(ts);
         ir_label_t *break_save = ts->break_target;
         ir_label_t *continue_save = ts->continue_target;
         ts->break_target = after;
@@ -431,8 +438,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     case STMT_GOTO: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
-        ir_stmt->br.uncond = ir_label_create(ts->tunit,
-                                             stmt->goto_params.label);
+        ir_stmt->br.uncond = trans_label_create(ts, stmt->goto_params.label);
         sl_append(ir_stmts, &ir_stmt->link);
         break;
     }
@@ -611,12 +617,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, type,
                                          ts->func->func.next_temp++);
         ir_expr_t *expr1 = trans_expr(ts, false, expr->cond.expr1, ir_stmts);
-        ir_label_t *if_true = ir_numlabel_create(ts->tunit,
-                                                 ts->func->func.next_label++);
-        ir_label_t *if_false = ir_numlabel_create(ts->tunit,
-                                                  ts->func->func.next_label++);
-        ir_label_t *after = ir_numlabel_create(ts->tunit,
-                                               ts->func->func.next_label++);
+        ir_label_t *if_true = trans_numlabel_create(ts);
+        ir_label_t *if_false = trans_numlabel_create(ts);
+        ir_label_t *after = trans_numlabel_create(ts);
 
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = expr1;
@@ -1024,20 +1027,16 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     case OP_LOGICAND:
     case OP_LOGICOR: {
         bool is_and = op == OP_LOGICAND;
+        ir_label_t *cur_block = ts->func->func.last_label;
 
-        ir_expr_t *temp = ir_temp_create(ts->tunit, ts->func, &ir_type_i1,
-                                         ts->func->func.next_temp++);
-        ir_label_t *right_label =
-            ir_numlabel_create(ts->tunit, ts->func->func.next_label++);
-        ir_label_t *done =
-            ir_numlabel_create(ts->tunit, ts->func->func.next_label++);
+        ir_label_t *right_label = trans_numlabel_create(ts);
+        ir_label_t *done = trans_numlabel_create(ts);
 
         // Create left expression
         ir_expr_t *left_expr = trans_expr(ts, false, left, ir_stmts);
         ir_expr_t *ir_expr = trans_expr_bool(ts, left_expr, ir_stmts);
 
         // First branch
-        ir_label_t *block = ts->func->func.last_label;
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = ir_expr;
         if (is_and) {
@@ -1079,7 +1078,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         } else {
             pred->expr->const_params.int_val = 1;
         }
-        pred->label = block;
+        pred->label = cur_block;
         sl_append(&ir_expr->phi.preds, &pred->link);
 
         pred = emalloc(sizeof(*pred));
@@ -1087,15 +1086,10 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         pred->label = right_label;
         sl_append(&ir_expr->phi.preds, &pred->link);
 
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        ir_stmt->assign.dest = temp;
-        ir_stmt->assign.src = ir_expr; // The phi node
-        sl_append(ir_stmts, &ir_stmt->link);
-
         if (left_loc != NULL) {
-            *left_loc = left_expr;
+            *left_loc = ir_expr;
         }
-        return temp;
+        return ir_expr;
     }
     default:
         assert(false);

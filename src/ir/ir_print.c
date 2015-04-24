@@ -293,6 +293,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     case IR_EXPR_PHI: {
         fprintf(stream, "phi ");
         ir_type_print(stream, expr->phi.type, NULL);
+        fprintf(stream, " ");
         SL_FOREACH(cur, &expr->phi.preds) {
             ir_expr_label_pair_t *pair = GET_ELEM(&expr->phi.preds, cur);
             fprintf(stream, "[ ");
