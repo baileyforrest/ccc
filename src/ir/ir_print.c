@@ -96,7 +96,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
     }
     switch (stmt->type) {
     case IR_STMT_LABEL:
-        fprintf(stream, "%s:", stmt->label->name);
+        fprintf(stream, "\n%s:", stmt->label->name);
         break;
     case IR_STMT_RET:
         fprintf(stream, "ret ");

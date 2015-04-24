@@ -363,6 +363,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         sl_append(ir_stmts, &ir_stmt->link);
 
         // Loop body
+        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+        ir_stmt->label = body;
+        sl_append(ir_stmts, &ir_stmt->link);
+
         trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
@@ -421,6 +425,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         sl_append(ir_stmts, &ir_stmt->link);
 
         // Loop body
+        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+        ir_stmt->label = body;
+        sl_append(ir_stmts, &ir_stmt->link);
+
         trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
         trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
