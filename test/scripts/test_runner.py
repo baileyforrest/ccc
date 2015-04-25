@@ -27,7 +27,7 @@ def usage():
     print("usage: %s [-llvm] [-v] [-jN] [compiler and options] [tests] \n"
           % sys.argv[0])
     print("test must be a c source file with a correct first line header:")
-    print("%s [return n | error | exception | noreturn ]" % HEADER_STR)
+    print("%s [return n | error | exception ]" % HEADER_STR)
 
     print("\noptional arguments:");
     print("-j Jobs to run in parallel")
@@ -106,7 +106,6 @@ def process_file(src_path):
         return_val = 0
         is_error = False
         is_except = False
-        is_noreturn = False
 
         if header[1] == "return":
             if len(header) < 3:
@@ -118,8 +117,6 @@ def process_file(src_path):
             is_error = True
         elif header[1] == "exception":
             is_except = True
-        elif header[1] == "noreturn":
-            is_noreturn = True
         else:
             fail(src_path, "Invalid header")
             return 0
@@ -203,7 +200,7 @@ def process_file(src_path):
             lines = subprocess.check_output(outname, timeout=timeout_remain,
                                             universal_newlines=True)
         except subprocess.TimeoutExpired:
-            if is_noreturn:
+            if is_except:
                 success(src_path)
                 return 1
             else:
