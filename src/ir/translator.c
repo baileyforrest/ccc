@@ -356,10 +356,14 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
-        ir_stmt->br.cond = NULL;
-        ir_stmt->br.uncond = cond;
-        trans_add_stmt(ts, ir_stmts, ir_stmt);
+        // Only add unconditional branch if last statement wasn't a return
+        ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
+        if (!(last != NULL && last->type == IR_STMT_RET)) {
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            ir_stmt->br.cond = NULL;
+            ir_stmt->br.uncond = cond;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+        }
 
         // End label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
