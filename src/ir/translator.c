@@ -375,13 +375,13 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         typetab_t *typetab_save;
         // Loop header:
         if (stmt->for_params.decl1 != NULL) {
+            typetab_save = ts->typetab;
+            ts->typetab = stmt->for_params.typetab;
             SL_FOREACH(cur, &stmt->for_params.decl1->decls) {
                 trans_decl_node(ts,
                                 GET_ELEM(&stmt->for_params.decl1->decls, cur),
                                 IR_DECL_NODE_LOCAL, ir_stmts);
             }
-            typetab_save = ts->typetab;
-            ts->typetab = stmt->for_params.typetab;
         } else if (stmt->for_params.expr1 != NULL) {
             trans_expr(ts, false, stmt->for_params.expr1, ir_stmts);
             typetab_save = NULL;
@@ -1523,7 +1523,7 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
     assert(status == CCC_OK);
 
     // Associate the given variable with the created entry
-    typetab_entry_t *tt_ent = tt_lookup(ts->typetab, var_expr->var.name);
+    typetab_entry_t *tt_ent = tt_lookup(ts->typetab, node->id);
     assert(tt_ent != NULL && tt_ent->entry_type == TT_VAR);
     tt_ent->var.ir_entry = entry;
 }
