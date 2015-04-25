@@ -915,8 +915,11 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
     }
     switch (dest->type) {
     case EXPR_VAR: {
-        ir_symtab_entry_t *entry = ir_symtab_lookup(&ts->func->func.locals,
-                                                    dest->var_id);
+        typetab_entry_t *tt_ent = tt_lookup(ts->typetab, dest->var_id);
+        assert(tt_ent != NULL && tt_ent->entry_type == TT_VAR);
+
+        ir_symtab_entry_t *entry = tt_ent->var.ir_entry;
+
         // Must be valid if typechecked
         assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
 
