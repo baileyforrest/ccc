@@ -164,12 +164,12 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     case IR_GDECL_FUNC_DECL:
         break;
     case IR_GDECL_GDATA:
-        sl_init(&gdecl->gdata.stmts, offsetof(ir_stmt_t, link));
+        sl_init(&gdecl->gdata.stmts.list, offsetof(ir_stmt_t, link));
         break;
     case IR_GDECL_FUNC:
         sl_init(&gdecl->func.params, offsetof(ir_expr_t, link));
-        sl_init(&gdecl->func.prefix, offsetof(ir_stmt_t, link));
-        sl_init(&gdecl->func.body, offsetof(ir_stmt_t, link));
+        sl_init(&gdecl->func.prefix.list, offsetof(ir_stmt_t, link));
+        sl_init(&gdecl->func.body.list, offsetof(ir_stmt_t, link));
         ir_symtab_init(&gdecl->func.locals);
         gdecl->func.next_temp = 0;
         gdecl->func.next_label = 0;

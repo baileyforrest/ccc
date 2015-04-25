@@ -374,6 +374,10 @@ typedef struct ir_stmt_t {
     };
 } ir_stmt_t;
 
+typedef struct ir_inst_stream_t {
+    slist_t list; /**< (ir_stmt) */
+} ir_inst_stream_t;
+
 typedef enum ir_gdecl_type_t {
     IR_GDECL_GDATA,
     IR_GDECL_FUNC_DECL,
@@ -386,7 +390,7 @@ typedef struct ir_gdecl_t {
 
     union {
         struct {
-            slist_t stmts; /**< (ir_stmt_t) Any initialization and the def */
+            ir_inst_stream_t stmts; /**< Any initialization and the def */
         } gdata;
 
         struct {
@@ -398,8 +402,8 @@ typedef struct ir_gdecl_t {
             ir_type_t *type;
             char *name;
             slist_t params; /**< (ir_expr_t) List of parameters (not owned) */
-            slist_t prefix; /**< (ir_stmt_t) List of prefix statements */
-            slist_t body; /**< (ir_stmt_t) */
+            ir_inst_stream_t prefix; /**<  Prefix statements */
+            ir_inst_stream_t body;
             ir_symtab_t locals;
             int next_temp; /**< Next temp name */
             int next_label; /**< Next label name */

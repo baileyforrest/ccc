@@ -28,11 +28,12 @@
 #include "util/util.h"
 #include "typecheck/typechecker.h"
 
-void trans_add_stmt(trans_state_t *ts, slist_t *stmt_list, ir_stmt_t *stmt) {
+void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
+                    ir_stmt_t *stmt) {
     if (stmt->type == IR_STMT_LABEL) {
         ts->func->func.last_label = stmt->label;
     }
-    sl_append(stmt_list, &stmt->link);
+    sl_append(&stream->list, &stmt->link);
 }
 
 ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
@@ -135,7 +136,8 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
 
         ir_stmt_t *start_label = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         start_label->label = trans_numlabel_create(ts);
-        sl_prepend(&ir_gdecl->func.prefix, &start_label->link);
+        trans_add_stmt(ts, &ir_gdecl->func.prefix, start_label);
+
         trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
         sl_append(ir_gdecls, &ir_gdecl->link);
         ts->func = NULL;
@@ -167,7 +169,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
     }
 }
 
-void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
+void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     switch (stmt->type) {
     case STMT_NOP:
         break;
@@ -224,7 +226,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
 
         trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
         // Unconditonal branch only if last instruction was not a return
-        ir_stmt_t *last = sl_tail(ir_stmts);
+        ir_stmt_t *last = sl_tail(&ir_stmts->list);
         if (!(last != NULL && last->type == IR_STMT_RET)) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
@@ -240,7 +242,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
 
             trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
             // Unconditonal branch only if last instruction was not a return
-            ir_stmt_t *last = sl_tail(ir_stmts);
+            ir_stmt_t *last = sl_tail(&ir_stmts->list);
             if (!(last != NULL && last->type == IR_STMT_RET)) {
                 ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;
@@ -537,7 +539,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
 }
 
 ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
-                      slist_t *ir_stmts) {
+                      ir_inst_stream_t *ir_stmts) {
     // TODO0: Handle other addrof cases
     switch (expr->type) {
     case EXPR_VOID:
@@ -875,7 +877,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 }
 
 ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
-                        slist_t *ir_stmts) {
+                        ir_inst_stream_t *ir_stmts) {
     ir_expr_t *ptr = NULL;
     while (dest->type == EXPR_PAREN) {
         dest = dest->paren_base;
@@ -922,7 +924,7 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
 
 
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
-                           slist_t *ir_stmts) {
+                           ir_inst_stream_t *ir_stmts) {
     ir_type_t *type = ir_expr_type(expr);
     if (type->type == IR_TYPE_INT && type->int_params.width == 1) {
         return expr;
@@ -957,7 +959,7 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
 }
 
 ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
-                       oper_t op, type_t *type, slist_t *ir_stmts,
+                       oper_t op, type_t *type, ir_inst_stream_t *ir_stmts,
                        ir_expr_t **left_loc) {
     type = ast_type_untypedef(type);
     bool is_float = false;
@@ -1169,7 +1171,8 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     return op_expr;
 }
 
-ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
+ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
+                         ir_inst_stream_t *ir_stmts) {
     assert(expr->type == EXPR_UNARY);
     oper_t op = expr->unary.op;
     if (op == OP_ADDR) {
@@ -1291,7 +1294,8 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
 }
 
 ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
-                                 ir_expr_t *src_expr, slist_t *ir_stmts) {
+                                 ir_expr_t *src_expr,
+                                 ir_inst_stream_t *ir_stmts) {
     // Don't do anything if types are equal
     if (typecheck_type_equal(ast_type_unmod(dest), ast_type_unmod(src))) {
         return src_expr;
@@ -1399,7 +1403,8 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     return temp;
 }
 
-void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
+void trans_decl_node(trans_state_t *ts, decl_node_t *node,
+                     ir_inst_stream_t *ir_stmts) {
     bool global = ts->func == NULL;
     ir_expr_t *name = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
