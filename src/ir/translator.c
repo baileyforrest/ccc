@@ -1288,6 +1288,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
     case OP_LOGICNOT:
         // Convert expression to bool, then do a bitwise not
         ir_expr = trans_expr_bool(ts, ir_expr, ir_stmts);
+        type = ir_expr_type(ir_expr);
         op = OP_BITNOT;
         // FALL THROUGH
     case OP_BITNOT:
