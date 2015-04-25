@@ -106,6 +106,14 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         }
 
         trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
+
+        // Remove trailing labels
+        ir_stmt_t *last = ir_inst_stream_tail(&ir_gdecl->func.body);
+        while (last->type == IR_STMT_LABEL) {
+            dl_remove(&ir_gdecl->func.body.list, &last->link);
+            last = ir_inst_stream_tail(&ir_gdecl->func.body);
+        }
+
         sl_append(ir_gdecls, &ir_gdecl->link);
 
         // Restore state
@@ -372,7 +380,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ts->break_target = after;
         ts->continue_target = cond;
 
-        typetab_t *typetab_save;
+        typetab_t *typetab_save = NULL;
         // Loop header:
         if (stmt->for_params.decl1 != NULL) {
             typetab_save = ts->typetab;
@@ -384,7 +392,6 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             }
         } else if (stmt->for_params.expr1 != NULL) {
             trans_expr(ts, false, stmt->for_params.expr1, ir_stmts);
-            typetab_save = NULL;
         }
 
         // Unconditional branch to test
@@ -890,7 +897,7 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
         assert(false);
     }
     ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_STORE);
-    ir_stmt->store.type = ir_expr_type(src);
+    ir_stmt->store.type = trans_type(ts, dest->etype);
     ir_stmt->store.val = src;
     ir_stmt->store.ptr = ptr;
     trans_add_stmt(ts, ir_stmts, ir_stmt);
