@@ -406,7 +406,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
                                 GET_ELEM(&stmt->for_params.decl1->decls, cur),
                                 ir_stmts);
             }
-        } else {
+        } else if (stmt->for_params.expr1 != NULL) {
             trans_expr(ts, false, stmt->for_params.expr1, ir_stmts);
         }
 
@@ -422,14 +422,23 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->label = cond;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        ir_expr_t *test = trans_expr(ts, false, stmt->for_params.expr2,
-                                     ir_stmts);
+        if (stmt->for_params.expr2 == NULL) {
+            // If there's not a second expression, just do an unconditional jump
+            // to the body
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            ir_stmt->br.cond = NULL;
+            ir_stmt->br.uncond = body;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+        } else {
+            ir_expr_t *test = trans_expr(ts, false, stmt->for_params.expr2,
+                                         ir_stmts);
 
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
-        ir_stmt->br.cond = test;
-        ir_stmt->br.if_true = body;
-        ir_stmt->br.if_false = after;
-        trans_add_stmt(ts, ir_stmts, ir_stmt);
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            ir_stmt->br.cond = test;
+            ir_stmt->br.if_true = body;
+            ir_stmt->br.if_false = after;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+        }
 
         // Loop body
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
@@ -437,7 +446,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
-        trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
+        if (stmt->for_params.expr3 != NULL) {
+            trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
+        }
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = cond;
