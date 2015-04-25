@@ -1061,7 +1061,6 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     case OP_LOGICAND:
     case OP_LOGICOR: {
         bool is_and = op == OP_LOGICAND;
-        ir_label_t *cur_block = ts->func->func.last_label;
 
         ir_label_t *right_label = trans_numlabel_create(ts);
         ir_label_t *done = trans_numlabel_create(ts);
@@ -1069,6 +1068,9 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         // Create left expression
         ir_expr_t *left_expr = trans_expr(ts, false, left, ir_stmts);
         ir_expr_t *ir_expr = trans_expr_bool(ts, left_expr, ir_stmts);
+
+        // Must be after translating first expression
+        ir_label_t *cur_block = ts->func->func.last_label;
 
         // First branch
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
@@ -1089,6 +1091,9 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 
         ir_expr = trans_expr(ts, false, right, ir_stmts);
         ir_expr_t *right_val = trans_expr_bool(ts, ir_expr, ir_stmts);
+
+        // Set right source to last created label
+        right_label = ts->func->func.last_label;
 
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
