@@ -3,7 +3,7 @@
 SRC=src
 BIN_NAME=./bin/ccc
 OUTPUT_C=dump.c
-OUTPUT_O=dump.c
+OUTPUT_O=dump.o
 
 FILES=$(find $SRC -name "*.c")
 

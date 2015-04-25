@@ -645,6 +645,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         // Expression
         ir_expr_t *expr2 = trans_expr(ts, false, expr->cond.expr2, ir_stmts);
 
+        // Set true source to last created label
+        if_true = ts->func->func.last_label;
+
         // Jump to after
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
@@ -660,6 +663,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         // Expression
         ir_expr_t *expr3 = trans_expr(ts, false, expr->cond.expr3, ir_stmts);
+
+        // Set false source to last created label
+        if_false = ts->func->func.last_label;
 
         // Jump to after
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
