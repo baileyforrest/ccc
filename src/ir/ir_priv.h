@@ -23,6 +23,8 @@
 #ifndef _IR_PRIV_H_
 #define _IR_PRIV_H_
 
+#include "ir.h"
+
 void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree);
 
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl);

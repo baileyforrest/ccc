@@ -51,7 +51,7 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA: {
-        SL_FOREACH(cur, &gdecl->gdata.stmts.list) {
+        DL_FOREACH(cur, &gdecl->gdata.stmts.list) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->gdata.stmts.list, cur),
                           false);
         }
@@ -77,11 +77,11 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         fprintf(stream, ")");
 
         fprintf(stream, " {\n");
-        SL_FOREACH(cur, &gdecl->func.prefix.list) {
+        DL_FOREACH(cur, &gdecl->func.prefix.list) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->func.prefix.list, cur),
                           true);
         }
-        SL_FOREACH(cur, &gdecl->func.body.list) {
+        DL_FOREACH(cur, &gdecl->func.body.list) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->func.body.list, cur),
                           true);
         }

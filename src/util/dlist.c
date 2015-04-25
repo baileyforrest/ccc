@@ -24,6 +24,9 @@
 
 #include <assert.h>
 
+extern void *dl_head(dlist_t *dlist);
+extern void *dl_tail(dlist_t *dlist);
+
 void dl_init(dlist_t *dlist, size_t head_offset) {
     dlist->head = NULL;
     dlist->tail = NULL;

@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 
+#include "util/dlist.h"
 #include "util/htable.h"
 #include "util/slist.h"
 #include "util/util.h"
@@ -321,7 +322,7 @@ typedef enum ir_stmt_type_t {
 
 typedef struct ir_stmt_t {
     sl_link_t heap_link;
-    sl_link_t link;
+    dl_link_t link;
     ir_stmt_type_t type;
 
     union {
@@ -375,7 +376,7 @@ typedef struct ir_stmt_t {
 } ir_stmt_t;
 
 typedef struct ir_inst_stream_t {
-    slist_t list; /**< (ir_stmt) */
+    dlist_t list; /**< (ir_stmt) */
 } ir_inst_stream_t;
 
 typedef enum ir_gdecl_type_t {
@@ -435,6 +436,14 @@ extern ir_type_t ir_type_x86_fp80;
 
 #define SWITCH_VAL_TYPE ir_type_i64
 #define NELEM_TYPE ir_type_i64
+
+inline ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream) {
+    return dl_head(&stream->list);
+}
+
+inline ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream) {
+    return dl_tail(&stream->list);
+}
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name);
 

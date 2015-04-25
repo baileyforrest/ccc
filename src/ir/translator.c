@@ -36,7 +36,7 @@ void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
     if (stmt->type == IR_STMT_LABEL) {
         ts->func->func.last_label = stmt->label;
     }
-    sl_append(&stream->list, &stmt->link);
+    dl_append(&stream->list, &stmt->link);
 }
 
 ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
@@ -197,7 +197,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
         trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
         // Unconditonal branch only if last instruction was not a return
-        ir_stmt_t *last = sl_tail(&ir_stmts->list);
+        ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
         if (!(last != NULL && last->type == IR_STMT_RET)) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
@@ -213,7 +213,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
             trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
             // Unconditonal branch only if last instruction was not a return
-            ir_stmt_t *last = sl_tail(&ir_stmts->list);
+            ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
             if (!(last != NULL && last->type == IR_STMT_RET)) {
                 ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;

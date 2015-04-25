@@ -44,6 +44,9 @@ ir_type_t ir_type_float = IR_FLOAT_LIT(IR_FLOAT_FLOAT);
 ir_type_t ir_type_double = IR_FLOAT_LIT(IR_FLOAT_DOUBLE);
 ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
+extern ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream);
+extern ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream);
+
 ir_type_t *ir_expr_type(ir_expr_t *expr) {
     switch (expr->type) {
     case IR_EXPR_VAR:
@@ -164,12 +167,12 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     case IR_GDECL_FUNC_DECL:
         break;
     case IR_GDECL_GDATA:
-        sl_init(&gdecl->gdata.stmts.list, offsetof(ir_stmt_t, link));
+        dl_init(&gdecl->gdata.stmts.list, offsetof(ir_stmt_t, link));
         break;
     case IR_GDECL_FUNC:
         sl_init(&gdecl->func.params, offsetof(ir_expr_t, link));
-        sl_init(&gdecl->func.prefix.list, offsetof(ir_stmt_t, link));
-        sl_init(&gdecl->func.body.list, offsetof(ir_stmt_t, link));
+        dl_init(&gdecl->func.prefix.list, offsetof(ir_stmt_t, link));
+        dl_init(&gdecl->func.body.list, offsetof(ir_stmt_t, link));
         ir_symtab_init(&gdecl->func.locals);
         gdecl->func.next_temp = 0;
         gdecl->func.next_label = 0;
