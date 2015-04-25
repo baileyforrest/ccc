@@ -205,14 +205,18 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
         trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
 
-        // Unconditonal branch only if last instruction was not a return
-        if (!ir_inst_stream_last_ret(ir_stmts)) {
+        bool true_ret = false;
+        if (ir_inst_stream_last_ret(ir_stmts)) {
+            true_ret = true;
+        } else {
+            // Unconditonal branch only if last instruction was not a return
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
             ir_stmt->br.uncond = after;
             trans_add_stmt(ts, ir_stmts, ir_stmt);
         }
 
+        bool false_ret = false;
         if (if_false != NULL) {
             // False branch
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
@@ -222,7 +226,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
 
             // Unconditonal branch only if last instruction was not a return
-            if (!ir_inst_stream_last_ret(ir_stmts)) {
+            if (ir_inst_stream_last_ret(ir_stmts)) {
+                false_ret = true;
+            } else {
                 ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;
                 ir_stmt->br.uncond = after;
@@ -230,10 +236,12 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             }
         }
 
-        // End label
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
-        ir_stmt->label = after;
-        trans_add_stmt(ts, ir_stmts, ir_stmt);
+        // Only add end label if both branches didn't return
+        if (!(true_ret && false_ret)) {
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+            ir_stmt->label = after;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+        }
         break;
     }
     case STMT_SWITCH: {
