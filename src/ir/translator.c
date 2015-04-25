@@ -683,6 +683,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         // Expression
         ir_expr_t *expr2 = trans_expr(ts, false, expr->cond.expr2, ir_stmts);
+        expr2 = trans_type_conversion(ts, expr->etype, expr->cond.expr2->etype,
+                                      expr2, ir_stmts);
 
         // Set true source to last created label
         if_true = ts->func->func.last_label;
@@ -702,6 +704,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         // Expression
         ir_expr_t *expr3 = trans_expr(ts, false, expr->cond.expr3, ir_stmts);
+        expr3 = trans_type_conversion(ts, expr->etype, expr->cond.expr3->etype,
+                                      expr3, ir_stmts);
 
         // Set false source to last created label
         if_false = ts->func->func.last_label;
@@ -1537,8 +1541,8 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
             store->store.type = trans_type(ts, node->type);
             ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
             store->store.val = trans_type_conversion(ts, node->type,
-                                                       node->expr->etype, val,
-                                                       ir_stmts);
+                                                     node->expr->etype, val,
+                                                     ir_stmts);
             store->store.ptr = var_expr;
             trans_add_stmt(ts, ir_stmts, store);
         }
