@@ -204,9 +204,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
+
         // Unconditonal branch only if last instruction was not a return
-        ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
-        if (!(last != NULL && last->type == IR_STMT_RET)) {
+        if (!ir_inst_stream_last_ret(ir_stmts)) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
             ir_stmt->br.uncond = after;
@@ -220,9 +220,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             trans_add_stmt(ts, ir_stmts, ir_stmt);
 
             trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
+
             // Unconditonal branch only if last instruction was not a return
-            ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
-            if (!(last != NULL && last->type == IR_STMT_RET)) {
+            if (!ir_inst_stream_last_ret(ir_stmts)) {
                 ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;
                 ir_stmt->br.uncond = after;
@@ -356,9 +356,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
+
         // Only add unconditional branch if last statement wasn't a return
-        ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
-        if (!(last != NULL && last->type == IR_STMT_RET)) {
+        if (!ir_inst_stream_last_ret(ir_stmts)) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
             ir_stmt->br.uncond = cond;
@@ -437,8 +437,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
         // Only add 3rd expression and unconditional branch if last statement
         // wasn't a return
-        ir_stmt_t *last = ir_inst_stream_tail(ir_stmts);
-        if (!(last != NULL && last->type == IR_STMT_RET)) {
+        if (!ir_inst_stream_last_ret(ir_stmts)) {
             if (stmt->for_params.expr3 != NULL) {
                 trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
             }
