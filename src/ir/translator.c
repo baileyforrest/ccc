@@ -368,10 +368,10 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt->label = body;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        returns = trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
+        bool stmt_returns = trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
 
         // Only add unconditional branch if loop doesn't return
-        if (!returns) {
+        if (!stmt_returns) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
             ir_stmt->br.uncond = cond;
@@ -447,11 +447,11 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt->label = body;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        returns = trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
+        bool stmt_returns = trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
 
         // Only add 3rd expression and unconditional branch if last statement
         // wasn't a return
-        if (!returns) {
+        if (!stmt_returns) {
             if (stmt->for_params.expr3 != NULL) {
                 trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
             }
