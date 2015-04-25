@@ -567,7 +567,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_ASSIGN: {
         if (expr->assign.op == OP_NOP) {
             ir_expr_t *src = trans_expr(ts, false, expr->assign.expr, ir_stmts);
-            return trans_assign(ts, expr->assign.dest, src, ir_stmts);
+            return trans_assign(ts, expr->assign.dest, src,
+                                expr->assign.expr->etype, ir_stmts);
         }
         ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *dest;
@@ -582,7 +583,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         binop->assign.src = op_expr;
         trans_add_stmt(ts, ir_stmts, binop);
 
-        return trans_assign(ts, expr->assign.dest, temp, ir_stmts);
+        return trans_assign(ts, expr->assign.dest, temp,
+                            expr->assign.expr->etype, ir_stmts);
     }
     case EXPR_CONST_INT: {
         ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
@@ -865,7 +867,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 }
 
 ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
-                        ir_inst_stream_t *ir_stmts) {
+                        type_t *src_type, ir_inst_stream_t *ir_stmts) {
     ir_expr_t *ptr = NULL;
     while (dest->type == EXPR_PAREN) {
         dest = dest->paren_base;
@@ -904,7 +906,8 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
     }
     ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_STORE);
     ir_stmt->store.type = trans_type(ts, dest->etype);
-    ir_stmt->store.val = src;
+    ir_stmt->store.val = trans_type_conversion(ts, dest->etype, src_type, src,
+                                               ir_stmts);
     ir_stmt->store.ptr = ptr;
     trans_add_stmt(ts, ir_stmts, ir_stmt);
     return src;
@@ -1205,7 +1208,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         assign->assign.src = op_expr;
         trans_add_stmt(ts, ir_stmts, assign);
 
-        trans_assign(ts, expr->unary.expr, temp, ir_stmts);
+        trans_assign(ts, expr->unary.expr, temp, expr->etype, ir_stmts);
 
         switch (op) {
         case OP_PREINC:

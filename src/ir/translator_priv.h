@@ -69,7 +69,7 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
                                  ir_inst_stream_t *ir_stmts);
 
 ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
-                        ir_inst_stream_t *ir_stmts);
+                        type_t *src_type, ir_inst_stream_t *ir_stmts);
 
 char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned);
 
