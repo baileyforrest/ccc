@@ -66,4 +66,17 @@ void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
  */
 bool typecheck_type_equal(type_t *t1, type_t *t2);
 
+/**
+ * Verifies that t1 and t2 are compatible, and the returns the "higher" type of
+ * the two.
+ *
+ * @param mark Location of usage. NULL if none, no errors will be reported
+ * @param t1 Type 1
+ * @param t2 Type 2
+ * @param result The wider of t1 and t2 otherwise.
+ *     NULL if they are not compatible
+ * @return true if the node typechecks, false otherwise
+ */
+bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2, type_t **result);
+
 #endif /* _TYPECHECKER_H_ */

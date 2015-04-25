@@ -108,19 +108,6 @@ bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type);
 type_t *typecheck_get_ptr_base(type_t *t1);
 
 /**
- * Verifies that t1 and t2 are compatible, and the returns the "higher" type of
- * the two.
- *
- * @param mark Location of usage
- * @param t1 Type 1
- * @param t2 Type 2
- * @param result The wider of t1 and t2 otherwise.
- *     NULL if they are not compatible
- * @return true if the node typechecks, false otherwise
- */
-bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2, type_t **result);
-
-/**
  * Returns true if from can be cast to to.
  *
  * @param mark Location of the type cast

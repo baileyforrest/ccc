@@ -1137,21 +1137,30 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     // Comparisons need to be handled separately
     if (is_cmp) {
         ir_expr_t *cmp;
-        ir_expr_t *left_expr;
+        type_t *max_type;
+        bool success = typecheck_type_max(NULL, left->etype, right->etype,
+                                          &max_type);
+        // Must be valid if typechecked
+        assert(success && max_type != NULL);
+
+        ir_expr_t *left_expr = trans_expr(ts, false, left, ir_stmts);
+        left_expr = trans_type_conversion(ts, max_type, left->etype, left_expr,
+                                          ir_stmts);
+        ir_expr_t *right_expr = trans_expr(ts, false, right, ir_stmts);
+        right_expr = trans_type_conversion(ts, max_type, right->etype,
+                                           right_expr, ir_stmts);
         if (is_float) {
             cmp = ir_expr_create(ts->tunit, IR_EXPR_FCMP);
             cmp->fcmp.cond = cmp_type;
-            left_expr = trans_expr(ts, false, left, ir_stmts);
             cmp->fcmp.expr1 = left_expr;
-            cmp->fcmp.expr2 = trans_expr(ts, false, right, ir_stmts);
-            cmp->fcmp.type = ir_expr_type(left_expr);
+            cmp->fcmp.expr2 = right_expr;
+            cmp->fcmp.type = trans_type(ts, max_type);
         } else {
             cmp = ir_expr_create(ts->tunit, IR_EXPR_ICMP);
             cmp->icmp.cond = cmp_type;
-            left_expr = trans_expr(ts, false, left, ir_stmts);
             cmp->icmp.expr1 = left_expr;
-            cmp->icmp.expr2 = trans_expr(ts, false, right, ir_stmts);;
-            cmp->icmp.type = ir_expr_type(left_expr);
+            cmp->icmp.expr2 = right_expr;
+            cmp->icmp.type = trans_type(ts, max_type);
         }
         if (left_loc != NULL) {
             *left_loc = left_expr;
