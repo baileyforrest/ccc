@@ -1483,7 +1483,10 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
         if (node->expr != NULL) {
             ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
             store->store.type = trans_type(ts, node->type);
-            store->store.val = trans_expr(ts, false, node->expr, ir_stmts);
+            ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
+            store->store.val = trans_type_conversion(ts, node->type,
+                                                       node->expr->etype, val,
+                                                       ir_stmts);
             store->store.ptr = var_expr;
             trans_add_stmt(ts, ir_stmts, store);
         }
