@@ -204,13 +204,13 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     }
 
     case STMT_IF: {
+        ir_expr_t *cond = trans_expr(ts, false, stmt->if_params.expr, ir_stmts);
+        cond = trans_expr_bool(ts, cond, ir_stmts);
+
         ir_label_t *if_true = trans_numlabel_create(ts);
         ir_label_t *if_false = stmt->if_params.false_stmt == NULL ?
             NULL : trans_numlabel_create(ts);
         ir_label_t *after = trans_numlabel_create(ts);
-
-        ir_expr_t *cond = trans_expr(ts, false, stmt->if_params.expr, ir_stmts);
-        cond = trans_expr_bool(ts, cond, ir_stmts);
 
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = cond;
@@ -224,10 +224,14 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         sl_append(ir_stmts, &ir_stmt->link);
 
         trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
-        ir_stmt->br.cond = NULL;
-        ir_stmt->br.uncond = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        // Unconditonal branch only if last instruction was not a return
+        ir_stmt_t *last = sl_tail(ir_stmts);
+        if (!(last != NULL && last->type == IR_STMT_RET)) {
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            ir_stmt->br.cond = NULL;
+            ir_stmt->br.uncond = after;
+            sl_append(ir_stmts, &ir_stmt->link);
+        }
 
         if (if_false != NULL) {
             // False branch
@@ -236,10 +240,14 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             sl_append(ir_stmts, &ir_stmt->link);
 
             trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
-            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
-            ir_stmt->br.cond = NULL;
-            ir_stmt->br.uncond = after;
-            sl_append(ir_stmts, &ir_stmt->link);
+            // Unconditonal branch only if last instruction was not a return
+            ir_stmt_t *last = sl_tail(ir_stmts);
+            if (!(last != NULL && last->type == IR_STMT_RET)) {
+                ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+                ir_stmt->br.cond = NULL;
+                ir_stmt->br.uncond = after;
+                sl_append(ir_stmts, &ir_stmt->link);
+            }
         }
 
         // End label
