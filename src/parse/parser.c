@@ -985,6 +985,12 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
         case LOGICOR:  op1 = OP_LOGICOR;  break;
 
         case COND: { // Conditional operator
+            // Cond takes lowest precedence, if there was a previous operator,
+            // just return left
+            if (prev_op != OP_NOP) {
+                *result = left;
+                return CCC_OK;
+            }
             LEX_ADVANCE(lex);
             new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
                                        EXPR_COND);
@@ -1046,6 +1052,12 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
         case LOGICOR:  op2 = OP_LOGICOR;  break;
 
         case COND: { // Cond has lowest precedence, combine left and right
+            // Cond takes lowest precedence, if there was a previous operator,
+            // just return left
+            if (prev_op != OP_NOP) {
+                *result = left;
+                return CCC_OK;
+            }
             LEX_ADVANCE(lex);
             new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
                                        EXPR_BIN);
