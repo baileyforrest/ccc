@@ -35,6 +35,8 @@ typedef struct trans_state_t {
 
 #define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL }
 
+void trans_add_stmt(trans_state_t *ts, slist_t *stmt_list, ir_stmt_t *stmt);
+
 ir_label_t *trans_label_create(trans_state_t *ts, char *str);
 
 ir_label_t *trans_numlabel_create(trans_state_t *ts);

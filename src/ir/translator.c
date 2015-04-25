@@ -28,20 +28,19 @@
 #include "util/util.h"
 #include "typecheck/typechecker.h"
 
-ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
-    ir_label_t *label = ir_label_create(ts->tunit, str);
-    ts->func->func.last_label = label;
+void trans_add_stmt(trans_state_t *ts, slist_t *stmt_list, ir_stmt_t *stmt) {
+    if (stmt->type == IR_STMT_LABEL) {
+        ts->func->func.last_label = stmt->label;
+    }
+    sl_append(stmt_list, &stmt->link);
+}
 
-    return label;
+ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
+    return ir_label_create(ts->tunit, str);
 }
 
 ir_label_t *trans_numlabel_create(trans_state_t *ts) {
-    ir_label_t *label =
-        ir_numlabel_create(ts->tunit, ts->func->func.next_label++);
-
-    ts->func->func.last_label = label;
-
-    return label;
+    return ir_numlabel_create(ts->tunit, ts->func->func.next_label++);
 }
 
 ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type) {
@@ -109,7 +108,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             stmt->assign.src->alloca.type = name->var.type;
             stmt->assign.src->alloca.nelem_type = NULL;
             stmt->assign.src->alloca.align = ast_type_align(node->type);
-            sl_append(&ts->func->func.prefix, &stmt->link);
+            trans_add_stmt(ts, &ts->func->func.prefix, stmt);
             entry->var.access = temp;
             status_t status = ir_symtab_insert(symtab, entry);
             assert(status == CCC_OK);
@@ -119,7 +118,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             store->store.type = name->var.type;
             store->store.val = name;
             store->store.ptr = temp;
-            sl_append(&ts->func->func.body, &store->link);
+            trans_add_stmt(ts, &ts->func->func.body, store);
         }
 
         ir_expr_t *name = ir_expr_create(ts->tunit, IR_EXPR_VAR);
@@ -184,44 +183,44 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
     case STMT_LABEL: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = trans_label_create(ts, stmt->label.label);
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         trans_stmt(ts, stmt->label.stmt, ir_stmts);
         break;
     }
     case STMT_CASE: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = stmt->case_params.label;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         trans_stmt(ts, stmt->case_params.stmt, ir_stmts);
         break;
     }
     case STMT_DEFAULT: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = stmt->default_params.label;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         trans_stmt(ts, stmt->default_params.stmt, ir_stmts);
         break;
     }
 
     case STMT_IF: {
-        ir_expr_t *cond = trans_expr(ts, false, stmt->if_params.expr, ir_stmts);
-        cond = trans_expr_bool(ts, cond, ir_stmts);
-
         ir_label_t *if_true = trans_numlabel_create(ts);
         ir_label_t *if_false = stmt->if_params.false_stmt == NULL ?
             NULL : trans_numlabel_create(ts);
         ir_label_t *after = trans_numlabel_create(ts);
 
+        ir_expr_t *cond = trans_expr(ts, false, stmt->if_params.expr, ir_stmts);
+        cond = trans_expr_bool(ts, cond, ir_stmts);
+
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = cond;
         ir_stmt->br.if_true = if_true;
         ir_stmt->br.if_false = if_false == NULL ? after : if_false;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // True branch
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = if_true;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
         // Unconditonal branch only if last instruction was not a return
@@ -230,14 +229,14 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
             ir_stmt->br.uncond = after;
-            sl_append(ir_stmts, &ir_stmt->link);
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
         }
 
         if (if_false != NULL) {
             // False branch
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
             ir_stmt->label = if_false;
-            sl_append(ir_stmts, &ir_stmt->link);
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
 
             trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
             // Unconditonal branch only if last instruction was not a return
@@ -246,14 +245,14 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
                 ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;
                 ir_stmt->br.uncond = after;
-                sl_append(ir_stmts, &ir_stmt->link);
+                trans_add_stmt(ts, ir_stmts, ir_stmt);
             }
         }
 
         // End label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         break;
     }
     case STMT_SWITCH: {
@@ -290,14 +289,14 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
 
         stmt->switch_params.default_stmt->default_params.label = label;
         ir_stmt->switch_params.default_case = label;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->switch_params.stmt, ir_stmts);
 
         // Preceeding label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Restore break target
         ts->break_target = break_save;
@@ -316,7 +315,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = body;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Loop body
         trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
@@ -328,12 +327,12 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = test;
         ir_stmt->br.if_true = body;
         ir_stmt->br.if_false = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // End label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Restore state
         ts->break_target = break_save;
@@ -353,13 +352,13 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = cond;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
 
         // Loop test
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = cond;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         ir_expr_t *test = trans_expr(ts, false, stmt->while_params.expr,
                                      ir_stmts);
@@ -368,23 +367,23 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = test;
         ir_stmt->br.if_true = body;
         ir_stmt->br.if_false = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Loop body
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = body;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = cond;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // End label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Restore state
         ts->break_target = break_save;
@@ -415,13 +414,13 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = cond;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
 
         // Loop test
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = cond;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         ir_expr_t *test = trans_expr(ts, false, stmt->for_params.expr2,
                                      ir_stmts);
@@ -430,24 +429,24 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = test;
         ir_stmt->br.if_true = body;
         ir_stmt->br.if_false = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Loop body
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = body;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
         trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = cond;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // End label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Restore state
         ts->break_target = break_save;
@@ -459,7 +458,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = trans_label_create(ts, stmt->goto_params.label);
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         break;
     }
     case STMT_CONTINUE: {
@@ -467,7 +466,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = NULL;
         assert(ts->continue_target != NULL);
         ir_stmt->br.uncond = ts->continue_target;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         break;
     }
     case STMT_BREAK: {
@@ -475,7 +474,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
         ir_stmt->br.cond = NULL;
         assert(ts->break_target != NULL);
         ir_stmt->br.uncond = ts->break_target;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         break;
     }
     case STMT_RETURN: {
@@ -489,7 +488,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, slist_t *ir_stmts) {
             trans_type_conversion(ts, stmt->return_params.type,
                                   stmt->return_params.expr->etype, ret_val,
                                   ir_stmts);
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
         break;
     }
 
@@ -560,7 +559,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
             assign->assign.dest = temp;
             assign->assign.src = load;
-            sl_append(ir_stmts, &assign->link);
+            trans_add_stmt(ts, ir_stmts, assign);
 
             return temp;
         } else {
@@ -586,7 +585,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_stmt_t *binop = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         binop->assign.dest = temp;
         binop->assign.src = op_expr;
-        sl_append(ir_stmts, &binop->link);
+        trans_add_stmt(ts, ir_stmts, binop);
 
         return trans_assign(ts, expr->assign.dest, temp, ir_stmts);
     }
@@ -623,7 +622,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         binop->assign.dest = temp;
         binop->assign.src = op_expr;
 
-        sl_append(ir_stmts, &binop->link);
+        trans_add_stmt(ts, ir_stmts, binop);
         return temp;
     }
     case EXPR_UNARY:
@@ -640,13 +639,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_stmt->br.cond = trans_expr_bool(ts, expr1, ir_stmts);
         ir_stmt->br.if_true = if_true;
         ir_stmt->br.if_false = if_false;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // True branch
         // Label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = if_true;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Expression
         ir_expr_t *expr2 = trans_expr(ts, false, expr->cond.expr2, ir_stmts);
@@ -655,14 +654,14 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
 
         // False branch
         // Label
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = if_false;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Expression
         ir_expr_t *expr3 = trans_expr(ts, false, expr->cond.expr3, ir_stmts);
@@ -671,12 +670,12 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // End
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = after;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         ir_expr_t *phi = ir_expr_create(ts->tunit, IR_EXPR_PHI);
         phi->phi.type = type;
@@ -696,7 +695,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         assign->assign.dest = temp;
         assign->assign.src = phi;
-        sl_append(ir_stmts, &assign->link);
+        trans_add_stmt(ts, ir_stmts, assign);
 
         return temp;
     }
@@ -728,7 +727,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         ir_stmt->assign.dest = temp;
         ir_stmt->assign.src = call;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         return temp;
     }
@@ -906,7 +905,7 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
     ir_stmt->store.type = ir_expr_type(src);
     ir_stmt->store.val = src;
     ir_stmt->store.ptr = ptr;
-    sl_append(ir_stmts, &ir_stmt->link);
+    trans_add_stmt(ts, ir_stmts, ir_stmt);
     return src;
 }
 
@@ -942,7 +941,7 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
     ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
     stmt->assign.dest = temp;
     stmt->assign.src = cmp;
-    sl_append(ir_stmts, &stmt->link);
+    trans_add_stmt(ts, ir_stmts, stmt);
     return temp;
 }
 
@@ -1067,12 +1066,12 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
             ir_stmt->br.if_true = done;
             ir_stmt->br.if_false = right_label;
         }
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Right side
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = right_label;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         ir_expr = trans_expr(ts, false, right, ir_stmts);
         ir_expr_t *right_val = trans_expr_bool(ts, ir_expr, ir_stmts);
@@ -1080,12 +1079,12 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = done;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
 
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = done;
-        sl_append(ir_stmts, &ir_stmt->link);
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         ir_expr = ir_expr_create(ts->tunit, IR_EXPR_PHI);
         ir_expr->phi.type = &ir_type_i1;
@@ -1202,7 +1201,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         assign->assign.dest = temp;
         assign->assign.src = op_expr;
-        sl_append(ir_stmts, &assign->link);
+        trans_add_stmt(ts, ir_stmts, assign);
 
         trans_assign(ts, expr->unary.expr, temp, ir_stmts);
 
@@ -1226,7 +1225,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         assign->assign.dest = temp;
         assign->assign.src = load;
-        sl_append(ir_stmts, &assign->link);
+        trans_add_stmt(ts, ir_stmts, assign);
         return temp;
     }
 
@@ -1271,7 +1270,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr, slist_t *ir_stmts) {
         ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         assign->assign.dest = temp;
         assign->assign.src = op_expr;
-        sl_append(ir_stmts, &assign->link);
+        trans_add_stmt(ts, ir_stmts, assign);
         return temp;
     }
     default: break;
@@ -1385,7 +1384,7 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
     ir_stmt->assign.dest = temp;
     ir_stmt->assign.src = convert;
-    sl_append(ir_stmts, &ir_stmt->link);
+    trans_add_stmt(ts, ir_stmts, ir_stmt);
     return temp;
 }
 
@@ -1412,21 +1411,20 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node, slist_t *ir_stmts) {
         ir_expr_t *src = node->expr == NULL ?
             NULL : trans_expr(ts, false, node->expr, ir_stmts);
         stmt->assign.src = src;
-        sl_append(ir_stmts, &stmt->link);
+        trans_add_stmt(ts, ir_stmts, stmt);
     } else {
-        slist_t *allocs = &ts->func->func.prefix;
         ir_expr_t *src = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
         src->alloca.type = name->var.type->ptr.base;
         src->alloca.nelem_type = NULL;
         src->alloca.align = ast_type_align(node->type);
         stmt->assign.src = src;
-        sl_append(allocs, &stmt->link);
+        trans_add_stmt(ts, &ts->func->func.prefix, stmt);
         if (node->expr != NULL) {
             ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
             store->store.type = trans_type(ts, node->type);
             store->store.val = trans_expr(ts, false, node->expr, ir_stmts);
             store->store.ptr = name;
-            sl_append(ir_stmts, &store->link);
+            trans_add_stmt(ts, ir_stmts, store);
         }
     }
 }
