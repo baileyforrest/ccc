@@ -314,6 +314,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             // Loop test
             ir_expr_t *test = trans_expr(ts, false, stmt->while_params.expr,
                                          ir_stmts);
+            test = trans_expr_bool(ts, test, ir_stmts);
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = test;
             ir_stmt->br.if_true = body;
@@ -354,6 +355,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
         ir_expr_t *test = trans_expr(ts, false, stmt->while_params.expr,
                                      ir_stmts);
+        test = trans_expr_bool(ts, test, ir_stmts);
 
         ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = test;
@@ -431,6 +433,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         } else {
             ir_expr_t *test = trans_expr(ts, false, stmt->for_params.expr2,
                                          ir_stmts);
+            test = trans_expr_bool(ts, test, ir_stmts);
 
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = test;
@@ -1240,7 +1243,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         case OP_PREINC:
         case OP_POSTINC: op_expr->binop.op = IR_OP_ADD; break;
         case OP_PREDEC:
-        case OP_POSTDEC: op_expr->binop.op = IR_OP_ADD; break;
+        case OP_POSTDEC: op_expr->binop.op = IR_OP_SUB; break;
         default: assert(false);
         }
         ir_expr_t *other = ir_expr_create(ts->tunit, IR_EXPR_CONST);
