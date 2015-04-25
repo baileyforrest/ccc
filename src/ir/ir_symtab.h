@@ -42,6 +42,7 @@ typedef struct ir_symtab_entry_t {
     sl_link_t link;
     ir_symtab_entry_type_t type;
     char *name;
+    int number; /**< Current number for variable. -1 if its already numbered */
 
     union {
         struct {

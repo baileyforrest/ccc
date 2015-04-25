@@ -1321,7 +1321,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 // already defined, and this is a definiton, or if the
                 // types are not equal
                 if (entry->entry_type != TT_VAR ||
-                    (entry->var_defined && !is_decl) ||
+                    (entry->var.var_defined && !is_decl) ||
                     !typecheck_type_equal(cmp_type, decl_node->type)) {
                     logger_log(&decl_node->mark, LOG_ERR,
                                "Redefined symbol %s", decl_node->id);
@@ -1329,7 +1329,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 }
             }
         } else {
-            entry->var_defined = !is_decl;
+            entry->var.var_defined = !is_decl;
         }
     }
     if (decl_node->expr != NULL) {

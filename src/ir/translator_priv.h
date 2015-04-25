@@ -71,8 +71,17 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
 ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
                         ir_inst_stream_t *ir_stmts);
 
+char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned);
+
+typedef enum ir_decl_node_type_t {
+    IR_DECL_NODE_GLOBAL,
+    IR_DECL_NODE_LOCAL,
+    IR_DECL_NODE_FDEFN,
+    IR_DECL_NODE_FUNC_PARAM,
+} ir_decl_node_type_t;
+
 void trans_decl_node(trans_state_t *ts, decl_node_t *node,
-                     ir_inst_stream_t *ir_stmts);
+                     ir_decl_node_type_t type, ir_inst_stream_t *ir_stmts);
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type);
 

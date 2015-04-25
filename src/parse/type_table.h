@@ -51,7 +51,10 @@ typedef struct typetab_entry_t {
     tt_type_t entry_type;
     struct type_t *type;
     union {
-        bool var_defined;   /**< Whether or not a variable was defined */
+        struct {
+            bool var_defined;   /**< Whether or not a variable was defined */
+            struct ir_symtab_entry_t *ir_entry;
+        } var;
         long long enum_val; /**< Value of an enumeration type */
     };
 } typetab_entry_t;

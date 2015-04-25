@@ -49,6 +49,9 @@ void ir_symtab_entry_destroy(ir_symtab_entry_t *entry) {
     default:
         assert(false);
     }
+    if (entry->number == -1) {
+        free(entry->name);
+    }
     free(entry);
 }
 
@@ -61,6 +64,13 @@ ir_symtab_entry_t *ir_symtab_entry_create(ir_symtab_entry_type_t type,
     ir_symtab_entry_t *entry = emalloc(sizeof(*entry));
     entry->type = type;
     entry->name = name;
+    entry->number = 0;
+    switch (type) {
+    case IR_SYMTAB_ENTRY_VAR:
+        break;
+    default:
+        assert(false);
+    }
     return entry;
 }
 
