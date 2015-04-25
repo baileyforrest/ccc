@@ -439,7 +439,7 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         // Restore state
         ts->break_target = break_save;
         ts->continue_target = continue_save;
-        if (ts->typetab != NULL) {
+        if (typetab_save != NULL) {
             ts->typetab = typetab_save;
         }
         break;
