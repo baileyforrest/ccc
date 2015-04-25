@@ -46,7 +46,6 @@ ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
 extern ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream);
 extern ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream);
-extern bool ir_inst_stream_last_ret(ir_inst_stream_t *stream);
 
 ir_type_t *ir_expr_type(ir_expr_t *expr) {
     switch (expr->type) {

@@ -445,11 +445,6 @@ inline ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream) {
     return dl_tail(&stream->list);
 }
 
-inline bool ir_inst_stream_last_ret(ir_inst_stream_t *stream) {
-    ir_stmt_t *tail = ir_inst_stream_tail(stream);
-    return tail != NULL && tail->type == IR_STMT_RET;
-}
-
 void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name);
 
 ir_type_t *ir_expr_type(ir_expr_t *expr);

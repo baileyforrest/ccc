@@ -48,7 +48,8 @@ ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
 
 void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
 
-void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts);
+// Returns true if the statement always returns, false otherwise
+bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts);
 
 ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                       ir_inst_stream_t *ir_stmts);

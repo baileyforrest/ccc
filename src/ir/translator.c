@@ -148,7 +148,8 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
     }
 }
 
-void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
+bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
+    bool returns = false;
     switch (stmt->type) {
     case STMT_NOP:
         break;
@@ -165,21 +166,21 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = trans_label_create(ts, stmt->label.label);
         trans_add_stmt(ts, ir_stmts, ir_stmt);
-        trans_stmt(ts, stmt->label.stmt, ir_stmts);
+        returns = trans_stmt(ts, stmt->label.stmt, ir_stmts);
         break;
     }
     case STMT_CASE: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = stmt->case_params.label;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
-        trans_stmt(ts, stmt->case_params.stmt, ir_stmts);
+        returns = trans_stmt(ts, stmt->case_params.stmt, ir_stmts);
         break;
     }
     case STMT_DEFAULT: {
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = stmt->default_params.label;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
-        trans_stmt(ts, stmt->default_params.stmt, ir_stmts);
+        returns = trans_stmt(ts, stmt->default_params.stmt, ir_stmts);
         break;
     }
 
@@ -203,12 +204,9 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt->label = if_true;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
+        bool true_ret = trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts);
 
-        bool true_ret = false;
-        if (ir_inst_stream_last_ret(ir_stmts)) {
-            true_ret = true;
-        } else {
+        if (!true_ret) {
             // Unconditonal branch only if last instruction was not a return
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
@@ -223,12 +221,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             ir_stmt->label = if_false;
             trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-            trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
+            false_ret = trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
 
             // Unconditonal branch only if last instruction was not a return
-            if (ir_inst_stream_last_ret(ir_stmts)) {
-                false_ret = true;
-            } else {
+            if (!false_ret) {
                 ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;
                 ir_stmt->br.uncond = after;
@@ -236,8 +232,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             }
         }
 
-        // Only add end label if both branches didn't return
-        if (!(true_ret && false_ret)) {
+        if (true_ret && false_ret) {
+            returns = true;
+        } else {
+            // Only add end label if both branches didn't return
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
             ir_stmt->label = after;
             trans_add_stmt(ts, ir_stmts, ir_stmt);
@@ -289,6 +287,8 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
         // Restore break target
         ts->break_target = break_save;
+
+        // TODO1: Set returns if all of the cases return
         break;
     }
 
@@ -307,21 +307,24 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Loop body
-        trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
+        returns = trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
 
-        // Loop test
-        ir_expr_t *test = trans_expr(ts, false, stmt->while_params.expr,
-                                     ir_stmts);
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
-        ir_stmt->br.cond = test;
-        ir_stmt->br.if_true = body;
-        ir_stmt->br.if_false = after;
-        trans_add_stmt(ts, ir_stmts, ir_stmt);
+        // Only translate test and end label if the body doesn't return
+        if (!returns) {
+            // Loop test
+            ir_expr_t *test = trans_expr(ts, false, stmt->while_params.expr,
+                                         ir_stmts);
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            ir_stmt->br.cond = test;
+            ir_stmt->br.if_true = body;
+            ir_stmt->br.if_false = after;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        // End label
-        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
-        ir_stmt->label = after;
-        trans_add_stmt(ts, ir_stmts, ir_stmt);
+            // End label
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+            ir_stmt->label = after;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+        }
 
         // Restore state
         ts->break_target = break_save;
@@ -363,10 +366,10 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt->label = body;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
+        returns = trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
 
-        // Only add unconditional branch if last statement wasn't a return
-        if (!ir_inst_stream_last_ret(ir_stmts)) {
+        // Only add unconditional branch if loop doesn't return
+        if (!returns) {
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
             ir_stmt->br.cond = NULL;
             ir_stmt->br.uncond = cond;
@@ -441,11 +444,11 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt->label = body;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
+        returns = trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
 
         // Only add 3rd expression and unconditional branch if last statement
         // wasn't a return
-        if (!ir_inst_stream_last_ret(ir_stmts)) {
+        if (!returns) {
             if (stmt->for_params.expr3 != NULL) {
                 trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
             }
@@ -504,12 +507,16 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
                                   stmt->return_params.expr->etype, ret_val,
                                   ir_stmts);
         trans_add_stmt(ts, ir_stmts, ir_stmt);
+
+        returns = true; // Return statement always returns
         break;
     }
 
     case STMT_COMPOUND: {
         typetab_t *typetab_save = ts->typetab;
         ts->typetab = &stmt->compound.typetab;
+        bool has_break = false;
+        bool has_return = false;
         bool ignore_until_label = false;
 
         SL_FOREACH(cur, &stmt->compound.stmts) {
@@ -521,14 +528,22 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
                     continue;
                 }
             }
-            // If we encounter a return statement, ignore all statements until
-            // a labeled statement
-            if (cur_stmt->type == STMT_RETURN) {
+            if (cur_stmt->type == STMT_BREAK) {
+                has_break = true;
+            }
+
+            // If we encounter a statement which always returns, ignore all
+            // statements until a labeled statement
+            if (trans_stmt(ts, cur_stmt, ir_stmts)) {
+                has_return = true;
                 ignore_until_label = true;
             }
-            trans_stmt(ts, cur_stmt, ir_stmts);
         }
         ts->typetab = typetab_save;
+
+        // The compound statement returns if we found a returning statement,
+        // and there is no break
+        returns = has_return && !has_break;
         break;
     }
 
@@ -538,6 +553,8 @@ void trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     default:
         assert(false);
     }
+
+    return returns;
 }
 
 ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
