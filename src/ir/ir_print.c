@@ -70,7 +70,7 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         assert(gdecl->func.type->type == IR_TYPE_FUNC);
         ir_type_print(stream, gdecl->func.type->func.type, NULL);
         fprintf(stream, " @%s", gdecl->func.name);
-        fprintf(stream, " (");
+        fprintf(stream, "(");
         SL_FOREACH(cur, &gdecl->func.params) {
             ir_expr_t *expr = GET_ELEM(&gdecl->func.params, cur);
             ir_type_print(stream, ir_expr_type(expr), NULL);
@@ -337,7 +337,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_type_print(stream, func_sig->func.type, NULL);
         fprintf(stream, " ");
         ir_expr_print(stream, expr->call.func_ptr);
-        fprintf(stream, " (");
+        fprintf(stream, "(");
 
         SL_FOREACH(cur, &expr->call.arglist) {
             ir_type_expr_pair_t *pair = GET_ELEM(&expr->call.arglist, cur);
@@ -369,7 +369,7 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
         if (func_name != NULL) {
             fprintf(stream, " @%s", func_name);
         }
-        fprintf(stream, " (");
+        fprintf(stream, "(");
         VEC_FOREACH(cur, &type->func.params) {
             ir_type_t *arg = vec_get(&type->func.params, cur);
             ir_type_print(stream, arg, NULL);
