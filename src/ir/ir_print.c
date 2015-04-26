@@ -73,6 +73,9 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
             ir_type_print(stream, ir_expr_type(expr), NULL);
             fprintf(stream, " ");
             ir_expr_print(stream, expr);
+            if (expr != sl_tail(&gdecl->func.params)) {
+                fprintf(stream, ", ");
+            }
         }
         fprintf(stream, ")");
 
