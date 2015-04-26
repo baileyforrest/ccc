@@ -44,6 +44,12 @@
 typedef uint32_t (*ht_hashfunc)(const void *key);
 typedef bool (*ht_cmpfunc)(const void *key1, const void *key2);
 
+typedef struct ht_ptr_elem_t {
+    sl_link_t link;
+    void *key;
+    void *val;
+} ht_ptr_elem_t;
+
 /**
  * Paramaters for initializing a hashtable
  */

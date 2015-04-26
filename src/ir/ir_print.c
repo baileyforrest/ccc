@@ -43,8 +43,11 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
     fprintf(stream, "target datalayout = \"%s\"\n", DATALAYOUT);
     fprintf(stream, "target triple = \"%s\"\n", TRIPLE);
     fprintf(stream, "\n");
-    SL_FOREACH(cur, &irtree->gdecls) {
-        ir_gdecl_print(stream, GET_ELEM(&irtree->gdecls, cur));
+    SL_FOREACH(cur, &irtree->decls) {
+        ir_gdecl_print(stream, GET_ELEM(&irtree->decls, cur));
+    }
+    SL_FOREACH(cur, &irtree->funcs) {
+        ir_gdecl_print(stream, GET_ELEM(&irtree->funcs, cur));
     }
 }
 
@@ -103,6 +106,9 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
     switch (stmt->type) {
     case IR_STMT_LABEL:
         fprintf(stream, "\n%s:", stmt->label->name);
+        break;
+    case IR_STMT_EXPR:
+        ir_expr_print(stream, stmt->expr);
         break;
     case IR_STMT_RET:
         fprintf(stream, "ret ");

@@ -311,6 +311,7 @@ typedef struct ir_label_node_t {
 
 typedef enum ir_stmt_type_t {
     IR_STMT_LABEL,
+    IR_STMT_EXPR,
     IR_STMT_RET,
     IR_STMT_BR,
     IR_STMT_SWITCH,
@@ -327,6 +328,7 @@ typedef struct ir_stmt_t {
 
     union {
         ir_label_t *label;
+        ir_expr_t *expr;
 
         struct {
             ir_type_t *type;
@@ -415,12 +417,15 @@ typedef struct ir_gdecl_t {
 
 typedef struct ir_trans_unit_t {
     sl_link_t link;
-    slist_t gdecls;
+    slist_t decls;
+    slist_t funcs;
+    ir_symtab_t globals;
+    htable_t labels;
+    htable_t global_decls; /* (char * -> decl_node_t *) */
+
     slist_t stmts;
     slist_t exprs;
     slist_t types;
-    ir_symtab_t globals;
-    htable_t labels;
 } ir_trans_unit_t;
 
 // Built in types

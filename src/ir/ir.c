@@ -142,13 +142,14 @@ ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
 
 ir_trans_unit_t *ir_trans_unit_create(void) {
     ir_trans_unit_t *tunit = emalloc(sizeof(ir_trans_unit_t));
-    sl_init(&tunit->gdecls, offsetof(ir_gdecl_t, link));
+    sl_init(&tunit->decls, offsetof(ir_gdecl_t, link));
+    sl_init(&tunit->funcs, offsetof(ir_gdecl_t, link));
     sl_init(&tunit->stmts, offsetof(ir_stmt_t, heap_link));
     sl_init(&tunit->exprs, offsetof(ir_expr_t, heap_link));
     sl_init(&tunit->types, offsetof(ir_type_t, heap_link));
     ir_symtab_init(&tunit->globals);
 
-    static const ht_params_t ht_params = {
+    static const ht_params_t labels_params = {
         0,                          // Size estimate
         offsetof(ir_label_t, name), // Offset of key
         offsetof(ir_label_t, link), // Offset of ht link
@@ -156,7 +157,17 @@ ir_trans_unit_t *ir_trans_unit_create(void) {
         ind_str_eq,                 // void string compare
     };
 
-    ht_init(&tunit->labels, &ht_params);
+    ht_init(&tunit->labels, &labels_params);
+
+    static const ht_params_t fun_decls_params = {
+        0,                             // Size estimate
+        offsetof(ht_ptr_elem_t, key),  // Offset of key
+        offsetof(ht_ptr_elem_t, link), // Offset of ht link
+        ind_str_hash,                  // Hash function
+        ind_str_eq,                    // void string compare
+    };
+
+    ht_init(&tunit->global_decls, &fun_decls_params);
     return tunit;
 }
 
@@ -191,6 +202,7 @@ ir_stmt_t *ir_stmt_create(ir_trans_unit_t *tunit, ir_stmt_type_t type) {
 
     switch (stmt->type) {
     case IR_STMT_LABEL:
+    case IR_STMT_EXPR:
     case IR_STMT_RET:
     case IR_STMT_BR:
     case IR_STMT_ASSIGN:
@@ -344,6 +356,7 @@ void ir_expr_destroy(ir_expr_t *expr) {
 void ir_stmt_destroy(ir_stmt_t *stmt) {
     switch (stmt->type) {
     case IR_STMT_LABEL:
+    case IR_STMT_EXPR:
     case IR_STMT_ASSIGN:
     case IR_STMT_STORE:
     case IR_STMT_INTRINSIC_FUNC:
@@ -380,11 +393,13 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     if (trans_unit == NULL) {
         return;
     }
-    SL_DESTROY_FUNC(&trans_unit->gdecls, ir_gdecl_destroy);
+    SL_DESTROY_FUNC(&trans_unit->decls, ir_gdecl_destroy);
+    SL_DESTROY_FUNC(&trans_unit->funcs, ir_gdecl_destroy);
     SL_DESTROY_FUNC(&trans_unit->stmts, ir_stmt_destroy);
     SL_DESTROY_FUNC(&trans_unit->exprs, ir_expr_destroy);
     SL_DESTROY_FUNC(&trans_unit->types, ir_type_destroy);
     ir_symtab_destroy(&trans_unit->globals);
     HT_DESTROY_FUNC(&trans_unit->labels, free);
+    HT_DESTROY_FUNC(&trans_unit->global_decls, free);
     free(trans_unit);
 }

@@ -46,6 +46,7 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type);
 
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
 
+void trans_gdecl_node(trans_state_t *ts, decl_node_t *node);
 void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
 
 // Returns true if the statement always returns, false otherwise
@@ -81,7 +82,7 @@ typedef enum ir_decl_node_type_t {
     IR_DECL_NODE_FUNC_PARAM,
 } ir_decl_node_type_t;
 
-void trans_decl_node(trans_state_t *ts, decl_node_t *node,
+ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
                      ir_decl_node_type_t type, ir_inst_stream_t *ir_stmts);
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type);

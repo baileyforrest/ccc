@@ -64,15 +64,6 @@ ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast) {
     ts->tunit = tunit;
     ts->typetab = &ast->typetab;
 
-    // Handle data definitions first
-    SL_FOREACH(cur, &ast->gdecls) {
-        gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
-        if (gdecl->type != GDECL_DECL) {
-            continue;
-        }
-        trans_gdecl(ts, gdecl, &tunit->gdecls);
-    }
-
     // Add this translation unit's function declaration to symbol table
     SL_FOREACH(cur, &ast->gdecls) {
         gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
@@ -83,17 +74,28 @@ ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast) {
         trans_decl_node(ts, node, IR_DECL_NODE_FDEFN, NULL);
     }
 
-    // Translate the functions
     SL_FOREACH(cur, &ast->gdecls) {
         gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
-        if (gdecl->type != GDECL_FDEFN) {
-            continue;
-        }
-        trans_gdecl(ts, gdecl, &tunit->gdecls);
+        trans_gdecl(ts, gdecl, &tunit->funcs);
     }
 
-
     return tunit;
+}
+
+void trans_gdecl_node(trans_state_t *ts, decl_node_t *node) {
+    ir_gdecl_t *ir_gdecl;
+    if (node->type->type == TYPE_FUNC) {
+        ir_gdecl = ir_gdecl_create(IR_GDECL_FUNC_DECL);
+        ir_gdecl->func_decl.type = trans_decl_node(ts, node,
+                                                   IR_DECL_NODE_FDEFN,
+                                                   &ir_gdecl->gdata.stmts);
+        ir_gdecl->func_decl.name = node->id;
+    } else {
+        ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
+        trans_decl_node(ts, node, IR_DECL_NODE_GLOBAL,
+                        &ir_gdecl->gdata.stmts);
+    }
+    sl_append(&ts->tunit->decls, &ir_gdecl->link);
 }
 
 void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
@@ -151,18 +153,14 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         if (type->type == TYPE_MOD && type->mod.type_mod & TMOD_TYPEDEF) {
             return;
         }
-        SL_FOREACH(cur, &gdecl->decl->decls) {
-            ir_gdecl_t *ir_gdecl;
-            decl_node_t *node = GET_ELEM(&gdecl->decl->decls, cur);
 
-            // Function declarations are handled differently
-            if (node->type->type == TYPE_FUNC) {
-                continue;
-            }
-            ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
-            trans_decl_node(ts, node, IR_DECL_NODE_GLOBAL,
-                            &ir_gdecl->gdata.stmts);
-            sl_append(ir_gdecls, &ir_gdecl->link);
+        // Keep track of global decls, so they are only translated if used
+        SL_FOREACH(cur, &gdecl->decl->decls) {
+            decl_node_t *node = GET_ELEM(&gdecl->decl->decls, cur);
+            ht_ptr_elem_t *elem = emalloc(sizeof(*elem));
+            elem->key = node->id;
+            elem->val = node;
+            ht_insert(&ts->tunit->global_decls, &elem->link);
         }
         break;
     }
@@ -596,6 +594,15 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         assert(tt_ent != NULL && tt_ent->entry_type == TT_VAR);
         ir_symtab_entry_t *entry = tt_ent->var.ir_entry;
 
+        // Lazily add used global variables to declaration list
+        if (entry == NULL) {
+            ht_ptr_elem_t *elem = ht_lookup(&ts->tunit->global_decls,
+                                            &expr->var_id);
+            assert(elem != NULL);
+            trans_gdecl_node(ts, elem->val);
+            entry = tt_ent->var.ir_entry;
+        }
+
         // Must be valid if typechecked
         assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
 
@@ -784,19 +791,25 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             sl_append(&call->call.arglist, &pair->link);
         }
 
+        ir_stmt_t *ir_stmt;
+        ir_expr_t *result;
         // Void returning function, don't create a temp
         if (expr->call.func->etype->func.type->type == TYPE_VOID) {
-            return NULL;
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
+            ir_stmt->expr = call;
+            result = NULL;
+        } else {
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+            ir_type_t *ret_type = call->call.func_sig->func.type;
+            ir_expr_t *temp = trans_temp_create(ts, ret_type);
+            ir_stmt->assign.dest = temp;
+            ir_stmt->assign.src = call;
+            result = temp;
         }
 
-        ir_type_t *ret_type = call->call.func_sig->func.type;
-        ir_expr_t *temp = trans_temp_create(ts, ret_type);
-        ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        ir_stmt->assign.dest = temp;
-        ir_stmt->assign.src = call;
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
-        return temp;
+        return result;
     }
     case EXPR_CMPD: {
         ir_expr_t *ir_expr = NULL;
@@ -1505,8 +1518,9 @@ char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned) {
     return patch_name;
 }
 
-void trans_decl_node(trans_state_t *ts, decl_node_t *node,
-                     ir_decl_node_type_t type, ir_inst_stream_t *ir_stmts) {
+ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
+                           ir_decl_node_type_t type,
+                           ir_inst_stream_t *ir_stmts) {
     ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     ir_type_t *expr_type = trans_type(ts, node->type);
 
@@ -1637,6 +1651,8 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
     typetab_entry_t *tt_ent = tt_lookup(ts->typetab, node->id);
     assert(tt_ent != NULL && tt_ent->entry_type == TT_VAR);
     tt_ent->var.ir_entry = entry;
+
+    return expr_type;
 }
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type) {

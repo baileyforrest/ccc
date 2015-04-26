@@ -196,7 +196,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type, char *name,
     assert(tt_type != TT_TYPEDEF && "Use tt_insert_typedef");
 
     status_t status = CCC_OK;
-    typetab_entry_t *new_entry = emalloc(sizeof(typetab_entry_t));
+    typetab_entry_t *new_entry = ecalloc(1, sizeof(typetab_entry_t));
 
     new_entry->type = type;
     new_entry->entry_type = tt_type;
