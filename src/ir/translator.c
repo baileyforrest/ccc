@@ -63,10 +63,35 @@ ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast) {
     ir_trans_unit_t *tunit = ir_trans_unit_create();
     ts->tunit = tunit;
     ts->typetab = &ast->typetab;
+
+    // Handle data definitions first
     SL_FOREACH(cur, &ast->gdecls) {
         gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
+        if (gdecl->type != GDECL_DECL) {
+            continue;
+        }
         trans_gdecl(ts, gdecl, &tunit->gdecls);
     }
+
+    // Add this translation unit's function declaration to symbol table
+    SL_FOREACH(cur, &ast->gdecls) {
+        gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
+        if (gdecl->type != GDECL_FDEFN) {
+            continue;
+        }
+        decl_node_t *node = sl_head(&gdecl->decl->decls);
+        trans_decl_node(ts, node, IR_DECL_NODE_FDEFN, NULL);
+    }
+
+    // Translate the functions
+    SL_FOREACH(cur, &ast->gdecls) {
+        gdecl_t *gdecl = GET_ELEM(&ast->gdecls, cur);
+        if (gdecl->type != GDECL_FDEFN) {
+            continue;
+        }
+        trans_gdecl(ts, gdecl, &tunit->gdecls);
+    }
+
 
     return tunit;
 }
@@ -75,7 +100,6 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
     switch (gdecl->type) {
     case GDECL_FDEFN: {
         decl_node_t *node = sl_head(&gdecl->decl->decls);
-        trans_decl_node(ts, node, IR_DECL_NODE_FDEFN, NULL);
 
         assert(node != NULL);
         assert(node == sl_tail(&gdecl->decl->decls));
@@ -130,15 +154,14 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         SL_FOREACH(cur, &gdecl->decl->decls) {
             ir_gdecl_t *ir_gdecl;
             decl_node_t *node = GET_ELEM(&gdecl->decl->decls, cur);
+
+            // Function declarations are handled differently
             if (node->type->type == TYPE_FUNC) {
-                ir_gdecl = ir_gdecl_create(IR_GDECL_FUNC_DECL);
-                ir_gdecl->func_decl.name = node->id;
-                ir_gdecl->func_decl.type = trans_type(ts, node->type);
-            } else {
-                ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
-                trans_decl_node(ts, node, IR_DECL_NODE_GLOBAL,
-                                &ir_gdecl->gdata.stmts);
+                continue;
             }
+            ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
+            trans_decl_node(ts, node, IR_DECL_NODE_GLOBAL,
+                            &ir_gdecl->gdata.stmts);
             sl_append(ir_gdecls, &ir_gdecl->link);
         }
         break;
@@ -1487,16 +1510,13 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
     ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     ir_type_t *expr_type = trans_type(ts, node->type);
 
-    ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-    ptr_type->ptr.base = expr_type;
-
     ir_symtab_t *symtab;
     ir_expr_t *access;
     bool name_owned = false;
 
     switch (type) {
     case IR_DECL_NODE_FDEFN:
-        var_expr->var.type = ptr_type->ptr.base;
+        var_expr->var.type = expr_type;
         var_expr->var.name = node->id;
         var_expr->var.local = false;
 
@@ -1504,6 +1524,9 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
         access = var_expr;
         break;
     case IR_DECL_NODE_GLOBAL: {
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = expr_type;
+
         var_expr->var.type = ptr_type;
         var_expr->var.name = node->id;
         var_expr->var.local = false;
@@ -1521,6 +1544,9 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
         break;
     }
     case IR_DECL_NODE_LOCAL: {
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = expr_type;
+
         symtab = &ts->func->func.locals;
 
         var_expr->var.type = ptr_type;
@@ -1556,7 +1582,10 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
         access = var_expr;
         break;
     }
-    case IR_DECL_NODE_FUNC_PARAM:
+    case IR_DECL_NODE_FUNC_PARAM: {
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = expr_type;
+
         symtab = &ts->func->func.locals;
 
         var_expr->var.type = expr_type;
@@ -1588,6 +1617,7 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
 
         access = temp;
         break;
+    }
     default:
         assert(false);
     }
