@@ -131,7 +131,15 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
                             &ir_gdecl->func.body);
         }
 
-        trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
+        bool returns = trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
+
+        // If the function didn't return, add a return
+        if (!returns) {
+            ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_RET);
+            ir_stmt->ret.type = ir_gdecl->func.type->func.type;
+            ir_stmt->ret.val = NULL;
+            trans_add_stmt(ts, &ir_gdecl->func.body, ir_stmt);
+        }
 
         // Remove trailing labels
         ir_stmt_t *last = ir_inst_stream_tail(&ir_gdecl->func.body);
@@ -524,12 +532,17 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         assert(ts->func->type == IR_GDECL_FUNC &&
                ts->func->func.type->type == IR_TYPE_FUNC);
         ir_stmt->ret.type = ts->func->func.type->func.type;
-        ir_expr_t *ret_val = trans_expr(ts, false, stmt->return_params.expr,
-                                        ir_stmts);
-        ir_stmt->ret.val =
-            trans_type_conversion(ts, stmt->return_params.type,
-                                  stmt->return_params.expr->etype, ret_val,
-                                  ir_stmts);
+
+        if (stmt->return_params.expr == NULL) {
+            ir_stmt->ret.val = NULL;
+        } else {
+            ir_expr_t *ret_val = trans_expr(ts, false, stmt->return_params.expr,
+                                            ir_stmts);
+            ir_stmt->ret.val =
+                trans_type_conversion(ts, stmt->return_params.type,
+                                      stmt->return_params.expr->etype, ret_val,
+                                      ir_stmts);
+        }
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         returns = true; // Return statement always returns
@@ -1382,9 +1395,14 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
 ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
                                  ir_expr_t *src_expr,
                                  ir_inst_stream_t *ir_stmts) {
+    dest = ast_type_unmod(dest);
+    src = ast_type_unmod(src);
     // Don't do anything if types are equal
-    if (typecheck_type_equal(ast_type_unmod(dest), ast_type_unmod(src))) {
+    if (typecheck_type_equal(dest, src)) {
         return src_expr;
+    }
+    if (dest->type == TYPE_BOOL) {
+        return trans_expr_bool(ts, src_expr, ir_stmts);
     }
 
     ir_type_t *dest_type = trans_type(ts, dest);
@@ -1470,9 +1488,12 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
             assert(false);
         }
         break;
+    case IR_TYPE_VOID:
+        // Casted to void expression cannot be used, typechecker should ensure
+        // this
+        return NULL;
 
     case IR_TYPE_OPAQUE:
-    case IR_TYPE_VOID:
     case IR_TYPE_STRUCT:
     default:
         assert(false);

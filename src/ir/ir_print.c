@@ -113,8 +113,10 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
     case IR_STMT_RET:
         fprintf(stream, "ret ");
         ir_type_print(stream, stmt->ret.type, NULL);
-        fprintf(stream, " ");
-        ir_expr_print(stream, stmt->ret.val);
+        if (stmt->ret.val != NULL) {
+            fprintf(stream, " ");
+            ir_expr_print(stream, stmt->ret.val);
+        }
         break;
     case IR_STMT_BR:
         fprintf(stream, "br ");
