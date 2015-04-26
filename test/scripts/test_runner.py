@@ -197,8 +197,13 @@ def process_file(src_path):
             outname = exec_name
 
         try:
-            lines = subprocess.check_output(outname, timeout=timeout_remain,
-                                            universal_newlines=True)
+            if verbose:
+                lines = subprocess.check_output(outname, timeout=timeout_remain,
+                                                universal_newlines=True)
+            else:
+                lines = subprocess.check_output(outname, timeout=timeout_remain,
+                                                universal_newlines=True,
+                                                stderr=DEV_NULL)
         except subprocess.TimeoutExpired:
             if is_except:
                 success(src_path)

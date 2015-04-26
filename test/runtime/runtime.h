@@ -31,7 +31,7 @@ void *calloc(unsigned long nmemb, unsigned long size);
 #define __STRING(x) #x
 #define assert(expr)                                                    \
     ((expr)                                                             \
-     ? __ASSERT_VOID_CAST (0)                                           \
+     ? (void)0                                                          \
      : __assert_fail (__STRING(expr), __FILE__, __LINE__, __func__))
 
 #define bool _Bool
@@ -42,5 +42,20 @@ void *calloc(unsigned long nmemb, unsigned long size);
 #define alloc(type) calloc(1, sizeof(type))
 #define alloc_array(type, num) calloc(num, sizeof(type))
 typedef char string[];
+
+typedef int fpt;
+
+fpt fadd(fpt x, fpt y);
+fpt fsub(fpt x, fpt y);
+fpt fmul(fpt x, fpt y);
+fpt fdiv(fpt x, fpt y);
+bool fless(fpt x, fpt y);
+
+fpt itof(int n);
+int ftoi(fpt x);
+
+void print_fpt(fpt x);
+void print_int(int n);
+void print_hex(int n);
 
 #endif /* _RUNTIME_H_ */
