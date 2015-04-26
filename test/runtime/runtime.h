@@ -37,10 +37,10 @@ void *calloc(unsigned long nmemb, unsigned long size);
 #define bool _Bool
 #define true 1
 #define false 0
-#define NULL ((void *)0);
+#define NULL ((void *)0)
 
-#define alloc(type) calloc(1, sizeof(type))
-#define alloc_array(type, num) calloc(num, sizeof(type))
+#define alloc(type) ((type *)calloc(1, sizeof(type)))
+#define alloc_array(type, num) ((type *)calloc(num, sizeof(type)))
 typedef char string[];
 
 typedef int fpt;
