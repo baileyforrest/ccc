@@ -1485,8 +1485,10 @@ char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned) {
 void trans_decl_node(trans_state_t *ts, decl_node_t *node,
                      ir_decl_node_type_t type, ir_inst_stream_t *ir_stmts) {
     ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
+    ir_type_t *expr_type = trans_type(ts, node->type);
+
     ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-    ptr_type->ptr.base = trans_type(ts, node->type);
+    ptr_type->ptr.base = expr_type;
 
     ir_symtab_t *symtab;
     ir_expr_t *access;
@@ -1541,8 +1543,9 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
         // If there's an initialization, evaluate it and store it
         if (node->expr != NULL) {
             ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
-            store->store.type = trans_type(ts, node->type);
+            store->store.type = expr_type;
             ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
+
             store->store.val = trans_type_conversion(ts, node->type,
                                                      node->expr->etype, val,
                                                      ir_stmts);
@@ -1556,7 +1559,7 @@ void trans_decl_node(trans_state_t *ts, decl_node_t *node,
     case IR_DECL_NODE_FUNC_PARAM:
         symtab = &ts->func->func.locals;
 
-        var_expr->var.type = trans_type(ts, node->type);
+        var_expr->var.type = expr_type;
         var_expr->var.name = trans_decl_node_name(symtab, node->id,
                                                   &name_owned);
         var_expr->var.local = true;
