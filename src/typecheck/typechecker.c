@@ -1658,7 +1658,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             break;
         case TYPE_PTR:
             if (expr->mem_acc.op == OP_ARROW) {
-                compound = ast_type_unmod(expr->mem_acc.base->etype->ptr.base);
+                compound = ast_type_unmod(compound->ptr.base);
                 if (compound->type == TYPE_STRUCT ||
                     compound->type == TYPE_UNION) {
                     break;
