@@ -586,10 +586,6 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
             goto fail;
         }
     } else { // struct/union
-        // Must match at least one struct declaration
-        if (CCC_OK != (status = par_struct_declaration(lex, entry_type))) {
-            goto fail;
-        }
         while (CCC_BACKTRACK !=
                (status = par_struct_declaration(lex, entry_type))) {
             if (status != CCC_OK) {
