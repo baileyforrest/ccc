@@ -931,31 +931,50 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return ir_expr;
     }
     case EXPR_MEM_ACC: {
-        ir_expr_t *pointer = trans_expr(ts, false, expr->mem_acc.base,
-                                        ir_stmts);
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
+
+        ir_expr_t *pointer;
+        ir_type_expr_pair_t *pair;
+        while (expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT) {
+            // Get index into the structure
+            pair = emalloc(sizeof(*pair));
+            pair->type = &ir_type_i32;
+            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+            pair->expr->const_params.type = &ir_type_i32;
+            pair->expr->const_params.ctype = IR_CONST_INT;
+            pair->expr->const_params.int_val =
+                ast_get_member_num(expr->mem_acc.base->etype, expr->mem_acc.name);
+            sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
+            expr = expr->mem_acc.base;
+        }
+        if (expr->mem_acc.op == OP_ARROW) {
+            type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
+            assert(etype->type == TYPE_PTR);
+
+            // Get index into the structure
+            pair = emalloc(sizeof(*pair));
+            pair->type = &ir_type_i32;
+            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+            pair->expr->const_params.type = &ir_type_i32;
+            pair->expr->const_params.ctype = IR_CONST_INT;
+            pair->expr->const_params.int_val =
+                ast_get_member_num(etype->ptr.base, expr->mem_acc.name);
+            sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
+
+            pair = emalloc(sizeof(*pair));
+            pair->type = &ir_type_i32;
+            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+            pair->expr->const_params.type = &ir_type_i32;
+            pair->expr->const_params.ctype = IR_CONST_INT;
+            pair->expr->const_params.int_val = 0;
+            sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
+            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
+        } else {
+            pointer = trans_expr(ts, false, expr, ir_stmts);
+        }
         elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
         elem_ptr->getelemptr.ptr_val = pointer;
-
-        // Get 0th index to point to structure
-        ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-        pair->type = &ir_type_i32;
-        pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        pair->expr->const_params.type = &ir_type_i32;
-        pair->expr->const_params.ctype = IR_CONST_INT;
-        pair->expr->const_params.int_val = 0;
-        sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
-
-        // Get index into the structure
-        pair = emalloc(sizeof(*pair));
-        pair->type = &ir_type_i32;
-        pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        pair->expr->const_params.type = &ir_type_i32;
-        pair->expr->const_params.ctype = IR_CONST_INT;
-        pair->expr->const_params.int_val =
-            ast_get_member_num(expr->mem_acc.base->etype, expr->mem_acc.name);
-        sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
         ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
 

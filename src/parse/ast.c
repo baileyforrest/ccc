@@ -505,10 +505,6 @@ size_t ast_type_offset(type_t *type, slist_t *path) {
 size_t ast_get_member_num(type_t *type, char *name) {
     size_t mem_num;
     type = ast_type_unmod(type);
-    if (type->type == TYPE_PTR) {
-        type = type->ptr.base;
-    }
-    type = ast_type_unmod(type);
     type = ast_type_find_member(type, name, NULL, &mem_num);
     if (type == NULL) {
         return -1;
