@@ -1706,9 +1706,9 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
 
         if (umod_arr->type == TYPE_PTR) {
-            expr->etype = expr->arr_idx.array->etype->ptr.base;
+            expr->etype = umod_arr->ptr.base;
         } else { // umod_arr->type == TYPE_ARR
-            expr->etype = expr->arr_idx.array->etype->arr.base;
+            expr->etype = umod_arr->arr.base;
         }
         return retval;
     }
