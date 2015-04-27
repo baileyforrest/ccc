@@ -26,6 +26,7 @@
 
 void *calloc(unsigned long nmemb, unsigned long size);
 void exit(int status);
+int __test();
 
 #define __STRING(x) #x
 #define assert(expr)                            \

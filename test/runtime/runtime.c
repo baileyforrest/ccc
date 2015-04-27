@@ -71,7 +71,7 @@ int print_hex(int n) {
   return 0;
 }
 
-extern int __test();
+int __test();
 
 int main() {
     printf("%d\n", __test());

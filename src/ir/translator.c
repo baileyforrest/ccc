@@ -812,16 +812,32 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     }
     case EXPR_CALL: {
         ir_expr_t *call = ir_expr_create(ts->tunit, IR_EXPR_CALL);
-        call->call.func_sig = trans_type(ts, expr->call.func->etype);
+        type_t *func_sig = expr->call.func->etype;
+        call->call.func_sig = trans_type(ts, func_sig);
         call->call.func_ptr = trans_expr(ts, false, expr->call.func, ir_stmts);
+        assert(func_sig->type == TYPE_FUNC);
 
-        SL_FOREACH(cur, &expr->call.params) {
-            expr_t *param = GET_ELEM(&expr->call.params, cur);
+        sl_link_t *cur_sig = func_sig->func.params.head;
+        sl_link_t *cur_expr = expr->call.params.head;
+        while (cur_sig != NULL) {
+            assert(cur_expr != NULL);
+            decl_t *decl = GET_ELEM(&func_sig->func.params, cur_sig);
+            decl_node_t *node = sl_head(&decl->decls);
+            type_t *sig_type = node == NULL ? decl->type : node->type;
+
+            expr_t *param = GET_ELEM(&expr->call.params, cur_expr);
+            ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
+            ir_expr = trans_type_conversion(ts, sig_type, param->etype, ir_expr,
+                                            ir_stmts);
             ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-            pair->type = trans_type(ts, param->etype);
-            pair->expr = trans_expr(ts, false, param, ir_stmts);
+            pair->type = trans_type(ts, sig_type);
+            pair->expr = ir_expr;
             sl_append(&call->call.arglist, &pair->link);
+
+            cur_sig = cur_sig->next;
+            cur_expr = cur_expr->next;
         }
+        assert(cur_expr == NULL);
 
         ir_stmt_t *ir_stmt;
         ir_expr_t *result;
