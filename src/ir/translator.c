@@ -33,6 +33,7 @@
 
 #define MAX_GLOBAL_NAME 128
 #define GLOBAL_PREFIX ".glo"
+#define STRUCT_PREFIX "struct."
 
 
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
@@ -958,6 +959,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
 
+        if (addrof) {
+            return ptr;
+        }
+
         // Load instruction
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = elem_ptr->getelemptr.type;
@@ -966,11 +971,12 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return trans_assign_temp(ts, ir_stmts, load);
     }
     case EXPR_ARR_IDX: {
+        ir_expr_t *pointer = trans_expr(ts, false, expr->arr_idx.array,
+                                        ir_stmts);
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
-        elem_ptr->getelemptr.ptr_val = trans_expr(ts, false,
-                                                  expr->arr_idx.array,
-                                                  ir_stmts);
+        elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
+        elem_ptr->getelemptr.ptr_val = pointer;
 
         ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
         pair->type = &ir_type_i64;
@@ -978,6 +984,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
         ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
+
+        if (addrof) {
+            return ptr;
+        }
 
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = elem_ptr->getelemptr.type;
@@ -1016,13 +1026,10 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
     }
 
     case EXPR_MEM_ACC:
-        // TODO0: This
-        assert(false);
-        break;
     case EXPR_ARR_IDX:
-        // TODO0: This
-        assert(false);
+        ptr = trans_expr(ts, true, dest, ir_stmts);
         break;
+
     case EXPR_UNARY: {
         ptr = trans_unaryop(ts, dest, ir_stmts);
         break;
@@ -1763,12 +1770,15 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
 
         // If this is a named structure, create a struct id type
         if (type->struct_params.name != NULL) {
+            char *name = emalloc(strlen(type->struct_params.name) +
+                                 sizeof(STRUCT_PREFIX));
+            sprintf(name, STRUCT_PREFIX"%s", type->struct_params.name);
             ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
-            id_type->id_struct.name = type->struct_params.name;
+            id_type->id_struct.name = name;
             id_type->id_struct.type = ir_type;
 
             ir_gdecl_t *id_gdecl = ir_gdecl_create(IR_GDECL_ID_STRUCT);
-            id_gdecl->id_struct.name = type->struct_params.name;
+            id_gdecl->id_struct.name = name;
             id_gdecl->id_struct.type = ir_type;
             id_gdecl->id_struct.id_type = id_type;
             sl_append(&ts->tunit->id_structs, &id_gdecl->link);

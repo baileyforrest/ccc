@@ -387,8 +387,10 @@ void ir_stmt_destroy(ir_stmt_t *stmt) {
 void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
-    case IR_GDECL_ID_STRUCT:
     case IR_GDECL_FUNC_DECL:
+        break;
+    case IR_GDECL_ID_STRUCT:
+        free(gdecl->id_struct.name);
         break;
     case IR_GDECL_FUNC:
         ir_symtab_destroy(&gdecl->func.locals);

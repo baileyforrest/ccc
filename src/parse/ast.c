@@ -394,7 +394,7 @@ size_t ast_type_size(type_t *type) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
 
             SL_FOREACH(icur, &decl->decls) {
-                decl_node_t *decl_node = GET_ELEM(&decl->decls, cur);
+                decl_node_t *decl_node = GET_ELEM(&decl->decls, icur);
                 if (type->type == TYPE_STRUCT) {
                     size += ast_type_size(decl_node->type);
                 } else { // type->type == TYPE_UNION
