@@ -212,6 +212,16 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             }
             fprintf(stream, " }");
             break;
+        case IR_CONST_STR: {
+            // TODO1 Add these as type properties
+            fprintf(stream, "private unnamed_addr constant ");
+            ir_type_print(stream, expr->const_params.type, NULL);
+
+            // TODO1 Add align as type property
+            fprintf(stream, " c\"%s\\00\", align 1",
+                    expr->const_params.str_val);
+            break;
+        }
         case IR_CONST_ARR: {
             fprintf(stream, "[ ");
             assert(expr->const_params.type->type == IR_TYPE_ARR);
@@ -264,8 +274,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         break;
     case IR_EXPR_GETELEMPTR:
         fprintf(stream, "getelementptr ");
-        ir_type_print(stream, expr->getelemptr.type, NULL);
-        fprintf(stream, ", ");
         ir_type_print(stream, expr->getelemptr.type, NULL);
         fprintf(stream, "* ");
         ir_expr_print(stream, expr->getelemptr.ptr_val);
@@ -392,9 +400,9 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
         fprintf(stream, "*");
         break;
     case IR_TYPE_ARR:
-        fprintf(stream, "[ %zu x ", type->arr.nelems);
+        fprintf(stream, "[%zu x ", type->arr.nelems);
         ir_type_print(stream, type->arr.elem_type, NULL);
-        fprintf(stream, " ]");
+        fprintf(stream, "]");
         break;
     case IR_TYPE_STRUCT: {
         fprintf(stream, "type { ");
@@ -455,6 +463,7 @@ const char *ir_convert_str(ir_convert_t conv) {
     case IR_CONVERT_SITOFP:   return "sitofp";
     case IR_CONVERT_PTRTOINT: return "ptrtoint";
     case IR_CONVERT_INTTOPTR: return "inttoptr";
+    case IR_CONVERT_BITCAST:  return "bitcast";
     default:
         assert(false);
     }

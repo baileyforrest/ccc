@@ -46,6 +46,7 @@ ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
 extern ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream);
 extern ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream);
+extern void ir_inst_stream_append(ir_inst_stream_t *stream, ir_stmt_t *stmt);
 
 ir_type_t *ir_expr_type(ir_expr_t *expr) {
     switch (expr->type) {
@@ -69,9 +70,10 @@ ir_type_t *ir_expr_type(ir_expr_t *expr) {
         return expr->select.type;
     case IR_EXPR_CALL:
         return expr->call.func_sig->func.type;
+    case IR_EXPR_GETELEMPTR:
+        return expr->getelemptr.type;
     case IR_EXPR_VAARG:
     case IR_EXPR_ALLOCA:
-    case IR_EXPR_GETELEMPTR:
     default:
         assert(false);
     }
@@ -168,6 +170,8 @@ ir_trans_unit_t *ir_trans_unit_create(void) {
     };
 
     ht_init(&tunit->global_decls, &fun_decls_params);
+    ht_init(&tunit->strings, &fun_decls_params);
+    tunit->static_num = 0;
     return tunit;
 }
 
@@ -326,6 +330,7 @@ void ir_expr_destroy(ir_expr_t *expr) {
         case IR_CONST_FLOAT:
         case IR_CONST_NULL:
         case IR_CONST_ZERO:
+        case IR_CONST_STR:
         case IR_CONST_ARR:
             break;
         case IR_CONST_STRUCT:
@@ -389,6 +394,11 @@ void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     free(gdecl);
 }
 
+void ir_trans_unit_string_destroy(ht_ptr_elem_t *elem) {
+    free(elem->key);
+    free(elem);
+}
+
 void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     if (trans_unit == NULL) {
         return;
@@ -401,5 +411,7 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     ir_symtab_destroy(&trans_unit->globals);
     HT_DESTROY_FUNC(&trans_unit->labels, free);
     HT_DESTROY_FUNC(&trans_unit->global_decls, free);
+    HT_DESTROY_FUNC(&trans_unit->strings, ir_trans_unit_string_destroy);
     free(trans_unit);
 }
+

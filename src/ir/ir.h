@@ -106,6 +106,7 @@ typedef enum ir_const_type_t {
     IR_CONST_FLOAT,
     IR_CONST_NULL,
     IR_CONST_STRUCT,
+    IR_CONST_STR,
     IR_CONST_ARR,
     IR_CONST_ZERO,
 } ir_const_type_t;
@@ -228,6 +229,7 @@ struct ir_expr_t {
                 long long int_val;
                 long double float_val;
                 slist_t struct_val; /**< (ir_type_expr_pair_t) */
+                char *str_val;
                 slist_t arr_val; /**< (ir_expr_t) */
             };
         } const_params;
@@ -422,6 +424,8 @@ typedef struct ir_trans_unit_t {
     ir_symtab_t globals;
     htable_t labels;
     htable_t global_decls; /* (char * -> decl_node_t *) */
+    htable_t strings; /* (char * -> ir_expr_t *) */
+    int static_num;
 
     slist_t stmts;
     slist_t exprs;
@@ -448,6 +452,10 @@ inline ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream) {
 
 inline ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream) {
     return dl_tail(&stream->list);
+}
+
+inline void ir_inst_stream_append(ir_inst_stream_t *stream, ir_stmt_t *stmt) {
+    dl_append(&stream->list, &stmt->link);
 }
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name);

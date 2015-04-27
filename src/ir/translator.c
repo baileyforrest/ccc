@@ -31,12 +31,16 @@
 // TODO1: Approximate this programatically using MAX_INT
 #define MAX_NUM_LEN 20
 
+#define MAX_GLOBAL_NAME 128
+#define GLOBAL_PREFIX ".glo"
+
+
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt) {
     if (stmt->type == IR_STMT_LABEL) {
         ts->func->func.last_label = stmt->label;
     }
-    dl_append(&stream->list, &stmt->link);
+    ir_inst_stream_append(stream, stmt);
 }
 
 ir_label_t *trans_label_create(trans_state_t *ts, char *str) {
@@ -51,6 +55,20 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type) {
     return ir_temp_create(ts->tunit, ts->func, type,
                           ts->func->func.next_temp++);
 }
+
+// TODO1: Replace this common pattern in code with this
+ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
+                             ir_expr_t *expr) {
+    ir_expr_t *temp = trans_temp_create(ts, ir_expr_type(expr));
+
+    ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+    assign->assign.dest = temp;
+    assign->assign.src = expr;
+    trans_add_stmt(ts, stream, assign);
+
+    return temp;
+}
+
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
 
@@ -681,13 +699,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return ir_expr;
     }
     case EXPR_CONST_STR: {
-        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        ir_expr->const_params.ctype = IR_CONST_ARR;
-        ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
-        // TODO0: Create a global string, change str_val to point to that
-        assert(false);
-        return ir_expr;
+        ir_expr_t *ir_expr = trans_string(ts, expr->const_val.str_val);
+        return trans_assign_temp(ts, ir_stmts, ir_expr);
     }
+
     case EXPR_BIN: {
         ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *op_expr = trans_binop(ts, expr->bin.expr1, expr->bin.expr2,
@@ -917,7 +932,14 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = elem_ptr->getelemptr.type;
         load->load.ptr = elem_ptr;
-        return load;
+
+        ir_expr_t *temp = trans_temp_create(ts, load->load.type);
+
+        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+        assign->assign.dest = temp;
+        assign->assign.src = load;
+        trans_add_stmt(ts, ir_stmts, assign);
+        return temp;
     }
     case EXPR_ARR_IDX: {
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
@@ -926,25 +948,18 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                                                   expr->arr_idx.array,
                                                   ir_stmts);
 
-        // Get 0th index to point to array
         ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-        pair->type = &ir_type_i32;
-        pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        pair->expr->const_params.type = &ir_type_i32;
-        pair->expr->const_params.ctype = IR_CONST_INT;
-        pair->expr->const_params.int_val = 0;
-        sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
-
-        // Get index into the array
-        pair = emalloc(sizeof(*pair));
         pair->type = &ir_type_i64;
         pair->expr = trans_expr(ts, false, expr->arr_idx.index, ir_stmts);
         sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
+        ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
+
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = elem_ptr->getelemptr.type;
-        load->load.ptr = elem_ptr;
-        return load;
+        load->load.ptr = ptr;
+
+        return trans_assign_temp(ts, ir_stmts, load);
     }
     case EXPR_INIT_LIST:
     case EXPR_DESIG_INIT:
@@ -1404,6 +1419,12 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     if (dest->type == TYPE_BOOL) {
         return trans_expr_bool(ts, src_expr, ir_stmts);
     }
+    if ((dest->type == TYPE_ARR || dest->type == TYPE_PTR ||
+         dest->type == TYPE_FUNC) &&
+        (src->type == TYPE_ARR || src->type == TYPE_PTR ||
+         src->type == TYPE_FUNC)) {
+        return src_expr;
+    }
 
     ir_type_t *dest_type = trans_type(ts, dest);
     ir_type_t *src_type = trans_type(ts, src);
@@ -1782,4 +1803,67 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         assert(false);
     }
     return NULL;
+}
+
+ir_expr_t *trans_string(trans_state_t *ts, char *str) {
+    ht_ptr_elem_t *elem = ht_lookup(&ts->tunit->strings, &str);
+    if (elem != NULL) {
+        return elem->val;
+    }
+
+    char namebuf[MAX_GLOBAL_NAME];
+
+    size_t len = snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
+                          ts->tunit->static_num++);
+
+    elem = emalloc(sizeof(*elem));
+    elem->key = emalloc(len + 1);
+    strcpy(elem->key, namebuf);
+
+    ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+    type->arr.nelems = strlen(str) + 1;
+    type->arr.elem_type = &ir_type_i8;
+
+    ir_expr_t *var = ir_expr_create(ts->tunit, IR_EXPR_VAR);
+    var->var.name = elem->key;
+    var->var.local = false;
+    var->var.type = type;
+
+    ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+    arr_lit->const_params.ctype = IR_CONST_STR;
+    arr_lit->const_params.type = type;
+    arr_lit->const_params.str_val = str;
+
+    ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+    assign->assign.dest = var;
+    assign->assign.src = arr_lit;
+
+    ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
+    ir_inst_stream_append(&global->gdata.stmts, assign);
+    sl_append(&ts->tunit->decls, &global->link);
+
+    // TODO0: the 0's can be stored statically
+    ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+    elem_ptr->getelemptr.type = type;
+
+    elem_ptr->getelemptr.ptr_val = var;
+    ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
+    pair->type = &ir_type_i32;
+    pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+    pair->expr->const_params.type = &ir_type_i32;
+    pair->expr->const_params.ctype = IR_CONST_INT;
+    pair->expr->const_params.int_val = 0;
+    sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
+
+    pair = emalloc(sizeof(*pair));
+    pair->type = &ir_type_i32;
+    pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+    pair->expr->const_params.type = &ir_type_i32;
+    pair->expr->const_params.ctype = IR_CONST_INT;
+    pair->expr->const_params.int_val = 0;
+    sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
+    elem->val = elem_ptr;
+    ht_insert(&ts->tunit->strings, &elem->link);
+
+    return elem_ptr;
 }
