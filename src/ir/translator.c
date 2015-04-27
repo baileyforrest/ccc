@@ -1752,6 +1752,25 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             assert(gdecl->type == IR_GDECL_ID_STRUCT);
             return gdecl->id_struct.id_type;
         }
+        ir_gdecl_t *id_gdecl = NULL;
+
+        // Must create named entry before creating the actual struct to
+        // prevent infinite recursion
+        // If this is a named structure, create a struct id type
+        if (type->struct_params.name != NULL) {
+            char *name = emalloc(strlen(type->struct_params.name) +
+                                 sizeof(STRUCT_PREFIX));
+            sprintf(name, STRUCT_PREFIX"%s", type->struct_params.name);
+            ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
+            id_type->id_struct.name = name;
+            id_type->id_struct.type = ir_type;
+
+            id_gdecl = ir_gdecl_create(IR_GDECL_ID_STRUCT);
+            id_gdecl->id_struct.name = name;
+            id_gdecl->id_struct.id_type = id_type;
+            sl_append(&ts->tunit->id_structs, &id_gdecl->link);
+            type->struct_params.trans_state = id_gdecl;
+        }
 
         // Create a new structure object
         ir_type = ir_type_create(ts->tunit, IR_TYPE_STRUCT);
@@ -1771,24 +1790,11 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
                 vec_push_back(&ir_type->struct_params.types, decl_type);
             }
         }
-
-        // If this is a named structure, create a struct id type
-        if (type->struct_params.name != NULL) {
-            char *name = emalloc(strlen(type->struct_params.name) +
-                                 sizeof(STRUCT_PREFIX));
-            sprintf(name, STRUCT_PREFIX"%s", type->struct_params.name);
-            ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
-            id_type->id_struct.name = name;
-            id_type->id_struct.type = ir_type;
-
-            ir_gdecl_t *id_gdecl = ir_gdecl_create(IR_GDECL_ID_STRUCT);
-            id_gdecl->id_struct.name = name;
+        if (id_gdecl != NULL) {
             id_gdecl->id_struct.type = ir_type;
-            id_gdecl->id_struct.id_type = id_type;
-            sl_append(&ts->tunit->id_structs, &id_gdecl->link);
-            type->struct_params.trans_state = id_gdecl;
-            ir_type = id_type;
+            return id_gdecl->id_struct.id_type;
         }
+
         return ir_type;
     }
 
