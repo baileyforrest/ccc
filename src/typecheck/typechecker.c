@@ -182,11 +182,11 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
     t2 = ast_type_untypedef(t2);
 
     // Remove any modifiers which do not effect equality
-    if (t1->type == TYPE_MOD && (t1->mod.type_mod & IGNORE_MASK) == 0) {
+    while (t1->type == TYPE_MOD && (t1->mod.type_mod & IGNORE_MASK) == 0) {
         t1 = t1->mod.base;
         t1 = ast_type_untypedef(t1);
     }
-    if (t2->type == TYPE_MOD && (t2->mod.type_mod & IGNORE_MASK) == 0) {
+    while (t2->type == TYPE_MOD && (t2->mod.type_mod & IGNORE_MASK) == 0) {
         t2 = t2->mod.base;
         t2 = ast_type_untypedef(t2);
     }
