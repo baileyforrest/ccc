@@ -1117,7 +1117,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
 
     case TYPE_MOD:
         if (!(type->mod.type_mod & TMOD_UNSIGNED) &&
-            TYPE_IS_INTEGRAL(type->mod.base)) {
+            TYPE_IS_INTEGRAL(ast_type_untypedef(type->mod.base))) {
             is_signed = true;
         }
         break;
