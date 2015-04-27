@@ -932,14 +932,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_MEM_ACC: {
         ir_expr_t *pointer = trans_expr(ts, false, expr->mem_acc.base,
                                         ir_stmts);
-        if (expr->mem_acc.op == OP_ARROW) {
-            // TODO0: Handle this
-            assert(false);
-        } else {
-            assert(expr->mem_acc.op = OP_DOT);
-        }
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
+        elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
         elem_ptr->getelemptr.ptr_val = pointer;
 
         // Get 0th index to point to structure
@@ -961,18 +956,14 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             ast_get_member_num(expr->mem_acc.base->etype, expr->mem_acc.name);
         sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
+        ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
+
         // Load instruction
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = elem_ptr->getelemptr.type;
-        load->load.ptr = elem_ptr;
+        load->load.ptr = ptr;
 
-        ir_expr_t *temp = trans_temp_create(ts, load->load.type);
-
-        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        assign->assign.dest = temp;
-        assign->assign.src = load;
-        trans_add_stmt(ts, ir_stmts, assign);
-        return temp;
+        return trans_assign_temp(ts, ir_stmts, load);
     }
     case EXPR_ARR_IDX: {
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
@@ -1451,12 +1442,6 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     }
     if (dest->type == TYPE_BOOL) {
         return trans_expr_bool(ts, src_expr, ir_stmts);
-    }
-    if ((dest->type == TYPE_ARR || dest->type == TYPE_PTR ||
-         dest->type == TYPE_FUNC) &&
-        (src->type == TYPE_ARR || src->type == TYPE_PTR ||
-         src->type == TYPE_FUNC)) {
-        return src_expr;
     }
 
     ir_type_t *dest_type = trans_type(ts, dest);

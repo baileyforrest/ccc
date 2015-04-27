@@ -274,8 +274,8 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         break;
     case IR_EXPR_GETELEMPTR:
         fprintf(stream, "getelementptr ");
-        ir_type_print(stream, expr->getelemptr.type, NULL);
-        fprintf(stream, "* ");
+        ir_type_print(stream, expr->getelemptr.ptr_type, NULL);
+        fprintf(stream, " ");
         ir_expr_print(stream, expr->getelemptr.ptr_val);
         fprintf(stream, ", ");
         SL_FOREACH(cur, &expr->getelemptr.idxs) {
@@ -405,7 +405,7 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
         fprintf(stream, "]");
         break;
     case IR_TYPE_STRUCT: {
-        fprintf(stream, "type { ");
+        fprintf(stream, "{ ");
         VEC_FOREACH(cur, &type->struct_params.types) {
             ir_type_t *elem = vec_get(&type->struct_params.types, cur);
             ir_type_print(stream, elem, NULL);

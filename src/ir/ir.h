@@ -255,6 +255,7 @@ struct ir_expr_t {
 
         struct {
             ir_type_t *type;
+            ir_type_t *ptr_type;
             ir_expr_t *ptr_val;
             slist_t idxs; /**< ir_type_expr_pair_t */
         } getelemptr;
