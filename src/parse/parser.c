@@ -1002,7 +1002,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
             }
             LEX_MATCH(lex, COLON);
             if (CCC_OK !=
-                par_expression(lex, &new_node->cond.expr3)) {
+                par_oper_expression(lex, OP_NOP, NULL, &new_node->cond.expr3)) {
                 goto fail;
             }
 
@@ -1075,7 +1075,8 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
                 goto fail;
             }
             LEX_MATCH(lex, COLON);
-            if (CCC_OK != par_expression(lex, &cond_node->cond.expr3)) {
+            if (CCC_OK != par_oper_expression(lex, OP_NOP, NULL,
+                                              &cond_node->cond.expr3)) {
                 goto fail;
             }
 
