@@ -1820,16 +1820,17 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     size_t len = snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
                           ts->tunit->static_num++);
 
-    elem = emalloc(sizeof(*elem));
-    elem->key = emalloc(len + 1);
-    strcpy(elem->key, namebuf);
+    elem = emalloc(sizeof(*elem) + len + 1);
+    elem->key = str;
+    char *name = (char *)elem + sizeof(*elem);
+    strcpy(name, namebuf);
 
     ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
     type->arr.nelems = strlen(str) + 1;
     type->arr.elem_type = &ir_type_i8;
 
     ir_expr_t *var = ir_expr_create(ts->tunit, IR_EXPR_VAR);
-    var->var.name = elem->key;
+    var->var.name = name;
     var->var.local = false;
     var->var.type = type;
 

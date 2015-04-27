@@ -394,11 +394,6 @@ void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     free(gdecl);
 }
 
-void ir_trans_unit_string_destroy(ht_ptr_elem_t *elem) {
-    free(elem->key);
-    free(elem);
-}
-
 void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     if (trans_unit == NULL) {
         return;
@@ -411,7 +406,6 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     ir_symtab_destroy(&trans_unit->globals);
     HT_DESTROY_FUNC(&trans_unit->labels, free);
     HT_DESTROY_FUNC(&trans_unit->global_decls, free);
-    HT_DESTROY_FUNC(&trans_unit->strings, ir_trans_unit_string_destroy);
+    HT_DESTROY_FUNC(&trans_unit->strings, free);
     free(trans_unit);
 }
-
