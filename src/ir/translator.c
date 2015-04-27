@@ -354,12 +354,16 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         // Loop body
-        returns = trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
+        ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+        ir_stmt->label = body;
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
+
+        returns = trans_stmt(ts, stmt->do_params.stmt, ir_stmts);
 
         // Only translate test and end label if the body doesn't return
         if (!returns) {
             // Loop test
-            ir_expr_t *test = trans_expr(ts, false, stmt->while_params.expr,
+            ir_expr_t *test = trans_expr(ts, false, stmt->do_params.expr,
                                          ir_stmts);
             test = trans_expr_bool(ts, test, ir_stmts);
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);

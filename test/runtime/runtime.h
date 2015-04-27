@@ -24,15 +24,16 @@
 #ifndef _RUNTIME_H_
 #define _RUNTIME_H_
 
-extern void __assert_fail(const char *__assertion, const char *__file,
-                          unsigned int __line, const char *__function);
 void *calloc(unsigned long nmemb, unsigned long size);
+void exit(int status);
 
 #define __STRING(x) #x
-#define assert(expr)                                                    \
-    ((expr)                                                             \
-     ? (void)0                                                          \
-     : __assert_fail (__STRING(expr), __FILE__, __LINE__, __func__))
+#define assert(expr)                            \
+    do {                                        \
+        if (!(expr)) {                          \
+            exit(1);                            \
+        }                                       \
+    } while (0)
 
 #define bool _Bool
 #define true 1
