@@ -625,8 +625,21 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_PAREN:
         return trans_expr(ts, false, expr->paren_base, ir_stmts);
     case EXPR_VAR: {
-        typetab_entry_t *tt_ent = tt_lookup(ts->typetab, expr->var_id);
-        assert(tt_ent != NULL && tt_ent->entry_type == TT_VAR);
+        typetab_t *tt = ts->typetab;
+        typetab_entry_t *tt_ent;
+        do {
+            assert(tt != NULL);
+            tt_ent = tt_lookup(tt, expr->var_id);
+            assert(tt_ent != NULL);
+
+            // Search through scopes until we find this expression's entry
+            if (tt_ent->entry_type == TT_VAR &&
+                tt_ent->type == expr->etype) {
+                break;
+            }
+
+            tt = tt->last;
+        } while(true);
         ir_symtab_entry_t *entry = tt_ent->var.ir_entry;
 
         // Lazily add used global variables to declaration list
