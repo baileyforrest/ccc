@@ -1400,17 +1400,11 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         return NULL;
     }
     case OP_DEREF: {
-        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         assert(type->type == IR_TYPE_PTR);
         load->load.type = type->ptr.base;
         load->load.ptr = ir_expr;
-
-        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        assign->assign.dest = temp;
-        assign->assign.src = load;
-        trans_add_stmt(ts, ir_stmts, assign);
-        return temp;
+        return trans_assign_temp(ts, ir_stmts, load);
     }
 
     case OP_LOGICNOT:
