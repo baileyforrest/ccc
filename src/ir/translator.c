@@ -1031,7 +1031,11 @@ ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
         break;
 
     case EXPR_UNARY: {
-        ptr = trans_unaryop(ts, dest, ir_stmts);
+        if (dest->unary.op == OP_DEREF) {
+            ptr = trans_expr(ts, false, dest->unary.expr, ir_stmts);
+        } else {
+            ptr = trans_unaryop(ts, dest, ir_stmts);
+        }
         break;
     }
     case EXPR_CMPD: {
