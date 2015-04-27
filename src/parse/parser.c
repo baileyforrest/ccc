@@ -1053,9 +1053,15 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
 
         case COND: { // Cond has lowest precedence, combine left and right
             // Cond takes lowest precedence, if there was a previous operator,
-            // just return left
+            // combine left and right and return
             if (prev_op != OP_NOP) {
-                *result = left;
+                new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+                                           EXPR_BIN);
+                new_node->type = EXPR_BIN;
+                new_node->bin.op = op1;
+                new_node->bin.expr1 = left;
+                new_node->bin.expr2 = right;
+                *result = new_node;
                 return CCC_OK;
             }
             LEX_ADVANCE(lex);
