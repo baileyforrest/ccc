@@ -1734,7 +1734,15 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     case TYPE_MOD:         return trans_type(ts, type->mod.base);
     case TYPE_PAREN:       return trans_type(ts, type->paren_base);
 
-    case TYPE_STRUCT:
+    case TYPE_STRUCT: {
+        // If there is a named definition of this structure, return that
+        if (type->struct_params.trans_state != NULL) {
+            ir_gdecl_t *gdecl = type->struct_params.trans_state;
+            assert(gdecl->type == IR_GDECL_ID_STRUCT);
+            return gdecl->id_struct.id_type;
+        }
+
+        // Create a new structure object
         ir_type = ir_type_create(ts->tunit, IR_TYPE_STRUCT);
         SL_FOREACH(cur_decl, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
@@ -1752,7 +1760,23 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
                 vec_push_back(&ir_type->struct_params.types, decl_type);
             }
         }
+
+        // If this is a named structure, create a struct id type
+        if (type->struct_params.name != NULL) {
+            ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
+            id_type->id_struct.name = type->struct_params.name;
+            id_type->id_struct.type = ir_type;
+
+            ir_gdecl_t *id_gdecl = ir_gdecl_create(IR_GDECL_ID_STRUCT);
+            id_gdecl->id_struct.name = type->struct_params.name;
+            id_gdecl->id_struct.type = ir_type;
+            id_gdecl->id_struct.id_type = id_type;
+            sl_append(&ts->tunit->id_structs, &id_gdecl->link);
+            type->struct_params.trans_state = id_gdecl;
+            ir_type = id_type;
+        }
         return ir_type;
+    }
 
     case TYPE_UNION: {
         type_t *max_type = NULL;

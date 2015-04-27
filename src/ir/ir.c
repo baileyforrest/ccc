@@ -144,6 +144,7 @@ ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
 
 ir_trans_unit_t *ir_trans_unit_create(void) {
     ir_trans_unit_t *tunit = emalloc(sizeof(ir_trans_unit_t));
+    sl_init(&tunit->id_structs, offsetof(ir_gdecl_t, link));
     sl_init(&tunit->decls, offsetof(ir_gdecl_t, link));
     sl_init(&tunit->funcs, offsetof(ir_gdecl_t, link));
     sl_init(&tunit->stmts, offsetof(ir_stmt_t, heap_link));
@@ -180,6 +181,7 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     gdecl->type = type;
     switch (type) {
     case IR_GDECL_FUNC_DECL:
+    case IR_GDECL_ID_STRUCT:
         break;
     case IR_GDECL_GDATA:
         dl_init(&gdecl->gdata.stmts.list, offsetof(ir_stmt_t, link));
@@ -283,6 +285,7 @@ ir_type_t *ir_type_create(ir_trans_unit_t *tunit, ir_type_type_t type) {
     case IR_TYPE_PTR:
     case IR_TYPE_ARR:
     case IR_TYPE_OPAQUE:
+    case IR_TYPE_ID_STRUCT:
         break;
     default:
         assert(false);
@@ -305,6 +308,7 @@ void ir_type_destroy(ir_type_t *type) {
     case IR_TYPE_PTR:
     case IR_TYPE_ARR:
     case IR_TYPE_OPAQUE:
+    case IR_TYPE_ID_STRUCT:
         break;
     default:
         assert(false);
@@ -383,6 +387,7 @@ void ir_stmt_destroy(ir_stmt_t *stmt) {
 void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
+    case IR_GDECL_ID_STRUCT:
     case IR_GDECL_FUNC_DECL:
         break;
     case IR_GDECL_FUNC:
@@ -398,6 +403,7 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     if (trans_unit == NULL) {
         return;
     }
+    SL_DESTROY_FUNC(&trans_unit->id_structs, ir_gdecl_destroy);
     SL_DESTROY_FUNC(&trans_unit->decls, ir_gdecl_destroy);
     SL_DESTROY_FUNC(&trans_unit->funcs, ir_gdecl_destroy);
     SL_DESTROY_FUNC(&trans_unit->stmts, ir_stmt_destroy);

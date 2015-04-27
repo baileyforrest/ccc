@@ -115,6 +115,7 @@ struct type_t {
         struct {                 /**< Struct/union params */
             char *name;          /**< Name of struct/union, NULL if anon */
             slist_t decls;       /**< (decl_t) List of struct/union decls */
+            void *trans_state;
         } struct_params;
 
         struct {

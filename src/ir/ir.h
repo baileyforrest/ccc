@@ -59,6 +59,7 @@ typedef enum ir_type_type_t {
     IR_TYPE_PTR,
     IR_TYPE_ARR,
     IR_TYPE_STRUCT,
+    IR_TYPE_ID_STRUCT,
     IR_TYPE_OPAQUE,
 } ir_type_type_t;
 
@@ -95,6 +96,11 @@ struct ir_type_t {
         struct {
             vec_t types; /**< (ir_type_t) Types in the structure */
         } struct_params;
+
+        struct {
+            char *name;
+            ir_type_t *type;
+        } id_struct;
     };
 };
 
@@ -386,6 +392,7 @@ typedef struct ir_inst_stream_t {
 
 typedef enum ir_gdecl_type_t {
     IR_GDECL_GDATA,
+    IR_GDECL_ID_STRUCT,
     IR_GDECL_FUNC_DECL,
     IR_GDECL_FUNC,
 } ir_gdecl_type_t;
@@ -398,6 +405,12 @@ typedef struct ir_gdecl_t {
         struct {
             ir_inst_stream_t stmts; /**< Any initialization and the def */
         } gdata;
+
+        struct {
+            char *name;
+            ir_type_t *type;
+            ir_type_t *id_type;
+        } id_struct;
 
         struct {
             ir_type_t *type;
@@ -420,6 +433,7 @@ typedef struct ir_gdecl_t {
 
 typedef struct ir_trans_unit_t {
     sl_link_t link;
+    slist_t id_structs;
     slist_t decls;
     slist_t funcs;
     ir_symtab_t globals;

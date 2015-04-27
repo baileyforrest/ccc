@@ -43,6 +43,10 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
     fprintf(stream, "target datalayout = \"%s\"\n", DATALAYOUT);
     fprintf(stream, "target triple = \"%s\"\n", TRIPLE);
     fprintf(stream, "\n");
+    SL_FOREACH(cur, &irtree->id_structs) {
+        ir_gdecl_print(stream, GET_ELEM(&irtree->decls, cur));
+    }
+    fprintf(stream, "\n");
     SL_FOREACH(cur, &irtree->decls) {
         ir_gdecl_print(stream, GET_ELEM(&irtree->decls, cur));
     }
@@ -53,18 +57,20 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
 
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
-    case IR_GDECL_GDATA: {
+    case IR_GDECL_GDATA:
         DL_FOREACH(cur, &gdecl->gdata.stmts.list) {
             ir_stmt_print(stream, GET_ELEM(&gdecl->gdata.stmts.list, cur),
                           false);
         }
         break;
-    }
-    case IR_GDECL_FUNC_DECL: {
+    case IR_GDECL_ID_STRUCT:
+        fprintf(stream, "%%%s = type ", gdecl->id_struct.name);
+        ir_type_print(stream, gdecl->id_struct.type, NULL);
+        break;
+    case IR_GDECL_FUNC_DECL:
         fprintf(stream, "declare ");
         ir_type_print(stream, gdecl->func_decl.type, gdecl->func_decl.name);
         break;
-    }
     case IR_GDECL_FUNC:
         fprintf(stream, "\ndefine ");
         assert(gdecl->func.type->type == IR_TYPE_FUNC);
@@ -414,6 +420,10 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
             }
         }
         fprintf(stream, " }");
+        break;
+    }
+    case IR_TYPE_ID_STRUCT: {
+        fprintf(stream, "%%%s", type->id_struct.name);
         break;
     }
     case IR_TYPE_OPAQUE:
