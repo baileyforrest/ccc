@@ -1487,10 +1487,12 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             expr->etype->ptr.type_mod = TMOD_NONE;
             expr->etype->ptr.base = expr->unary.expr->etype;
             break;
-        case OP_DEREF:
-            assert(expr->unary.expr->etype->type == TYPE_PTR);
-            expr->etype = expr->unary.expr->etype->ptr.base;
+        case OP_DEREF: {
+            type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
+            assert(ptr_type->type == TYPE_PTR);
+            expr->etype = ptr_type->ptr.base;
             break;
+        }
         case OP_LOGICNOT:
             expr->etype = tt_bool;
             break;

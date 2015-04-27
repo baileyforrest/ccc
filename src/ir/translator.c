@@ -979,8 +979,11 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         elem_ptr->getelemptr.ptr_val = pointer;
 
         ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
+        ir_expr_t *index = trans_expr(ts, false, expr->arr_idx.index, ir_stmts);
+        index = trans_type_conversion(ts, tt_size_t, expr->arr_idx.index->etype,
+                                      index, ir_stmts);
         pair->type = &ir_type_i64;
-        pair->expr = trans_expr(ts, false, expr->arr_idx.index, ir_stmts);
+        pair->expr = index;
         sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
         ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
