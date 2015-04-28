@@ -1003,7 +1003,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         } else { // !is_arr_idx && expr->type != EXPR_MEM_ACC
             pointer = trans_expr(ts, false, expr, ir_stmts);
             ir_type_t *ptr_type = ir_expr_type(pointer);
-            if (ptr_type->type == IR_TYPE_PTR) {
+            if (!last_array && ptr_type->type == IR_TYPE_PTR) {
                 ir_type_t *base_type = ptr_type->ptr.base;
 
                 if (base_type->type == IR_TYPE_STRUCT ||
