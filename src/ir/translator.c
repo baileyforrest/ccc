@@ -941,19 +941,35 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
 
+        bool last_array = false;
         ir_expr_t *pointer;
         ir_type_expr_pair_t *pair;
-        while (expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT) {
-            // Get index into the structure
+        while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
+            || expr->type == EXPR_ARR_IDX) {
             pair = emalloc(sizeof(*pair));
-            pair->type = &ir_type_i32;
-            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-            pair->expr->const_params.type = &ir_type_i32;
-            pair->expr->const_params.ctype = IR_CONST_INT;
-            pair->expr->const_params.int_val =
-                ast_get_member_num(expr->mem_acc.base->etype, expr->mem_acc.name);
+            if (expr->type == EXPR_MEM_ACC) {
+                // Get index into the structure
+                pair->type = &ir_type_i32;
+                pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+                pair->expr->const_params.type = &ir_type_i32;
+                pair->expr->const_params.ctype = IR_CONST_INT;
+                pair->expr->const_params.int_val =
+                    ast_get_member_num(expr->mem_acc.base->etype,
+                                       expr->mem_acc.name);
+                expr = expr->mem_acc.base;
+                last_array = false;
+            } else { // expr->type == EXPR_ARR_IDX
+                ir_expr_t *index = trans_expr(ts, false, expr->arr_idx.index,
+                                              ir_stmts);
+                index = trans_type_conversion(ts, tt_size_t,
+                                              expr->arr_idx.index->etype,
+                                              index, ir_stmts);
+                pair->type = trans_type(ts, tt_size_t);
+                pair->expr = index;
+                expr = expr->arr_idx.array;
+                last_array = true;
+            }
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
-            expr = expr->mem_acc.base;
         }
 
         bool prepend_zero = false;
@@ -979,8 +995,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             assert(ptr_type->type == IR_TYPE_PTR);
             ir_type_t *base_type = ptr_type->ptr.base;
 
-            if (base_type->type == IR_TYPE_STRUCT ||
-                base_type->type == IR_TYPE_ID_STRUCT) {
+            if (!last_array &&
+                (base_type->type == IR_TYPE_STRUCT ||
+                 base_type->type == IR_TYPE_ID_STRUCT)) {
                 prepend_zero = true;
             }
         }
