@@ -1486,8 +1486,10 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
 ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
                                  ir_expr_t *src_expr,
                                  ir_inst_stream_t *ir_stmts) {
-    dest = ast_type_unmod(dest);
-    src = ast_type_unmod(src);
+    type_t *orig_dest = ast_type_untypedef(dest);
+    type_t *orig_src = ast_type_untypedef(src);
+    dest = ast_type_unmod(orig_dest);
+    src = ast_type_unmod(orig_src);
     // Don't do anything if types are equal
     if (typecheck_type_equal(dest, src)) {
         return src_expr;
@@ -1504,15 +1506,15 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     ir_convert_t convert_op;
     switch (dest_type->type) {
     case IR_TYPE_INT: {
-        bool dest_signed =
-            dest->type == TYPE_MOD && dest->mod.type_mod & TMOD_UNSIGNED;
+        bool dest_signed = !(orig_dest->type == TYPE_MOD &&
+                             orig_dest->mod.type_mod & TMOD_UNSIGNED);
         switch (src_type->type) {
         case IR_TYPE_INT:
             if (dest_type->int_params.width < src_type->int_params.width) {
                 convert_op = IR_CONVERT_TRUNC;
             } else {
-                bool src_signed =
-                    src->type == TYPE_MOD && src->mod.type_mod & TMOD_UNSIGNED;
+                bool src_signed = !(orig_src->type == TYPE_MOD &&
+                                    orig_src->mod.type_mod & TMOD_UNSIGNED);
                 if (src_signed) {
                     convert_op = IR_CONVERT_SEXT;
                 } else {
