@@ -1515,7 +1515,8 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
             } else {
                 bool src_signed = !(orig_src->type == TYPE_MOD &&
                                     orig_src->mod.type_mod & TMOD_UNSIGNED);
-                if (src_signed) {
+                // Bools are treated as unsigned
+                if (src_signed && src_type->int_params.width != 1) {
                     convert_op = IR_CONVERT_SEXT;
                 } else {
                     convert_op = IR_CONVERT_ZEXT;
