@@ -661,6 +661,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 return entry->var.access;
             }
             ir_type_t *type = ir_expr_type(entry->var.access)->ptr.base;
+
+            // Structs are always refered to by addresses
+            if (type->type == IR_TYPE_STRUCT ||
+                type->type == IR_TYPE_ID_STRUCT) {
+                return entry->var.access;
+            }
+
             // Load var into a temp
             ir_expr_t *temp = trans_temp_create(ts, type);
             ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
@@ -948,6 +955,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
             expr = expr->mem_acc.base;
         }
+
+        bool prepend_zero = false;
         if (expr->mem_acc.op == OP_ARROW) {
             type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
             assert(etype->type == TYPE_PTR);
@@ -962,6 +971,20 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 ast_get_member_num(etype->ptr.base, expr->mem_acc.name);
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
 
+            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
+            prepend_zero = true;
+        } else {
+            pointer = trans_expr(ts, false, expr, ir_stmts);
+            ir_type_t *ptr_type = ir_expr_type(pointer);
+            assert(ptr_type->type == IR_TYPE_PTR);
+            ir_type_t *base_type = ptr_type->ptr.base;
+
+            if (base_type->type == IR_TYPE_STRUCT ||
+                base_type->type == IR_TYPE_ID_STRUCT) {
+                prepend_zero = true;
+            }
+        }
+        if (prepend_zero) {
             pair = emalloc(sizeof(*pair));
             pair->type = &ir_type_i32;
             pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
@@ -969,9 +992,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             pair->expr->const_params.ctype = IR_CONST_INT;
             pair->expr->const_params.int_val = 0;
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
-            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
-        } else {
-            pointer = trans_expr(ts, false, expr, ir_stmts);
         }
         elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
         elem_ptr->getelemptr.ptr_val = pointer;
@@ -1400,8 +1420,13 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         return NULL;
     }
     case OP_DEREF: {
-        ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         assert(type->type == IR_TYPE_PTR);
+        // Don't load from structs
+        if (type->ptr.base->type == IR_TYPE_STRUCT ||
+            type->ptr.base->type == IR_TYPE_ID_STRUCT) {
+            return ir_expr;
+        }
+        ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = type->ptr.base;
         load->load.ptr = ir_expr;
         return trans_assign_temp(ts, ir_stmts, load);
