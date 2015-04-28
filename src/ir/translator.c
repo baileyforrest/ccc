@@ -70,6 +70,18 @@ ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
     return temp;
 }
 
+// TODO1: Replace this common pattern in code with this
+ir_expr_t *trans_load_addr(trans_state_t *ts, ir_inst_stream_t *stream,
+                           ir_expr_t *expr) {
+    ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
+    ir_type_t *type = ir_expr_type(expr);
+    assert(type->type == IR_TYPE_PTR);
+    load->load.type = type->ptr.base;
+    load->load.ptr = expr;
+
+    return trans_assign_temp(ts, stream, load);
+}
+
 ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     assert(ast != NULL);
 
@@ -688,14 +700,16 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
     }
     case EXPR_ASSIGN: {
+        ir_expr_t *dest_addr = trans_expr(ts, true, expr->assign.dest,
+                                          ir_stmts);
         if (expr->assign.op == OP_NOP) {
             ir_expr_t *src = trans_expr(ts, false, expr->assign.expr, ir_stmts);
-            return trans_assign(ts, expr->assign.dest, src,
+            return trans_assign(ts, dest_addr, expr->assign.dest->etype, src,
                                 expr->assign.expr->etype, ir_stmts);
         }
         ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *dest;
-        ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest,
+        ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, dest_addr,
                                          expr->assign.expr, expr->assign.op,
                                          expr->etype, ir_stmts, &dest);
 
@@ -706,7 +720,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         binop->assign.src = op_expr;
         trans_add_stmt(ts, ir_stmts, binop);
 
-        return trans_assign(ts, expr->assign.dest, temp,
+        return trans_assign(ts, dest_addr, expr->assign.dest->etype, temp,
                             expr->assign.expr->etype, ir_stmts);
     }
     case EXPR_CONST_INT: {
@@ -730,9 +744,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
     case EXPR_BIN: {
         ir_type_t *type = trans_type(ts, expr->etype);
-        ir_expr_t *op_expr = trans_binop(ts, expr->bin.expr1, expr->bin.expr2,
-                                         expr->bin.op, expr->etype, ir_stmts,
-                                         NULL);
+        ir_expr_t *op_expr = trans_binop(ts, expr->bin.expr1, NULL,
+                                         expr->bin.expr2, expr->bin.op,
+                                         expr->etype, ir_stmts, NULL);
         ir_expr_t *temp = trans_temp_create(ts, type);
 
         ir_stmt_t *binop = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
@@ -743,7 +757,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return temp;
     }
     case EXPR_UNARY:
-        return trans_unaryop(ts, expr, ir_stmts);
+        return trans_unaryop(ts, addrof, expr, ir_stmts);
 
     case EXPR_COND: {
         ir_type_t *type = trans_type(ts, expr->etype);
@@ -940,7 +954,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_ARR_IDX:
     case EXPR_MEM_ACC: {
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
-        elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
+        ir_type_t *expr_type = trans_type(ts, expr->etype);
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = expr_type;
+        elem_ptr->getelemptr.type = ptr_type;
 
         bool last_array = false;
         ir_expr_t *pointer;
@@ -1032,7 +1049,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         // Load instruction
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
-        load->load.type = elem_ptr->getelemptr.type;
+        load->load.type = expr_type;
         load->load.ptr = ptr;
 
         return trans_assign_temp(ts, ir_stmts, load);
@@ -1047,53 +1064,14 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     return NULL;
 }
 
-ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
-                        type_t *src_type, ir_inst_stream_t *ir_stmts) {
-    ir_expr_t *ptr = NULL;
-    while (dest->type == EXPR_PAREN) {
-        dest = dest->paren_base;
-    }
-    switch (dest->type) {
-    case EXPR_VAR: {
-        typetab_entry_t *tt_ent = tt_lookup(ts->typetab, dest->var_id);
-        assert(tt_ent != NULL && tt_ent->entry_type == TT_VAR);
-
-        ir_symtab_entry_t *entry = tt_ent->var.ir_entry;
-
-        // Must be valid if typechecked
-        assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
-
-        ptr = entry->var.access;
-        break;
-    }
-
-    case EXPR_MEM_ACC:
-    case EXPR_ARR_IDX:
-        ptr = trans_expr(ts, true, dest, ir_stmts);
-        break;
-
-    case EXPR_UNARY: {
-        if (dest->unary.op == OP_DEREF) {
-            ptr = trans_expr(ts, false, dest->unary.expr, ir_stmts);
-        } else {
-            ptr = trans_unaryop(ts, dest, ir_stmts);
-        }
-        break;
-    }
-    case EXPR_CMPD: {
-        // TODO0: This
-        assert(false);
-        break;
-    }
-    default:
-        // Would not have typechecked if its not an lvalue
-        assert(false);
-    }
+ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
+                        type_t *dest_type, ir_expr_t *src, type_t *src_type,
+                        ir_inst_stream_t *ir_stmts) {
     ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_STORE);
-    ir_stmt->store.type = trans_type(ts, dest->etype);
-    ir_stmt->store.val = trans_type_conversion(ts, dest->etype, src_type, src,
+    ir_stmt->store.type = trans_type(ts, dest_type);
+    ir_stmt->store.val = trans_type_conversion(ts, dest_type, src_type, src,
                                                ir_stmts);
-    ir_stmt->store.ptr = ptr;
+    ir_stmt->store.ptr = dest_ptr;
     trans_add_stmt(ts, ir_stmts, ir_stmt);
     return src;
 }
@@ -1134,9 +1112,9 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
     return temp;
 }
 
-ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
-                       oper_t op, type_t *type, ir_inst_stream_t *ir_stmts,
-                       ir_expr_t **left_loc) {
+ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
+                       expr_t *right, oper_t op, type_t *type,
+                       ir_inst_stream_t *ir_stmts, ir_expr_t **left_loc) {
     type = ast_type_untypedef(type);
     bool is_float = false;
     bool is_signed = false;
@@ -1349,7 +1327,12 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     op_expr->binop.type = trans_type(ts, type);
 
     // Evaluate the types and convert types if necessary
-    ir_expr_t *left_expr = trans_expr(ts, false, left, ir_stmts);
+    ir_expr_t *left_expr;
+    if (left_addr == NULL) {
+        left_expr = trans_expr(ts, false, left, ir_stmts);
+    } else {
+        left_expr = trans_load_addr(ts, ir_stmts, left_addr);
+    }
     op_expr->binop.expr1 = trans_type_conversion(ts, type, left->etype,
                                                  left_expr, ir_stmts);
     ir_expr_t *right_expr = trans_expr(ts, false, right, ir_stmts);
@@ -1361,30 +1344,27 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
     return op_expr;
 }
 
-ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
+ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
                          ir_inst_stream_t *ir_stmts) {
     assert(expr->type == EXPR_UNARY);
     oper_t op = expr->unary.op;
-    if (op == OP_ADDR) {
-        return trans_expr(ts, true, expr->unary.expr, ir_stmts);
-    }
-    ir_expr_t *ir_expr = trans_expr(ts, false, expr->unary.expr, ir_stmts);
-    ir_type_t *type = ir_expr_type(ir_expr);
     switch (op) {
-    case OP_UPLUS:
-        // Do nothing
-        return ir_expr;
-
     case OP_ADDR:
-        // Handled above
-        assert(false);
-        return NULL;
+        return trans_expr(ts, true, expr->unary.expr, ir_stmts);
 
     case OP_PREINC:
     case OP_PREDEC:
     case OP_POSTINC:
     case OP_POSTDEC: {
-        ir_expr_t *temp = trans_temp_create(ts, type);
+        ir_expr_t *expr_addr = trans_expr(ts, true, expr->unary.expr, ir_stmts);
+        ir_type_t *type = ir_expr_type(expr_addr);
+        assert(type->type == IR_TYPE_PTR);
+
+        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
+        ir_expr->load.type = type->ptr.base;
+        ir_expr->load.ptr = expr_addr;
+        ir_expr = trans_assign_temp(ts, ir_stmts, ir_expr);
+
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
 
         switch (op) {
@@ -1400,14 +1380,11 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         other->const_params.int_val = 1;
         op_expr->binop.expr1 = ir_expr;
         op_expr->binop.expr2 = other;
-        op_expr->binop.type = type;
+        op_expr->binop.type = type->ptr.base;
 
-        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        assign->assign.dest = temp;
-        assign->assign.src = op_expr;
-        trans_add_stmt(ts, ir_stmts, assign);
-
-        trans_assign(ts, expr->unary.expr, temp, expr->etype, ir_stmts);
+        ir_expr_t *temp = trans_assign_temp(ts, ir_stmts, op_expr);
+        trans_assign(ts, expr_addr, expr->unary.expr->etype, temp, expr->etype,
+                     ir_stmts);
 
         switch (op) {
         case OP_PREINC:
@@ -1419,8 +1396,21 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         assert(false);
         return NULL;
     }
+    default:
+        break;
+    }
+
+    ir_expr_t *ir_expr = trans_expr(ts, false, expr->unary.expr, ir_stmts);
+    ir_type_t *type = ir_expr_type(ir_expr);
+    switch (op) {
+    case OP_UPLUS:
+        return ir_expr;
+
     case OP_DEREF: {
         assert(type->type == IR_TYPE_PTR);
+        if (addrof) {
+            return ir_expr;
+        }
         // Don't load from structs
         if (type->ptr.base->type == IR_TYPE_STRUCT ||
             type->ptr.base->type == IR_TYPE_ID_STRUCT) {
@@ -1477,7 +1467,8 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
         trans_add_stmt(ts, ir_stmts, assign);
         return temp;
     }
-    default: break;
+    default:
+        break;
     }
     assert(false);
     return NULL;

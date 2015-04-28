@@ -47,6 +47,9 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type);
 ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                              ir_expr_t *expr);
 
+ir_expr_t *trans_load_addr(trans_state_t *ts, ir_inst_stream_t *stream,
+                           ir_expr_t *expr);
+
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
 
 void trans_gdecl_node(trans_state_t *ts, decl_node_t *node);
@@ -61,11 +64,11 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
                            ir_inst_stream_t *ir_stmts);
 
-ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, expr_t *right,
-                       oper_t op, type_t *type, ir_inst_stream_t *ir_stmts,
-                       ir_expr_t **left_loc);
+ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
+                       expr_t *right, oper_t op, type_t *type,
+                       ir_inst_stream_t *ir_stmts, ir_expr_t **left_loc);
 
-ir_expr_t *trans_unaryop(trans_state_t *ts, expr_t *expr,
+ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
                          ir_inst_stream_t *ir_stmts);
 
 
@@ -73,8 +76,9 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
                                  ir_expr_t *src_expr,
                                  ir_inst_stream_t *ir_stmts);
 
-ir_expr_t *trans_assign(trans_state_t *ts, expr_t *dest, ir_expr_t *src,
-                        type_t *src_type, ir_inst_stream_t *ir_stmts);
+ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
+                        type_t *dest_type, ir_expr_t *src, type_t *src_type,
+                        ir_inst_stream_t *ir_stmts);
 
 char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned);
 
