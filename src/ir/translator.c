@@ -937,18 +937,18 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                             &expr->offsetof_params.path);
         return ir_expr;
     }
+    case EXPR_ARR_IDX:
     case EXPR_MEM_ACC: {
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
 
-        bool last_array = false;
         ir_expr_t *pointer;
         ir_type_expr_pair_t *pair;
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
             || expr->type == EXPR_ARR_IDX) {
-            pair = emalloc(sizeof(*pair));
             if (expr->type == EXPR_MEM_ACC) {
                 // Get index into the structure
+                pair = emalloc(sizeof(*pair));
                 pair->type = &ir_type_i32;
                 pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
                 pair->expr->const_params.type = &ir_type_i32;
@@ -957,8 +957,15 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                     ast_get_member_num(expr->mem_acc.base->etype,
                                        expr->mem_acc.name);
                 expr = expr->mem_acc.base;
-                last_array = false;
+                sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
             } else { // expr->type == EXPR_ARR_IDX
+                // If this is a pointer instead of an array, stop here because
+                // we need to do a load for the next index
+                type_t *arr_type = ast_type_unmod(expr->arr_idx.array->etype);
+                if (arr_type->type == TYPE_PTR) {
+                    break;
+                }
+                pair = emalloc(sizeof(*pair));
                 ir_expr_t *index = trans_expr(ts, false, expr->arr_idx.index,
                                               ir_stmts);
                 index = trans_type_conversion(ts, tt_size_t,
@@ -967,13 +974,14 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 pair->type = trans_type(ts, tt_size_t);
                 pair->expr = index;
                 expr = expr->arr_idx.array;
-                last_array = true;
+                sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
+
             }
-            sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
         }
 
         bool prepend_zero = false;
-        if (expr->mem_acc.op == OP_ARROW) {
+        if (expr->type == EXPR_MEM_ACC) {
+            assert(expr->mem_acc.op == OP_ARROW);
             type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
             assert(etype->type == TYPE_PTR);
 
@@ -989,16 +997,16 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
             prepend_zero = true;
-        } else {
+        } else { // !is_arr_idx && expr->type != EXPR_MEM_ACC
             pointer = trans_expr(ts, false, expr, ir_stmts);
             ir_type_t *ptr_type = ir_expr_type(pointer);
-            assert(ptr_type->type == IR_TYPE_PTR);
-            ir_type_t *base_type = ptr_type->ptr.base;
+            if (ptr_type->type == IR_TYPE_PTR) {
+                ir_type_t *base_type = ptr_type->ptr.base;
 
-            if (!last_array &&
-                (base_type->type == IR_TYPE_STRUCT ||
-                 base_type->type == IR_TYPE_ID_STRUCT)) {
-                prepend_zero = true;
+                if (base_type->type == IR_TYPE_STRUCT ||
+                    base_type->type == IR_TYPE_ID_STRUCT) {
+                    prepend_zero = true;
+                }
             }
         }
         if (prepend_zero) {
@@ -1020,34 +1028,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
 
         // Load instruction
-        ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
-        load->load.type = elem_ptr->getelemptr.type;
-        load->load.ptr = ptr;
-
-        return trans_assign_temp(ts, ir_stmts, load);
-    }
-    case EXPR_ARR_IDX: {
-        ir_expr_t *pointer = trans_expr(ts, false, expr->arr_idx.array,
-                                        ir_stmts);
-        ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
-        elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
-        elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
-        elem_ptr->getelemptr.ptr_val = pointer;
-
-        ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-        ir_expr_t *index = trans_expr(ts, false, expr->arr_idx.index, ir_stmts);
-        index = trans_type_conversion(ts, tt_size_t, expr->arr_idx.index->etype,
-                                      index, ir_stmts);
-        pair->type = &ir_type_i64;
-        pair->expr = index;
-        sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
-
-        ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
-
-        if (addrof) {
-            return ptr;
-        }
-
         ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
         load->load.type = elem_ptr->getelemptr.type;
         load->load.ptr = ptr;
