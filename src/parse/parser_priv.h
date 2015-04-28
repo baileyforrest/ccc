@@ -214,11 +214,13 @@ status_t par_struct_declaration(lex_wrap_t *lex, type_t *type);
  * allocates a new type object.
  *
  * @param lex Current lexer state
+ * @param compound If true, parsing specifier qualifiers for compound type
  * @param type The location to store the result.
  * @return CCC_OK on success, CCC_BACKTRACK if the next token does now allow
  *     parsing a declaratios_specifier, error code on error
  */
-status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type);
+status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
+                                  type_t **type);
 
 /**
  * Parses a struct declarator list.

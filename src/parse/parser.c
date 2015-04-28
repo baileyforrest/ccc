@@ -605,7 +605,7 @@ fail:
 status_t par_struct_declaration(lex_wrap_t *lex, type_t *type) {
     status_t status = CCC_OK;
     type_t *decl_type = NULL;
-    if (CCC_OK != (status = par_specifier_qualifiers(lex, &decl_type))) {
+    if (CCC_OK != (status = par_specifier_qualifiers(lex, true, &decl_type))) {
         if (decl_type == NULL || status != CCC_BACKTRACK) {
             goto fail;
         }
@@ -620,7 +620,8 @@ fail:
     return status;
 }
 
-status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type) {
+status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
+                                  type_t **type) {
     status_t status = CCC_OK;;
     *type = NULL; // Set to NULL so sub functions will allocate
 
@@ -632,6 +633,17 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, type_t **type) {
             if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) == NULL) {
                 return CCC_BACKTRACK;
             }
+
+            // Compound types are in another namespace, so if we get an
+            // the names are allowed to collide with a typedef name
+            if (compound) {
+                bool has_specifier = *type != NULL &&
+                ((*type)->type != TYPE_MOD || (*type)->mod.base != NULL);
+                if (has_specifier) {
+                    return CCC_BACKTRACK;
+                }
+            }
+
             // FALL THROUGH
         case DECL_SPEC_TYPE_SPEC_NO_ID:
             if (CCC_OK != (status = par_type_specifier(lex, type))) {
@@ -1631,7 +1643,7 @@ status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result) {
         LEX_MATCH(lex, LPAREN);
     }
 
-    if (CCC_OK != (status = par_specifier_qualifiers(lex, &base))) {
+    if (CCC_OK != (status = par_specifier_qualifiers(lex, false, &base))) {
         if (base == NULL || status != CCC_BACKTRACK) {
             goto fail;
         }
