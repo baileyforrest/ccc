@@ -717,6 +717,10 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         } while(!done);
     }
 
+    // TODO1: Is this correct?
+    // Set hex numbers as unsigned
+    has_u = has_u || is_hex;
+
     lexer->next_char = cur;
     if (err) {
         return status;
