@@ -141,9 +141,10 @@ int ts_advance(tstream_t *ts);
  * Skip whitespace characters and block comments, or stop if the end is reached
  *
  * @param ts Text stream to use
+ * @param skip_newlines if true, newlines are skipped too
  * @return The number of characters skipped
  */
-size_t ts_skip_ws_and_comment(tstream_t *ts);
+size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines);
 
 /**
  * Skip a "string" bounded by double or single quotes

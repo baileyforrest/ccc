@@ -61,7 +61,7 @@ int ts_advance(tstream_t *ts) {
     return *(ts->cur++);
 }
 
-size_t ts_skip_ws_and_comment(tstream_t *ts) {
+size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines) {
     size_t num_chars = 0;
     bool done = false;
     bool comment = false;
@@ -84,6 +84,13 @@ size_t ts_skip_ws_and_comment(tstream_t *ts) {
             continue;
         }
         switch (ts_cur(ts)) {
+        case '\n':
+            if (skip_newlines) {
+                ts_advance(ts);
+            } else {
+                done = true;
+            }
+            break;
         case ' ':
         case '\t':
             // Skip white space

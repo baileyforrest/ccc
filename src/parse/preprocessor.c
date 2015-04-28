@@ -542,7 +542,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     if (macro_inst != NULL && !isspace(last_char) &&
         (cur_char == ' ' || cur_char == '\t' || cur_char == '\\' ||
          cur_char == '#')) {
-        ts_skip_ws_and_comment(&lookahead);
+        ts_skip_ws_and_comment(&lookahead, false);
 
         // Skip multiple ## with only white space around them
         while (!ts_end(&lookahead)) {
@@ -553,7 +553,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             } else {
                 break;
             }
-            ts_skip_ws_and_comment(&lookahead);
+            ts_skip_ws_and_comment(&lookahead, false);
         }
         if (concat) {
             // Set stream to new location
@@ -582,7 +582,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                            "Unexpected '#' in directive");
             }
             ts_advance(stream);
-            ts_skip_ws_and_comment(stream);
+            ts_skip_ws_and_comment(stream, false);
             char *start = ts_location(stream);
             size_t len = ts_advance_identifier(stream);
             len_str_t lookup = { start, len };
@@ -680,7 +680,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
             // Check if there's a concatenation after the parameter
             if (!concat) {
-                ts_skip_ws_and_comment(&lookahead);
+                ts_skip_ws_and_comment(&lookahead, false);
                 if (ts_cur(&lookahead) == '#' && ts_cur(&lookahead) == '#') {
                     concat = true;
                 }
@@ -760,7 +760,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
 
     if (macro->num_params >= 0) {
-        ts_skip_ws_and_comment(&lookahead);
+        ts_skip_ws_and_comment(&lookahead, true);
         if (ts_cur(&lookahead) != '(') {
             // If macro requires params, but none are provided, this is just
             // treated as identifier
@@ -776,7 +776,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         ts_advance(&lookahead); // Skip the paren
 
         if (macro->num_params == 0) {
-            ts_skip_ws_and_comment(&lookahead);
+            ts_skip_ws_and_comment(&lookahead, false);
             if (ts_cur(&lookahead) != ')') {
                 logger_log(&stream->mark, LOG_ERR,
                            "unterminated argument list invoking macro \"%.*s\"",
@@ -791,7 +791,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             bool done = false;
 
             SL_FOREACH(cur_link, &macro->params) {
-                ts_skip_ws_and_comment(&lookahead);
+                ts_skip_ws_and_comment(&lookahead, false);
                 num_params++;
                 tstream_t cur_param;
                 memcpy(&cur_param, &lookahead, sizeof(tstream_t));
@@ -806,7 +806,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     }
                     if (ts_cur(&lookahead) == '/' &&
                         ts_next(&lookahead) == '*') {
-                        ts_skip_ws_and_comment(&lookahead);
+                        ts_skip_ws_and_comment(&lookahead, false);
                         continue;
                     }
                     if (ts_cur(&lookahead) == '(') {
@@ -1003,7 +1003,7 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
 
 int pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,
                       tstream_t *stream) {
-    ts_skip_ws_and_comment(lookahead);
+    ts_skip_ws_and_comment(lookahead, false);
     bool paren = false;
     if (ts_cur(lookahead) == '(') {
         ts_advance(lookahead);

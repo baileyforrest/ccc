@@ -357,8 +357,8 @@ status_t pp_directive_define(preprocessor_t *pp) {
                             redefined = true;
                             break;
                         }
-                        ts_skip_ws_and_comment(&cur_stream);
-                        ts_skip_ws_and_comment(&new_stream);
+                        ts_skip_ws_and_comment(&cur_stream, false);
+                        ts_skip_ws_and_comment(&new_stream, false);
                     }
 
                     if (ts_advance(&cur_stream) != ts_advance(&new_stream)) {
@@ -404,7 +404,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     }
 
     // Skip whitespace before name
-    ts_skip_ws_and_comment(stream);
+    ts_skip_ws_and_comment(stream, false);
     if (ts_end(stream)) {
         logger_log(&stream->mark, LOG_ERR,
                    "Unexpected EOF in macro definition");
@@ -429,7 +429,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
 
         bool done = false;
         while (!done && !ts_end(stream)) {
-            ts_skip_ws_and_comment(stream);
+            ts_skip_ws_and_comment(stream, false);
             cur = ts_location(stream);
 
             // 0 parameter macro
@@ -459,7 +459,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
 
             sl_append(&new_macro->params, &string->link);
 
-            ts_skip_ws_and_comment(stream);
+            ts_skip_ws_and_comment(stream, false);
 
             switch (ts_cur(stream)) {
             case ')':
@@ -492,7 +492,7 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
     }
 
     // Skip whitespace after parameters
-    ts_skip_ws_and_comment(stream);
+    ts_skip_ws_and_comment(stream, false);
     cur = ts_location(stream);
 
     // Set macro to start at this location on the stream
@@ -549,7 +549,7 @@ status_t pp_directive_undef(preprocessor_t *pp) {
     tstream_t *stream = &file->stream;
 
     // Skip whitespace before name
-    ts_skip_ws_and_comment(stream);
+    ts_skip_ws_and_comment(stream, false);
     if (ts_end(stream)) {
         logger_log(&stream->mark, LOG_ERR, "Unexpected EOF inside undef");
         status = CCC_ESYNTAX;
@@ -592,7 +592,7 @@ status_t pp_directive_ifdef_helper(preprocessor_t *pp, const char *directive,
         return status;
     }
 
-    ts_skip_ws_and_comment(stream);
+    ts_skip_ws_and_comment(stream, false);
     if (ts_end(stream)) {
         logger_log(&stream->mark, LOG_ERR, "Unexpected EOF in %s", directive);
         status = CCC_ESYNTAX;
