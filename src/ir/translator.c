@@ -942,6 +942,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = trans_type(ts, expr->etype);
 
+        bool last_array = false;
         ir_expr_t *pointer;
         ir_type_expr_pair_t *pair;
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
@@ -959,12 +960,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 expr = expr->mem_acc.base;
                 sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
             } else { // expr->type == EXPR_ARR_IDX
-                // If this is a pointer instead of an array, stop here because
-                // we need to do a load for the next index
                 type_t *arr_type = ast_type_unmod(expr->arr_idx.array->etype);
-                if (arr_type->type == TYPE_PTR) {
-                    break;
-                }
+
                 pair = emalloc(sizeof(*pair));
                 ir_expr_t *index = trans_expr(ts, false, expr->arr_idx.index,
                                               ir_stmts);
@@ -976,11 +973,17 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 expr = expr->arr_idx.array;
                 sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
 
+                // If this is a pointer instead of an array, stop here because
+                // we need to do a load for the next index
+                if (arr_type->type == TYPE_PTR) {
+                    last_array = true;
+                    break;
+                }
             }
         }
 
         bool prepend_zero = false;
-        if (expr->type == EXPR_MEM_ACC) {
+        if (!last_array && expr->type == EXPR_MEM_ACC) {
             assert(expr->mem_acc.op == OP_ARROW);
             type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
             assert(etype->type == TYPE_PTR);
