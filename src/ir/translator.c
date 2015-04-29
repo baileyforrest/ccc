@@ -1326,16 +1326,18 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
     op_expr->binop.op = ir_op;
     op_expr->binop.type = trans_type(ts, type);
 
-    // Evaluate right first in clase left_addr's value is affected by right
-    ir_expr_t *right_expr = trans_expr(ts, false, right, ir_stmts);
-    op_expr->binop.expr2 = trans_type_conversion(ts, type, right->etype,
-                                                 right_expr, ir_stmts);
-
     // Evaluate the types and convert types if necessary
     ir_expr_t *left_expr;
     if (left_addr == NULL) {
         left_expr = trans_expr(ts, false, left, ir_stmts);
+        ir_expr_t *right_expr = trans_expr(ts, false, right, ir_stmts);
+        op_expr->binop.expr2 = trans_type_conversion(ts, type, right->etype,
+                                                     right_expr, ir_stmts);
     } else {
+        // Evaluate right first in clase left_addr's value is affected by right
+        ir_expr_t *right_expr = trans_expr(ts, false, right, ir_stmts);
+        op_expr->binop.expr2 = trans_type_conversion(ts, type, right->etype,
+                                                     right_expr, ir_stmts);
         left_expr = trans_load_addr(ts, ir_stmts, left_addr);
     }
     op_expr->binop.expr1 = trans_type_conversion(ts, type, left->etype,
