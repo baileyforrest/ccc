@@ -389,6 +389,7 @@ size_t ast_type_size(type_t *type) {
         // TODO1: Handle bit fields
     case TYPE_STRUCT:
     case TYPE_UNION: {
+        size_t max_align = 1;
         size_t size = 0;
         SL_FOREACH(cur, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
@@ -398,9 +399,16 @@ size_t ast_type_size(type_t *type) {
                 if (type->type == TYPE_STRUCT) {
                     size += ast_type_size(decl_node->type);
                 } else { // type->type == TYPE_UNION
-                    size = MAX(size, ast_type_size(decl_node->type));
+                    size_t cur_size = ast_type_size(decl_node->type);
+                    size = MAX(size, cur_size);
                 }
+                size_t align = ast_type_align(decl_node->type);
+                max_align = MAX(max_align, align);
             }
+        }
+        size_t remain = size % max_align;
+        if (remain != 0) {
+            size += max_align - remain;
         }
         return size;
     }
@@ -454,8 +462,9 @@ size_t ast_type_align(type_t *type) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
 
             SL_FOREACH(icur, &decl->decls) {
-                decl_node_t *decl_node = GET_ELEM(&decl->decls, cur);
-                align = MAX(align, ast_type_align(decl_node->type));
+                decl_node_t *decl_node = GET_ELEM(&decl->decls, icur);
+                size_t cur_align = ast_type_align(decl_node->type);
+                align = MAX(align, cur_align);
             }
         }
         return align;
