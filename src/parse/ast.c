@@ -66,6 +66,8 @@ type_t *ast_type_create(trans_unit_t *tunit, fmark_t *mark, type_type_t type) {
     case TYPE_STRUCT:
     case TYPE_UNION:
         sl_init(&node->struct_params.decls, offsetof(decl_t, link));
+        node->struct_params.esize = -1;
+        node->struct_params.ealign = -1;
         break;
     case TYPE_ENUM:
         sl_init(&node->enum_params.ids, offsetof(decl_node_t, link));
@@ -389,6 +391,9 @@ size_t ast_type_size(type_t *type) {
         // TODO1: Handle bit fields
     case TYPE_STRUCT:
     case TYPE_UNION: {
+        if (type->struct_params.esize != (size_t)-1) {
+            return type->struct_params.esize;
+        }
         size_t max_align = 1;
         size_t size = 0;
         SL_FOREACH(cur, &type->struct_params.decls) {
@@ -410,6 +415,7 @@ size_t ast_type_size(type_t *type) {
         if (remain != 0) {
             size += max_align - remain;
         }
+        type->struct_params.esize = size;
         return size;
     }
     case TYPE_ENUM:
@@ -457,6 +463,9 @@ size_t ast_type_align(type_t *type) {
 
     case TYPE_STRUCT:
     case TYPE_UNION: {
+        if (type->struct_params.ealign != (size_t)-1) {
+            return type->struct_params.ealign;
+        }
         size_t align = 0;
         SL_FOREACH(cur, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
@@ -467,6 +476,7 @@ size_t ast_type_align(type_t *type) {
                 align = MAX(align, cur_align);
             }
         }
+        type->struct_params.ealign = align;
         return align;
     }
     case TYPE_ENUM:

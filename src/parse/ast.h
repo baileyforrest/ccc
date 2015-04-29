@@ -116,6 +116,8 @@ struct type_t {
             char *name;          /**< Name of struct/union, NULL if anon */
             slist_t decls;       /**< (decl_t) List of struct/union decls */
             void *trans_state;
+            size_t esize;        /**< Cached size. -1 if unassigned */
+            size_t ealign;       /**< Cached align. -1 if unassigned */
         } struct_params;
 
         struct {
