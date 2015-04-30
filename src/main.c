@@ -157,9 +157,9 @@ int main(int argc, char **argv) {
             logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
             exit(EXIT_FAILURE);
         }
-        int status;
-        waitpid(pid, &status, 0);
-        if (status != 0) {
+        int child_status;
+        waitpid(pid, &child_status, 0);
+        if (child_status != 0) {
             logger_log(NULL, LOG_ERR, "%s: llc Failed!", filename);
             goto src_done0;
         }
@@ -179,7 +179,11 @@ int main(int argc, char **argv) {
             logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
             exit(EXIT_FAILURE);
         }
-        waitpid(pid, &status, 0);
+        waitpid(pid, &child_status, 0);
+        if (child_status != 0) {
+            logger_log(NULL, LOG_ERR, "%s: as Failed!", filename);
+            goto src_done0;
+        }
 
         str_node_t *obj_node = emalloc(sizeof(str_node_t));
         obj_node->str = tempfile_path(obj_tempfile);
