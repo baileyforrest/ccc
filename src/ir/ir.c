@@ -418,3 +418,93 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     HT_DESTROY_FUNC(&trans_unit->strings, free);
     free(trans_unit);
 }
+
+ir_expr_t *ir_expr_zero(ir_type_t *type) {
+    switch (type->type) {
+    case IR_TYPE_INT:
+        switch (type->int_params.width) {
+        case 1: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_INT, .type = &ir_type_i1,
+                                    .int_val = 0 } };
+            return &expr;
+        }
+        case 8: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_INT, .type = &ir_type_i8,
+                                    .int_val = 0 } };
+            return &expr;
+        }
+        case 16: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_INT, .type = &ir_type_i16,
+                                    .int_val = 0 } };
+            return &expr;
+        }
+        case 32: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_INT, .type = &ir_type_i32,
+                                    .int_val = 0 } };
+            return &expr;
+        }
+        case 64: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_INT, .type = &ir_type_i64,
+                                    .int_val = 0 } };
+            return &expr;
+        }
+        default:
+            assert(false);
+        }
+        return NULL;
+    case IR_TYPE_FLOAT:
+        switch (type->float_params.type) {
+        case IR_FLOAT_FLOAT: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_FLOAT, .type = &ir_type_float,
+                                    .float_val = 0.0 } };
+            return &expr;
+        }
+        case IR_FLOAT_DOUBLE: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_FLOAT, .type = &ir_type_double,
+                                    .float_val = 0.0 } };
+            return &expr;
+        }
+        case IR_FLOAT_X86_FP80: {
+            static ir_expr_t expr =
+                { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+                  .const_params = { IR_CONST_FLOAT, .type = &ir_type_x86_fp80,
+                                    .float_val = 0.0 } };
+            return &expr;
+        }
+        default:
+            assert(false);
+        }
+        return NULL;
+    case IR_TYPE_PTR: {
+        static ir_type_t ptr = { SL_LINK_LIT, IR_TYPE_PTR,
+                                 .ptr = { &ir_type_void } };
+        static ir_expr_t expr =
+            { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
+              .const_params = { IR_CONST_NULL, .type = &ptr, { } } };
+        return &expr;
+    }
+
+    case IR_TYPE_VOID:
+    case IR_TYPE_FUNC:
+    case IR_TYPE_ARR:
+    case IR_TYPE_STRUCT:
+    case IR_TYPE_ID_STRUCT:
+    case IR_TYPE_OPAQUE:
+    default:
+        assert(false);
+    }
+}

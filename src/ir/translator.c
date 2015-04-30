@@ -87,7 +87,6 @@ ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
     return trans_trans_unit(&ts, ast);
 }
 
-// TODO0: Do decls first, then function definitions
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast) {
     ir_trans_unit_t *tunit = ir_trans_unit_create();
     ts->tunit = tunit;
@@ -992,10 +991,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         if (prepend_zero) {
             pair = emalloc(sizeof(*pair));
             pair->type = &ir_type_i32;
-            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-            pair->expr->const_params.type = &ir_type_i32;
-            pair->expr->const_params.ctype = IR_CONST_INT;
-            pair->expr->const_params.int_val = 0;
+            pair->expr = ir_expr_zero(&ir_type_i32);
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
         }
         elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
@@ -1041,18 +1037,14 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
     bool is_float = type->type == IR_TYPE_FLOAT;
 
     ir_expr_t *cmp;
-    ir_expr_t *zero = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-    zero->const_params.type = type;
-    zero->const_params.ctype = IR_CONST_INT;
+    ir_expr_t *zero = ir_expr_zero(type);
     if (is_float) {
-        zero->const_params.float_val = 0.0;
         cmp = ir_expr_create(ts->tunit, IR_EXPR_FCMP);
         cmp->fcmp.cond = IR_FCMP_ONE;
         cmp->fcmp.type = type;
         cmp->fcmp.expr1 = expr;
         cmp->fcmp.expr2 = zero;
     } else {
-        zero->const_params.int_val = 0;
         cmp = ir_expr_create(ts->tunit, IR_EXPR_ICMP);
         cmp->icmp.cond = IR_ICMP_NE;
         cmp->icmp.type = type;
@@ -1883,18 +1875,12 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     elem_ptr->getelemptr.ptr_val = var;
     ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
     pair->type = &ir_type_i32;
-    pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-    pair->expr->const_params.type = &ir_type_i32;
-    pair->expr->const_params.ctype = IR_CONST_INT;
-    pair->expr->const_params.int_val = 0;
+    pair->expr = ir_expr_zero(&ir_type_i32);
     sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
     pair = emalloc(sizeof(*pair));
     pair->type = &ir_type_i32;
-    pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-    pair->expr->const_params.type = &ir_type_i32;
-    pair->expr->const_params.ctype = IR_CONST_INT;
-    pair->expr->const_params.int_val = 0;
+    pair->expr = ir_expr_zero(&ir_type_i32);
     sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
     elem->val = elem_ptr;
     ht_insert(&ts->tunit->strings, &elem->link);
