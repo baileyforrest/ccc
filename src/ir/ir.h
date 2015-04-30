@@ -249,6 +249,7 @@ struct ir_expr_t {
 
         struct {
             ir_type_t *type;
+            ir_type_t *elem_type;
             ir_type_t *nelem_type;
             int nelems;
             int align;

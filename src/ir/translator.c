@@ -57,7 +57,6 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type) {
                           ts->func->func.next_temp++);
 }
 
-// TODO1: Replace this common pattern in code with this
 ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                              ir_expr_t *expr) {
     ir_expr_t *temp = trans_temp_create(ts, ir_expr_type(expr));
@@ -680,18 +679,11 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 return entry->var.access;
             }
 
-            // Load var into a temp
-            ir_expr_t *temp = trans_temp_create(ts, type);
             ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
             load->load.type = ir_expr_type(entry->var.access)->ptr.base;
             load->load.ptr = entry->var.access;
 
-            ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-            assign->assign.dest = temp;
-            assign->assign.src = load;
-            trans_add_stmt(ts, ir_stmts, assign);
-
-            return temp;
+            return trans_assign_temp(ts, ir_stmts, load);
         } else {
             if (addrof) { // Can't take address of register variable
                 assert(false);
@@ -707,18 +699,12 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             return trans_assign(ts, dest_addr, expr->assign.dest->etype, src,
                                 expr->assign.expr->etype, ir_stmts);
         }
-        ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *dest;
         ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, dest_addr,
                                          expr->assign.expr, expr->assign.op,
                                          expr->etype, ir_stmts, &dest);
 
-        ir_expr_t *temp = trans_temp_create(ts, type);
-
-        ir_stmt_t *binop = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        binop->assign.dest = temp;
-        binop->assign.src = op_expr;
-        trans_add_stmt(ts, ir_stmts, binop);
+        ir_expr_t *temp = trans_assign_temp(ts, ir_stmts, op_expr);
 
         return trans_assign(ts, dest_addr, expr->assign.dest->etype, temp,
                             expr->assign.expr->etype, ir_stmts);
@@ -743,18 +729,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     }
 
     case EXPR_BIN: {
-        ir_type_t *type = trans_type(ts, expr->etype);
         ir_expr_t *op_expr = trans_binop(ts, expr->bin.expr1, NULL,
                                          expr->bin.expr2, expr->bin.op,
                                          expr->etype, ir_stmts, NULL);
-        ir_expr_t *temp = trans_temp_create(ts, type);
-
-        ir_stmt_t *binop = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        binop->assign.dest = temp;
-        binop->assign.src = op_expr;
-
-        trans_add_stmt(ts, ir_stmts, binop);
-        return temp;
+        return trans_assign_temp(ts, ir_stmts, op_expr);
     }
     case EXPR_UNARY:
         return trans_unaryop(ts, addrof, expr, ir_stmts);
@@ -831,14 +809,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         pred->label = if_false;
         sl_append(&phi->phi.preds, &pred->link);
 
-        ir_expr_t *temp = trans_temp_create(ts, type);
-
-        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        assign->assign.dest = temp;
-        assign->assign.src = phi;
-        trans_add_stmt(ts, ir_stmts, assign);
-
-        return temp;
+        return trans_assign_temp(ts, ir_stmts, phi);
     }
     case EXPR_CAST: {
         ir_expr_t *src_expr = trans_expr(ts, false, expr->cast.base, ir_stmts);
@@ -874,23 +845,17 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
         assert(cur_expr == NULL);
 
-        ir_stmt_t *ir_stmt;
         ir_expr_t *result;
         // Void returning function, don't create a temp
         if (expr->call.func->etype->func.type->type == TYPE_VOID) {
-            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
+            ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
             ir_stmt->expr = call;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
             result = NULL;
         } else {
-            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-            ir_type_t *ret_type = call->call.func_sig->func.type;
-            ir_expr_t *temp = trans_temp_create(ts, ret_type);
-            ir_stmt->assign.dest = temp;
-            ir_stmt->assign.src = call;
-            result = temp;
+            result = trans_assign_temp(ts, ir_stmts, call);
         }
 
-        trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         return result;
     }
@@ -1085,7 +1050,6 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
     }
     bool is_float = type->type == IR_TYPE_FLOAT;
 
-    ir_expr_t *temp = trans_temp_create(ts, &ir_type_i1);
     ir_expr_t *cmp;
     ir_expr_t *zero = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     zero->const_params.type = type;
@@ -1105,11 +1069,8 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
         cmp->icmp.expr1 = expr;
         cmp->icmp.expr2 = zero;
     }
-    ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-    stmt->assign.dest = temp;
-    stmt->assign.src = cmp;
-    trans_add_stmt(ts, ir_stmts, stmt);
-    return temp;
+
+    return trans_assign_temp(ts, ir_stmts, cmp);
 }
 
 ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
@@ -1435,7 +1396,6 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
     case OP_BITNOT:
     case OP_UMINUS: {
         bool is_bnot = op == OP_BITNOT;
-        ir_expr_t *temp = trans_temp_create(ts, type);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
         if (is_bnot) {
             assert(type->type == IR_TYPE_INT);
@@ -1465,11 +1425,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         op_expr->binop.expr2 = ir_expr;
         op_expr->binop.type = type;
 
-        ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        assign->assign.dest = temp;
-        assign->assign.src = op_expr;
-        trans_add_stmt(ts, ir_stmts, assign);
-        return temp;
+        return trans_assign_temp(ts, ir_stmts, op_expr);
     }
     default:
         break;
@@ -1495,7 +1451,6 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
 
     ir_type_t *dest_type = trans_type(ts, dest);
     ir_type_t *src_type = trans_type(ts, src);
-    ir_expr_t *temp = trans_temp_create(ts, dest_type);
 
     ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     ir_convert_t convert_op;
@@ -1592,11 +1547,7 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     convert->convert.val = src_expr;
     convert->convert.dest_type = dest_type;
 
-    ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-    ir_stmt->assign.dest = temp;
-    ir_stmt->assign.src = convert;
-    trans_add_stmt(ts, ir_stmts, ir_stmt);
-    return temp;
+    return trans_assign_temp(ts, ir_stmts, convert);
 }
 
 char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned) {
@@ -1680,7 +1631,8 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
 
         // Have to allocate variable on the stack
         ir_expr_t *src = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
-        src->alloca.type = var_expr->var.type->ptr.base;
+        src->alloca.type = ptr_type;
+        src->alloca.elem_type = var_expr->var.type->ptr.base;
         src->alloca.nelem_type = NULL;
         src->alloca.align = ast_type_align(node->type);
 
@@ -1718,16 +1670,13 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         var_expr->var.local = true;
 
         ir_expr_t *alloca = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
-        alloca->alloca.type = var_expr->var.type;
+        alloca->alloca.type = ptr_type;
+        alloca->alloca.elem_type = var_expr->var.type;
         alloca->alloca.nelem_type = NULL;
         alloca->alloca.align = ast_type_align(node->type);
 
         // Stack variable to refer to paramater by
-        ir_expr_t *temp = trans_temp_create(ts, ptr_type);
-        ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        stmt->assign.dest = temp;
-        stmt->assign.src = alloca;
-        trans_add_stmt(ts, &ts->func->func.prefix, stmt);
+        ir_expr_t *temp = trans_assign_temp(ts, &ts->func->func.prefix, alloca);
 
         // Record the function parameter
         sl_append(&ts->func->func.params, &var_expr->link);

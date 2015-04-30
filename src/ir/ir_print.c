@@ -262,7 +262,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     }
     case IR_EXPR_ALLOCA:
         fprintf(stream, "alloca ");
-        ir_type_print(stream, expr->alloca.type, NULL);
+        ir_type_print(stream, expr->alloca.elem_type, NULL);
         if (expr->alloca.nelem_type != NULL) {
             fprintf(stream, ", ");
             ir_type_print(stream, expr->alloca.nelem_type, NULL);

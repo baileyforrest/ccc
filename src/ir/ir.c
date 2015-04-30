@@ -56,8 +56,12 @@ ir_type_t *ir_expr_type(ir_expr_t *expr) {
         return expr->const_params.type;
     case IR_EXPR_BINOP:
         return expr->binop.type;
+    case IR_EXPR_ALLOCA:
+        return expr->alloca.type;
     case IR_EXPR_LOAD:
         return expr->load.type;
+    case IR_EXPR_GETELEMPTR:
+        return expr->getelemptr.type;
     case IR_EXPR_CONVERT:
         return expr->convert.dest_type;
     case IR_EXPR_ICMP:
@@ -70,10 +74,7 @@ ir_type_t *ir_expr_type(ir_expr_t *expr) {
         return expr->select.type;
     case IR_EXPR_CALL:
         return expr->call.func_sig->func.type;
-    case IR_EXPR_GETELEMPTR:
-        return expr->getelemptr.type;
     case IR_EXPR_VAARG:
-    case IR_EXPR_ALLOCA:
     default:
         assert(false);
     }
