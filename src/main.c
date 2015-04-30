@@ -189,6 +189,11 @@ int main(int argc, char **argv) {
 
     src_done0:
         man_destroy(&manager);
+        if (status != CCC_OK || logger_has_error() ||
+            (optman.warn_opts & WARN_ERROR && logger_has_warn())) {
+            link = false;
+            break;
+        }
     }
 
     if (link) {

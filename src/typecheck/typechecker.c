@@ -136,12 +136,17 @@ void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
     case EXPR_SIZEOF:
     case EXPR_ALIGNOF:
         if (expr->sizeof_params.type != NULL) {
+            type_t *type;
             decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
-            assert(node != NULL);
+            if (node == NULL) {
+                type = expr->sizeof_params.type->type;
+            } else {
+                type = node->type;
+            }
             if (expr->type == EXPR_SIZEOF) {
-                *result = ast_type_size(node->type);
+                *result = ast_type_size(type);
             } else { // expr->type == EXPR_ALIGNOF
-                *result = ast_type_align(node->type);
+                *result = ast_type_align(type);
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
@@ -482,6 +487,9 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
 
     case OP_PLUS:
     case OP_MINUS:
+        if (is_numeric1 && is_numeric2) {
+            return true;
+        }
         // Allow pointers to be added with integers
         if ((is_ptr1 && is_int2) || (is_int1 && is_ptr2)) {
             return true;
