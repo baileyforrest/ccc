@@ -49,6 +49,10 @@ inline void *vec_get(vec_t *vec, size_t idx) {
     return vec->elems[idx];
 }
 
+inline void **vec_elems(vec_t *vec) {
+    return vec->elems;
+}
+
 inline size_t vec_size(vec_t *vec) {
     return vec->size;
 }

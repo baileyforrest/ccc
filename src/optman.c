@@ -65,7 +65,7 @@ status_t optman_init(int argc, char **argv) {
     optman.std = DEFAULT_STD;
     optman.misc = 0;
     optman.pp_deps = 0;
-    optman.output = 0;
+    optman.output_opts = 0;
 
     return optman_parse(argc, argv);
 }

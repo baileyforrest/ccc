@@ -96,6 +96,8 @@ typedef struct len_str_node_node_t {
     len_str_node_t node;
 } len_str_node_node_t;
 
+char *ccc_basename(char *path);
+
 /**
  * Malloc that reports error and exits if memory cannot be obtained
  *

@@ -33,6 +33,15 @@ extern bool len_str_eq(const void *vstr1, const void *vstr2);
 
 static const char *const mem_err = "out of memory, giving up";
 
+char *ccc_basename(char *path) {
+    size_t path_len = strlen(path);
+    while (path_len > 0 && path[path_len - 1] != '/') {
+        --path_len;
+    }
+
+    return path + path_len;
+}
+
 void *emalloc(size_t size) {
     void *result = malloc(size);
     if (result == NULL) {
