@@ -426,36 +426,36 @@ ir_expr_t *ir_expr_zero(ir_type_t *type) {
         case 1: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_INT, .type = &ir_type_i1,
-                                    .int_val = 0 } };
+                  { .const_params = { IR_CONST_INT, &ir_type_i1,
+                                      { .int_val = 0 } } } };
             return &expr;
         }
         case 8: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_INT, .type = &ir_type_i8,
-                                    .int_val = 0 } };
+                  { .const_params = { IR_CONST_INT, &ir_type_i8,
+                                      { .int_val = 0 } } } };
             return &expr;
         }
         case 16: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_INT, .type = &ir_type_i16,
-                                    .int_val = 0 } };
+                  { .const_params = { IR_CONST_INT, &ir_type_i16,
+                                      { .int_val = 0 } } } };
             return &expr;
         }
         case 32: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_INT, .type = &ir_type_i32,
-                                    .int_val = 0 } };
+                  { .const_params = { IR_CONST_INT, &ir_type_i32,
+                                      { .int_val = 0 } } } };
             return &expr;
         }
         case 64: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_INT, .type = &ir_type_i64,
-                                    .int_val = 0 } };
+                  { .const_params = { IR_CONST_INT, &ir_type_i64,
+                                      { .int_val = 0 } } } };
             return &expr;
         }
         default:
@@ -467,22 +467,22 @@ ir_expr_t *ir_expr_zero(ir_type_t *type) {
         case IR_FLOAT_FLOAT: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_FLOAT, .type = &ir_type_float,
-                                    .float_val = 0.0 } };
+                  { .const_params = { IR_CONST_FLOAT, &ir_type_float,
+                                      { .float_val = 0.0 } } } };
             return &expr;
         }
         case IR_FLOAT_DOUBLE: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_FLOAT, .type = &ir_type_double,
-                                    .float_val = 0.0 } };
+                  { .const_params = { IR_CONST_FLOAT, &ir_type_double,
+                                      { .float_val = 0.0 } } } };
             return &expr;
         }
         case IR_FLOAT_X86_FP80: {
             static ir_expr_t expr =
                 { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-                  .const_params = { IR_CONST_FLOAT, .type = &ir_type_x86_fp80,
-                                    .float_val = 0.0 } };
+                  { .const_params = { IR_CONST_FLOAT, &ir_type_x86_fp80,
+                                      { .float_val = 0.0 } } } };
             return &expr;
         }
         default:
@@ -494,7 +494,7 @@ ir_expr_t *ir_expr_zero(ir_type_t *type) {
                                  .ptr = { &ir_type_void } };
         static ir_expr_t expr =
             { SL_LINK_LIT, SL_LINK_LIT, IR_EXPR_CONST,
-              .const_params = { IR_CONST_NULL, .type = &ptr, { } } };
+              .const_params = { IR_CONST_NULL, &ptr, { } } };
         return &expr;
     }
 

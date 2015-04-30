@@ -1171,6 +1171,9 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                                 continue;
                             }
                             elem = elem->desig_init.val;
+                            // TODO1: This isn't correct,
+                            // Doesn't correctly handle assigning to scalar
+                            // members of anonymous struct/union
                             if (elem->type != EXPR_INIT_LIST) {
                                 logger_log(&expr->mark, LOG_ERR,
                                            "invalid_initializer");
