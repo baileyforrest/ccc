@@ -47,7 +47,7 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type);
 ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                              ir_expr_t *expr);
 
-ir_expr_t *trans_load_addr(trans_state_t *ts, ir_inst_stream_t *stream,
+ir_expr_t *trans_load_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                            ir_expr_t *expr);
 
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);

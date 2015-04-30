@@ -69,8 +69,7 @@ ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
     return temp;
 }
 
-// TODO1: Replace this common pattern in code with this
-ir_expr_t *trans_load_addr(trans_state_t *ts, ir_inst_stream_t *stream,
+ir_expr_t *trans_load_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                            ir_expr_t *expr) {
     ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
     ir_type_t *type = ir_expr_type(expr);
@@ -679,11 +678,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 return entry->var.access;
             }
 
-            ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
-            load->load.type = ir_expr_type(entry->var.access)->ptr.base;
-            load->load.ptr = entry->var.access;
-
-            return trans_assign_temp(ts, ir_stmts, load);
+            return trans_load_temp(ts, ir_stmts, entry->var.access);
         } else {
             if (addrof) { // Can't take address of register variable
                 assert(false);
@@ -1012,12 +1007,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             return ptr;
         }
 
-        // Load instruction
-        ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
-        load->load.type = expr_type;
-        load->load.ptr = ptr;
-
-        return trans_assign_temp(ts, ir_stmts, load);
+        return trans_load_temp(ts, ir_stmts, ptr);
     }
     case EXPR_INIT_LIST:
     case EXPR_DESIG_INIT:
@@ -1299,7 +1289,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         ir_expr_t *right_expr = trans_expr(ts, false, right, ir_stmts);
         op_expr->binop.expr2 = trans_type_conversion(ts, type, right->etype,
                                                      right_expr, ir_stmts);
-        left_expr = trans_load_addr(ts, ir_stmts, left_addr);
+        left_expr = trans_load_temp(ts, ir_stmts, left_addr);
     }
     op_expr->binop.expr1 = trans_type_conversion(ts, type, left->etype,
                                                  left_expr, ir_stmts);
@@ -1325,11 +1315,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_type_t *type = ir_expr_type(expr_addr);
         assert(type->type == IR_TYPE_PTR);
 
-        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
-        ir_expr->load.type = type->ptr.base;
-        ir_expr->load.ptr = expr_addr;
-        ir_expr = trans_assign_temp(ts, ir_stmts, ir_expr);
-
+        ir_expr_t *ir_expr = trans_load_temp(ts, ir_stmts, expr_addr);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
 
         switch (op) {
@@ -1381,10 +1367,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
             type->ptr.base->type == IR_TYPE_ID_STRUCT) {
             return ir_expr;
         }
-        ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
-        load->load.type = type->ptr.base;
-        load->load.ptr = ir_expr;
-        return trans_assign_temp(ts, ir_stmts, load);
+        return trans_load_temp(ts, ir_stmts, ir_expr);
     }
 
     case OP_LOGICNOT:
