@@ -1,4 +1,7 @@
-int main() {
+//test return 36
+// Tests basic comparison operations
+
+int __test() {
     int x = 3, y = 4;
     int z = 0;
     if (x < y) {

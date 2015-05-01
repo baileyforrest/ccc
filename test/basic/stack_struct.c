@@ -1,9 +1,12 @@
+//test return 7
+// Tests struct stored on stack as local variable
+
 struct foo {
     int x;
     int y;
 };
 
-int main() {
+int __test() {
     struct foo bar;
     bar.x = 3;
 

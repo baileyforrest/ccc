@@ -1,4 +1,7 @@
-//test except
-int main() {
-    return 1 / 0;
+//test exception
+// Test divide by zero
+
+int __test() {
+    int x = 0;
+    return 1 / x;
 }

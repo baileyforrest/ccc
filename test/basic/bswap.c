@@ -1,3 +1,6 @@
+//test return -65536
+// Tests basic function call
+
 unsigned static short __bswap_16(unsigned short __bsx)
 {
     return ((unsigned short)((((__bsx) >> 8) & 255) | (((__bsx) & 255) << 8)));
@@ -10,7 +13,7 @@ unsigned static int __bswap_32(unsigned int __bsx)
 }
 
 
-int main() {
+int __test() {
     unsigned x = __bswap_32(0xFFFF);
     return x;
 }

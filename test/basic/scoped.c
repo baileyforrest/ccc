@@ -1,4 +1,7 @@
-int main() {
+//test return 16
+// Tests variable scopes
+
+int __test() {
     int x = 0;
     int z = 3;
     int z1 = 3;

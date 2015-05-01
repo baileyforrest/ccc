@@ -1,9 +1,6 @@
-//test return 4
-/**
- * Tests for alignof operator
- * TODO: Add more stuff
- */
+//test return 5
+// Tests alignof operator
 
-int main() {
-    return _Alignof(int);
+int __test() {
+    return _Alignof(int) + _Alignof(char);
 }

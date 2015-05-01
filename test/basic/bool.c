@@ -1,6 +1,9 @@
-#include "runtime.h"
+//test return 0
+// Tests basic boolean operations
 
-int main() {
+#include <stdbool.h>
+
+int __test() {
     bool x = true;
     bool y = false;
     if (x && y) {

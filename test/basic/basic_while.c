@@ -1,8 +1,7 @@
-/**
- *
- */
+//test return 6
+// Basic while loop test
 
-int main() {
+int __test() {
     int x = 0;
     int y = 0;
 

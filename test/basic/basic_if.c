@@ -1,8 +1,7 @@
-/**
- *
- */
+//test return 5
+// Tests basic if statements
 
-int main() {
+int __test() {
     int x = 0;
     int y = 0;
 
