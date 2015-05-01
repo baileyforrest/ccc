@@ -43,8 +43,14 @@ typedef struct ir_label_t ir_label_t;
 #define TYPE_IS_NUMERIC(test)                                       \
     ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_DOUBLE)
 
+#define TYPE_IS_FLOAT(test)                                         \
+    ((test)->type >= TYPE_FLOAT && (test)->type <= TYPE_LONG_DOUBLE)
+
 #define TYPE_IS_INTEGRAL(test)                                      \
     ((test)->type >= TYPE_BOOL && (test)->type <= TYPE_LONG_LONG)
+
+#define TYPE_IS_UNSIGNED(test)                                          \
+    ((test)->type == TYPE_MOD && (test)->mod.type_mod & TMOD_UNSIGNED)
 
 #define TYPE_IS_PTR(test)                                   \
     ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_PTR)

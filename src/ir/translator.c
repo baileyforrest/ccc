@@ -1126,33 +1126,14 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
     case OP_BITAND:   ir_op = IR_OP_AND; break;
     case OP_BITXOR:   ir_op = IR_OP_XOR; break;
     case OP_BITOR:    ir_op = IR_OP_OR; break;
+
     case OP_LT:
-        is_cmp = true;
-        cmp_type = is_float ? IR_FCMP_OLT :
-            is_signed ? IR_ICMP_SLT : IR_ICMP_ULT;
-        break;
     case OP_GT:
-        is_cmp = true;
-        cmp_type = is_float ? IR_FCMP_OGT :
-            is_signed ? IR_ICMP_SGT : IR_ICMP_UGT;
-        break;
     case OP_LE:
-        is_cmp = true;
-        cmp_type = is_float ? IR_FCMP_OLE :
-            is_signed ? IR_ICMP_SLE : IR_ICMP_ULE;
-        break;
     case OP_GE:
-        is_cmp = true;
-        cmp_type = is_float ? IR_FCMP_OGE :
-            is_signed ? IR_ICMP_SGE : IR_ICMP_UGE;
-        break;
     case OP_EQ:
-        is_cmp = true;
-        cmp_type = is_float ? IR_FCMP_OEQ : IR_ICMP_EQ;
-        break;
     case OP_NE:
         is_cmp = true;
-        cmp_type = is_float ? IR_FCMP_ONE : IR_ICMP_NE;
         break;
     case OP_LOGICAND:
     case OP_LOGICOR: {
@@ -1232,12 +1213,44 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
 
     // Comparisons need to be handled separately
     if (is_cmp) {
-        ir_expr_t *cmp;
+        type_t *left_type = ast_type_untypedef(left->etype);
+        type_t *right_type = ast_type_untypedef(right->etype);
         type_t *max_type;
         bool success = typecheck_type_max(NULL, left->etype, right->etype,
                                           &max_type);
         // Must be valid if typechecked
         assert(success && max_type != NULL);
+        is_float = TYPE_IS_FLOAT(max_type);
+        is_signed = !TYPE_IS_UNSIGNED(left_type) &&
+            !TYPE_IS_UNSIGNED(right_type);
+
+        switch (op) {
+        case OP_LT:
+            cmp_type = is_float ? IR_FCMP_OLT :
+                is_signed ? IR_ICMP_SLT : IR_ICMP_ULT;
+            break;
+        case OP_GT:
+            cmp_type = is_float ? IR_FCMP_OGT :
+                is_signed ? IR_ICMP_SGT : IR_ICMP_UGT;
+            break;
+        case OP_LE:
+            cmp_type = is_float ? IR_FCMP_OLE :
+                is_signed ? IR_ICMP_SLE : IR_ICMP_ULE;
+            break;
+        case OP_GE:
+            cmp_type = is_float ? IR_FCMP_OGE :
+                is_signed ? IR_ICMP_SGE : IR_ICMP_UGE;
+            break;
+        case OP_EQ:
+            cmp_type = is_float ? IR_FCMP_OEQ : IR_ICMP_EQ;
+            break;
+        case OP_NE:
+            cmp_type = is_float ? IR_FCMP_ONE : IR_ICMP_NE;
+            break;
+        default:
+            assert(false);
+        }
+        ir_expr_t *cmp;
 
         ir_expr_t *left_expr = trans_expr(ts, false, left, ir_stmts);
         left_expr = trans_type_conversion(ts, max_type, left->etype, left_expr,
