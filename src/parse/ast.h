@@ -154,6 +154,7 @@ struct type_t {
         struct {                 /**< Structure for array info */
             type_t *base;        /**< Base type */
             expr_t *len;         /**< Dimension length */
+            size_t nelems;       /**< Number of elems */
         } arr;
 
         struct {                 /**< Structure for pointer info */

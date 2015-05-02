@@ -252,7 +252,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
                 fprintf(stream, " ");
                 ir_expr_print(stream, elem);
                 if (elem != sl_tail(&expr->const_params.arr_val)) {
-                    fprintf(stream, " ,");
+                    fprintf(stream, ", ");
                 }
             }
             fprintf(stream, " ]");

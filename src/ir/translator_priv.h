@@ -53,6 +53,7 @@ ir_expr_t *trans_load_temp(trans_state_t *ts, ir_inst_stream_t *stream,
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
 
 void trans_gdecl_node(trans_state_t *ts, decl_node_t *node);
+
 void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
 
 // Returns true if the statement always returns, false otherwise
@@ -97,5 +98,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type);
 ir_oper_t trans_op(oper_t op);
 
 ir_expr_t *trans_string(trans_state_t *ts, char *str);
+
+ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);
 
 #endif /* _TRANSLATOR_PRIV_H */

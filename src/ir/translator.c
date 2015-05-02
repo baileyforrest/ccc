@@ -625,12 +625,11 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
 
 ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                       ir_inst_stream_t *ir_stmts) {
-    // TODO0: Handle other addrof cases
     switch (expr->type) {
     case EXPR_VOID:
         return NULL;
     case EXPR_PAREN:
-        return trans_expr(ts, false, expr->paren_base, ir_stmts);
+        return trans_expr(ts, addrof, expr->paren_base, ir_stmts);
     case EXPR_VAR: {
         typetab_t *tt = ts->typetab;
         typetab_entry_t *tt_ent;
@@ -668,10 +667,14 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             }
             ir_type_t *type = ir_expr_type(entry->var.access)->ptr.base;
 
-            // Structs are always refered to by addresses
-            if (type->type == IR_TYPE_STRUCT ||
-                type->type == IR_TYPE_ID_STRUCT) {
+            // Structs and arrays are always refered to by addresses
+            switch (type->type) {
+            case IR_TYPE_STRUCT:
+            case IR_TYPE_ID_STRUCT:
+            case IR_TYPE_ARR:
                 return entry->var.access;
+            default:
+                break;
             }
 
             return trans_load_temp(ts, ir_stmts, entry->var.access);
@@ -979,9 +982,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             if (!last_array && ptr_type->type == IR_TYPE_PTR) {
                 ir_type_t *base_type = ptr_type->ptr.base;
 
-                if (base_type->type == IR_TYPE_STRUCT ||
-                    base_type->type == IR_TYPE_ID_STRUCT) {
+                switch (base_type->type) {
+                case IR_TYPE_STRUCT:
+                case IR_TYPE_ID_STRUCT:
+                case IR_TYPE_ARR:
                     prepend_zero = true;
+                default:
+                    break;
                 }
             }
         }
@@ -1002,7 +1009,23 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         return trans_load_temp(ts, ir_stmts, ptr);
     }
-    case EXPR_INIT_LIST:
+    case EXPR_INIT_LIST: {
+        type_t *etype = ast_type_unmod(expr->etype);
+        switch (etype->type) {
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+            // TODO0: This
+            break;
+        case TYPE_ARR:
+            return trans_array_init(ts, expr);
+        default: {
+            expr_t *head = sl_head(&expr->init_list.exprs);
+            assert(head != NULL);
+            return trans_expr(ts, false, head, ir_stmts);
+        }
+        }
+        break;
+    }
     case EXPR_DESIG_INIT:
         // TODO0: Create global data and copy it in
         assert(false);
@@ -1929,4 +1952,32 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     ht_insert(&ts->tunit->strings, &elem->link);
 
     return elem_ptr;
+}
+
+ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
+    assert(expr->type == EXPR_INIT_LIST);
+    assert(expr->etype->type == TYPE_ARR);
+
+    type_t *ast_elem_type = expr->etype->arr.base;
+    ir_type_t *elem_type = trans_type(ts, ast_elem_type);
+
+    ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+    type->arr.elem_type = elem_type;
+
+    ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+    sl_init(&arr_lit->const_params.arr_val, offsetof(ir_expr_t, link));
+    arr_lit->const_params.ctype = IR_CONST_ARR;
+    arr_lit->const_params.type = type;
+
+    // TODO0: nelems should be from the type
+    size_t nelems = 0;
+    SL_FOREACH(cur, &expr->init_list.exprs) {
+        expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur);
+        ir_expr_t *ir_elem = trans_expr(ts, false, elem, NULL);
+        sl_append(&arr_lit->const_params.arr_val, &ir_elem->link);
+        ++nelems;
+    }
+    type->arr.nelems = nelems;
+
+    return arr_lit;
 }

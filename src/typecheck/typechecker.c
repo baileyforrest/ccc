@@ -1356,6 +1356,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 assert(false);
                 return false;
             case EXPR_INIT_LIST:
+                decl_node->expr->etype = decl_node->type;
                 retval &= typecheck_init_list(tcs, decl_node->type,
                                               decl_node->expr);
                 break;
