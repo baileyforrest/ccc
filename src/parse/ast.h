@@ -315,6 +315,7 @@ struct expr_t {
 
         struct {                    /**< Initalizer list */
             slist_t exprs;          /**< List of expressions */
+            size_t nelems;
         } init_list;
 
         struct {

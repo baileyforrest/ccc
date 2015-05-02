@@ -995,7 +995,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         if (prepend_zero) {
             pair = emalloc(sizeof(*pair));
             pair->type = &ir_type_i32;
-            pair->expr = ir_expr_zero(&ir_type_i32);
+            pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
         }
         elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
@@ -1057,7 +1057,7 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
     bool is_float = type->type == IR_TYPE_FLOAT;
 
     ir_expr_t *cmp;
-    ir_expr_t *zero = ir_expr_zero(type);
+    ir_expr_t *zero = ir_expr_zero(ts->tunit, type);
     if (is_float) {
         cmp = ir_expr_create(ts->tunit, IR_EXPR_FCMP);
         cmp->fcmp.cond = IR_FCMP_ONE;
@@ -1866,13 +1866,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         return ir_type;
     case TYPE_ARR:
         ir_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
-        if (type->arr.len != NULL) {
-            long long size;
-            typecheck_const_expr_eval(ts->typetab, type->arr.len, &size);
-            ir_type->arr.nelems = size;
-        } else {
-            ir_type->arr.nelems = 0;
-        }
+        ir_type->arr.nelems = type->arr.nelems;
         ir_type->arr.elem_type = trans_type(ts, type->arr.base);
         return ir_type;
     case TYPE_PTR:
@@ -1941,12 +1935,12 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
 
     ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
     pair->type = &ir_type_i32;
-    pair->expr = ir_expr_zero(&ir_type_i32);
+    pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
     sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
 
     pair = emalloc(sizeof(*pair));
     pair->type = &ir_type_i32;
-    pair->expr = ir_expr_zero(&ir_type_i32);
+    pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
     sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
     elem->val = elem_ptr;
     ht_insert(&ts->tunit->strings, &elem->link);
@@ -1958,18 +1952,15 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     assert(expr->type == EXPR_INIT_LIST);
     assert(expr->etype->type == TYPE_ARR);
 
-    type_t *ast_elem_type = expr->etype->arr.base;
-    ir_type_t *elem_type = trans_type(ts, ast_elem_type);
-
-    ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
-    type->arr.elem_type = elem_type;
+    ir_type_t *type = trans_type(ts, expr->etype);
+    assert(type->type == IR_TYPE_ARR);
+    ir_type_t *elem_type = type->arr.elem_type;
 
     ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     sl_init(&arr_lit->const_params.arr_val, offsetof(ir_expr_t, link));
     arr_lit->const_params.ctype = IR_CONST_ARR;
     arr_lit->const_params.type = type;
 
-    // TODO0: nelems should be from the type
     size_t nelems = 0;
     SL_FOREACH(cur, &expr->init_list.exprs) {
         expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur);
@@ -1977,7 +1968,11 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
         sl_append(&arr_lit->const_params.arr_val, &ir_elem->link);
         ++nelems;
     }
-    type->arr.nelems = nelems;
+
+    while (nelems++ < type->arr.nelems) {
+        ir_expr_t *zero = ir_expr_zero(ts->tunit, elem_type);
+        sl_append(&arr_lit->const_params.arr_val, &zero->link);
+    }
 
     return arr_lit;
 }

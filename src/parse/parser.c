@@ -1891,6 +1891,7 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
             }
         }
         sl_append(&expr->init_list.exprs, &cur->link);
+        ++expr->init_list.nelems;
     }
 
     *result = expr;

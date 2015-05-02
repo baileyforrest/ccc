@@ -1359,6 +1359,14 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 decl_node->expr->etype = decl_node->type;
                 retval &= typecheck_init_list(tcs, decl_node->type,
                                               decl_node->expr);
+
+                // If we're assigning to an array without a size, set the
+                // array's size to the init list length
+                if (decl_node->type->type == TYPE_ARR &&
+                    decl_node->type->arr.len == NULL) {
+                    decl_node->type->arr.nelems =
+                        decl_node->expr->init_list.nelems;
+                }
                 break;
             default:
                 retval &= typecheck_type_assignable(&decl_node->mark,
@@ -1916,6 +1924,14 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         retval &= typecheck_type(tcs, type->arr.base);
         if (type->arr.len != NULL) {
             retval &= typecheck_expr(tcs, type->arr.len, TC_CONST);
+            long long nelems;
+            typecheck_const_expr_eval(tcs->typetab, type->arr.len,
+                                      &nelems);
+            if (nelems < 0) {
+                logger_log(&type->arr.len->mark, LOG_ERR,
+                           "size of array is negative");
+            }
+            type->arr.nelems = nelems;
         }
         return retval;
     case TYPE_PTR:
