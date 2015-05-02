@@ -312,10 +312,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
                                       cur_case->case_params.val, &case_val);
 
             ir_expr_label_pair_t *pair = emalloc(sizeof(ir_expr_label_pair_t));
-            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-            pair->expr->const_params.int_val = case_val;
-            pair->expr->const_params.type = &SWITCH_VAL_TYPE;
-            pair->expr->const_params.ctype = IR_CONST_INT;
+            pair->expr = ir_int_const(ts->tunit, &SWITCH_VAL_TYPE, case_val);
             pair->label = label;
 
             sl_append(&ir_stmt->switch_params.cases, &pair->link);
@@ -703,13 +700,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return trans_assign(ts, dest_addr, expr->assign.dest->etype, temp,
                             expr->assign.expr->etype, ir_stmts);
     }
-    case EXPR_CONST_INT: {
-        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        ir_expr->const_params.ctype = IR_CONST_INT;
-        ir_expr->const_params.type = trans_type(ts, expr->const_val.type);
-        ir_expr->const_params.int_val = expr->const_val.int_val;
-        return ir_expr;
-    }
+    case EXPR_CONST_INT:
+        return ir_int_const(ts->tunit, trans_type(ts, expr->const_val.type),
+                            expr->const_val.int_val);
+
     case EXPR_CONST_FLOAT: {
         ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
         ir_expr->const_params.ctype = IR_CONST_FLOAT;
@@ -862,53 +856,43 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return ir_expr;
     }
     case EXPR_SIZEOF: {
-        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        ir_expr->const_params.type = trans_type(ts, expr->etype);
-        ir_expr->const_params.ctype = IR_CONST_INT;
+        long long val;
         if (expr->sizeof_params.type != NULL) {
             decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
             if (node != NULL) {
-                ir_expr->const_params.int_val = ast_type_size(node->type);
+                val = ast_type_size(node->type);
             } else {
                 assert(node == sl_tail(&expr->sizeof_params.type->decls));
-                ir_expr->const_params.int_val =
-                    ast_type_size(expr->sizeof_params.type->type);
+                val = ast_type_size(expr->sizeof_params.type->type);
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            ir_expr->const_params.int_val =
-                ast_type_size(expr->sizeof_params.expr->etype);
+            val = ast_type_size(expr->sizeof_params.expr->etype);
         }
-        return ir_expr;
+
+        return ir_int_const(ts->tunit, trans_type(ts, expr->etype), val);
     }
     case EXPR_ALIGNOF: {
-        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        ir_expr->const_params.type = trans_type(ts, expr->etype);
-        ir_expr->const_params.ctype = IR_CONST_INT;
+        long long val;
         if (expr->sizeof_params.type != NULL) {
             decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
             if (node != NULL) {
-                ir_expr->const_params.int_val = ast_type_align(node->type);
+                val = ast_type_align(node->type);
             } else {
                 assert(node == sl_tail(&expr->sizeof_params.type->decls));
-                ir_expr->const_params.int_val =
-                    ast_type_align(expr->sizeof_params.type->type);
+                val = ast_type_align(expr->sizeof_params.type->type);
             }
         } else {
             assert(expr->sizeof_params.expr != NULL);
-            ir_expr->const_params.int_val =
-                ast_type_align(expr->sizeof_params.expr->etype);
+            val = ast_type_align(expr->sizeof_params.expr->etype);
         }
-        return ir_expr;
+
+        return ir_int_const(ts->tunit, trans_type(ts, expr->etype), val);
     }
     case EXPR_OFFSETOF: {
-        ir_expr_t *ir_expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        ir_expr->const_params.type = trans_type(ts, expr->etype);
-        ir_expr->const_params.ctype = IR_CONST_INT;
-        ir_expr->const_params.int_val =
-            ast_type_offset(expr->offsetof_params.type->type,
-                            &expr->offsetof_params.path);
-        return ir_expr;
+        size_t offset = ast_type_offset(expr->offsetof_params.type->type,
+                                        &expr->offsetof_params.path);
+        return ir_int_const(ts->tunit, trans_type(ts, expr->etype), offset);
     }
     case EXPR_ARR_IDX:
     case EXPR_MEM_ACC: {
@@ -927,12 +911,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 // Get index into the structure
                 pair = emalloc(sizeof(*pair));
                 pair->type = &ir_type_i32;
-                pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-                pair->expr->const_params.type = &ir_type_i32;
-                pair->expr->const_params.ctype = IR_CONST_INT;
-                pair->expr->const_params.int_val =
-                    ast_get_member_num(expr->mem_acc.base->etype,
-                                       expr->mem_acc.name);
+                int mem_num = ast_get_member_num(expr->mem_acc.base->etype,
+                                                 expr->mem_acc.name);
+                pair->expr = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
                 expr = expr->mem_acc.base;
                 sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
             } else { // expr->type == EXPR_ARR_IDX
@@ -967,11 +948,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             // Get index into the structure
             pair = emalloc(sizeof(*pair));
             pair->type = &ir_type_i32;
-            pair->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-            pair->expr->const_params.type = &ir_type_i32;
-            pair->expr->const_params.ctype = IR_CONST_INT;
-            pair->expr->const_params.int_val =
+            int mem_num =
                 ast_get_member_num(etype->ptr.base, expr->mem_acc.name);
+            pair->expr = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
             sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
 
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
@@ -1206,13 +1185,10 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         ir_expr->phi.type = &ir_type_i1;
 
         ir_expr_label_pair_t *pred = emalloc(sizeof(*pred));
-        pred->expr = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        pred->expr->const_params.type = &ir_type_i1;
-        pred->expr->const_params.ctype = IR_CONST_INT;
         if (is_and) {
-            pred->expr->const_params.int_val = 0;
+            pred->expr = ir_int_const(ts->tunit, &ir_type_i1, 0);
         } else {
-            pred->expr->const_params.int_val = 1;
+            pred->expr = ir_int_const(ts->tunit, &ir_type_i1, 1);
         }
         pred->label = cur_block;
         sl_append(&ir_expr->phi.preds, &pred->link);
@@ -1350,10 +1326,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         case OP_POSTDEC: op_expr->binop.op = IR_OP_SUB; break;
         default: assert(false);
         }
-        ir_expr_t *other = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        other->const_params.ctype = IR_CONST_INT;
-        other->const_params.type = type;
-        other->const_params.int_val = 1;
+        ir_expr_t *other = ir_int_const(ts->tunit, type->ptr.base, 1);
         op_expr->binop.expr1 = ir_expr;
         op_expr->binop.expr2 = other;
         op_expr->binop.type = type->ptr.base;
@@ -1421,13 +1394,11 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
                 return NULL;
             }
         }
-        ir_expr_t *other = ir_expr_create(ts->tunit, IR_EXPR_CONST);
-        other->const_params.ctype = IR_CONST_INT;
-        other->const_params.type = type;
+        ir_expr_t *other;
         if (is_bnot) {
-            other->const_params.int_val = -1;
+            other = ir_int_const(ts->tunit, type, -1);
         } else {
-            other->const_params.int_val = 0;
+            other = ir_int_const(ts->tunit, type, 0);
         }
         op_expr->binop.expr1 = other;
         op_expr->binop.expr2 = ir_expr;

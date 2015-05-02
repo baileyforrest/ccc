@@ -421,15 +421,22 @@ void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit) {
     free(trans_unit);
 }
 
+ir_expr_t *ir_int_const(ir_trans_unit_t *tunit, ir_type_t *type,
+                        long long value) {
+    assert(type->type == IR_TYPE_INT);
+    ir_expr_t *expr = ir_expr_create(tunit, IR_EXPR_CONST);
+    expr->const_params.ctype = IR_CONST_INT;
+    expr->const_params.type = type;
+    expr->const_params.int_val = value;
+    return expr;
+}
+
+
 ir_expr_t *ir_expr_zero(ir_trans_unit_t *tunit, ir_type_t *type) {
     switch (type->type) {
-    case IR_TYPE_INT: {
-        ir_expr_t *expr = ir_expr_create(tunit, IR_EXPR_CONST);
-        expr->const_params.ctype = IR_CONST_INT;
-        expr->const_params.type = type;
-        expr->const_params.int_val = 0;
-        return expr;
-    }
+    case IR_TYPE_INT:
+        return ir_int_const(tunit, type, 0);
+
     case IR_TYPE_FLOAT: {
         ir_expr_t *expr = ir_expr_create(tunit, IR_EXPR_CONST);
         expr->const_params.ctype = IR_CONST_FLOAT;

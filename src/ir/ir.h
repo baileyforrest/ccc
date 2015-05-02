@@ -519,6 +519,9 @@ ir_type_t *ir_type_create(ir_trans_unit_t *tunit, ir_type_type_t type);
 
 void ir_trans_unit_destroy(ir_trans_unit_t *trans_unit);
 
+ir_expr_t *ir_int_const(ir_trans_unit_t *tunit, ir_type_t *type,
+                        long long value);
+
 ir_expr_t *ir_expr_zero(ir_trans_unit_t *tunit, ir_type_t *type);
 
 #endif /* _IR_H_ */
