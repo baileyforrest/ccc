@@ -328,7 +328,6 @@ typedef enum ir_stmt_type_t {
     IR_STMT_INDIR_BR,
     IR_STMT_ASSIGN,
     IR_STMT_STORE,
-    IR_STMT_INTRINSIC_FUNC,
 } ir_stmt_type_t;
 
 typedef struct ir_stmt_t {
@@ -379,11 +378,6 @@ typedef struct ir_stmt_t {
             ir_expr_t *val;
             ir_expr_t *ptr;
         } store;
-
-        struct {
-            ir_type_t *func_sig;
-            char *name;
-        } intrinsic_func;
     };
 } ir_stmt_t;
 
@@ -506,6 +500,11 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num);
 
 ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
                           ir_type_t *type, int num);
+
+// TODO1: This is a temporary solution. Later a global string table should
+// be created
+ir_expr_t *ir_var_owned_name_create(ir_trans_unit_t *tunit, ir_type_t *type,
+                                     char *name);
 
 ir_trans_unit_t *ir_trans_unit_create(void);
 

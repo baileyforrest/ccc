@@ -97,6 +97,9 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type);
 
 ir_oper_t trans_op(oper_t op);
 
+ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
+                                       ir_expr_t *init, size_t align);
+
 ir_expr_t *trans_string(trans_state_t *ts, char *str);
 
 ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);

@@ -1856,21 +1856,33 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     return NULL;
 }
 
+ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
+                                       ir_expr_t *init, size_t align) {
+    char namebuf[MAX_GLOBAL_NAME];
+
+    snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
+             ts->tunit->static_num++);
+
+    ir_expr_t *var = ir_var_owned_name_create(ts->tunit, type, namebuf);
+    var->var.local = false;
+
+    ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
+    global->linkage = IR_LINKAGE_PRIVATE;
+    global->gdata.flags = IR_GDATA_CONSTANT | IR_GDATA_UNNAMED_ADDR;
+    global->gdata.type = type;
+    global->gdata.var = var;
+    global->gdata.init = init;
+    global->gdata.align = align;
+    sl_append(&ts->tunit->decls, &global->link);
+
+    return var;
+}
+
 ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     ht_ptr_elem_t *elem = ht_lookup(&ts->tunit->strings, &str);
     if (elem != NULL) {
         return elem->val;
     }
-
-    char namebuf[MAX_GLOBAL_NAME];
-
-    size_t len = snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
-                          ts->tunit->static_num++);
-
-    elem = emalloc(sizeof(*elem) + len + 1);
-    elem->key = str;
-    char *name = (char *)elem + sizeof(*elem);
-    strcpy(name, namebuf);
 
     ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
     type->arr.nelems = strlen(str) + 1;
@@ -1878,24 +1890,12 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
     ptr_type->ptr.base = type;
 
-    ir_expr_t *var = ir_expr_create(ts->tunit, IR_EXPR_VAR);
-    var->var.name = name;
-    var->var.local = false;
-    var->var.type = ptr_type;
-
     ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     arr_lit->const_params.ctype = IR_CONST_STR;
     arr_lit->const_params.type = type;
     arr_lit->const_params.str_val = str;
 
-    ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
-    global->linkage = IR_LINKAGE_PRIVATE;
-    global->gdata.flags = IR_GDATA_CONSTANT | IR_GDATA_UNNAMED_ADDR;
-    global->gdata.type = type;
-    global->gdata.var = var;
-    global->gdata.init = arr_lit;
-    global->gdata.align = 1;
-    sl_append(&ts->tunit->decls, &global->link);
+    ir_expr_t *var = trans_create_private_global(ts, type, arr_lit, 1);
 
     ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
     ir_type_t *elem_ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
@@ -1904,6 +1904,8 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     elem_ptr->getelemptr.ptr_type = ptr_type;
     elem_ptr->getelemptr.ptr_val = var;
 
+    // We need to 0's on getelemptr, one to get the array, another to get
+    // the array's address
     ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
     pair->type = &ir_type_i32;
     pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
@@ -1913,6 +1915,9 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     pair->type = &ir_type_i32;
     pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
     sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
+
+    elem = emalloc(sizeof(*elem));
+    elem->key = str;
     elem->val = elem_ptr;
     ht_insert(&ts->tunit->strings, &elem->link);
 

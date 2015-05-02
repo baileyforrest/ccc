@@ -190,9 +190,6 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         fprintf(stream, "* ");
         ir_expr_print(stream, stmt->store.ptr);
         break;
-    case IR_STMT_INTRINSIC_FUNC:
-        // TODO0: This
-        break;
     default:
         assert(false);
     }

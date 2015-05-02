@@ -143,6 +143,19 @@ ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
     return temp;
 }
 
+ir_expr_t *ir_var_owned_name_create(ir_trans_unit_t *tunit, ir_type_t *type,
+                                    char *name) {
+    ir_expr_t *var = emalloc(sizeof(ir_expr_t) + strlen(name) + 1);
+    var->type = IR_EXPR_VAR;
+    var->var.type = type;
+    var->var.name = (char *)var + sizeof(*var);
+    strcpy(var->var.name, name);
+    var->var.local = true;
+    sl_append(&tunit->exprs, &var->heap_link);
+
+    return var;
+}
+
 ir_trans_unit_t *ir_trans_unit_create(void) {
     ir_trans_unit_t *tunit = emalloc(sizeof(ir_trans_unit_t));
     sl_init(&tunit->id_structs, offsetof(ir_gdecl_t, link));
@@ -216,7 +229,6 @@ ir_stmt_t *ir_stmt_create(ir_trans_unit_t *tunit, ir_stmt_type_t type) {
     case IR_STMT_BR:
     case IR_STMT_ASSIGN:
     case IR_STMT_STORE:
-    case IR_STMT_INTRINSIC_FUNC:
         break;
     case IR_STMT_SWITCH:
         sl_init(&stmt->switch_params.cases,
@@ -371,7 +383,6 @@ void ir_stmt_destroy(ir_stmt_t *stmt) {
     case IR_STMT_EXPR:
     case IR_STMT_ASSIGN:
     case IR_STMT_STORE:
-    case IR_STMT_INTRINSIC_FUNC:
     case IR_STMT_RET:
     case IR_STMT_BR:
         break;
