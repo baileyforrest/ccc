@@ -391,6 +391,22 @@ typedef struct ir_inst_stream_t {
     dlist_t list; /**< (ir_stmt) */
 } ir_inst_stream_t;
 
+typedef enum ir_linkage_t {
+    IR_LINKAGE_DEFAULT = 0,
+    IR_LINKAGE_PRIVATE,
+    IR_LINKAGE_INTERNAL,
+    IR_LINKAGE_LINKONCE,
+    IR_LINKAGE_WEAK,
+    IR_LINKAGE_LINKONCE_ODR,
+    IR_LINKAGE_WEAK_ODR,
+    IR_LINKAGE_EXTERNAL,
+} ir_linkage_t;
+
+typedef enum ir_gdata_flags_t {
+    IR_GDATA_CONSTANT     = 1 << 0, // If false, then global
+    IR_GDATA_UNNAMED_ADDR = 1 << 1,
+} ir_gdata_flags_t;
+
 typedef enum ir_gdecl_type_t {
     IR_GDECL_GDATA,
     IR_GDECL_ID_STRUCT,
@@ -401,10 +417,16 @@ typedef enum ir_gdecl_type_t {
 typedef struct ir_gdecl_t {
     sl_link_t link;
     ir_gdecl_type_t type;
+    ir_linkage_t linkage;
 
     union {
         struct {
-            ir_inst_stream_t stmts; /**< Any initialization and the def */
+            ir_gdata_flags_t flags;
+            ir_type_t *type;
+            ir_expr_t *var;
+            ir_expr_t *init;
+            size_t align;
+            ir_inst_stream_t setup;
         } gdata;
 
         struct {

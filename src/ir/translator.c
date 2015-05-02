@@ -114,14 +114,12 @@ void trans_gdecl_node(trans_state_t *ts, decl_node_t *node) {
     ir_gdecl_t *ir_gdecl;
     if (node->type->type == TYPE_FUNC) {
         ir_gdecl = ir_gdecl_create(IR_GDECL_FUNC_DECL);
-        ir_gdecl->func_decl.type = trans_decl_node(ts, node,
-                                                   IR_DECL_NODE_FDEFN,
-                                                   &ir_gdecl->gdata.stmts);
+        ir_gdecl->func_decl.type = trans_decl_node(ts, node, IR_DECL_NODE_FDEFN,
+                                                   NULL);
         ir_gdecl->func_decl.name = node->id;
     } else {
         ir_gdecl = ir_gdecl_create(IR_GDECL_GDATA);
-        trans_decl_node(ts, node, IR_DECL_NODE_GLOBAL,
-                        &ir_gdecl->gdata.stmts);
+        trans_decl_node(ts, node, IR_DECL_NODE_GLOBAL, ir_gdecl);
     }
     sl_append(&ts->tunit->decls, &ir_gdecl->link);
 }
@@ -155,8 +153,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             decl_node_t *node = sl_head(&decl->decls);
             assert(node != NULL);
 
-            trans_decl_node(ts, node, IR_DECL_NODE_FUNC_PARAM,
-                            &ir_gdecl->func.body);
+            trans_decl_node(ts, node, IR_DECL_NODE_FUNC_PARAM, NULL);
         }
 
         bool returns = trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
@@ -1437,8 +1434,20 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
         return trans_expr_bool(ts, src_expr, ir_stmts);
     }
 
+    // Special case: If we're assigning array to pointer, and src_expr
+    // is already a pointer, then do no conversion if pointed types are equal
+    if (dest->type == TYPE_PTR && src->type == TYPE_ARR &&
+        ir_expr_type(src_expr)->type == IR_TYPE_PTR) {
+        type_t *pointed_dest = ast_type_unmod(dest->ptr.base);
+        type_t *pointed_src = ast_type_unmod(src->arr.base);
+        if (typecheck_type_equal(pointed_dest, pointed_src)) {
+            return src_expr;
+        }
+    }
+
     ir_type_t *dest_type = trans_type(ts, dest);
     ir_type_t *src_type = trans_type(ts, src);
+
 
     ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     ir_convert_t convert_op;
@@ -1569,7 +1578,8 @@ char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned) {
 
 ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
                            ir_decl_node_type_t type,
-                           ir_inst_stream_t *ir_stmts) {
+                           void *context) {
+    type_t *node_type = ast_type_untypedef(node->type);
     ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     ir_type_t *expr_type = trans_type(ts, node->type);
 
@@ -1587,6 +1597,22 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         access = var_expr;
         break;
     case IR_DECL_NODE_GLOBAL: {
+        ir_gdecl_t *gdecl = context;
+        assert(gdecl->type == IR_GDECL_GDATA);
+
+        // Set up correct linkage and modifiers
+        if (node_type->type == TYPE_MOD) {
+            if (node_type->mod.type_mod & TMOD_STATIC) {
+                gdecl->linkage = IR_LINKAGE_INTERNAL;
+            } else if (node_type->mod.type_mod & TMOD_EXTERN) {
+                gdecl->linkage = IR_LINKAGE_INTERNAL;
+            }
+
+            if (node_type->mod.type_mod & TMOD_CONST) {
+                gdecl->gdata.flags |= IR_GDATA_CONSTANT;
+            }
+        }
+
         ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
         ptr_type->ptr.base = expr_type;
 
@@ -1594,19 +1620,18 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         var_expr->var.name = node->id;
         var_expr->var.local = false;
 
-        ir_expr_t *src = node->expr == NULL ?
-            NULL : trans_expr(ts, false, node->expr, ir_stmts);
-
-        ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-        stmt->assign.dest = var_expr;
-        stmt->assign.src = src;
-        trans_add_stmt(ts, ir_stmts, stmt);
+        gdecl->gdata.type = expr_type;
+        gdecl->gdata.var = var_expr;
+        gdecl->gdata.init = node->expr == NULL ?
+            NULL : trans_expr(ts, false, node->expr, &gdecl->gdata.setup);
+        gdecl->gdata.align = ast_type_align(node->type);
 
         symtab = &ts->tunit->globals;
         access = var_expr;
         break;
     }
     case IR_DECL_NODE_LOCAL: {
+        ir_inst_stream_t *ir_stmts = context;
         ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
         ptr_type->ptr.base = expr_type;
 
@@ -1862,30 +1887,35 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
     type->arr.nelems = strlen(str) + 1;
     type->arr.elem_type = &ir_type_i8;
+    ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+    ptr_type->ptr.base = type;
 
     ir_expr_t *var = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     var->var.name = name;
     var->var.local = false;
-    var->var.type = type;
+    var->var.type = ptr_type;
 
     ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     arr_lit->const_params.ctype = IR_CONST_STR;
     arr_lit->const_params.type = type;
     arr_lit->const_params.str_val = str;
 
-    ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
-    assign->assign.dest = var;
-    assign->assign.src = arr_lit;
-
     ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
-    ir_inst_stream_append(&global->gdata.stmts, assign);
+    global->linkage = IR_LINKAGE_PRIVATE;
+    global->gdata.flags = IR_GDATA_CONSTANT | IR_GDATA_UNNAMED_ADDR;
+    global->gdata.type = type;
+    global->gdata.var = var;
+    global->gdata.init = arr_lit;
+    global->gdata.align = 1;
     sl_append(&ts->tunit->decls, &global->link);
 
-    // TODO0: the 0's can be stored statically
     ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
-    elem_ptr->getelemptr.type = type;
-
+    ir_type_t *elem_ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+    elem_ptr_type->ptr.base = type->arr.elem_type;
+    elem_ptr->getelemptr.type = elem_ptr_type;
+    elem_ptr->getelemptr.ptr_type = ptr_type;
     elem_ptr->getelemptr.ptr_val = var;
+
     ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
     pair->type = &ir_type_i32;
     pair->expr = ir_expr_zero(&ir_type_i32);

@@ -25,6 +25,15 @@
 
 #include "ir.h"
 
+void ir_type_destroy(ir_type_t *type);
+
+void ir_expr_destroy(ir_expr_t *expr);
+
+void ir_stmt_destroy(ir_stmt_t *stmt);
+
+void ir_gdecl_destroy(ir_gdecl_t *gdecl);
+
+
 void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree);
 
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl);
@@ -45,13 +54,6 @@ const char *ir_fcmp_str(ir_fcmp_type_t conv);
 
 const char *ir_float_type_str(ir_float_type_t ftype);
 
-void ir_type_destroy(ir_type_t *type);
-
-void ir_expr_destroy(ir_expr_t *expr);
-
-void ir_stmt_destroy(ir_stmt_t *stmt);
-
-void ir_gdecl_destroy(ir_gdecl_t *gdecl);
-
+const char *ir_linkage_str(ir_linkage_t linkage);
 
 #endif /* _IR_PRIV_H_ */

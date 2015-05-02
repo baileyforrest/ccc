@@ -58,10 +58,30 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
-        DL_FOREACH(cur, &gdecl->gdata.stmts.list) {
-            ir_stmt_print(stream, GET_ELEM(&gdecl->gdata.stmts.list, cur),
-                          false);
+        ir_expr_print(stream, gdecl->gdata.var);
+        if (gdecl->linkage == IR_LINKAGE_DEFAULT) {
+            fprintf(stream, " =");
+        } else {
+            fprintf(stream, " = %s", ir_linkage_str(gdecl->linkage));
         }
+
+        if (gdecl->gdata.flags & IR_GDATA_UNNAMED_ADDR) {
+            fprintf(stream, " unnamed_addr");
+        }
+
+        if (gdecl->gdata.flags & IR_GDATA_CONSTANT) {
+            fprintf(stream, " constant");
+        } else {
+            fprintf(stream, " global");
+        }
+
+        fprintf(stream, " ");
+        ir_type_print(stream, gdecl->gdata.type, NULL);
+        if (gdecl->gdata.init != NULL) {
+            fprintf(stream, " ");
+            ir_expr_print(stream, gdecl->gdata.init);
+        }
+        fprintf(stream, ", align %zd", gdecl->gdata.align);
         break;
     case IR_GDECL_ID_STRUCT:
         fprintf(stream, "%%%s = type ", gdecl->id_struct.name);
@@ -219,13 +239,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             fprintf(stream, " }");
             break;
         case IR_CONST_STR: {
-            // TODO1 Add these as type properties
-            fprintf(stream, "private unnamed_addr constant ");
-            ir_type_print(stream, expr->const_params.type, NULL);
-
-            // TODO1 Add align as type property
-            fprintf(stream, " c\"%s\\00\", align 1",
-                    expr->const_params.str_val);
+            fprintf(stream, " c\"%s\\00\"", expr->const_params.str_val);
             break;
         }
         case IR_CONST_ARR: {
@@ -529,6 +543,22 @@ const char *ir_float_type_str(ir_float_type_t ftype) {
     case IR_FLOAT_FLOAT:    return "float";
     case IR_FLOAT_DOUBLE:   return "double";
     case IR_FLOAT_X86_FP80: return "x86_fp80";
+    default:
+        assert(false);
+    }
+    return NULL;
+}
+
+const char *ir_linkage_str(ir_linkage_t linkage) {
+    switch (linkage) {
+    case IR_LINKAGE_DEFAULT:      return "";
+    case IR_LINKAGE_PRIVATE:      return "private";
+    case IR_LINKAGE_INTERNAL:     return "internal";
+    case IR_LINKAGE_LINKONCE:     return "linkonce";
+    case IR_LINKAGE_WEAK:         return "weak";
+    case IR_LINKAGE_LINKONCE_ODR: return "linkonce_odr";
+    case IR_LINKAGE_WEAK_ODR:     return "weak_odr";
+    case IR_LINKAGE_EXTERNAL:     return "external";
     default:
         assert(false);
     }

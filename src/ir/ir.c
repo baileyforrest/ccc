@@ -180,12 +180,14 @@ ir_trans_unit_t *ir_trans_unit_create(void) {
 ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     ir_gdecl_t *gdecl = emalloc(sizeof(ir_gdecl_t));
     gdecl->type = type;
+    gdecl->linkage = IR_LINKAGE_DEFAULT;
     switch (type) {
     case IR_GDECL_FUNC_DECL:
     case IR_GDECL_ID_STRUCT:
         break;
     case IR_GDECL_GDATA:
-        dl_init(&gdecl->gdata.stmts.list, offsetof(ir_stmt_t, link));
+        dl_init(&gdecl->gdata.setup.list, offsetof(ir_stmt_t, link));
+        gdecl->gdata.flags = 0;
         break;
     case IR_GDECL_FUNC:
         sl_init(&gdecl->func.params, offsetof(ir_expr_t, link));

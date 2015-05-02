@@ -90,7 +90,7 @@ typedef enum ir_decl_node_type_t {
 } ir_decl_node_type_t;
 
 ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
-                     ir_decl_node_type_t type, ir_inst_stream_t *ir_stmts);
+                           ir_decl_node_type_t type, void *context);
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type);
 
