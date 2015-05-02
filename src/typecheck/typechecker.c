@@ -333,9 +333,11 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
     type_t *umod_to = ast_type_unmod(to);
     type_t *umod_from = ast_type_unmod(from);
 
-    // TODO1: This ignores const
-    if (typecheck_type_equal(umod_from, umod_from)) {
-        return true;
+    if (umod_to->type == TYPE_VOID) {
+        if (mark != NULL) {
+            logger_log(mark, LOG_ERR, "invalid use of void expression");
+        }
+        return false;
     }
 
     if (umod_from->type == TYPE_VOID) {
@@ -345,6 +347,12 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
         }
         return false;
     }
+
+    // TODO1: This ignores const
+    if (typecheck_type_equal(umod_from, umod_from)) {
+        return true;
+    }
+
 
     if (umod_from->type == TYPE_STRUCT || umod_from->type == TYPE_UNION) {
         goto fail;
@@ -1291,11 +1299,18 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                          type_type_t type) {
     bool retval = true;
     retval &= typecheck_type(tcs, decl_node->type);
+    type_t *node_type = ast_type_untypedef(decl_node->type);
+
+    if (ast_type_unmod(node_type)->type == TYPE_VOID) {
+        logger_log(&decl_node->mark, LOG_ERR,
+                   "variable or field '%s' declared void", decl_node->id);
+        return false;
+    }
+
     if (type == TYPE_VOID && decl_node->id != NULL) {
         status_t status;
         typetab_entry_t *entry = NULL;
-        type_t *untypedef = ast_type_untypedef(decl_node->type);
-        type_t *type_base = untypedef;
+        type_t *type_base = node_type;
         while (type_base->type == TYPE_PTR || type_base->type == TYPE_ARR) {
             type_base = typecheck_get_ptr_base(type_base);
         }
@@ -1304,13 +1319,13 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
         // declaration not equal to the function we're currently in
         bool is_decl = ((type_base->type == TYPE_MOD &&
                          type_base->mod.type_mod & TMOD_EXTERN) ||
-                        (decl_node->type->type == TYPE_FUNC &&
+                        (node_type->type == TYPE_FUNC &&
                          (tcs->func == NULL ||
                           decl_node != sl_head(&tcs->func->decl->decls))));
 
         if (CCC_OK !=
             (status =
-             tt_insert(tcs->typetab, decl_node->type, TT_VAR, decl_node->id,
+             tt_insert(tcs->typetab, node_type, TT_VAR, decl_node->id,
                        &entry))) {
             if (status != CCC_DUPLICATE) {
                 logger_log(&decl_node->mark, LOG_ERR,
@@ -1333,7 +1348,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 // types are not equal
                 if (entry->entry_type != TT_VAR ||
                     (entry->var.var_defined && !is_decl) ||
-                    !typecheck_type_equal(cmp_type, decl_node->type)) {
+                    !typecheck_type_equal(cmp_type, node_type)) {
                     logger_log(&decl_node->mark, LOG_ERR,
                                "Redefined symbol %s", decl_node->id);
                     return false;
@@ -1356,21 +1371,20 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 assert(false);
                 return false;
             case EXPR_INIT_LIST:
-                decl_node->expr->etype = decl_node->type;
-                retval &= typecheck_init_list(tcs, decl_node->type,
+                decl_node->expr->etype = node_type;
+                retval &= typecheck_init_list(tcs, node_type,
                                               decl_node->expr);
 
                 // If we're assigning to an array without a size, set the
                 // array's size to the init list length
-                if (decl_node->type->type == TYPE_ARR &&
-                    decl_node->type->arr.len == NULL) {
-                    decl_node->type->arr.nelems =
+                if (node_type->type == TYPE_ARR &&
+                    node_type->arr.len == NULL) {
+                    node_type->arr.nelems =
                         decl_node->expr->init_list.nelems;
                 }
                 break;
             default:
-                retval &= typecheck_type_assignable(&decl_node->mark,
-                                                    decl_node->type,
+                retval &= typecheck_type_assignable(&decl_node->mark, node_type,
                                                     decl_node->expr->etype);
             }
             break;
@@ -1510,6 +1524,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case OP_DEREF: {
             type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
             assert(ptr_type->type == TYPE_PTR);
+            if (ast_type_unmod(ptr_type->ptr.base)->type == TYPE_VOID) {
+                logger_log(&expr->mark, LOG_WARN,
+                           "dereferencing a 'void *' pointer");
+            }
             expr->etype = ptr_type->ptr.base;
             break;
         }

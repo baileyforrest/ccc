@@ -160,6 +160,9 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     if (gdecl->decl->type == NULL) {
         logger_log(&LEX_CUR(lex).mark, LOG_WARN,
                    "Data definition has no type or storage class");
+
+        // When no type is specified, assume it is int
+        gdecl->decl->type = tt_int;
     }
 
     if (CCC_OK != (status = par_declarator_base(lex, gdecl->decl))) {
@@ -852,6 +855,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
     status_t status = CCC_OK;
     type_t *base = node->type;
     type_t **lpatch = NULL;
+    type_t **last_node = NULL;
 
     switch (LEX_CUR(lex).type) {
     case LPAREN: {
@@ -883,7 +887,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
         break;
     }
 
-    type_t **last_node = &base;
+    last_node = &base;
     bool done = false;
     while (!done) {
         switch (LEX_CUR(lex).type) {
@@ -1085,12 +1089,15 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
 
             // Set new_node to cond_node so it is properly freed on error
             new_node = cond_node;
-            if (CCC_OK != par_expression(lex, &cond_node->cond.expr2)) {
+            if (CCC_OK !=
+                (status = par_expression(lex, &cond_node->cond.expr2))) {
                 goto fail;
             }
             LEX_MATCH(lex, COLON);
-            if (CCC_OK != par_oper_expression(lex, OP_NOP, NULL,
-                                              &cond_node->cond.expr3)) {
+            if (CCC_OK !=
+                (status =
+                 par_oper_expression(lex, OP_NOP, NULL,
+                                     &cond_node->cond.expr3))) {
                 goto fail;
             }
 
