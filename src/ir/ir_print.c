@@ -361,7 +361,14 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         assert(expr->call.func_sig->type == IR_TYPE_FUNC);
         ir_type_t *func_sig = expr->call.func_sig;
         fprintf(stream, "call ");
-        ir_type_print(stream, func_sig->func.type, NULL);
+
+        if (func_sig->func.varargs) {
+            // Need to print full funtion sig when calling va function
+            ir_type_print(stream, func_sig, NULL);
+            fprintf(stream, "*");
+        } else {
+            ir_type_print(stream, func_sig->func.type, NULL);
+        }
         fprintf(stream, " ");
         ir_expr_print(stream, expr->call.func_ptr);
         fprintf(stream, "(");
@@ -403,6 +410,9 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
             if (cur != vec_size(&type->func.params) - 1) {
                 fprintf(stream, ", ");
             }
+        }
+        if (type->func.varargs) {
+            fprintf(stream, ", ...");
         }
         fprintf(stream, ")");
         break;

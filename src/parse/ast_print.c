@@ -281,9 +281,8 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
 
     str_node_t *node = NULL;
     if (decl_node->id != NULL) {
-        node = emalloc(sizeof(*node) + strlen(decl_node->id) + 1);
-        node->str = (char *)node + sizeof(*node);
-        strcpy(node->str, decl_node->id);
+        node = emalloc(sizeof(*node));
+        node->str = decl_node->id;
         sl_append(&accum, &node->link);
     }
 

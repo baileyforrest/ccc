@@ -25,6 +25,8 @@
 
 #include <assert.h>
 
+#include "util/string_store.h"
+
 #define MAX_LABEL_LEN 512
 #define ANON_LABEL_PREFIX "BB"
 
@@ -107,9 +109,8 @@ ir_label_t *ir_numlabel_create(ir_trans_unit_t *tunit, int num) {
     }
 
     // Allocate the label and its string in one chunk
-    label = emalloc(sizeof(ir_label_t) + strlen(buf) + 1);
-    label->name = (char *)label + sizeof(*label);
-    strcpy(label->name, buf);
+    label = emalloc(sizeof(ir_label_t));
+    label->name = sstore_lookup(buf);
     status_t status = ht_insert(&tunit->labels, &label->link);
     assert(status == CCC_OK);
 
@@ -124,12 +125,11 @@ ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
     char buf[MAX_LABEL_LEN];
     snprintf(buf, sizeof(buf), "%d", num);
     buf[sizeof(buf) - 1] = '\0';
-    size_t len = strlen(buf);
-    ir_expr_t *temp = emalloc(sizeof(ir_expr_t) + len + 1);
+
+    ir_expr_t *temp = emalloc(sizeof(ir_expr_t));
     temp->type = IR_EXPR_VAR;
     temp->var.type = type;
-    temp->var.name = (char *)temp + sizeof(*temp);
-    strcpy(temp->var.name, buf);
+    temp->var.name = sstore_lookup(buf);
     temp->var.local = true;
     sl_append(&tunit->exprs, &temp->heap_link);
 
@@ -141,19 +141,6 @@ ir_expr_t *ir_temp_create(ir_trans_unit_t *tunit, ir_gdecl_t *func,
     assert(status == CCC_OK);
 
     return temp;
-}
-
-ir_expr_t *ir_var_owned_name_create(ir_trans_unit_t *tunit, ir_type_t *type,
-                                    char *name) {
-    ir_expr_t *var = emalloc(sizeof(ir_expr_t) + strlen(name) + 1);
-    var->type = IR_EXPR_VAR;
-    var->var.type = type;
-    var->var.name = (char *)var + sizeof(*var);
-    strcpy(var->var.name, name);
-    var->var.local = true;
-    sl_append(&tunit->exprs, &var->heap_link);
-
-    return var;
 }
 
 ir_trans_unit_t *ir_trans_unit_create(void) {
@@ -402,9 +389,7 @@ void ir_gdecl_destroy(ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
     case IR_GDECL_FUNC_DECL:
-        break;
     case IR_GDECL_ID_STRUCT:
-        free(gdecl->id_struct.name);
         break;
     case IR_GDECL_FUNC:
         ir_symtab_destroy(&gdecl->func.locals);

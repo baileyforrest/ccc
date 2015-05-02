@@ -34,6 +34,7 @@
 
 #include "util/htable.h"
 #include "util/util.h"
+#include "util/string_store.h"
 
 
 /**
@@ -97,14 +98,12 @@ status_t fdir_insert(const char *filename, fdir_entry_t **result) {
     }
 
     // Allocate the entry and name string in one region
-    entry = emalloc(sizeof(fdir_entry_t) + strlen(filename) + 1);
+    entry = emalloc(sizeof(fdir_entry_t));
     // Initialize to safe values for destructor
     entry->buf = MAP_FAILED;
     entry->fd = -1;
 
-    entry->filename = (char *)entry + sizeof(*entry);
-
-    strcpy(entry->filename, filename);
+    entry->filename = sstore_lookup(filename);
 
     if (-1 == (entry->fd = open(filename, O_RDONLY, 0))) {
         status = CCC_FILEERR;

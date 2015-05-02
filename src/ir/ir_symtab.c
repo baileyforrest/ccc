@@ -49,9 +49,6 @@ void ir_symtab_entry_destroy(ir_symtab_entry_t *entry) {
     default:
         assert(false);
     }
-    if (entry->number == -1) {
-        free(entry->name);
-    }
     free(entry);
 }
 

@@ -41,7 +41,6 @@ typedef struct pp_file_t {
     slist_t cond_insts; /**< Instances of conditional preprocessor directive */
     tstream_t stream;   /**< Text stream */
     int if_count;       /**< Instances of if at start of current conditional */
-    bool owns_name;     /**< True if pp_file owns filename, false otherwise */
 } pp_file_t;
 
 /**

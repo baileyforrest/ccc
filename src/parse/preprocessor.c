@@ -229,15 +229,11 @@ pp_file_t *pp_file_create(void) {
 
     sl_init(&pp_file->cond_insts, offsetof(pp_cond_inst_t, link));
     pp_file->if_count = 0;
-    pp_file->owns_name = false;
 
     return pp_file;
 }
 
 void pp_file_destroy(pp_file_t *pp_file) {
-    if (pp_file->owns_name) {
-        free(pp_file->stream.mark.filename);
-    }
     SL_DESTROY_FUNC(&pp_file->cond_insts, free);
     free(pp_file);
 }

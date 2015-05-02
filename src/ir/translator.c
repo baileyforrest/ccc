@@ -26,6 +26,8 @@
 #include <assert.h>
 
 #include "util/util.h"
+#include "util/string_store.h"
+
 #include "typecheck/typechecker.h"
 
 // TODO1: Approximate this programatically using MAX_INT
@@ -831,7 +833,20 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             cur_sig = cur_sig->next;
             cur_expr = cur_expr->next;
         }
-        assert(cur_expr == NULL);
+        if (func_sig->func.varargs) {
+            while (cur_expr != NULL) {
+                expr_t *param = GET_ELEM(&expr->call.params, cur_expr);
+                ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
+                ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
+                pair->type = ir_expr_type(ir_expr);
+                pair->expr = ir_expr;
+                sl_append(&call->call.arglist, &pair->link);
+
+                cur_expr = cur_expr->next;
+            }
+        } else {
+            assert(cur_expr == NULL);
+        }
 
         ir_expr_t *result;
         // Void returning function, don't create a temp
@@ -1541,10 +1556,9 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     return trans_assign_temp(ts, ir_stmts, convert);
 }
 
-char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned) {
+char *trans_decl_node_name(ir_symtab_t *symtab, char *name) {
     ir_symtab_entry_t *entry = ir_symtab_lookup(symtab, name);
     if (entry == NULL) {
-        *name_owned = false;
         return name;
     }
 
@@ -1566,8 +1580,7 @@ char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned) {
     // Record next number to try from
     entry->number = number;
 
-    *name_owned = true;
-    return patch_name;
+    return sstore_insert(patch_name);
 }
 
 ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
@@ -1579,7 +1592,6 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
 
     ir_symtab_t *symtab;
     ir_expr_t *access;
-    bool name_owned = false;
 
     switch (type) {
     case IR_DECL_NODE_FDEFN:
@@ -1632,8 +1644,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         symtab = &ts->func->func.locals;
 
         var_expr->var.type = ptr_type;
-        var_expr->var.name = trans_decl_node_name(symtab, node->id,
-                                                  &name_owned);
+        var_expr->var.name = trans_decl_node_name(symtab, node->id);
         var_expr->var.local = true;
 
         // Have to allocate variable on the stack
@@ -1672,8 +1683,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         symtab = &ts->func->func.locals;
 
         var_expr->var.type = expr_type;
-        var_expr->var.name = trans_decl_node_name(symtab, node->id,
-                                                  &name_owned);
+        var_expr->var.name = trans_decl_node_name(symtab, node->id);
         var_expr->var.local = true;
 
         ir_expr_t *alloca = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
@@ -1705,9 +1715,6 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
     // Create the symbol table entry
     ir_symtab_entry_t *entry =
         ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR, var_expr->var.name);
-    if (name_owned) {
-        entry->number = -1;
-    }
     entry->var.expr = var_expr;
     entry->var.access = access;
     status_t status = ir_symtab_insert(symtab, entry);
@@ -1756,6 +1763,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             char *name = emalloc(strlen(type->struct_params.name) +
                                  sizeof(STRUCT_PREFIX));
             sprintf(name, STRUCT_PREFIX"%s", type->struct_params.name);
+            name = sstore_insert(name);
             ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
             id_type->id_struct.name = name;
             id_type->id_struct.type = ir_type;
@@ -1863,7 +1871,9 @@ ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
     snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
              ts->tunit->static_num++);
 
-    ir_expr_t *var = ir_var_owned_name_create(ts->tunit, type, namebuf);
+    ir_expr_t *var = ir_expr_create(ts->tunit, IR_EXPR_VAR);
+    var->var.name = sstore_lookup(namebuf);
+    var->var.type = type;
     var->var.local = false;
 
     ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);

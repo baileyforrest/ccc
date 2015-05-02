@@ -34,6 +34,7 @@
 
 #include "util/htable.h"
 #include "util/util.h"
+#include "util/string_store.h"
 
 #include "typecheck/typechecker.h"
 
@@ -851,17 +852,10 @@ status_t pp_directive_line(preprocessor_t *pp) {
             goto fail;
         }
         len -= 2; // -2 for quotes
-        char *new_filename = emalloc(len + 1);
-        // Copy filename + 1 so we don't copy the quote
-        strncpy(new_filename, filename + 1, len);
-        new_filename[len] = '\0';
+        filename[len] = '\0';
 
-        if (file->owns_name) { // Free the old new_filename if it owns it
-            free(file->stream.mark.filename);
-        } else {
-            file->owns_name = true;
-        }
-        file->stream.mark.filename = new_filename;
+        // Copy filename + 1 so we don't copy the quote
+        file->stream.mark.filename = sstore_lookup(filename + 1);
         file->stream.mark.line = line_num;
         break;
     }

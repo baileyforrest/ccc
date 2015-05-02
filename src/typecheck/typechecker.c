@@ -1602,9 +1602,18 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                 retval = false;
             }
         }
-        if (!func_sig->func.varargs && cur_arg != NULL) {
-            logger_log(&expr->mark, LOG_ERR, "too many arguments to function");
-            retval = false;
+        if (cur_arg != NULL) {
+            if (func_sig->func.varargs) {
+                while (cur_arg != NULL) {
+                    expr_t *arg = GET_ELEM(&expr->call.params, cur_arg);
+                    retval &= typecheck_expr(tcs, arg, TC_NOCONST);
+                    cur_arg = cur_arg->next;
+                }
+            } else {
+                logger_log(&expr->mark, LOG_ERR,
+                           "too many arguments to function");
+                retval = false;
+            }
         }
         expr->etype = func_sig->func.type;
         return retval;

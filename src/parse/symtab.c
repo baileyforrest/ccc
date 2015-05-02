@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "util/htable.h"
+#include "util/string_store.h"
 #include "util/util.h"
 
 /**
@@ -156,10 +157,8 @@ status_t st_lookup(symtab_t *table, char *str, token_t type,
 
     // Doesn't exist. Need to allocate memory for the string and entry
     // We allocate them together so they are freed together
-    cur_entry = emalloc(sizeof(*cur_entry) + strlen(str) + 1);
-    cur_entry->key = (char *)cur_entry + sizeof(*cur_entry);
-
-    strcpy(cur_entry->key, str);
+    cur_entry = emalloc(sizeof(*cur_entry));
+    cur_entry->key = sstore_lookup(str);
 
     cur_entry->type = type;
 

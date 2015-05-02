@@ -39,6 +39,7 @@
 #include "util/file_directory.h"
 #include "util/logger.h"
 #include "util/tempfile.h"
+#include "util/string_store.h"
 
 #include "typecheck/typechecker.h"
 
@@ -59,6 +60,8 @@ int main(int argc, char **argv) {
 
     logger_init();
     fdir_init();
+    sstore_init();
+
     sl_init(&temp_files, offsetof(tempfile_t, link));
 
     bool link = false;
@@ -193,11 +196,11 @@ int main(int argc, char **argv) {
 
     src_done0:
         man_destroy(&manager);
-        if (status != CCC_OK || logger_has_error() ||
-            (optman.warn_opts & WARN_ERROR && logger_has_warn())) {
-            link = false;
-            break;
-        }
+    }
+
+    if (status != CCC_OK || logger_has_error() ||
+        (optman.warn_opts & WARN_ERROR && logger_has_warn())) {
+        link = false;
     }
 
     if (link) {
@@ -243,6 +246,7 @@ int main(int argc, char **argv) {
 fail1:
     optman_destroy();
 fail0:
+    sstore_destroy();
     fdir_destroy();
 
     SL_DESTROY_FUNC(&temp_files, tempfile_destroy);

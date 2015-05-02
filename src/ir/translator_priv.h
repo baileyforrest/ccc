@@ -81,7 +81,7 @@ ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
                         type_t *dest_type, ir_expr_t *src, type_t *src_type,
                         ir_inst_stream_t *ir_stmts);
 
-char *trans_decl_node_name(ir_symtab_t *symtab, char *name, bool *name_owned);
+char *trans_decl_node_name(ir_symtab_t *symtab, char *name);
 
 typedef enum ir_decl_node_type_t {
     IR_DECL_NODE_GLOBAL,
