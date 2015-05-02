@@ -109,7 +109,6 @@ int main(int argc, char **argv) {
             goto src_done0;
         }
 
-        // TODO1: Remove after later stages debugged
         if (optman.dump_opts & DUMP_AST) {
             goto src_done0;
         }
@@ -119,6 +118,7 @@ int main(int argc, char **argv) {
 
         if (optman.dump_opts & DUMP_IR) {
             ir_print(stdout, ir, filename);
+            goto src_done0;
         }
 
         if (optman.output_opts & OUTPUT_ASM &&

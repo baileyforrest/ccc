@@ -198,6 +198,8 @@ inline bool len_str_eq(const void *vstr1, const void *vstr2) {
     return strncmp(str1->str, str2->str, str1->len) == 0;
 }
 
+char *unescape_str(char *str);
+
 #define ASCII_LOWER \
 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': \
 case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':\
