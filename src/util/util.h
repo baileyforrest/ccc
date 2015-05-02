@@ -27,6 +27,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -199,6 +200,8 @@ inline bool len_str_eq(const void *vstr1, const void *vstr2) {
 }
 
 char *unescape_str(char *str);
+
+int print_str_encode(FILE *stream, char *str);
 
 #define ASCII_LOWER \
 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': \

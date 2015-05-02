@@ -236,7 +236,9 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             fprintf(stream, " }");
             break;
         case IR_CONST_STR: {
-            fprintf(stream, " c\"%s\\00\"", expr->const_params.str_val);
+            fprintf(stream, " c\"");
+            print_str_encode(stream, expr->const_params.str_val);
+            fprintf(stream, "\\00\"");
             break;
         }
         case IR_CONST_ARR: {

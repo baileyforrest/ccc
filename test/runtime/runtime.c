@@ -74,6 +74,6 @@ int print_hex(int n) {
 int __test();
 
 int main() {
-    printf("%d\n", __test());
+    printf("\n%d\n", __test());
     return 0;
 }

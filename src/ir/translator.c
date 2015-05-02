@@ -1894,8 +1894,10 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
         return elem->val;
     }
 
+    char *unescaped = unescape_str(str);
+
     ir_type_t *type = ir_type_create(ts->tunit, IR_TYPE_ARR);
-    type->arr.nelems = strlen(str) + 1;
+    type->arr.nelems = strlen(unescaped) + 1;
     type->arr.elem_type = &ir_type_i8;
     ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
     ptr_type->ptr.base = type;
@@ -1903,7 +1905,7 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     arr_lit->const_params.ctype = IR_CONST_STR;
     arr_lit->const_params.type = type;
-    arr_lit->const_params.str_val = str;
+    arr_lit->const_params.str_val = unescaped;
 
     ir_expr_t *var = trans_create_private_global(ts, type, arr_lit, 1);
 
