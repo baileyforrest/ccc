@@ -7,8 +7,7 @@ import subprocess
 import time
 import multiprocessing
 
-RUNTIME_DIR = "./test/runtime/"
-RUNTIME = os.path.join(RUNTIME_DIR, "runtime.c")
+DEF_RUNTIME_DIR = "./test/runtime"
 HEADER_STR = "//test"
 TEMP_DIR = "/tmp/ccc/"
 LLVM_SUFFIX = "ll"
@@ -18,6 +17,7 @@ CLANG = "clang"
 
 DEV_NULL = open(os.devnull, 'w')
 
+runtime_dir = DEF_RUNTIME_DIR
 verbose = False
 llvm = False
 compiler_opts = None
@@ -37,6 +37,8 @@ arg_parse.add_argument("-l", "--llvm",
                        action="store_true")
 arg_parse.add_argument("-j", "--jobs", type=int, default=1,
                        help="Number of jobs to run in parallel")
+arg_parse.add_argument("-r", "--runtime",
+                       help="Alternate test runtime to use")
 
 arg_parse.add_argument("compiler", help="Compiler and options")
 arg_parse.add_argument("test", nargs="+", help="Test files")
@@ -52,13 +54,16 @@ def main():
     global verbose
     global llvm
     global compiler_opts
+    global runtime_dir
 
     args = arg_parse.parse_args()
 
-    if (args.verbose):
+    if args.verbose:
         verbose = True
-    if (args.llvm):
+    if args.llvm:
         llvm = True
+    if args.runtime:
+        runtime_dir = args.runtime
     jobs = args.jobs
 
     compiler_opts = args.compiler.split()
@@ -85,6 +90,7 @@ def main():
 
 def process_file(src_path):
     temp_files = []
+    runtime = os.path.join(runtime_dir, "runtime.c")
 
     try:
         src = open(src_path)
@@ -127,12 +133,12 @@ def process_file(src_path):
             try:
                 if verbose and not is_error:
                     retval = subprocess.call(
-                        compiler_opts + ["-I", RUNTIME_DIR] +
+                        compiler_opts + ["-I", runtime_dir] +
                         ["-o", outname, src_path],
                         timeout=timeout_remain)
                 else:
                     retval = subprocess.call(
-                        compiler_opts + ["-I", RUNTIME_DIR] +
+                        compiler_opts + ["-I", runtime_dir] +
                         ["-o", outname, src_path],
                         timeout=timeout_remain, stdout=DEV_NULL,
                         stderr=subprocess.STDOUT)
@@ -145,13 +151,13 @@ def process_file(src_path):
             try:
                 if verbose and not is_error:
                     retval = subprocess.call(
-                        compiler_opts + ["-I", RUNTIME_DIR] +
-                        ["-o", outname, src_path, RUNTIME],
+                        compiler_opts + ["-I", runtime_dir] +
+                        ["-o", outname, src_path, runtime],
                         timeout=timeout_remain)
                 else:
                     retval = subprocess.call(
-                        compiler_opts + ["-I", RUNTIME_DIR] +
-                        ["-o", outname, src_path, RUNTIME],
+                        compiler_opts + ["-I", runtime_dir] +
+                        ["-o", outname, src_path, runtime],
                         timeout=timeout_remain, stdout=DEV_NULL,
                         stderr=subprocess.STDOUT)
             except subprocess.TimeoutExpired:
@@ -179,10 +185,10 @@ def process_file(src_path):
             exec_name = TEMP_DIR + src_name
             temp_files.append(exec_name)
             if verbose:
-                retval = subprocess.call([CLANG, outname, RUNTIME, "-o",
+                retval = subprocess.call([CLANG, outname, runtime, "-o",
                                           exec_name])
             else:
-                retval = subprocess.call([CLANG, outname, RUNTIME, "-o",
+                retval = subprocess.call([CLANG, outname, runtime, "-o",
                                           exec_name], stdout=DEV_NULL,
                                          stderr=subprocess.STDOUT)
             if retval != 0:
