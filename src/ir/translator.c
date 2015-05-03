@@ -1667,34 +1667,9 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         stmt->assign.src = src;
         trans_add_stmt(ts, &ts->func->func.prefix, stmt);
 
-        // If there's an initialization, evaluate it and store it
         if (node->expr != NULL) {
-            if (expr_type->type == IR_TYPE_STRUCT ||
-                expr_type->type == IR_TYPE_ARR) {
-                // For structures and arrays, create a global static object and
-                // then memcpy from the global object into the local one
-                ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
-                ir_expr_t *global =
-                    trans_create_private_global(ts, ir_expr_type(val), val,
-                                                ast_type_align(node_type));
-
-                // TODO1: Handle volatile, should probably be a property
-                // on the ptr expression, in which case the flag to the function
-                // can be removed
-                trans_memcpy(ts, ir_stmts, var_expr, global,
-                             ast_type_size(node_type),
-                             ast_type_align(node_type), false);
-            } else {
-                ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
-                store->store.type = expr_type;
-                ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
-
-                store->store.val = trans_type_conversion(ts, node_type,
-                                                         node->expr->etype, val,
-                                                         ir_stmts);
-                store->store.ptr = var_expr;
-                trans_add_stmt(ts, ir_stmts, store);
-            }
+            trans_initializer(ts, ir_stmts, node_type, expr_type, var_expr,
+                              node->expr);
         }
 
         access = var_expr;
@@ -1750,6 +1725,72 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
     tt_ent->var.ir_entry = entry;
 
     return expr_type;
+}
+
+void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                       type_t *ast_type, ir_type_t *ir_type, ir_expr_t *addr,
+                       expr_t *val) {
+    switch (ast_type->type) {
+    case TYPE_STRUCT:
+        // TODO0: This
+        assert(false);
+        break;
+    case TYPE_ARR:
+        assert(val == NULL || val->type == EXPR_INIT_LIST);
+        assert(ir_type->type == IR_TYPE_ARR);
+
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = ir_type;
+
+        ir_type_t *elem_type = trans_type(ts, ast_type->arr.base);
+
+        sl_link_t *cur = val == NULL ? NULL : val->init_list.exprs.head;
+        for (size_t nelem = 0; nelem < ir_type->arr.nelems; ++nelem) {
+            ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+            cur_addr->getelemptr.type = ir_type->arr.elem_type;
+            cur_addr->getelemptr.ptr_type = ptr_type;
+            cur_addr->getelemptr.ptr_val = addr;
+
+            // We need to 0's on getelemptr, one to get the array, another to
+            // get the array index
+            ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
+            pair->type = &ir_type_i64;
+            pair->expr = ir_expr_zero(ts->tunit, &ir_type_i64);
+            sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+
+            pair = emalloc(sizeof(*pair));
+            pair->type = &ir_type_i64;
+            pair->expr = ir_int_const(ts->tunit, &ir_type_i64, nelem);
+            sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+
+            cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
+
+            if (cur == NULL) {
+                trans_initializer(ts, ir_stmts, ast_type->arr.base,
+                                  elem_type, cur_addr, NULL);
+            } else {
+                expr_t *elem = GET_ELEM(&val->init_list.exprs, cur);
+                trans_initializer(ts, ir_stmts, ast_type->arr.base,
+                                  elem_type, cur_addr, elem);
+                cur = cur->next;
+            }
+        }
+        break;
+    default: {
+        ir_expr_t *ir_val = val == NULL ? ir_expr_zero(ts->tunit, ir_type) :
+            trans_expr(ts, false, val, ir_stmts);
+        ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
+        store->store.type = ir_type;
+        if (val == NULL) {
+            store->store.val = ir_val;
+        } else {
+            store->store.val = trans_type_conversion(ts, ast_type, val->etype,
+                                                     ir_val, ir_stmts);
+        }
+        store->store.ptr = addr;
+        trans_add_stmt(ts, ir_stmts, store);
+    }
+    }
 }
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type) {

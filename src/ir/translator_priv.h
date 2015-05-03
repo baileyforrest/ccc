@@ -99,6 +99,11 @@ typedef enum ir_decl_node_type_t {
 ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
                            ir_decl_node_type_t type, void *context);
 
+// If val is NULL, then a "zero" value will be substituted instead
+void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                       type_t *ast_type, ir_type_t *ir_type, ir_expr_t *addr,
+                       expr_t *val);
+
 ir_type_t *trans_type(trans_state_t *ts, type_t *type);
 
 ir_oper_t trans_op(oper_t op);
