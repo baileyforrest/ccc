@@ -1770,6 +1770,9 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                 trans_initializer(ts, ir_stmts, ast_type->arr.base,
                                   elem_type, cur_addr, elem);
                 ++nelem;
+                if (nelem == ir_type->arr.nelems) {
+                    break;
+                }
             }
         }
 

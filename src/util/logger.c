@@ -49,7 +49,7 @@ void logger_log_line(fmark_t *mark) {
         return;
     }
     // Print the line
-    for (const char *c = mark->line_start; *c != '\n'; ++c) {
+    for (const char *c = mark->line_start; *c && *c != '\n'; ++c) {
         fputc(*c, stderr);
     }
     fputc('\n', stderr);

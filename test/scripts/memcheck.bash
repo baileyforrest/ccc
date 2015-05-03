@@ -1,9 +1,11 @@
 #!/bin/bash
 
 CC=./bin/ccc
-CFLAGS="-Itest/runtime --dump_ir"
+CFLAGS="--dump_ir"
+runtime=$1
+shift
 
 for file in "$@"
 do
-    valgrind $CC $CFLAGS $file > dump.c
+    valgrind $CC -I $runtime $CFLAGS $file > dump.c
 done
