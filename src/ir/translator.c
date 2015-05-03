@@ -36,6 +36,7 @@
 #define GLOBAL_PREFIX ".glo"
 #define STRUCT_PREFIX "struct."
 
+#define LLVM_MEMCPY "llvm.memcpy.p0i8.p0i8.i64"
 
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt) {
@@ -1456,20 +1457,30 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     ir_type_t *dest_type = trans_type(ts, dest);
     ir_type_t *src_type = trans_type(ts, src);
 
+    bool dest_signed = !(orig_dest->type == TYPE_MOD &&
+                         orig_dest->mod.type_mod & TMOD_UNSIGNED);
 
+    bool src_signed = !(orig_src->type == TYPE_MOD &&
+                        orig_src->mod.type_mod & TMOD_UNSIGNED);
+
+    return trans_ir_type_conversion(ts, dest_type, dest_signed,
+                                    src_type, src_signed, src_expr,
+                                    ir_stmts);
+}
+
+ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
+                                    bool dest_signed, ir_type_t *src_type,
+                                    bool src_signed, ir_expr_t *src_expr,
+                                    ir_inst_stream_t *ir_stmts) {
     ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     ir_convert_t convert_op;
     switch (dest_type->type) {
     case IR_TYPE_INT: {
-        bool dest_signed = !(orig_dest->type == TYPE_MOD &&
-                             orig_dest->mod.type_mod & TMOD_UNSIGNED);
         switch (src_type->type) {
         case IR_TYPE_INT:
             if (dest_type->int_params.width < src_type->int_params.width) {
                 convert_op = IR_CONVERT_TRUNC;
             } else {
-                bool src_signed = !(orig_src->type == TYPE_MOD &&
-                                    orig_src->mod.type_mod & TMOD_UNSIGNED);
                 // Bools are treated as unsigned
                 if (src_signed && src_type->int_params.width != 1) {
                     convert_op = IR_CONVERT_SEXT;
@@ -1497,16 +1508,13 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     }
     case IR_TYPE_FLOAT:
         switch (src_type->type) {
-        case IR_TYPE_INT: {
-            bool src_signed =
-                src->type == TYPE_MOD && src->mod.type_mod & TMOD_UNSIGNED;
+        case IR_TYPE_INT:
             if (src_signed) {
                 convert_op = IR_CONVERT_FPTOSI;
             } else {
                 convert_op = IR_CONVERT_FPTOUI;
             }
             break;
-        }
         case IR_TYPE_FLOAT:
             if (src_type->float_params.type < dest_type->float_params.type) {
                 convert_op = IR_CONVERT_FPEXT;
@@ -1587,7 +1595,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
                            void *context) {
     type_t *node_type = ast_type_untypedef(node->type);
     ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
-    ir_type_t *expr_type = trans_type(ts, node->type);
+    ir_type_t *expr_type = trans_type(ts, node_type);
 
     ir_symtab_t *symtab;
     ir_expr_t *access;
@@ -1629,7 +1637,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         gdecl->gdata.var = var_expr;
         gdecl->gdata.init = node->expr == NULL ?
             NULL : trans_expr(ts, false, node->expr, &gdecl->gdata.setup);
-        gdecl->gdata.align = ast_type_align(node->type);
+        gdecl->gdata.align = ast_type_align(node_type);
 
         symtab = &ts->tunit->globals;
         access = var_expr;
@@ -1651,7 +1659,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         src->alloca.type = ptr_type;
         src->alloca.elem_type = var_expr->var.type->ptr.base;
         src->alloca.nelem_type = NULL;
-        src->alloca.align = ast_type_align(node->type);
+        src->alloca.align = ast_type_align(node_type);
 
         // Assign the named variable to the allocation
         ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
@@ -1661,15 +1669,32 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
 
         // If there's an initialization, evaluate it and store it
         if (node->expr != NULL) {
-            ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
-            store->store.type = expr_type;
-            ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
+            if (expr_type->type == IR_TYPE_STRUCT ||
+                expr_type->type == IR_TYPE_ARR) {
+                // For structures and arrays, create a global static object and
+                // then memcpy from the global object into the local one
+                ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
+                ir_expr_t *global =
+                    trans_create_private_global(ts, ir_expr_type(val), val,
+                                                ast_type_align(node_type));
 
-            store->store.val = trans_type_conversion(ts, node->type,
-                                                     node->expr->etype, val,
-                                                     ir_stmts);
-            store->store.ptr = var_expr;
-            trans_add_stmt(ts, ir_stmts, store);
+                // TODO1: Handle volatile, should probably be a property
+                // on the ptr expression, in which case the flag to the function
+                // can be removed
+                trans_memcpy(ts, ir_stmts, var_expr, global,
+                             ast_type_size(node_type),
+                             ast_type_align(node_type), false);
+            } else {
+                ir_stmt_t *store = ir_stmt_create(ts->tunit, IR_STMT_STORE);
+                store->store.type = expr_type;
+                ir_expr_t *val = trans_expr(ts, false, node->expr, ir_stmts);
+
+                store->store.val = trans_type_conversion(ts, node_type,
+                                                         node->expr->etype, val,
+                                                         ir_stmts);
+                store->store.ptr = var_expr;
+                trans_add_stmt(ts, ir_stmts, store);
+            }
         }
 
         access = var_expr;
@@ -1689,7 +1714,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         alloca->alloca.type = ptr_type;
         alloca->alloca.elem_type = var_expr->var.type;
         alloca->alloca.nelem_type = NULL;
-        alloca->alloca.align = ast_type_align(node->type);
+        alloca->alloca.align = ast_type_align(node_type);
 
         // Stack variable to refer to paramater by
         ir_expr_t *temp = trans_assign_temp(ts, &ts->func->func.prefix, alloca);
@@ -1870,9 +1895,12 @@ ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
     snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
              ts->tunit->static_num++);
 
+    ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+    ptr_type->ptr.base = type;
+
     ir_expr_t *var = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     var->var.name = sstore_lookup(namebuf);
-    var->var.type = type;
+    var->var.type = ptr_type;
     var->var.local = false;
 
     ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
@@ -1962,4 +1990,76 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     }
 
     return arr_lit;
+}
+
+void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                  ir_expr_t *dest, ir_expr_t *src, size_t len,
+                  size_t align, bool isvolatile) {
+    ir_expr_t *dest_ptr = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                                   ir_expr_type(dest), false,
+                                                   dest, ir_stmts);
+    ir_expr_t *src_ptr = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                                  ir_expr_type(src), false,
+                                                  src, ir_stmts);
+
+    ir_expr_t *len_expr = ir_int_const(ts->tunit, &ir_type_i64, len);
+    ir_expr_t *align_expr = ir_int_const(ts->tunit, &ir_type_i32, align);
+
+    ir_expr_t *volatile_expr = ir_int_const(ts->tunit, &ir_type_i1, isvolatile);
+
+    ir_expr_t *exprs[] = { dest_ptr, src_ptr, len_expr, align_expr,
+                           volatile_expr };
+
+    char *func_name = LLVM_MEMCPY;
+    ir_symtab_entry_t *func = ir_symtab_lookup(&ts->tunit->globals, func_name);
+
+    // Lazily create the function declaration and object
+    if (func == NULL) {
+        ir_type_t *func_type = ir_type_create(ts->tunit, IR_TYPE_FUNC);
+        func_type->func.type = &ir_type_void;
+        func_type->func.varargs = false;
+        vec_push_back(&func_type->func.params, &ir_type_i8_ptr);
+        vec_push_back(&func_type->func.params, &ir_type_i8_ptr);
+        vec_push_back(&func_type->func.params, &ir_type_i64);
+        vec_push_back(&func_type->func.params, &ir_type_i32);
+        vec_push_back(&func_type->func.params, &ir_type_i1);
+
+        ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
+        var_expr->var.type = func_type;
+        var_expr->var.name = func_name;
+        var_expr->var.local = false;
+
+        func = ir_symtab_entry_create(IR_SYMTAB_ENTRY_VAR, var_expr->var.name);
+        func->var.expr = var_expr;
+        func->var.access = var_expr;
+
+        status_t status = ir_symtab_insert(&ts->tunit->globals, func);
+        assert(status == CCC_OK);
+
+        // Add the declaration
+        ir_gdecl_t *ir_gdecl = ir_gdecl_create(IR_GDECL_FUNC_DECL);
+        ir_gdecl->func_decl.type = func_type;
+        ir_gdecl->func_decl.name = func_name;
+        sl_append(&ts->tunit->decls, &ir_gdecl->link);
+    }
+    assert(func->type == IR_SYMTAB_ENTRY_VAR);
+
+    ir_expr_t *func_expr = func->var.access;
+
+    ir_expr_t *call = ir_expr_create(ts->tunit, IR_EXPR_CALL);
+    call->call.func_sig = ir_expr_type(func_expr);
+    call->call.func_ptr = func_expr;
+
+    size_t num_exprs = sizeof(exprs) / sizeof(exprs[0]);
+
+    for (size_t i = 0; i < num_exprs; ++i) {
+        ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
+        pair->type = ir_expr_type(exprs[i]);
+        pair->expr = exprs[i];
+        sl_append(&call->call.arglist, &pair->link);
+    }
+
+    ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
+    stmt->expr = call;
+    trans_add_stmt(ts, ir_stmts, stmt);
 }

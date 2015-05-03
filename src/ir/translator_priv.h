@@ -77,6 +77,12 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
                                  ir_expr_t *src_expr,
                                  ir_inst_stream_t *ir_stmts);
 
+ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
+                                    bool dest_signed, ir_type_t *src_type,
+                                    bool src_signed, ir_expr_t *src_expr,
+                                    ir_inst_stream_t *ir_stmts);
+
+
 ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
                         type_t *dest_type, ir_expr_t *src, type_t *src_type,
                         ir_inst_stream_t *ir_stmts);
@@ -103,5 +109,9 @@ ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
 ir_expr_t *trans_string(trans_state_t *ts, char *str);
 
 ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);
+
+void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                  ir_expr_t *dest, ir_expr_t *src, size_t len,
+                  size_t align, bool isvolatile);
 
 #endif /* _TRANSLATOR_PRIV_H */

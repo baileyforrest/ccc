@@ -46,6 +46,8 @@ ir_type_t ir_type_float = IR_FLOAT_LIT(IR_FLOAT_FLOAT);
 ir_type_t ir_type_double = IR_FLOAT_LIT(IR_FLOAT_DOUBLE);
 ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
+ir_type_t ir_type_i8_ptr = { SL_LINK_LIT, IR_TYPE_PTR, .ptr = { &ir_type_i8 } };
+
 extern ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream);
 extern ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream);
 extern void ir_inst_stream_append(ir_inst_stream_t *stream, ir_stmt_t *stmt);
