@@ -1744,9 +1744,37 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
         ir_type_t *elem_type = trans_type(ts, ast_type->arr.base);
 
+        size_t nelem = 0;
+        if (val != NULL) {
+            SL_FOREACH(cur, &val->init_list.exprs) {
+                ir_expr_t *cur_addr = ir_expr_create(ts->tunit,
+                                                     IR_EXPR_GETELEMPTR);
+                cur_addr->getelemptr.type = ir_type->arr.elem_type;
+                cur_addr->getelemptr.ptr_type = ptr_type;
+                cur_addr->getelemptr.ptr_val = addr;
+
+                // We need to 0's on getelemptr, one to get the array, another
+                // to get the array index
+                ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
+                pair->type = &ir_type_i64;
+                pair->expr = ir_expr_zero(ts->tunit, &ir_type_i64);
+                sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+
+                pair = emalloc(sizeof(*pair));
+                pair->type = &ir_type_i64;
+                pair->expr = ir_int_const(ts->tunit, &ir_type_i64, nelem);
+                sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+
+                cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
+                expr_t *elem = GET_ELEM(&val->init_list.exprs, cur);
+                trans_initializer(ts, ir_stmts, ast_type->arr.base,
+                                  elem_type, cur_addr, elem);
+                ++nelem;
+            }
+        }
+
         // TODO2: Optimization, for trailing zeros make a loop
-        sl_link_t *cur = val == NULL ? NULL : val->init_list.exprs.head;
-        for (size_t nelem = 0; nelem < ir_type->arr.nelems; ++nelem) {
+        for(; nelem < ir_type->arr.nelems; ++nelem) {
             ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
             cur_addr->getelemptr.type = ir_type->arr.elem_type;
             cur_addr->getelemptr.ptr_type = ptr_type;
@@ -1766,15 +1794,8 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
             cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
 
-            if (cur == NULL) {
-                trans_initializer(ts, ir_stmts, ast_type->arr.base,
-                                  elem_type, cur_addr, NULL);
-            } else {
-                expr_t *elem = GET_ELEM(&val->init_list.exprs, cur);
-                trans_initializer(ts, ir_stmts, ast_type->arr.base,
-                                  elem_type, cur_addr, elem);
-                cur = cur->next;
-            }
+            trans_initializer(ts, ir_stmts, ast_type->arr.base,
+                              elem_type, cur_addr, NULL);
         }
         break;
     default: {
