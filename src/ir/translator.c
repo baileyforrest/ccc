@@ -30,8 +30,7 @@
 
 #include "typecheck/typechecker.h"
 
-// TODO1: Approximate this programatically using MAX_INT
-#define MAX_NUM_LEN 20
+#define MAX_NUM_LEN 21
 
 #define MAX_GLOBAL_NAME 128
 #define GLOBAL_PREFIX ".glo"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
 import subprocess
@@ -17,23 +18,28 @@ CLANG = "clang"
 
 DEV_NULL = open(os.devnull, 'w')
 
-NUM_PROCS = 4
-
 verbose = False
 llvm = False
 compiler_opts = None
 
-def usage():
-    print("usage: %s [-llvm] [-v] [-jN] [compiler and options] [tests] \n"
-          % sys.argv[0])
-    print("test must be a c source file with a correct first line header:")
-    print("%s [return n | error | exception ]" % HEADER_STR)
+description = """tests must be a c source file with a correct first line header:
+//test [return n | error | exception ]"""
 
-    print("\noptional arguments:");
-    print("-j Jobs to run in parallel")
-    print("-v Verbose - Prints passed tests and compiler's stdout/stderr")
-    print("-llvm Compiles to llvm ir")
-    sys.exit(-1)
+arg_parse = argparse.ArgumentParser(
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=description)
+
+arg_parse.add_argument("-v", "--verbose",
+                       help="Prints pass tests and compiler's output",
+                       action="store_true")
+arg_parse.add_argument("-l", "--llvm",
+                       help="Specifies compiler command creates llvm ir",
+                       action="store_true")
+arg_parse.add_argument("-j", "--jobs", type=int, default=1,
+                       help="Number of jobs to run in parallel")
+
+arg_parse.add_argument("compiler", help="Compiler and options")
+arg_parse.add_argument("test", nargs="+", help="Test files")
 
 def fail(src_path, msg):
     print("FAIL: " + src_path + " " + msg)
@@ -47,25 +53,16 @@ def main():
     global llvm
     global compiler_opts
 
-    if len(sys.argv) < 3:
-        usage()
+    args = arg_parse.parse_args()
 
-    args = sys.argv[1:]
-    jobs = 1
+    if (args.verbose):
+        verbose = True
+    if (args.llvm):
+        llvm = True
+    jobs = args.jobs
 
-    while args[0][0] == "-":
-        if args[0] == "-llvm":
-            llvm = True
-        elif args[0] == "-v":
-            verbose = True
-        elif args[0][:2] == "-j":
-            jobs = int(args[0][2:])
-        else:
-            usage()
-        args = args[1:]
-
-    compiler_opts = args[0].split()
-    src_files = args[1:]
+    compiler_opts = args.compiler.split()
+    src_files = args.test
 
     if not os.path.exists(TEMP_DIR):
         os.makedirs(TEMP_DIR)
