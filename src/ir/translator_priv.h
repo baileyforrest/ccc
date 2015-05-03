@@ -114,6 +114,7 @@ ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
 ir_expr_t *trans_string(trans_state_t *ts, char *str);
 
 ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);
+ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr);
 
 void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                   ir_expr_t *dest, ir_expr_t *src, size_t len,

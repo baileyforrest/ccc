@@ -186,6 +186,7 @@ typedef enum ir_fcmp_type_t {
     IR_FCMP_TRUE,
 } ir_fcmp_type_t;
 
+// TODO0: Remove this is favor of ir_expr_type
 typedef struct ir_type_expr_pair_t {
     sl_link_t link;
     ir_type_t *type;
@@ -234,7 +235,7 @@ struct ir_expr_t {
                 bool bool_val;
                 long long int_val;
                 long double float_val;
-                slist_t struct_val; /**< (ir_type_expr_pair_t) */
+                slist_t struct_val; /**< (ir_expr_t) */
                 char *str_val;
                 slist_t arr_val; /**< (ir_expr_t) */
             };
@@ -495,6 +496,8 @@ inline void ir_inst_stream_append(ir_inst_stream_t *stream, ir_stmt_t *stmt) {
 void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name);
 
 ir_type_t *ir_expr_type(ir_expr_t *expr);
+
+bool ir_type_equal(ir_type_t *t1, ir_type_t *t2);
 
 ir_label_t *ir_label_create(ir_trans_unit_t *tunit, char *str);
 

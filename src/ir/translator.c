@@ -1006,13 +1006,15 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_INIT_LIST: {
         type_t *etype = ast_type_unmod(expr->etype);
         switch (etype->type) {
-        case TYPE_STRUCT:
         case TYPE_UNION:
             // TODO0: This
             break;
+        case TYPE_STRUCT:
+            return trans_struct_init(ts, expr);
         case TYPE_ARR:
             return trans_array_init(ts, expr);
         default: {
+            // Just take the first element and tranlate it
             expr_t *head = sl_head(&expr->init_list.exprs);
             assert(head != NULL);
             return trans_expr(ts, false, head, ir_stmts);
@@ -1472,6 +1474,19 @@ ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
                                     bool dest_signed, ir_type_t *src_type,
                                     bool src_signed, ir_expr_t *src_expr,
                                     ir_inst_stream_t *ir_stmts) {
+    if (ir_type_equal(dest_type, src_type)) {
+        return src_expr;
+    }
+
+    // Special case, changing type of constant integer, just change its type
+    // to the dest type
+    if (src_expr->type == IR_EXPR_CONST &&
+        src_expr->const_params.ctype == IR_CONST_INT &&
+        dest_type->type == IR_TYPE_INT) {
+        src_expr->const_params.type = dest_type;
+        return src_expr;
+    }
+
     ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     ir_convert_t convert_op;
     switch (dest_type->type) {
@@ -1885,6 +1900,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         }
         if (id_gdecl != NULL) {
             id_gdecl->id_struct.type = ir_type;
+            id_gdecl->id_struct.id_type->id_struct.type = ir_type;
             return id_gdecl->id_struct.id_type;
         }
 
@@ -2036,6 +2052,7 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     ir_type_t *type = trans_type(ts, expr->etype);
     assert(type->type == IR_TYPE_ARR);
     ir_type_t *elem_type = type->arr.elem_type;
+    type_t *ast_elem_type = expr->etype->arr.base;
 
     ir_expr_t *arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     sl_init(&arr_lit->const_params.arr_val, offsetof(ir_expr_t, link));
@@ -2046,6 +2063,8 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     SL_FOREACH(cur, &expr->init_list.exprs) {
         expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur);
         ir_expr_t *ir_elem = trans_expr(ts, false, elem, NULL);
+        ir_elem = trans_type_conversion(ts, ast_elem_type, elem->etype,
+                                        ir_elem, NULL);
         sl_append(&arr_lit->const_params.arr_val, &ir_elem->link);
         ++nelems;
     }
@@ -2056,6 +2075,43 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     }
 
     return arr_lit;
+}
+
+ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
+    assert(expr->type == EXPR_INIT_LIST);
+    assert(expr->etype->type == TYPE_STRUCT);
+
+    ir_type_t *type = trans_type(ts, expr->etype);
+    assert(type->type == IR_TYPE_STRUCT || type->type == IR_TYPE_ID_STRUCT);
+    if (type->type == IR_TYPE_ID_STRUCT) {
+        type = type->id_struct.type;
+        assert(type->type == IR_TYPE_STRUCT);
+    }
+
+    ir_expr_t *struct_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+    sl_init(&struct_lit->const_params.struct_val, offsetof(ir_expr_t, link));
+    struct_lit->const_params.ctype = IR_CONST_STRUCT;
+    struct_lit->const_params.type = type;
+
+    sl_link_t *cur_elem = expr->init_list.exprs.head;
+    VEC_FOREACH(cur, &type->struct_params.types) {
+        ir_type_t *cur_type = vec_get(&type->struct_params.types, cur);
+
+        ir_expr_t *ir_elem;
+        if (cur_elem == NULL) {
+            ir_elem = ir_expr_zero(ts->tunit, cur_type);
+        } else {
+            expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
+            ir_elem = trans_expr(ts, false, elem, NULL);
+            ir_elem = trans_ir_type_conversion(ts, cur_type, false,
+                                               ir_expr_type(ir_elem), false,
+                                               ir_elem, NULL);
+            cur_elem = cur_elem->next;
+        }
+        sl_append(&struct_lit->const_params.struct_val, &ir_elem->link);
+    }
+
+    return struct_lit;
 }
 
 void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,

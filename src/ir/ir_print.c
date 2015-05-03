@@ -224,13 +224,12 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         case IR_CONST_STRUCT:
             fprintf(stream, "{ ");
             SL_FOREACH(cur, &expr->const_params.struct_val) {
-                ir_type_expr_pair_t *pair =
-                    GET_ELEM(&expr->const_params.struct_val, cur);
-                ir_type_print(stream, pair->type, NULL);
+                ir_expr_t *elem = GET_ELEM(&expr->const_params.struct_val, cur);
+                ir_type_print(stream, ir_expr_type(elem), NULL);
                 fprintf(stream, " ");
-                ir_expr_print(stream, pair->expr);
-                if (pair != sl_tail(&expr->const_params.struct_val)) {
-                    fprintf(stream, " ,");
+                ir_expr_print(stream, elem);
+                if (elem != sl_tail(&expr->const_params.struct_val)) {
+                    fprintf(stream, ", ");
                 }
             }
             fprintf(stream, " }");
@@ -244,10 +243,9 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         case IR_CONST_ARR: {
             fprintf(stream, "[ ");
             assert(expr->const_params.type->type == IR_TYPE_ARR);
-            ir_type_t *elem_type = expr->const_params.type->arr.elem_type;
             SL_FOREACH(cur, &expr->const_params.struct_val) {
                 ir_expr_t *elem = GET_ELEM(&expr->const_params.arr_val, cur);
-                ir_type_print(stream, elem_type, NULL);
+                ir_type_print(stream, ir_expr_type(elem), NULL);
                 fprintf(stream, " ");
                 ir_expr_print(stream, elem);
                 if (elem != sl_tail(&expr->const_params.arr_val)) {

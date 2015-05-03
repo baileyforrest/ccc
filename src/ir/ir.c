@@ -85,6 +85,67 @@ ir_type_t *ir_expr_type(ir_expr_t *expr) {
     return NULL;
 }
 
+bool ir_type_equal(ir_type_t *t1, ir_type_t *t2) {
+    if (t1 == t2) {
+        return true;
+    }
+
+    if (t1->type != t2->type) {
+        return false;
+    }
+
+    switch (t1->type) {
+    case IR_TYPE_INT: return t1->int_params.width == t2->int_params.width;
+    case IR_TYPE_FLOAT: return t1->float_params.type == t2->float_params.type;
+    case IR_TYPE_PTR: return ir_type_equal(t1->ptr.base, t2->ptr.base);
+
+    case IR_TYPE_ARR:
+        return t1->arr.nelems == t2->arr.nelems &&
+            ir_type_equal(t1->arr.elem_type, t2->arr.elem_type);
+
+    case IR_TYPE_STRUCT: {
+        size_t size1 = vec_size(&t1->struct_params.types);
+        if (size1 != vec_size(&t2->struct_params.types)) {
+            return false;
+        }
+        for (size_t i = 0; i < size1; ++i) {
+            if (!ir_type_equal(vec_get(&t1->struct_params.types, i),
+                               vec_get(&t2->struct_params.types, i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    case IR_TYPE_FUNC:
+        if (t1->func.varargs != t2->func.varargs) {
+            return false;
+        }
+        if (!ir_type_equal(t1->func.type, t2->func.type)) {
+            return false;
+        }
+
+        size_t size1 = vec_size(&t1->func.params);
+        if (size1 != vec_size(&t2->func.params)) {
+            return false;
+        }
+        for (size_t i = 0; i < size1; ++i) {
+            if (!ir_type_equal(vec_get(&t1->func.params, i),
+                               vec_get(&t2->func.params, i))) {
+                return false;
+            }
+        }
+        return true;
+
+        // These types should only have one copy
+    case IR_TYPE_ID_STRUCT:
+    case IR_TYPE_OPAQUE:
+    case IR_TYPE_VOID:
+    default:
+        assert(false);
+    }
+}
+
 ir_label_t *ir_label_create(ir_trans_unit_t *tunit, char *str) {
     ir_label_t *label = ht_lookup(&tunit->labels, &str);
     if (label != NULL) {
@@ -340,9 +401,7 @@ void ir_expr_destroy(ir_expr_t *expr) {
         case IR_CONST_ZERO:
         case IR_CONST_STR:
         case IR_CONST_ARR:
-            break;
         case IR_CONST_STRUCT:
-            SL_DESTROY_FUNC(&expr->const_params.struct_val, free);
             break;
         default:
             assert(false);
