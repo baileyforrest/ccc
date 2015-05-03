@@ -1744,6 +1744,7 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
         ir_type_t *elem_type = trans_type(ts, ast_type->arr.base);
 
+        // TODO2: Optimization, for trailing zeros make a loop
         sl_link_t *cur = val == NULL ? NULL : val->init_list.exprs.head;
         for (size_t nelem = 0; nelem < ir_type->arr.nelems; ++nelem) {
             ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
