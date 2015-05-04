@@ -852,7 +852,7 @@ status_t pp_directive_line(preprocessor_t *pp) {
             goto fail;
         }
         len -= 2; // -2 for quotes
-        filename[len] = '\0';
+        filename[len + 1] = '\0'; // Take off last quote
 
         // Copy filename + 1 so we don't copy the quote
         file->stream.mark.filename = sstore_lookup(filename + 1);
