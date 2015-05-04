@@ -126,4 +126,8 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                   ir_expr_t *dest, ir_expr_t *src, size_t len,
                   size_t align, bool isvolatile);
 
+bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
+                             slist_t *indexs);
+
+
 #endif /* _TRANSLATOR_PRIV_H */

@@ -916,11 +916,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
             || expr->type == EXPR_ARR_IDX) {
             if (expr->type == EXPR_MEM_ACC) {
-                // Get index into the structure
-                int mem_num = ast_get_member_num(expr->mem_acc.base->etype,
-                                                 expr->mem_acc.name);
-                ir_expr_t *idx = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
-                sl_prepend(&elem_ptr->getelemptr.idxs, &idx->link);
+                trans_struct_mem_offset(ts, expr->mem_acc.base->etype,
+                                        expr->mem_acc.name,
+                                        &elem_ptr->getelemptr.idxs);
                 expr = expr->mem_acc.base;
             } else { // expr->type == EXPR_ARR_IDX
                 type_t *arr_type = ast_type_unmod(expr->arr_idx.array->etype);
@@ -948,11 +946,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
             assert(etype->type == TYPE_PTR);
 
-            // Get index into the structure
-            int mem_num =
-                ast_get_member_num(etype->ptr.base, expr->mem_acc.name);
-            ir_expr_t *index = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
-            sl_prepend(&elem_ptr->getelemptr.idxs, &index->link);
+            trans_struct_mem_offset(ts, etype->ptr.base, expr->mem_acc.name,
+                                    &elem_ptr->getelemptr.idxs);
 
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
             prepend_zero = true;
@@ -2212,4 +2207,39 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
     ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
     stmt->expr = call;
     trans_add_stmt(ts, ir_stmts, stmt);
+}
+
+bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
+                             slist_t *indexs) {
+    type = ast_type_unmod(type);
+    assert(type->type == TYPE_STRUCT);
+
+    size_t offset = 0;
+    SL_FOREACH(cur_decl, &type->struct_params.decls) {
+        decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
+        SL_FOREACH(cur_node, &decl->decls) {
+            decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
+            if (strcmp(node->id, mem_name) == 0) {
+                ir_expr_t *index =
+                    ir_int_const(ts->tunit, &ir_type_i32, offset);
+                sl_prepend(indexs, &index->link);
+                return true;
+            }
+            ++offset;
+        }
+
+        if (sl_head(&decl->decls) == NULL &&
+            (decl->type->type == TYPE_STRUCT ||
+             decl->type->type == TYPE_UNION)) {
+            if (trans_struct_mem_offset(ts, decl->type, mem_name, indexs)) {
+                ir_expr_t *index =
+                    ir_int_const(ts->tunit, &ir_type_i32, offset);
+                sl_prepend(indexs, &index->link);
+                return true;
+            }
+            ++offset;
+        }
+    }
+
+    return false;
 }
