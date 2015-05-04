@@ -1,3 +1,4 @@
+//test return 10
 /**
  * Tests initializer lists
  */
@@ -10,8 +11,8 @@ typedef struct len_str_t {
 
 #define LEN_STR_LIT(str) { str, sizeof(str) - 1 }
 
-int main() {
+int __test() {
     len_str_t hello = { "hello", sizeof("hello") - 1};
     len_str_t hello2 = { "hello", sizeof "hello" - 1};
-    return 0;
+    return hello.len + hello2.len;
 }

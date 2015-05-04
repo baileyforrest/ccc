@@ -1,4 +1,4 @@
-// return 38
+//test return 38
 /**
  * Make sure concatenated macros are not expanded
  */
@@ -9,7 +9,7 @@ int bool_bool = 33;
 #define HELLO(type) type ## _ ## type
 #define STRING(type) #type
 
-int main() {
+int __test() {
     int *x = &HELLO(bool);
     int y = sizeof(STRING(bool));
     return *x + y;

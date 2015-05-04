@@ -1,11 +1,13 @@
-int main() {
+//test return 3827
+int __test() {
+    int x = 0;
 #line 555
-    __FILE__;
-    __LINE__;
-    __LINE__;
+    x += sizeof(__FILE__);
+    x += __LINE__;
+    x += __LINE__;
 #line 1337 "foo.c"
-    __FILE__;
-    __LINE__;
-    __LINE__;
-    return 0;
+    x += sizeof(__FILE__);
+    x += __LINE__;
+    x += __LINE__;
+    return x;
 }

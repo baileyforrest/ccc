@@ -1,9 +1,10 @@
+//test return 4
 /**
- * Make sure trailing space is trimmed from macro parameters
+ * Make sure leading and trailing space is trimmed from macro parameters
  */
 
 #define STR(x) #x
 
-int main() {
-    return sizeof(STR(foo     ));
+int __test() {
+    return sizeof(STR(     foo     ));
 }

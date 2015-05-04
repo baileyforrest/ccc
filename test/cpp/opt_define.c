@@ -1,6 +1,7 @@
+//test error
 /**
  * Tests -D option of preprocessor
  */
-int main() {
+int __test() {
     return FOO(3, BAR);
 }

@@ -1,5 +1,6 @@
+//test error
 #define FOO(x, y) ((x) * (y))
 
-int main() {
+int __test() {
     return FOO(x, 1);
 }

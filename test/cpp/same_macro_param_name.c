@@ -1,11 +1,8 @@
-/**
- * Check predefined macro values
- */
-
+//test return 33
 #define FOO(a) a
 #define BAR(a) FOO(a)
 
-int main() {
-    BAR(a);
-    return 0;
+int __test() {
+    int a = 33;
+    return BAR(a);
 }
