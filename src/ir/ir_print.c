@@ -296,11 +296,11 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_expr_print(stream, expr->getelemptr.ptr_val);
         fprintf(stream, ", ");
         SL_FOREACH(cur, &expr->getelemptr.idxs) {
-            ir_type_expr_pair_t *pair = GET_ELEM(&expr->getelemptr.idxs, cur);
-            ir_type_print(stream, pair->type, NULL);
+            ir_expr_t *elem = GET_ELEM(&expr->getelemptr.idxs, cur);
+            ir_type_print(stream, ir_expr_type(elem), NULL);
             fprintf(stream, " ");
-            ir_expr_print(stream, pair->expr);
-            if (pair != sl_tail(&expr->getelemptr.idxs)) {
+            ir_expr_print(stream, elem);
+            if (elem != sl_tail(&expr->getelemptr.idxs)) {
                 fprintf(stream, ", ");
             }
         }
@@ -374,11 +374,11 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         fprintf(stream, "(");
 
         SL_FOREACH(cur, &expr->call.arglist) {
-            ir_type_expr_pair_t *pair = GET_ELEM(&expr->call.arglist, cur);
-            ir_type_print(stream, pair->type, NULL);
+            ir_expr_t *elem = GET_ELEM(&expr->call.arglist, cur);
+            ir_type_print(stream, ir_expr_type(elem), NULL);
             fprintf(stream, " ");
-            ir_expr_print(stream, pair->expr);
-            if (pair != sl_tail(&expr->call.arglist)) {
+            ir_expr_print(stream, elem);
+            if (elem != sl_tail(&expr->call.arglist)) {
                 fprintf(stream, ", ");
             }
         }

@@ -311,16 +311,16 @@ ir_expr_t *ir_expr_create(ir_trans_unit_t *tunit, ir_expr_type_t type) {
         break;
 
     case IR_EXPR_GETELEMPTR:
-        sl_init(&expr->getelemptr.idxs, offsetof(ir_type_expr_pair_t, link));
+        sl_init(&expr->getelemptr.idxs, offsetof(ir_expr_t, link));
         break;
     case IR_EXPR_PHI:
         sl_init(&expr->phi.preds, offsetof(ir_expr_label_pair_t, link));
         break;
     case IR_EXPR_CALL:
-        sl_init(&expr->call.arglist, offsetof(ir_type_expr_pair_t, link));
+        sl_init(&expr->call.arglist, offsetof(ir_expr_t, link));
         break;
     case IR_EXPR_VAARG:
-        sl_init(&expr->vaarg.arglist, offsetof(ir_type_expr_pair_t, link));
+        sl_init(&expr->vaarg.arglist, offsetof(ir_expr_t, link));
         break;
     default:
         assert(false);
@@ -408,16 +408,16 @@ void ir_expr_destroy(ir_expr_t *expr) {
         }
         break;
     case IR_EXPR_GETELEMPTR:
-        SL_DESTROY_FUNC(&expr->getelemptr.idxs, free);
+        sl_destroy(&expr->getelemptr.idxs);
         break;
     case IR_EXPR_PHI:
         SL_DESTROY_FUNC(&expr->phi.preds, free);
         break;
     case IR_EXPR_CALL:
-        SL_DESTROY_FUNC(&expr->call.arglist, free);
+        sl_destroy(&expr->call.arglist);
         break;
     case IR_EXPR_VAARG:
-        SL_DESTROY_FUNC(&expr->vaarg.arglist, free);
+        sl_destroy(&expr->vaarg.arglist);
         break;
     default:
         assert(false);

@@ -825,10 +825,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
             ir_expr = trans_type_conversion(ts, sig_type, param->etype, ir_expr,
                                             ir_stmts);
-            ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-            pair->type = trans_type(ts, sig_type);
-            pair->expr = ir_expr;
-            sl_append(&call->call.arglist, &pair->link);
+            sl_append(&call->call.arglist, &ir_expr->link);
 
             cur_sig = cur_sig->next;
             cur_expr = cur_expr->next;
@@ -837,10 +834,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             while (cur_expr != NULL) {
                 expr_t *param = GET_ELEM(&expr->call.params, cur_expr);
                 ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
-                ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-                pair->type = ir_expr_type(ir_expr);
-                pair->expr = ir_expr;
-                sl_append(&call->call.arglist, &pair->link);
+                sl_append(&call->call.arglist, &ir_expr->link);
 
                 cur_expr = cur_expr->next;
             }
@@ -919,31 +913,25 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
         bool last_array = false;
         ir_expr_t *pointer;
-        ir_type_expr_pair_t *pair;
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
             || expr->type == EXPR_ARR_IDX) {
             if (expr->type == EXPR_MEM_ACC) {
                 // Get index into the structure
-                pair = emalloc(sizeof(*pair));
-                pair->type = &ir_type_i32;
                 int mem_num = ast_get_member_num(expr->mem_acc.base->etype,
                                                  expr->mem_acc.name);
-                pair->expr = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
+                ir_expr_t *idx = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
+                sl_prepend(&elem_ptr->getelemptr.idxs, &idx->link);
                 expr = expr->mem_acc.base;
-                sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
             } else { // expr->type == EXPR_ARR_IDX
                 type_t *arr_type = ast_type_unmod(expr->arr_idx.array->etype);
 
-                pair = emalloc(sizeof(*pair));
                 ir_expr_t *index = trans_expr(ts, false, expr->arr_idx.index,
                                               ir_stmts);
                 index = trans_type_conversion(ts, tt_size_t,
                                               expr->arr_idx.index->etype,
                                               index, ir_stmts);
-                pair->type = trans_type(ts, tt_size_t);
-                pair->expr = index;
+                sl_prepend(&elem_ptr->getelemptr.idxs, &index->link);
                 expr = expr->arr_idx.array;
-                sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
 
                 // If this is a pointer instead of an array, stop here because
                 // we need to do a load for the next index
@@ -961,12 +949,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             assert(etype->type == TYPE_PTR);
 
             // Get index into the structure
-            pair = emalloc(sizeof(*pair));
-            pair->type = &ir_type_i32;
             int mem_num =
                 ast_get_member_num(etype->ptr.base, expr->mem_acc.name);
-            pair->expr = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
-            sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
+            ir_expr_t *index = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
+            sl_prepend(&elem_ptr->getelemptr.idxs, &index->link);
 
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
             prepend_zero = true;
@@ -987,10 +973,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             }
         }
         if (prepend_zero) {
-            pair = emalloc(sizeof(*pair));
-            pair->type = &ir_type_i32;
-            pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
-            sl_prepend(&elem_ptr->getelemptr.idxs, &pair->link);
+            ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+            sl_prepend(&elem_ptr->getelemptr.idxs, &zero->link);
         }
         elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
         elem_ptr->getelemptr.ptr_val = pointer;
@@ -1758,15 +1742,11 @@ void trans_struct_init_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
     // We need to 0's on getelemptr, one to get the struct, another
     // to get the struct index
-    ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-    pair->type = &ir_type_i32;
-    pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
-    sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+    ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+    sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
-    pair = emalloc(sizeof(*pair));
-    pair->type = &ir_type_i32;
-    pair->expr = ir_int_const(ts->tunit, &ir_type_i32, offset);
-    sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+    zero = ir_int_const(ts->tunit, &ir_type_i32, offset);
+    sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
     cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
 
@@ -1835,15 +1815,11 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
                 // We need to 0's on getelemptr, one to get the array, another
                 // to get the array index
-                ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-                pair->type = &ir_type_i64;
-                pair->expr = ir_expr_zero(ts->tunit, &ir_type_i64);
-                sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+                ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i64);
+                sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
-                pair = emalloc(sizeof(*pair));
-                pair->type = &ir_type_i64;
-                pair->expr = ir_int_const(ts->tunit, &ir_type_i64, nelem);
-                sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+                zero = ir_int_const(ts->tunit, &ir_type_i64, nelem);
+                sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
                 cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
                 expr_t *elem = GET_ELEM(&val->init_list.exprs, cur);
@@ -1865,15 +1841,11 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
             // We need to 0's on getelemptr, one to get the array, another to
             // get the array index
-            ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-            pair->type = &ir_type_i64;
-            pair->expr = ir_expr_zero(ts->tunit, &ir_type_i64);
-            sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+            ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i64);
+            sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
-            pair = emalloc(sizeof(*pair));
-            pair->type = &ir_type_i64;
-            pair->expr = ir_int_const(ts->tunit, &ir_type_i64, nelem);
-            sl_append(&cur_addr->getelemptr.idxs, &pair->link);
+            zero = ir_int_const(ts->tunit, &ir_type_i64, nelem);
+            sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
             cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
 
@@ -2093,15 +2065,11 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
 
     // We need to 0's on getelemptr, one to get the array, another to get
     // the array's address
-    ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-    pair->type = &ir_type_i32;
-    pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
-    sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
+    ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+    sl_append(&elem_ptr->getelemptr.idxs, &zero->link);
 
-    pair = emalloc(sizeof(*pair));
-    pair->type = &ir_type_i32;
-    pair->expr = ir_expr_zero(ts->tunit, &ir_type_i32);
-    sl_append(&elem_ptr->getelemptr.idxs, &pair->link);
+    zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+    sl_append(&elem_ptr->getelemptr.idxs, &zero->link);
 
     elem = emalloc(sizeof(*elem));
     elem->key = str;
@@ -2195,9 +2163,6 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
     ir_expr_t *volatile_expr = ir_int_const(ts->tunit, &ir_type_i1, isvolatile);
 
-    ir_expr_t *exprs[] = { dest_ptr, src_ptr, len_expr, align_expr,
-                           volatile_expr };
-
     char *func_name = LLVM_MEMCPY;
     ir_symtab_entry_t *func = ir_symtab_lookup(&ts->tunit->globals, func_name);
 
@@ -2238,14 +2203,11 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
     call->call.func_sig = ir_expr_type(func_expr);
     call->call.func_ptr = func_expr;
 
-    size_t num_exprs = sizeof(exprs) / sizeof(exprs[0]);
-
-    for (size_t i = 0; i < num_exprs; ++i) {
-        ir_type_expr_pair_t *pair = emalloc(sizeof(*pair));
-        pair->type = ir_expr_type(exprs[i]);
-        pair->expr = exprs[i];
-        sl_append(&call->call.arglist, &pair->link);
-    }
+    sl_append(&call->call.arglist, &dest_ptr->link);
+    sl_append(&call->call.arglist, &src_ptr->link);
+    sl_append(&call->call.arglist, &len_expr->link);
+    sl_append(&call->call.arglist, &align_expr->link);
+    sl_append(&call->call.arglist, &volatile_expr->link);
 
     ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
     stmt->expr = call;

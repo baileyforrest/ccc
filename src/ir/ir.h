@@ -186,14 +186,6 @@ typedef enum ir_fcmp_type_t {
     IR_FCMP_TRUE,
 } ir_fcmp_type_t;
 
-// TODO0: Remove this is favor of ir_expr_type
-typedef struct ir_type_expr_pair_t {
-    sl_link_t link;
-    ir_type_t *type;
-    ir_expr_t *expr;
-} ir_type_expr_pair_t;
-
-
 typedef struct ir_expr_label_pair_t {
     sl_link_t link;
     ir_expr_t *expr;
@@ -265,7 +257,7 @@ struct ir_expr_t {
             ir_type_t *type;
             ir_type_t *ptr_type;
             ir_expr_t *ptr_val;
-            slist_t idxs; /**< ir_type_expr_pair_t */
+            slist_t idxs; /**< ir_expr_t */
         } getelemptr;
 
         struct {
@@ -304,12 +296,12 @@ struct ir_expr_t {
         struct {
             ir_type_t *func_sig;
             ir_expr_t *func_ptr;
-            slist_t arglist; /**< (ir_type_expr_pair_t) */
+            slist_t arglist; /**< (ir_expr_t) */
         } call;
 
         struct {
             ir_type_t *va_list_type;
-            slist_t arglist; /**< (ir_type_expr_pair_t) */
+            slist_t arglist; /**< (ir_expr_t) */
             ir_type_t *arg_type;
         } vaarg;
     };
