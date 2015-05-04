@@ -1602,6 +1602,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                 logger_log(&arg->mark, LOG_ERR,
                            "incompatible type for argument %d of function",
                            arg_num);
+                return false;
             }
 
             ++arg_num;
