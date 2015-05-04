@@ -692,15 +692,19 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             return trans_assign(ts, dest_addr, expr->assign.dest->etype, src,
                                 expr->assign.expr->etype, ir_stmts);
         }
+        type_t *max_type;
+        bool result = typecheck_type_max(NULL, expr->assign.expr->etype,
+                                         expr->etype, &max_type);
+        assert(result && max_type != NULL);
         ir_expr_t *dest;
         ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, dest_addr,
                                          expr->assign.expr, expr->assign.op,
-                                         expr->etype, ir_stmts, &dest);
+                                         max_type, ir_stmts, &dest);
 
         ir_expr_t *temp = trans_assign_temp(ts, ir_stmts, op_expr);
 
         return trans_assign(ts, dest_addr, expr->assign.dest->etype, temp,
-                            expr->assign.expr->etype, ir_stmts);
+                            max_type, ir_stmts);
     }
     case EXPR_CONST_INT:
         return ir_int_const(ts->tunit, trans_type(ts, expr->const_val.type),
