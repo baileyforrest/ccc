@@ -1546,13 +1546,14 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        /* TODO1: Do this only when its being used in an expr stmt or another
-           expr
-        retval &= typecheck_type_max(&expr->mark, expr->cond.expr2->etype,
-                                     expr->cond.expr3->etype,
-                                     &expr->etype);
-        */
-        expr->etype = expr->cond.expr2->etype;
+        if (ast_type_unmod(expr->cond.expr2->etype)->type == TYPE_VOID ||
+            ast_type_unmod(expr->cond.expr3->etype)->type == TYPE_VOID) {
+            expr->etype = tt_void;
+        } else {
+            retval &= typecheck_type_max(&expr->mark, expr->cond.expr2->etype,
+                                         expr->cond.expr3->etype,
+                                         &expr->etype);
+        }
         return retval;
 
     case EXPR_CAST: {
