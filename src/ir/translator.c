@@ -638,13 +638,20 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             assert(tt_ent != NULL);
 
             // Search through scopes until we find this expression's entry
-            if (tt_ent->entry_type == TT_VAR &&
+            if ((tt_ent->entry_type == TT_VAR ||
+                 tt_ent->entry_type == TT_ENUM_ID) &&
                 tt_ent->type == expr->etype) {
                 break;
             }
 
             tt = tt->last;
         } while(true);
+
+        // If this is an enum id, just return the integer value
+        if (tt_ent->entry_type == TT_ENUM_ID) {
+            return ir_int_const(ts->tunit, trans_type(ts, tt_ent->type),
+                                tt_ent->enum_val);
+        }
         ir_symtab_entry_t *entry = tt_ent->var.ir_entry;
 
         // Lazily add used global variables to declaration list
