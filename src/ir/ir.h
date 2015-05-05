@@ -472,6 +472,7 @@ extern ir_type_t ir_type_i8_ptr;
 
 #define SWITCH_VAL_TYPE ir_type_i64
 #define NELEM_TYPE ir_type_i64
+#define BOOL_TYPE ir_type_i8
 
 inline ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream) {
     return dl_head(&stream->list);

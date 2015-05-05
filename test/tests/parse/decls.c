@@ -21,6 +21,7 @@ typedef int foo_t;
 typedef int foo_t;
 
 _Bool bool_test = 1;
+void (*signal(int sig, void (*func)(int)))(int);
 
 int __test(int argc) {
     struct nested {

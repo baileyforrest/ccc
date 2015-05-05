@@ -1087,8 +1087,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         break;
 
     case TYPE_MOD:
-        if (!(type->mod.type_mod & TMOD_UNSIGNED) &&
-            TYPE_IS_INTEGRAL(ast_type_untypedef(type->mod.base))) {
+        if (!TYPE_IS_UNSIGNED(type)) {
             is_signed = true;
         }
         break;
@@ -1427,14 +1426,18 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     type_t *orig_src = ast_type_untypedef(src);
     dest = ast_type_unmod(orig_dest);
     src = ast_type_unmod(orig_src);
+
+    if (dest->type == TYPE_BOOL) {
+        ir_expr_t *i1_expr = trans_expr_bool(ts, src_expr, ir_stmts);
+        return trans_ir_type_conversion(ts, &BOOL_TYPE, false,
+                                        ir_expr_type(i1_expr), false,
+                                        i1_expr, ir_stmts);
+    }
+
     // Don't do anything if types are equal
     if (typecheck_type_equal(dest, src)) {
         return src_expr;
     }
-    if (dest->type == TYPE_BOOL) {
-        return trans_expr_bool(ts, src_expr, ir_stmts);
-    }
-
     // Special case: If we're assigning array to pointer, and src_expr
     // is already a pointer, then do no conversion if pointed types are equal
     if (dest->type == TYPE_PTR && src->type == TYPE_ARR &&
@@ -1447,13 +1450,11 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     }
 
     ir_type_t *dest_type = trans_type(ts, dest);
-    ir_type_t *src_type = trans_type(ts, src);
+    ir_type_t *src_type = ir_expr_type(src_expr);
 
-    bool dest_signed = !(orig_dest->type == TYPE_MOD &&
-                         orig_dest->mod.type_mod & TMOD_UNSIGNED);
+    bool dest_signed = !TYPE_IS_UNSIGNED(orig_dest);
 
-    bool src_signed = !(orig_src->type == TYPE_MOD &&
-                        orig_src->mod.type_mod & TMOD_UNSIGNED);
+    bool src_signed = !TYPE_IS_UNSIGNED(orig_src);
 
     return trans_ir_type_conversion(ts, dest_type, dest_signed,
                                     src_type, src_signed, src_expr,
@@ -1881,7 +1882,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     ir_type_t *ir_type = NULL;
     switch (type->type) {
     case TYPE_VOID:        return &ir_type_void;
-    case TYPE_BOOL:        return &ir_type_i1;
+    case TYPE_BOOL:        return &ir_type_i8;
     case TYPE_CHAR:        return &ir_type_i8;
     case TYPE_SHORT:       return &ir_type_i16;
     case TYPE_INT:         return &ir_type_i32;
