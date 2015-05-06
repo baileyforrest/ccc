@@ -170,12 +170,12 @@ def process_file(src_path):
         timeout_remain -= end - start
 
         if is_error:
-            if retval == 0 and not llvm:
-                fail(src_path, "Compilation unexpectedly suceeded")
-                return 0
-            else:
+            if retval != 0:
                 success(src_path)
                 return 1
+            elif not llvm: #llvm may fail in linkage phase
+                fail(src_path, "Compilation unexpectedly suceeded")
+                return 0
 
         if retval != 0:
             fail(src_path, "failed to compile")
@@ -193,10 +193,15 @@ def process_file(src_path):
                                          stderr=subprocess.STDOUT)
             if retval != 0:
                 if is_error:
+                    success(src_path)
                     return 1
                 else:
                     fail(src_path, "failed to create valid llvm ir")
                     return 0
+            elif is_error:
+                fail(src_path, "Compilation unexpectedly suceeded")
+                return 0
+
             outname = exec_name
 
         try:
