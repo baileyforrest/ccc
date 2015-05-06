@@ -215,11 +215,26 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             fprintf(stream, "%lld", expr->const_params.int_val);
             break;
         case IR_CONST_FLOAT:
-            fprintf(stream, "%Lf", expr->const_params.float_val);
+            assert(expr->const_params.type->type == IR_TYPE_FLOAT);
+            // We need to cast because llvm requires constants be only
+            // values that can be represented
+            switch (expr->const_params.type->float_params.type) {
+            case IR_FLOAT_FLOAT:
+                fprintf(stream, "%f", (float)expr->const_params.float_val);
+                break;
+            case IR_FLOAT_DOUBLE:
+                fprintf(stream, "%f", (double)expr->const_params.float_val);
+                break;
+            case IR_FLOAT_X86_FP80:
+                fprintf(stream, "%Lf",
+                        (long double)expr->const_params.float_val);
+                break;
+            default:
+                assert(false);
+            }
             break;
         case IR_CONST_NULL:
             fprintf(stream, "null");
-
             break;
         case IR_CONST_STRUCT:
             fprintf(stream, "{ ");

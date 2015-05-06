@@ -1508,13 +1508,16 @@ ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
         return src_expr;
     }
 
-    // Special case, changing type of constant integer, just change its type
-    // to the dest type
-    if (src_expr->type == IR_EXPR_CONST &&
-        src_expr->const_params.ctype == IR_CONST_INT &&
-        dest_type->type == IR_TYPE_INT) {
-        src_expr->const_params.type = dest_type;
-        return src_expr;
+    // Special case, changing type of constant integer/float, just change its
+    // type to the dest type
+    if (src_expr->type == IR_EXPR_CONST) {
+        if ((src_expr->const_params.ctype == IR_CONST_INT &&
+             dest_type->type == IR_TYPE_INT) ||
+            (src_expr->const_params.ctype == IR_CONST_FLOAT &&
+             dest_type->type == IR_TYPE_FLOAT)) {
+            src_expr->const_params.type = dest_type;
+            return src_expr;
+        }
     }
 
     ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
