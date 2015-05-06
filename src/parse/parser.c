@@ -1695,6 +1695,12 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
         }
         if (LEX_CUR(lex).type != RPAREN) {
             LEX_MATCH(lex, COMMA);
+            if (LEX_CUR(lex).type == RPAREN) {
+                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                           "Unexpected token %s", token_str(COMMA));
+                status = CCC_ESYNTAX;
+                goto fail;
+            }
         }
     }
     status = CCC_OK;
