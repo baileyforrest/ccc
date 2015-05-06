@@ -19,6 +19,8 @@
 /**
  * Implementation for preprocessor/file reader
  */
+// TODO2: Change preprocessor to only output one space per set of whitespace
+// characters, this will simplify implementation greatly
 
 #include "preprocessor.h"
 #include "preprocessor_priv.h"
@@ -473,6 +475,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             pp->line_comment = true;
         } else if (next_char == '*') {
             pp->block_comment = true;
+            // Advance stream to prevent /*/ from opening/closing
+            ts_advance(stream);
+            ts_advance(stream);
         }
     }
 
