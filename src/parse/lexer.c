@@ -726,17 +726,18 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         return status;
     }
 
+    char *end;
     errno = 0;
     if (is_float) {
         result->type = FLOATLIT;
         result->float_params.hasF = has_f;
         result->float_params.hasL = has_l;
         if (has_f) {
-            result->float_params.float_val = strtof(lexer->lexbuf, NULL);
+            result->float_params.float_val = strtof(lexer->lexbuf, &end);
         } else if (has_l) {
-            result->float_params.float_val = strtold(lexer->lexbuf, NULL);
+            result->float_params.float_val = strtold(lexer->lexbuf, &end);
         } else {
-            result->float_params.float_val = strtod(lexer->lexbuf, NULL);
+            result->float_params.float_val = strtod(lexer->lexbuf, &end);
         }
     } else {
         result->type = INTLIT;
@@ -745,22 +746,22 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         result->int_params.hasLL = has_ll;
         if (has_u) {
             if (has_l) {
-                result->int_params.int_val = strtoul(lexer->lexbuf, NULL, 0);
+                result->int_params.int_val = strtoul(lexer->lexbuf, &end, 0);
             } else if (has_ll) {
-                result->int_params.int_val = strtoull(lexer->lexbuf, NULL, 0);
+                result->int_params.int_val = strtoull(lexer->lexbuf, &end, 0);
             } else {
-                result->int_params.int_val = strtoul(lexer->lexbuf, NULL, 0);
+                result->int_params.int_val = strtoul(lexer->lexbuf, &end, 0);
                 if (result->int_params.int_val > UINT_MAX) {
                     errno = ERANGE;
                 }
             }
         } else {
             if (has_l) {
-                result->int_params.int_val = strtol(lexer->lexbuf, NULL, 0);
+                result->int_params.int_val = strtol(lexer->lexbuf, &end, 0);
             } else if (has_ll) {
-                result->int_params.int_val = strtoll(lexer->lexbuf, NULL, 0);
+                result->int_params.int_val = strtoll(lexer->lexbuf, &end, 0);
             } else {
-                result->int_params.int_val = strtol(lexer->lexbuf, NULL, 0);
+                result->int_params.int_val = strtol(lexer->lexbuf, &end, 0);
 
                 // Sign extend literal if necessary
                 if (result->int_params.int_val &
@@ -777,6 +778,21 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     }
     if (errno == ERANGE) {
         logger_log(&result->mark, LOG_ERR, "Overflow in numeric literal", cur);
+        status = CCC_ESYNTAX;
+    }
+
+    // End is allowed to be NULL or an integral literal suffix
+    switch (*end) {
+    case '\0':
+    case 'l':
+    case 'L':
+    case 'U':
+    case 'u':
+    case 'f':
+    case 'F':
+        break;
+    default:
+        logger_log(&result->mark, LOG_ERR, "Invalid integral constant", cur);
         status = CCC_ESYNTAX;
     }
 
