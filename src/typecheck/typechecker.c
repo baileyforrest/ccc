@@ -1300,10 +1300,18 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
     bool retval = true;
     retval &= typecheck_type(tcs, decl_node->type);
     type_t *node_type = ast_type_untypedef(decl_node->type);
+    type_t *unmod = ast_type_unmod(node_type);
 
-    if (ast_type_unmod(node_type)->type == TYPE_VOID) {
+    if (unmod->type == TYPE_VOID) {
         logger_log(&decl_node->mark, LOG_ERR,
                    "variable or field '%s' declared void", decl_node->id);
+        return false;
+    }
+    if ((type == TYPE_STRUCT || type == TYPE_UNION) &&
+        (unmod->type == TYPE_STRUCT || unmod->type == TYPE_UNION) &&
+        unmod->struct_params.esize == (size_t)-1) {
+        logger_log(&decl_node->mark, LOG_ERR, "field '%s' has incomplete type",
+                   decl_node->id);
         return false;
     }
 
@@ -1856,6 +1864,11 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                                      GET_ELEM(&type->struct_params.decls, cur),
                                      type->type);
         }
+        if (!retval) {
+            return false;
+        }
+
+        ast_type_size(type); // Take size to mark as being a complete type
         return retval;
     }
     case TYPE_ENUM: {
