@@ -204,13 +204,6 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         break;
     case IR_EXPR_CONST:
         switch (expr->const_params.ctype) {
-        case IR_CONST_BOOL:
-            if (expr->const_params.bool_val) {
-                fprintf(stream, "true");
-            } else {
-                fprintf(stream, "false");
-            }
-            break;
         case IR_CONST_INT:
             fprintf(stream, "%lld", expr->const_params.int_val);
             break;

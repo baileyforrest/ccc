@@ -394,14 +394,17 @@ void ir_expr_destroy(ir_expr_t *expr) {
         break;
     case IR_EXPR_CONST:
         switch (expr->const_params.ctype) {
-        case IR_CONST_BOOL:
         case IR_CONST_INT:
         case IR_CONST_FLOAT:
         case IR_CONST_NULL:
         case IR_CONST_ZERO:
         case IR_CONST_STR:
+            break;
         case IR_CONST_ARR:
+            sl_destroy(&expr->const_params.arr_val);
+            break;
         case IR_CONST_STRUCT:
+            sl_destroy(&expr->const_params.struct_val);
             break;
         default:
             assert(false);

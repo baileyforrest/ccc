@@ -107,7 +107,6 @@ struct ir_type_t {
 typedef struct ir_expr_t ir_expr_t;
 
 typedef enum ir_const_type_t {
-    IR_CONST_BOOL,
     IR_CONST_INT,
     IR_CONST_FLOAT,
     IR_CONST_NULL,
@@ -224,7 +223,6 @@ struct ir_expr_t {
             ir_const_type_t ctype;
             ir_type_t *type;
             union {
-                bool bool_val;
                 long long int_val;
                 long double float_val;
                 slist_t struct_val; /**< (ir_expr_t) */

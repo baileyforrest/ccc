@@ -1076,9 +1076,38 @@ ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
                            ir_inst_stream_t *ir_stmts) {
     ir_type_t *type = ir_expr_type(expr);
+
+    // Do nothing if expression is already the right type
     if (type->type == IR_TYPE_INT && type->int_params.width == 1) {
         return expr;
     }
+
+    // If this is a constant, just change it into the boolean type
+    if (expr->type == IR_EXPR_CONST) {
+        bool is_true;
+        switch (expr->const_params.ctype) {
+        case IR_CONST_NULL:  is_true = false; break;
+        case IR_CONST_STR:   is_true = true;  break;
+        case IR_CONST_ZERO:  is_true = false;  break;
+        case IR_CONST_INT:   is_true = expr->const_params.int_val != 0; break;
+        case IR_CONST_FLOAT:
+            is_true = expr->const_params.float_val != 0.0;
+            break;
+
+        case IR_CONST_STRUCT:
+        case IR_CONST_ARR:
+        default:
+            assert(false);
+            is_true = false;
+        }
+
+        expr->const_params.ctype = IR_CONST_INT;
+        expr->const_params.type = &ir_type_i1;
+        expr->const_params.int_val = is_true;
+
+        return expr;
+    }
+
     bool is_float = type->type == IR_TYPE_FLOAT;
 
     ir_expr_t *cmp;
