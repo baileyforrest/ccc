@@ -1586,9 +1586,9 @@ ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
         switch (src_type->type) {
         case IR_TYPE_INT:
             if (src_signed) {
-                convert_op = IR_CONVERT_FPTOSI;
+                convert_op = IR_CONVERT_SITOFP;
             } else {
-                convert_op = IR_CONVERT_FPTOUI;
+                convert_op = IR_CONVERT_UITOFP;
             }
             break;
         case IR_TYPE_FLOAT:
@@ -1690,16 +1690,26 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         assert(gdecl->type == IR_GDECL_GDATA);
 
         // Set up correct linkage and modifiers
-        if (node_type->type == TYPE_MOD) {
-            if (node_type->mod.type_mod & TMOD_STATIC) {
+        if ((node_type->type == TYPE_MOD &&
+             node_type->mod.type_mod & TMOD_CONST) ||
+            (node_type->type == TYPE_PTR &&
+             node_type->ptr.type_mod & TMOD_CONST)) {
+            gdecl->gdata.flags |= IR_GDATA_CONSTANT;
+        }
+
+        // storage class specifers (auto/register/static/extern) are attached
+        // to the base type, need to remove pointers
+        type_t *mod_check = node_type;
+        while (mod_check->type == TYPE_PTR) {
+            mod_check = ast_type_untypedef(mod_check->ptr.base);
+        }
+        if (mod_check->type == TYPE_MOD) {
+            if (mod_check->mod.type_mod & TMOD_STATIC) {
                 gdecl->linkage = IR_LINKAGE_INTERNAL;
-            } else if (node_type->mod.type_mod & TMOD_EXTERN) {
-                gdecl->linkage = IR_LINKAGE_INTERNAL;
+            } else if (mod_check->mod.type_mod & TMOD_EXTERN) {
+                gdecl->linkage = IR_LINKAGE_EXTERNAL;
             }
 
-            if (node_type->mod.type_mod & TMOD_CONST) {
-                gdecl->gdata.flags |= IR_GDATA_CONSTANT;
-            }
         }
 
         ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
