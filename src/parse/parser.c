@@ -27,13 +27,6 @@
  * In order to avoid duplicate code, there is a small amount of backtracking
  * used, but only ever 1 or 2 function calls deep. Tokens are never returned to
  * the lexer, so this should not be a performance problem.
- *
- * Error handling memory ownership strategy:
- * Functions which perform allocations are responsible for deallocations on
- * errors, except in subtle cases where this is not possible.
- *
- * All AST destructor functions ignore NULL, so child nodes should be
- * initialized to NULL.
  */
 // TODO1: Use TYPE_TYPEDEF only if print ast mode is on
 
@@ -1700,8 +1693,8 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
         if (status != CCC_OK) {
             goto fail;
         }
-        if (LEX_CUR(lex).type == COMMA) {
-            LEX_ADVANCE(lex);
+        if (LEX_CUR(lex).type != RPAREN) {
+            LEX_MATCH(lex, COMMA);
         }
     }
     status = CCC_OK;
