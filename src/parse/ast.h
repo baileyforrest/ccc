@@ -378,7 +378,7 @@ struct decl_t {
 typedef enum stmt_type_t {
     STMT_NOP,      /**< No op statement */
 
-    STMT_DECL,     /**< Declaration */
+    STMT_DECL,     /**< Declaration only allowed in compound statement */
 
     // Labeled Statements
     STMT_LABEL,    /**< Label */

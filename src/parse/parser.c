@@ -1926,25 +1926,12 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
         LEX_MATCH(lex, SEMI);
         break;
     }
-    case ID: {
+    case ID:
+        // If next character isn't a colon, then its an expression statement
         if (LEX_NEXT(lex).type != COLON) {
-            // Type specifier only if its a typedef name
-            if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) != NULL) {
-                stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark,
-                                       STMT_DECL);
-                if (CCC_OK != (status = par_declaration(lex, &stmt->decl,
-                                                        false))) {
-                    goto fail;
-                }
-
-                LEX_MATCH(lex, SEMI);
-                goto done;
-            } else {
-                return par_expression_statement(lex, result);
-            }
+            return par_expression_statement(lex, result);
         }
         // FALL THROUGH
-    }
     case CASE:
     case DEFAULT:
         return par_labeled_statement(lex, result);
@@ -1968,9 +1955,6 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     default:
         return par_expression_statement(lex, result);
     }
-
-done:
-    *result = stmt;
 
 fail:
     return status;
@@ -2263,8 +2247,40 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     LEX_MATCH(lex, LBRACE);
     while (LEX_CUR(lex).type != RBRACE) {
         stmt_t *cur = NULL;
-        if (CCC_OK != (status = par_statement(lex, &cur))) {
-            goto fail;
+        bool is_decl = false;
+
+        // Inside a compound statement, there can either be decls or statements
+        switch (LEX_CUR(lex).type) {
+            // Cases for declaration specifier
+        case DECL_SPEC_STORAGE_CLASS:
+        case DECL_SPEC_TYPE_SPEC_NO_ID:
+        case DECL_SPEC_TYPE_QUALIFIER:
+            is_decl = true;
+            break;
+        case ID:
+            // Can't be a decl if next token is a colon (its a label)
+            if (LEX_NEXT(lex).type == COLON) {
+                break;
+            }
+            // Type specifier only if its a typedef name
+            if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) != NULL) {
+                is_decl = true;
+            }
+            break;
+        default:
+            break;
+        }
+
+        if (is_decl) {
+            cur = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_DECL);
+            if(CCC_OK != (status = par_declaration(lex, &cur->decl, false))) {
+                goto fail;
+            }
+            LEX_MATCH(lex, SEMI);
+        } else {
+            if (CCC_OK != (status = par_statement(lex, &cur))) {
+                goto fail;
+            }
         }
         sl_append(&stmt->compound.stmts, &cur->link);
     }
