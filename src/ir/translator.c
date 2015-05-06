@@ -35,6 +35,7 @@
 #define MAX_GLOBAL_NAME 128
 #define GLOBAL_PREFIX ".glo"
 #define STRUCT_PREFIX "struct."
+#define UNION_PREFIX "union."
 
 #define LLVM_MEMCPY "llvm.memcpy.p0i8.p0i8.i64"
 
@@ -916,17 +917,51 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     }
     case EXPR_ARR_IDX:
     case EXPR_MEM_ACC: {
-        ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         ir_type_t *expr_type = trans_type(ts, expr->etype);
         ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
         ptr_type->ptr.base = expr_type;
+
+        type_t *base_type;
+        if (expr->type == EXPR_MEM_ACC) {
+            base_type = ast_type_unmod(expr->mem_acc.base->etype);
+        }
+
+        bool is_union = false;
+        ir_expr_t *pointer;
+        // Unions are handled differently
+        if (expr->type == EXPR_MEM_ACC &&
+            (expr->mem_acc.op == OP_DOT && base_type->type == TYPE_UNION)) {
+            is_union = true;
+            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
+        } else if (expr->type == EXPR_MEM_ACC &&
+                   expr->mem_acc.op == OP_ARROW &&
+                   base_type->ptr.base->type == TYPE_UNION) {
+            is_union = true;
+            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
+        }
+
+        if (is_union) {
+            pointer = trans_ir_type_conversion(ts, ptr_type, false,
+                                               ir_expr_type(pointer), false,
+                                               pointer, ir_stmts);
+
+            if (addrof) {
+                return pointer;
+            }
+            return trans_load_temp(ts, ir_stmts, pointer);
+        }
+
+        ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = ptr_type;
 
         bool last_array = false;
-        ir_expr_t *pointer;
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
             || expr->type == EXPR_ARR_IDX) {
             if (expr->type == EXPR_MEM_ACC) {
+                if (expr->mem_acc.base->etype->type == TYPE_UNION) {
+                    is_union = true;
+                    break;
+                }
                 trans_struct_mem_offset(ts, expr->mem_acc.base->etype,
                                         expr->mem_acc.name,
                                         &elem_ptr->getelemptr.idxs);
@@ -952,7 +987,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
 
         bool prepend_zero = false;
-        if (!last_array && expr->type == EXPR_MEM_ACC) {
+        if (!last_array && !is_union && expr->type == EXPR_MEM_ACC) {
             assert(expr->mem_acc.op == OP_ARROW);
             type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
             assert(etype->type == TYPE_PTR);
@@ -963,7 +998,11 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
             prepend_zero = true;
         } else { // !is_arr_idx && expr->type != EXPR_MEM_ACC
-            pointer = trans_expr(ts, false, expr, ir_stmts);
+            if (is_union) {
+                pointer = trans_expr(ts, true, expr, ir_stmts);
+            } else {
+                pointer = trans_expr(ts, false, expr, ir_stmts);
+            }
             ir_type_t *ptr_type = ir_expr_type(pointer);
             if (!last_array && ptr_type->type == IR_TYPE_PTR) {
                 ir_type_t *base_type = ptr_type->ptr.base;
@@ -1897,7 +1936,10 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     case TYPE_MOD:         return trans_type(ts, type->mod.base);
     case TYPE_PAREN:       return trans_type(ts, type->paren_base);
 
+    case TYPE_UNION:
     case TYPE_STRUCT: {
+        bool is_union = type->type == TYPE_UNION;
+
         // If there is a named definition of this structure, return that
         if (type->struct_params.trans_state != NULL) {
             ir_gdecl_t *gdecl = type->struct_params.trans_state;
@@ -1910,9 +1952,16 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         // prevent infinite recursion
         // If this is a named structure, create a struct id type
         if (type->struct_params.name != NULL) {
-            char *name = emalloc(strlen(type->struct_params.name) +
-                                 sizeof(STRUCT_PREFIX));
-            sprintf(name, STRUCT_PREFIX"%s", type->struct_params.name);
+            char *name;
+            if (is_union) {
+                name = emalloc(strlen(type->struct_params.name) +
+                               sizeof(UNION_PREFIX));
+                sprintf(name, UNION_PREFIX"%s", type->struct_params.name);
+            } else {
+                name = emalloc(strlen(type->struct_params.name) +
+                               sizeof(STRUCT_PREFIX));
+                sprintf(name, STRUCT_PREFIX"%s", type->struct_params.name);
+            }
             name = sstore_insert(name);
             ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
             id_type->id_struct.name = name;
@@ -1925,24 +1974,48 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             type->struct_params.trans_state = id_gdecl;
         }
 
+        type_t *max_type = NULL;
+        size_t max_size = 0;
+
         // Create a new structure object
         ir_type = ir_type_create(ts->tunit, IR_TYPE_STRUCT);
         SL_FOREACH(cur_decl, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
             SL_FOREACH(cur_node, &decl->decls) {
                 decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
-                ir_type_t *node_type = trans_type(ts, node->type);
-                vec_push_back(&ir_type->struct_params.types, node_type);
+                if (is_union) {
+                    size_t size = ast_type_size(node->type);
+                    if (size > max_size) {
+                        max_size = size;
+                        max_type = node->type;
+                    }
+                } else {
+                    ir_type_t *node_type = trans_type(ts, node->type);
+                    vec_push_back(&ir_type->struct_params.types, node_type);
+                }
             }
 
             // Add anonymous struct and union members to the struct
             if (sl_head(&decl->decls) == NULL &&
                 (decl->type->type == TYPE_STRUCT ||
                  decl->type->type == TYPE_UNION)) {
-                ir_type_t *decl_type = trans_type(ts, decl->type);
-                vec_push_back(&ir_type->struct_params.types, decl_type);
+                if (is_union) {
+                    size_t size = ast_type_size(decl->type);
+                    if (size > max_size) {
+                        max_size = size;
+                        max_type = decl->type;
+                    }
+                } else {
+                    ir_type_t *decl_type = trans_type(ts, decl->type);
+                    vec_push_back(&ir_type->struct_params.types, decl_type);
+                }
             }
         }
+        if (is_union && max_type != NULL) {
+            ir_type_t *ir_max_type = trans_type(ts, max_type);
+            vec_push_back(&ir_type->struct_params.types, ir_max_type);
+        }
+
         if (id_gdecl != NULL) {
             id_gdecl->id_struct.type = ir_type;
             id_gdecl->id_struct.id_type->id_struct.type = ir_type;
@@ -1951,35 +2024,6 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
 
         return ir_type;
     }
-
-    case TYPE_UNION: {
-        type_t *max_type = NULL;
-        size_t max_size = 0;
-        SL_FOREACH(cur_decl, &type->struct_params.decls) {
-            decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
-            SL_FOREACH(cur_node, &decl->decls) {
-                decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
-                size_t size = ast_type_size(node->type);
-                if (size > max_size) {
-                    max_size = size;
-                    max_type = node->type;
-                }
-            }
-
-            // Add anonymous struct and union members to the struct
-            if (sl_head(&decl->decls) == NULL &&
-                (decl->type->type == TYPE_STRUCT ||
-                 decl->type->type == TYPE_UNION)) {
-                size_t size = ast_type_size(decl->type);
-                if (size > max_size) {
-                    max_size = size;
-                    max_type = decl->type;
-                }
-            }
-        }
-        return trans_type(ts, max_type);
-    }
-
     case TYPE_FUNC:
         ir_type = ir_type_create(ts->tunit, IR_TYPE_FUNC);
         ir_type->func.type = trans_type(ts, type->func.type);

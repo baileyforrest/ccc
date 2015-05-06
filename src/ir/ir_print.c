@@ -486,7 +486,7 @@ const char *ir_convert_str(ir_convert_t conv) {
     case IR_CONVERT_TRUNC:    return "trunc";
     case IR_CONVERT_ZEXT:     return "zext";
     case IR_CONVERT_SEXT:     return "sext";
-    case IR_CONVERT_FPTRUNC:  return "fptruc";
+    case IR_CONVERT_FPTRUNC:  return "fptrunc";
     case IR_CONVERT_FPEXT:    return "fpext";
     case IR_CONVERT_FPTOUI:   return "fptoui";
     case IR_CONVERT_FPTOSI:   return "fptosi";
