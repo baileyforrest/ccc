@@ -453,6 +453,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Finished processing all files
     if (stream == NULL) {
+        if (pp->block_comment) {
+            logger_log(&stream->mark, LOG_ERR, "unterminated comment");
+        }
         return PP_EOF;
     }
 
