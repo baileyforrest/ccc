@@ -1954,8 +1954,33 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         // parameters to any symbol table
         type_type_t decl_type = save_tab == NULL ? TYPE_FUNC : TYPE_VOID;
         SL_FOREACH(cur, &type->func.params) {
-            retval &= typecheck_decl(tcs, GET_ELEM(&type->func.params, cur),
-                                     decl_type);
+            decl_t *decl = GET_ELEM(&type->func.params, cur);
+            decl_node_t *node = sl_head(&decl->decls);
+            assert(node == sl_tail(&decl->decls));
+
+            // Make sure param names are not duplicated
+            if (node != NULL && node->id != NULL) {
+                SL_FOREACH(cur, &type->func.params) {
+                    decl_t *cur_decl = GET_ELEM(&type->func.params, cur);
+                    decl_node_t *cur_node = sl_head(&cur_decl->decls);
+                    if (cur_node == node) {
+                        break;
+                    }
+                    if (cur_node == NULL || cur_node->id == NULL) {
+                        continue;
+                    }
+                    if (strcmp(node->id, cur_node->id) == 0) {
+                        logger_log(&node->mark, LOG_ERR,
+                                   "redefinition of parameter '%s'", node->id);
+                        logger_log(&cur_node->mark, LOG_INFO,
+                                   "previous definition of '%s' was here",
+                                   node->id);
+                        retval = false;
+                    }
+                }
+            }
+
+            retval &= typecheck_decl(tcs, decl, decl_type);
         }
 
         if (save_tab != NULL) {
