@@ -935,7 +935,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
         } else if (expr->type == EXPR_MEM_ACC &&
                    expr->mem_acc.op == OP_ARROW &&
-                   base_type->ptr.base->type == TYPE_UNION) {
+                   ast_type_unmod(base_type->ptr.base)->type == TYPE_UNION) {
             is_union = true;
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
         }
@@ -986,12 +986,18 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             }
         }
 
+        type_t *etype;
+        if (expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_ARROW) {
+            etype = ast_type_unmod(expr->mem_acc.base->etype);
+            assert(etype->type == TYPE_PTR);
+            if (ast_type_unmod(etype->ptr.base)->type == TYPE_UNION) {
+                is_union = true;
+            }
+        }
+
         bool prepend_zero = false;
         if (!last_array && !is_union && expr->type == EXPR_MEM_ACC) {
             assert(expr->mem_acc.op == OP_ARROW);
-            type_t *etype = ast_type_unmod(expr->mem_acc.base->etype);
-            assert(etype->type == TYPE_PTR);
-
             trans_struct_mem_offset(ts, etype->ptr.base, expr->mem_acc.name,
                                     &elem_ptr->getelemptr.idxs);
 
