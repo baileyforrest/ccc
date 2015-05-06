@@ -926,25 +926,17 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             base_type = ast_type_unmod(expr->mem_acc.base->etype);
         }
 
-        bool is_union = false;
         ir_expr_t *pointer;
         // Unions are handled differently
         if (expr->type == EXPR_MEM_ACC &&
-            (expr->mem_acc.op == OP_DOT && base_type->type == TYPE_UNION)) {
-            is_union = true;
-            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
-        } else if (expr->type == EXPR_MEM_ACC &&
-                   expr->mem_acc.op == OP_ARROW &&
-                   ast_type_unmod(base_type->ptr.base)->type == TYPE_UNION) {
-            is_union = true;
-            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
-        }
+            ((expr->mem_acc.op == OP_DOT && base_type->type == TYPE_UNION) ||
+             (expr->mem_acc.op == OP_ARROW &&
+              ast_type_unmod(base_type->ptr.base)->type == TYPE_UNION))) {
 
-        if (is_union) {
+            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
             pointer = trans_ir_type_conversion(ts, ptr_type, false,
                                                ir_expr_type(pointer), false,
                                                pointer, ir_stmts);
-
             if (addrof) {
                 return pointer;
             }
@@ -954,6 +946,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
         elem_ptr->getelemptr.type = ptr_type;
 
+        bool is_union = false;
         bool last_array = false;
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
             || expr->type == EXPR_ARR_IDX) {
