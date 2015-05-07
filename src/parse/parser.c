@@ -1929,21 +1929,7 @@ fail:
 
 
 status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
-    status_t status = CCC_OK;
-    stmt_t *stmt = NULL;
-
     switch (LEX_CUR(lex).type) {
-        // Cases for declaration specifier
-    case DECL_SPEC_STORAGE_CLASS:
-    case DECL_SPEC_TYPE_SPEC_NO_ID:
-    case DECL_SPEC_TYPE_QUALIFIER: {
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_DECL);
-        if(CCC_OK != (status = par_declaration(lex, &stmt->decl, false))) {
-            goto fail;
-        }
-        LEX_MATCH(lex, SEMI);
-        break;
-    }
     case ID:
         // If next character isn't a colon, then its an expression statement
         if (LEX_NEXT(lex).type != COLON) {
@@ -1973,9 +1959,6 @@ status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
     default:
         return par_expression_statement(lex, result);
     }
-
-fail:
-    return status;
 }
 
 status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
