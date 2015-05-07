@@ -582,6 +582,17 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         }
     }
 
+    if (entry != NULL) {
+        if (entry->struct_defined) {
+            logger_log(&LEX_CUR(lex).mark, LOG_ERR, "redefinition of '%s'",
+                       entry->key);
+            logger_log(&entry->type->mark, LOG_INFO, "originally defined here");
+            status = CCC_ESYNTAX;
+            goto fail;
+        }
+        entry->struct_defined = true;
+    }
+
     LEX_MATCH(lex, LBRACE);
 
     if (btype == TYPE_ENUM) {

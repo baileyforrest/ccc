@@ -56,6 +56,7 @@ typedef struct typetab_entry_t {
             struct ir_symtab_entry_t *ir_entry;
         } var;
         long long enum_val; /**< Value of an enumeration type */
+        bool struct_defined;
     };
 } typetab_entry_t;
 
