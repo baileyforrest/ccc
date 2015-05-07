@@ -738,7 +738,8 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     // Add typedefs to the typetable on the top of the stack
     if (is_typedef) {
         if (CCC_OK !=
-            (status = tt_insert_typedef(lex->typetab, decl, decl_node))) {
+            (status = tt_insert(lex->typetab, decl_node->type, TT_TYPEDEF,
+                                decl_node->id, NULL))) {
             if (status != CCC_DUPLICATE) {
                 goto fail;
             } else {

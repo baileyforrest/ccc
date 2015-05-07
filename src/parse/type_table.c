@@ -97,8 +97,6 @@ void tt_init(typetab_t *tt, typetab_t *last) {
     assert(tt != NULL);
     tt->last = last;
 
-    sl_init(&tt->typedef_bases, offsetof(typedef_base_t, link));
-
     static const ht_params_t params = {
         0,                               // Size estimate
         offsetof(typetab_entry_t, key),  // Offset of key
@@ -117,10 +115,6 @@ void tt_init(typetab_t *tt, typetab_t *last) {
             assert(status == CCC_OK);
         }
     }
-}
-
-static void typetab_typedef_base_destroy(typedef_base_t *entry) {
-    free(entry);
 }
 
 static void typetab_entry_destroy(typetab_entry_t *entry) {
@@ -144,48 +138,7 @@ void tt_destroy(typetab_t *tt) {
     // This order is important. types may point to typedef_bases,
     // typedef_bases may point to compound types
     HT_DESTROY_FUNC(&tt->types, typetab_entry_destroy);
-    SL_DESTROY_FUNC(&tt->typedef_bases, typetab_typedef_base_destroy);
     HT_DESTROY_FUNC(&tt->compound_types, typetab_entry_destroy);
-}
-
-/**
- * For typedefs, multiple typedefs may share the same base type. So we
- * store the base type in a different hash table which is freed after
- * the typedef hashtable
- */
-status_t tt_insert_typedef(typetab_t *tt, decl_t *decl,
-                           decl_node_t *decl_node) {
-    status_t status = CCC_OK;
-    typetab_entry_t *new_entry = emalloc(sizeof(typetab_entry_t));
-    typedef_base_t *base = NULL;
-
-    new_entry->type = decl_node->type;
-    new_entry->entry_type = TT_TYPEDEF;
-    new_entry->key = decl_node->id;
-
-    // Only create an entry in the second table if its the first decl, to make
-    // sure it is only removed once
-    if (decl_node == sl_head(&decl->decls)) {
-        base = emalloc(sizeof(typedef_base_t));
-        base->type = decl->type;
-    }
-
-    // Add base, and don't free on failure because the typedef may fail because
-    // of a duplicate typedef. We do this because multiple typedefs may share
-    // same base, with only one of them failing
-    if (base != NULL) {
-        sl_append(&tt->typedef_bases, &base->link);
-    }
-
-    if (CCC_OK != (status = ht_insert(&tt->types, &new_entry->link))) {
-        goto fail;
-    }
-
-    return status;
-
-fail:
-    free(new_entry);
-    return status;
 }
 
 status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type, char *name,
@@ -193,7 +146,6 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type, char *name,
     assert(tt != NULL);
     assert(type != NULL);
     assert(name != NULL);
-    assert(tt_type != TT_TYPEDEF && "Use tt_insert_typedef");
 
     status_t status = CCC_OK;
     typetab_entry_t *new_entry = ecalloc(1, sizeof(typetab_entry_t));
