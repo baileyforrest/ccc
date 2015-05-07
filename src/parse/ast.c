@@ -383,8 +383,9 @@ void struct_iter_init(type_t *type, struct_iter_t *iter) {
 
 void struct_iter_reset(struct_iter_t *iter) {
     iter->cur_decl = iter->type->struct_params.decls.head;
-    iter->decl = GET_ELEM(&iter->type->struct_params.decls, iter->cur_decl);
-    iter->cur_node = iter->decl->decls.head;
+    iter->decl = iter->cur_decl == NULL ?
+        NULL : GET_ELEM(&iter->type->struct_params.decls, iter->cur_decl);
+    iter->cur_node = iter->decl == NULL ? NULL : iter->decl->decls.head;
     iter->node = iter->cur_node == NULL ?
         NULL : GET_ELEM(&iter->decl->decls, iter->cur_node);
 }
@@ -394,7 +395,9 @@ bool struct_iter_advance(struct_iter_t *iter) {
         iter->cur_node = iter->cur_node->next;
     }
     if (iter->cur_node == NULL) {
-        iter->cur_decl = iter->cur_decl->next;
+        if (iter->cur_decl != NULL) {
+            iter->cur_decl = iter->cur_decl->next;
+        }
         if (iter->cur_decl != NULL) {
             iter->decl = GET_ELEM(&iter->type->struct_params.decls,
                                   iter->cur_decl);
