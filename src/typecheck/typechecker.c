@@ -349,7 +349,7 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
     }
 
     // TODO1: This ignores const
-    if (typecheck_type_equal(umod_from, umod_from)) {
+    if (typecheck_type_equal(umod_to, umod_from)) {
         return true;
     }
 
@@ -378,7 +378,7 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_LONG_DOUBLE:
-        if (is_num_from) {
+        if (is_num_from || umod_from->type == TYPE_ENUM) {
             return true;
         }
 
@@ -404,6 +404,11 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
         goto fail;
 
     case TYPE_ARR:
+        if (umod_from->type == TYPE_PTR &&
+            typecheck_type_assignable(mark, umod_to->arr.base,
+                                      umod_from->ptr.base)) {
+            return true;
+        }
         if (mark != NULL) {
             logger_log(mark, LOG_ERR,
                        "assignment to expression with array type");
@@ -432,7 +437,9 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
             }
             break;
         case TYPE_PTR:
-            if (umod_to->ptr.base->type == TYPE_VOID) {
+            // Can freely assign to/from void *
+            if (ast_type_unmod(umod_to->ptr.base)->type == TYPE_VOID ||
+                ast_type_unmod(umod_from->ptr.base)->type == TYPE_VOID) {
                 return true;
             }
             if (typecheck_type_assignable(mark, umod_to->ptr.base,
@@ -493,22 +500,23 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
         // Require both operands to be integers, which was already checked
         break;
 
-    case OP_PLUS:
     case OP_MINUS:
-        if (is_numeric1 && is_numeric2) {
-            return true;
-        }
-        // Allow pointers to be added with integers
-        if ((is_ptr1 && is_int2) || (is_int1 && is_ptr2)) {
-            return true;
-        }
-
         if (is_ptr1 && is_ptr2) {
             type_t *umod_base1 = ast_type_unmod(typecheck_get_ptr_base(umod1));
             type_t *umod_base2 = ast_type_unmod(typecheck_get_ptr_base(umod2));
             if (typecheck_type_equal(umod_base1, umod_base2)) {
                 return true;
             }
+        }
+        // FALL THROUGH
+
+    case OP_PLUS:
+        if (is_numeric1 && is_numeric2) {
+            return true;
+        }
+        // Allow pointers to be added with integers
+        if ((is_ptr1 && is_int2) || (is_int1 && is_ptr2)) {
+            return true;
         }
 
         break;
@@ -1476,6 +1484,14 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case OP_LOGICOR:
             expr->etype = tt_bool;
             break;
+        case OP_MINUS:
+            // subtracting pointers evaluates to size_t
+            if (ast_type_unmod(expr->bin.expr1->etype)->type == TYPE_PTR &&
+                ast_type_unmod(expr->bin.expr2->etype)->type == TYPE_PTR) {
+                expr->etype = tt_size_t;
+                break;
+            }
+            // FALL THROUGH
         default:
             retval &= typecheck_type_max(&expr->mark, expr->bin.expr1->etype,
                                          expr->bin.expr2->etype,
@@ -1850,6 +1866,10 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
 
     case TYPE_STRUCT:
     case TYPE_UNION: {
+        // If size exists, already typechecked
+        if (type->struct_params.esize != (size_t)-1) {
+            return true;
+        }
         SL_FOREACH(cur, &type->struct_params.decls) {
             retval &= typecheck_decl(tcs,
                                      GET_ELEM(&type->struct_params.decls, cur),

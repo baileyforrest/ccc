@@ -1191,7 +1191,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
 
     case SIZEOF:
     case ALIGNOF: {
-        type_type_t btype =
+        expr_type_t btype =
             LEX_CUR(lex).type == SIZEOF ? EXPR_SIZEOF : EXPR_ALIGNOF;
         LEX_ADVANCE(lex);
         base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, btype);

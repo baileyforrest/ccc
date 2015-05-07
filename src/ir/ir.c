@@ -31,10 +31,10 @@
 #define ANON_LABEL_PREFIX "BB"
 
 #define IR_INT_LIT(width)                                   \
-    { SL_LINK_LIT, IR_TYPE_INT, .int_params = { width } }
+    { SL_LINK_LIT, IR_TYPE_INT, { .int_params = { width } } }
 
 #define IR_FLOAT_LIT(type)                                      \
-    { SL_LINK_LIT, IR_TYPE_FLOAT, .float_params = { type } }
+    { SL_LINK_LIT, IR_TYPE_FLOAT, { .float_params = { type } } }
 
 ir_type_t ir_type_void = { SL_LINK_LIT, IR_TYPE_VOID, { } };
 ir_type_t ir_type_i1 = IR_INT_LIT(1);
@@ -46,7 +46,8 @@ ir_type_t ir_type_float = IR_FLOAT_LIT(IR_FLOAT_FLOAT);
 ir_type_t ir_type_double = IR_FLOAT_LIT(IR_FLOAT_DOUBLE);
 ir_type_t ir_type_x86_fp80 = IR_FLOAT_LIT(IR_FLOAT_X86_FP80);
 
-ir_type_t ir_type_i8_ptr = { SL_LINK_LIT, IR_TYPE_PTR, .ptr = { &ir_type_i8 } };
+ir_type_t ir_type_i8_ptr = { SL_LINK_LIT, IR_TYPE_PTR,
+                             { .ptr = { &ir_type_i8 } } };
 
 extern ir_stmt_t *ir_inst_stream_head(ir_inst_stream_t *stream);
 extern ir_stmt_t *ir_inst_stream_tail(ir_inst_stream_t *stream);

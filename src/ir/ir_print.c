@@ -330,7 +330,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         ir_expr_print(stream, expr->icmp.expr2);
         break;
     case IR_EXPR_FCMP:
-        fprintf(stream, "fcmp %s ", ir_icmp_str(expr->fcmp.cond));
+        fprintf(stream, "fcmp %s ", ir_fcmp_str(expr->fcmp.cond));
         ir_type_print(stream, expr->fcmp.type, NULL);
         fprintf(stream, " ");
         ir_expr_print(stream, expr->fcmp.expr1);
