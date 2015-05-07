@@ -1631,6 +1631,16 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     case EXPR_SIZEOF:
     case EXPR_ALIGNOF:
         if (expr->sizeof_params.type != NULL) {
+            decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
+            type_t *type = node != NULL ? node->type :
+                expr->sizeof_params.type->type;
+            type = ast_type_unmod(type);
+            if (type->type == TYPE_STRUCT || type->type == TYPE_UNION) {
+                // If the type hasn't been defined yet, then return an error
+                if (type->struct_params.esize == (size_t)-1) {
+                    return false;
+                }
+            }
             retval &= typecheck_decl(tcs, expr->sizeof_params.type, TYPE_VOID);
         }
         if (expr->sizeof_params.expr != NULL) {
