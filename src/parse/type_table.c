@@ -73,7 +73,7 @@ type_t * const tt_size_t = &stt_size_t;
 type_t * const tt_va_list = &stt_va_list;
 
 #define TYPE_TAB_LITERAL_ENTRY(type, type_str)                  \
-    { SL_LINK_LIT, type_str, TT_PRIM , &stt_ ## type, { } }
+    { SL_LINK_LIT, type_str, NULL, TT_PRIM , &stt_ ## type, { } }
 
 /**
  * Table of primative types
@@ -112,7 +112,9 @@ void tt_init(typetab_t *tt, typetab_t *last) {
     if (last == NULL) {
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_prim_types); ++i) {
             status_t status = ht_insert(&tt->types, &s_prim_types[i].link);
+
             assert(status == CCC_OK);
+            s_prim_types[i].typetab = tt;
         }
     }
 }
@@ -153,6 +155,7 @@ status_t tt_insert(typetab_t *tt, type_t *type, tt_type_t tt_type, char *name,
     new_entry->type = type;
     new_entry->entry_type = tt_type;
     new_entry->key = name;
+    new_entry->typetab = tt;
 
     if (tt_type == TT_COMPOUND) {
         status = ht_insert(&tt->compound_types, &new_entry->link);

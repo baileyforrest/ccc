@@ -533,6 +533,13 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
             *type = typedef_type;
             return CCC_OK;
         }
+
+        // If we're defining a new type, and the last entry is in a different
+        // scope than this one, then we need to create a new entry
+        if (LEX_CUR(lex).type == LBRACE && entry != NULL &&
+            entry->typetab != lex->typetab) {
+            entry = NULL;
+        }
     }
 
     if (entry == NULL) { // Allocate a new type if it doesn't exist

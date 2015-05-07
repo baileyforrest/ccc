@@ -47,6 +47,7 @@ typedef enum tt_type_t {
 typedef struct typetab_entry_t {
     sl_link_t link;
     char *key;
+    typetab_t *typetab;
     tt_type_t entry_type;
     struct type_t *type;
     union {
