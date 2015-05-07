@@ -376,6 +376,7 @@ void ast_gdecl_destroy(gdecl_t *gdecl) {
 }
 
 void struct_iter_init(type_t *type, struct_iter_t *iter) {
+    assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
     iter->type = type;
     struct_iter_reset(iter);
 }
@@ -384,10 +385,11 @@ void struct_iter_reset(struct_iter_t *iter) {
     iter->cur_decl = iter->type->struct_params.decls.head;
     iter->decl = GET_ELEM(&iter->type->struct_params.decls, iter->cur_decl);
     iter->cur_node = iter->decl->decls.head;
-    iter->node = GET_ELEM(&iter->decl->decls, iter->cur_node);
+    iter->node = iter->cur_node == NULL ?
+        NULL : GET_ELEM(&iter->decl->decls, iter->cur_node);
 }
 
-void struct_iter_advance(struct_iter_t *iter) {
+bool struct_iter_advance(struct_iter_t *iter) {
     if (iter->cur_node != NULL) {
         iter->cur_node = iter->cur_node->next;
     }
@@ -404,6 +406,8 @@ void struct_iter_advance(struct_iter_t *iter) {
     } else {
         iter->node = NULL;
     }
+
+    return iter->cur_decl != NULL || iter->cur_node != NULL;
 }
 
 size_t ast_type_size(type_t *type) {

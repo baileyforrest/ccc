@@ -1835,9 +1835,43 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                                      GET_ELEM(&type->struct_params.decls, cur),
                                      type->type);
         }
+
         if (!retval) {
             return false;
         }
+
+        // Make sure there are no duplicate names
+        struct_iter_t cur, check;
+        struct_iter_init(type, &cur);
+
+        do {
+            // Skip anonymous members
+            if (cur.node == NULL || cur.node->id == NULL) {
+                continue;
+            }
+
+            memcpy(&check, &cur, sizeof(cur));
+
+            while (struct_iter_advance(&check)) {
+                if (check.node != NULL) {
+                    if (check.node->id != NULL &&
+                        strcmp(cur.node->id, check.node->id) == 0) {
+                        logger_log(&check.node->mark, LOG_ERR,
+                                   "duplicate member '%s'", check.node->id);
+                        retval = false;
+                    }
+                } else {
+                    // Check anonymous struct/unions
+                    assert(check.decl != NULL);
+                    if (ast_type_find_member(check.decl->type, cur.node->id,
+                                             NULL, NULL)) {
+                        logger_log(&cur.node->mark, LOG_ERR,
+                                   "duplicate member '%s'", cur.node->id);
+                        retval = false;
+                    }
+                }
+            }
+        } while (struct_iter_advance(&cur));
 
         ast_type_size(type); // Take size to mark as being a complete type
         return retval;

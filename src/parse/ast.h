@@ -579,7 +579,7 @@ void struct_iter_init(type_t *type, struct_iter_t *iter);
 
 void struct_iter_reset(struct_iter_t *iter);
 
-void struct_iter_advance(struct_iter_t *iter);
+bool struct_iter_advance(struct_iter_t *iter);
 
 /**
  * Destroys an AST
