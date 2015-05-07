@@ -1529,9 +1529,16 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case OP_DEREF: {
             type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
             assert(ptr_type->type == TYPE_PTR);
-            if (ast_type_unmod(ptr_type->ptr.base)->type == TYPE_VOID) {
+            type_t *unmod = ast_type_unmod(ptr_type->ptr.base);
+            if (unmod->type == TYPE_VOID) {
                 logger_log(&expr->mark, LOG_WARN,
                            "dereferencing a 'void *' pointer");
+            }
+            if ((unmod->type == TYPE_STRUCT || unmod->type == TYPE_VOID) &&
+                unmod->struct_params.esize == (size_t)-1) {
+                logger_log(&expr->mark, LOG_ERR,
+                           "dereferencing pointer to incomplete type");
+                retval = false;
             }
             expr->etype = ptr_type->ptr.base;
             break;
@@ -1735,6 +1742,11 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             logger_log(&expr->mark, LOG_ERR,
                        "request for member '%s' in something not a structure "
                        "or union", expr->mem_acc.name);
+            return false;
+        }
+        if (compound->struct_params.esize == (size_t)-1) {
+            logger_log(&expr->mark, LOG_ERR,
+                       "dereferencing pointer to incomplete type");
             return false;
         }
         type_t *mem_type =
