@@ -1273,6 +1273,16 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
     type_t *node_type = ast_type_untypedef(decl_node->type);
     type_t *unmod = ast_type_unmod(node_type);
 
+    // TODO1: Incomplete types are allowed for function declarations
+    if ((unmod->type == TYPE_STRUCT || unmod->type == TYPE_UNION) &&
+        unmod->struct_params.esize == (size_t)-1 &&
+        !(node_type->type == TYPE_MOD &&
+          node_type->mod.type_mod & TMOD_EXTERN)) {
+        logger_log(&decl_node->mark, LOG_ERR,
+                   "storage size of '%s' isn't known", decl_node->id);
+        return false;
+    }
+
     if (unmod->type == TYPE_VOID) {
         logger_log(&decl_node->mark, LOG_ERR,
                    "variable or field '%s' declared void", decl_node->id);
