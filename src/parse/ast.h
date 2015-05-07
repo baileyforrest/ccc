@@ -538,6 +538,14 @@ typedef struct trans_unit_t {
     slist_t types;      /**< (types_t) */
 } trans_unit_t;
 
+typedef struct struct_iter_t {
+    type_t *type;
+    sl_link_t *cur_decl;
+    decl_t *decl;
+    sl_link_t *cur_node;
+    decl_node_t *node;
+} struct_iter_t;
+
 type_t *ast_type_create(trans_unit_t *tunit, fmark_t *mark, type_type_t type);
 
 expr_t *ast_expr_create(trans_unit_t *tunit, fmark_t *mark, expr_type_t type);
@@ -566,6 +574,12 @@ void ast_print(trans_unit_t *tu);
  * @param type The type to print
  */
 void ast_print_type(type_t *type);
+
+void struct_iter_init(type_t *type, struct_iter_t *iter);
+
+void struct_iter_reset(struct_iter_t *iter);
+
+void struct_iter_advance(struct_iter_t *iter);
 
 /**
  * Destroys an AST

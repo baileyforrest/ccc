@@ -375,6 +375,37 @@ void ast_gdecl_destroy(gdecl_t *gdecl) {
     free(gdecl);
 }
 
+void struct_iter_init(type_t *type, struct_iter_t *iter) {
+    iter->type = type;
+    struct_iter_reset(iter);
+}
+
+void struct_iter_reset(struct_iter_t *iter) {
+    iter->cur_decl = iter->type->struct_params.decls.head;
+    iter->decl = GET_ELEM(&iter->type->struct_params.decls, iter->cur_decl);
+    iter->cur_node = iter->decl->decls.head;
+    iter->node = GET_ELEM(&iter->decl->decls, iter->cur_node);
+}
+
+void struct_iter_advance(struct_iter_t *iter) {
+    if (iter->cur_node != NULL) {
+        iter->cur_node = iter->cur_node->next;
+    }
+    if (iter->cur_node == NULL) {
+        iter->cur_decl = iter->cur_decl->next;
+        if (iter->cur_decl != NULL) {
+            iter->decl = GET_ELEM(&iter->type->struct_params.decls,
+                                  iter->cur_decl);
+            iter->cur_node = iter->decl->decls.head;
+        }
+    }
+    if (iter->cur_node != NULL) {
+        iter->node = GET_ELEM(&iter->decl->decls, iter->cur_node);
+    } else {
+        iter->node = NULL;
+    }
+}
+
 size_t ast_type_size(type_t *type) {
     switch (type->type) {
     case TYPE_VOID:        return sizeof(void);
