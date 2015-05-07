@@ -31,7 +31,7 @@
 typedef enum log_type_t {
     LOG_ERR,  /**< Error */
     LOG_WARN, /**< Warning */
-    LOG_INFO  /**< Information */
+    LOG_NOTE  /**< Note */
 } log_type_t;
 
 /**

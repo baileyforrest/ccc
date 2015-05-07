@@ -1987,7 +1987,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                     if (strcmp(node->id, cur_node->id) == 0) {
                         logger_log(&node->mark, LOG_ERR,
                                    "redefinition of parameter '%s'", node->id);
-                        logger_log(&cur_node->mark, LOG_INFO,
+                        logger_log(&cur_node->mark, LOG_NOTE,
                                    "previous definition of '%s' was here",
                                    node->id);
                         retval = false;

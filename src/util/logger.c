@@ -80,7 +80,7 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
         break;
 
     default:
-        header = "info:";
+        header = "note:";
         break;
     }
 
