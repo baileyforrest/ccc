@@ -1173,6 +1173,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         return retval;
     }
     case TYPE_STRUCT: {
+        ast_canonicalize_init_list(tcs->tunit, type, expr);
         struct_iter_t iter;
         struct_iter_init(type, &iter);
 
