@@ -27,6 +27,7 @@
 #include <stdlib.h>
 
 #include "typecheck/typechecker.h"
+#include "util/logger.h"
 
 /**
  * Allocate an AST node, add it onto the translation unit's allocation list,
@@ -411,6 +412,238 @@ bool struct_iter_advance(struct_iter_t *iter) {
     }
 
     return iter->cur_decl != NULL || iter->cur_node != NULL;
+}
+
+// Init lists are nasty!
+status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
+                                    expr_t *expr) {
+    assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
+    assert(expr->type == EXPR_INIT_LIST);
+    status_t status = CCC_OK;
+
+    if (sl_head(&expr->init_list.exprs) == NULL) {
+        return status;
+    }
+
+    bool has_desig_init = false;
+    SL_FOREACH(cur, &expr->init_list.exprs) {
+        expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
+        if (cur_expr->type == EXPR_DESIG_INIT) {
+            has_desig_init = true;
+            break;
+        }
+    }
+
+    // New list of expressions
+    slist_t exprs = SLIST_LIT(offsetof(expr_t, link));
+
+    // List of init lists for anonymous struct/union members
+    slist_t anon_desig_init = SLIST_LIT(offsetof(expr_t, link));
+
+    // struct decl iterator
+    struct_iter_t iter;
+
+    // Phase 1: put designated initializers in the correct order
+    if (has_desig_init) {
+        static const ht_params_t params = {
+            0,                             // Size estimate
+            offsetof(ht_ptr_elem_t, key),  // Offset of key
+            offsetof(ht_ptr_elem_t, link), // Offset of ht link
+            ind_str_hash,                  // Hash function
+            ind_str_eq                     // string compare
+        };
+        // Hashtable mapping members to their value
+        htable_t map;
+        ht_init(&map, &params);
+
+        // List of unmapped members
+        slist_t unmapped = SLIST_LIT(offsetof(expr_t, link));
+
+        struct_iter_init(type, &iter);
+
+        // Build the map
+        SL_FOREACH(cur, &expr->init_list.exprs) {
+            // Skip anonymous members
+            while (iter.node == NULL || iter.node->id == NULL) {
+                struct_iter_advance(&iter);
+            }
+
+            expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
+            if (cur_expr->type == EXPR_DESIG_INIT) {
+                bool mapped = false;
+                struct_iter_reset(&iter);
+
+                do {
+                    // Look for a non anonymous member, matching the designated
+                    // initializer
+                    if (iter.node != NULL && iter.node->id != NULL &&
+                        strcmp(iter.node->id, cur_expr->desig_init.name) == 0) {
+                        ht_ptr_elem_t *elem = ht_lookup(&map, &iter.node->id);
+                        if (elem == NULL) {
+                            elem = emalloc(sizeof(*elem));
+                            elem->key = iter.node->id;
+                            ht_insert(&map, &elem->link);
+                        }
+                        // Overwrite old value if it exists
+                        elem->val = cur_expr;
+
+                        mapped = true;
+                        struct_iter_advance(&iter);
+                        break;
+                    }
+                } while (struct_iter_advance(&iter));
+                if (!mapped) {
+                    sl_append(&unmapped, &cur_expr->link);
+                }
+            } else {
+                // Non designated initializer, just map the to the current node
+                ht_ptr_elem_t *elem = ht_lookup(&map, &iter.node->id);
+                if (elem == NULL) {
+                    elem = emalloc(sizeof(*elem));
+                    elem->key = iter.node->id;
+                    ht_insert(&map, &elem->link);
+                }
+                elem->val = cur_expr;
+                struct_iter_advance(&iter);
+            }
+        }
+
+        // Place the designated initialzers in the correct order
+        struct_iter_init(type, &iter);
+        do {
+            if (iter.node != NULL && iter.node->id != NULL) {
+                ht_ptr_elem_t *elem = ht_lookup(&map, &iter.node->id);
+                expr_t *val;
+                if (elem != NULL) {
+                    val = elem->val;
+                } else {
+                    // Create void expressions to fill in the gaps
+                    val = ast_expr_create(tunit, &expr->mark, EXPR_VOID);
+                }
+                sl_append(&exprs, &val->link);
+            } else if (sl_head(&unmapped) != NULL && iter.node == NULL &&
+                       (iter.decl->type->type == TYPE_STRUCT ||
+                        iter.decl->type->type == TYPE_UNION)) {
+                // If this is an anonymous struct/union see if any of the
+                // unmapped designated initalizers are used
+                // Create a init list for this anonymous member
+                expr_t *init_list = ast_expr_create(tunit, &expr->mark,
+                                                     EXPR_DESIG_INIT);
+                sl_append(&anon_desig_init, &init_list->link);
+
+                sl_link_t *cur = unmapped.head;
+                sl_link_t *last = NULL;
+
+                // Place all unmapped initializers that belong to this member
+                // in the a desig_init list
+                while (cur != NULL) {
+                    expr_t *cur_expr = GET_ELEM(&unmapped, cur);
+                    if (NULL != ast_type_find_member(iter.decl->type,
+                                                     cur_expr->desig_init.name,
+                                                     NULL, NULL)) {
+                        if (cur == unmapped.head) {
+                            unmapped.head = cur->next;
+                        } else {
+                            last->next = cur->next;
+                        }
+                        if (cur == unmapped.tail) {
+                            unmapped.tail = last;
+                        }
+                        cur = cur->next;
+                        sl_append(&init_list->init_list.exprs, &cur_expr->link);
+                        continue;
+                    }
+
+                    last = cur;
+                    cur = cur->next;
+                }
+            }
+        } while(struct_iter_advance(&iter));
+
+        SL_FOREACH(cur, &unmapped) {
+            expr_t *cur_expr = GET_ELEM(&unmapped, cur);
+            logger_log(&cur_expr->mark, LOG_ERR,
+                       "unknown field '%s' specified in initializer",
+                       cur_expr->desig_init.name);
+            status = CCC_ESYNTAX;
+        }
+
+        HT_DESTROY_FUNC(&map, free);
+    } else {
+        // No designated initiaizers, just copy the list
+        memcpy(&exprs, &expr->init_list.exprs, sizeof(exprs));
+    }
+
+    if (status != CCC_OK) {
+        return status;
+    }
+
+    // Phase 2: Place members in correct recursive nestings
+
+    // Pointer to last pointer
+    sl_link_t **last = &anon_desig_init.head;
+
+    // Current anonymous struct/union init list
+    sl_link_t *cur_anon = anon_desig_init.head;
+
+    struct_iter_init(type, &iter);
+    SL_FOREACH(cur, &exprs) {
+        expr_t *cur_expr = GET_ELEM(&exprs, cur);
+
+        // Skip anonymous members that can't be struct/union
+        while (iter.node != NULL && iter.node->id == NULL) {
+            struct_iter_advance(&iter);
+        }
+
+        // Handle anonymous struct/union
+        if (iter.node == NULL && (iter.decl->type->type == TYPE_STRUCT ||
+                                  iter.decl->type->type == TYPE_UNION)) {
+            assert(cur_anon != NULL);
+            expr_t *desig_inits = GET_ELEM(&anon_desig_init, cur_anon);
+            cur_anon = cur_anon->next;
+
+            expr_t *init_list;
+
+            if (cur_expr->type == EXPR_INIT_LIST) {
+                // If init list, move the designated initializers to the
+                // existing init list
+                expr_t *front;
+                while (NULL !=
+                       (front = sl_pop_front(&desig_inits->init_list.exprs))) {
+                    sl_append(&cur_expr->init_list.exprs, &front->link);
+                }
+                init_list = cur_expr;
+            } else {
+                // Add desig_inits to the list
+                (*last)->next = &desig_inits->link;
+                desig_inits->link.next = cur->next;
+                if (exprs.tail == cur) {
+                    exprs.tail = &desig_inits->link;
+                }
+
+                // If current expression isn't a designated initializer,
+                // place in the front of desig_inits
+                if (cur_expr->type != EXPR_DESIG_INIT) {
+                    if (cur_expr->type != EXPR_VOID) {
+                        sl_prepend(&desig_inits->init_list.exprs,
+                                   &cur_expr->link);
+                    }
+                    cur = &desig_inits->link;
+                }
+                init_list = desig_inits;
+            }
+
+            ast_canonicalize_init_list(tunit, iter.decl->type, init_list);
+        }
+
+        struct_iter_advance(&iter);
+        last = &cur;
+    }
+
+    // Update the expression with the new init list
+    memcpy(&expr->init_list.exprs, &exprs, sizeof(exprs));
+
+    return status;
 }
 
 size_t ast_type_size(type_t *type) {

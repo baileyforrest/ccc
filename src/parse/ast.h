@@ -569,6 +569,13 @@ trans_unit_t *ast_trans_unit_create(bool dummy);
 void ast_print(trans_unit_t *tu);
 
 /**
+ * Destroys an AST
+ *
+ * @param ast The ast to destroy
+ */
+void ast_destroy(trans_unit_t *ast);
+
+/**
  * Print a type
  *
  * @param type The type to print
@@ -581,12 +588,8 @@ void struct_iter_reset(struct_iter_t *iter);
 
 bool struct_iter_advance(struct_iter_t *iter);
 
-/**
- * Destroys an AST
- *
- * @param ast The ast to destroy
- */
-void ast_destroy(trans_unit_t *ast);
+status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
+                                    expr_t *expr);
 
 /**
  * Gets the size of a type
