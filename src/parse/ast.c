@@ -425,13 +425,36 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
         return status;
     }
 
+    expr_t *last = NULL;
     bool has_desig_init = false;
     SL_FOREACH(cur, &expr->init_list.exprs) {
         expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
         if (cur_expr->type == EXPR_DESIG_INIT) {
+            last = cur_expr;
             has_desig_init = true;
             break;
         }
+    }
+
+    if (type->type == TYPE_UNION) {
+        expr_t *elem;
+        if (has_desig_init) {
+            elem = last;
+        } else {
+            // If its a union, just set init list to first entry
+            expr_t *head = sl_head(&expr->init_list.exprs);
+            if (head != sl_tail(&expr->init_list.exprs)) {
+                logger_log(&expr->mark, LOG_WARN,
+                           "excess elements in union initializer");
+            }
+            elem = head;
+        }
+
+        // Set only item to elem
+        expr->init_list.exprs.head = &elem->link;
+        expr->init_list.exprs.tail = &elem->link;
+
+        return status;
     }
 
     // New list of expressions
@@ -442,6 +465,27 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
 
     // struct decl iterator
     struct_iter_t iter;
+
+    bool has_compound = false;
+    struct_iter_init(type, &iter);
+    do {
+        if (iter.node != NULL && iter.node->id != NULL &&
+            (iter.node->type->type == TYPE_STRUCT ||
+             iter.node->type->type == TYPE_UNION)) {
+            has_compound = true;
+            break;
+        }
+        if (iter.node == NULL &&
+            (iter.decl->type->type == TYPE_STRUCT ||
+             iter.decl->type->type == TYPE_UNION)) {
+            has_compound = true;
+            break;
+        }
+    } while (struct_iter_advance(&iter));
+
+    if (!has_desig_init && !has_compound) {
+        return status;
+    }
 
     // Phase 1: put designated initializers in the correct order
     if (has_desig_init) {
@@ -464,7 +508,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
         // Build the map
         SL_FOREACH(cur, &expr->init_list.exprs) {
             // Skip anonymous members
-            while (iter.node == NULL || iter.node->id == NULL) {
+            while (iter.node != NULL && iter.node->id == NULL) {
                 struct_iter_advance(&iter);
             }
 
@@ -516,6 +560,9 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                 expr_t *val;
                 if (elem != NULL) {
                     val = elem->val;
+                    if (val->type == EXPR_DESIG_INIT) {
+                        val = val->desig_init.val;
+                    }
                 } else {
                     // Create void expressions to fill in the gaps
                     val = ast_expr_create(tunit, &expr->mark, EXPR_VOID);
@@ -579,65 +626,79 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
     }
 
     // Phase 2: Place members in correct recursive nestings
+    if (has_compound) {
+        // Pointer to last pointer
+        sl_link_t **last = &anon_desig_init.head;
 
-    // Pointer to last pointer
-    sl_link_t **last = &anon_desig_init.head;
+        // Current anonymous struct/union init list
+        sl_link_t *cur_anon = anon_desig_init.head;
 
-    // Current anonymous struct/union init list
-    sl_link_t *cur_anon = anon_desig_init.head;
+        struct_iter_init(type, &iter);
+        SL_FOREACH(cur, &exprs) {
+            expr_t *cur_expr = GET_ELEM(&exprs, cur);
 
-    struct_iter_init(type, &iter);
-    SL_FOREACH(cur, &exprs) {
-        expr_t *cur_expr = GET_ELEM(&exprs, cur);
+            // Skip anonymous members that can't be struct/union
+            while (iter.node != NULL && iter.node->id == NULL) {
+                struct_iter_advance(&iter);
+            }
 
-        // Skip anonymous members that can't be struct/union
-        while (iter.node != NULL && iter.node->id == NULL) {
-            struct_iter_advance(&iter);
-        }
+            bool anon = iter.node == NULL;
 
-        // Handle anonymous struct/union
-        if (iter.node == NULL && (iter.decl->type->type == TYPE_STRUCT ||
-                                  iter.decl->type->type == TYPE_UNION)) {
-            assert(cur_anon != NULL);
-            expr_t *desig_inits = GET_ELEM(&anon_desig_init, cur_anon);
-            cur_anon = cur_anon->next;
+            type_t *type = anon ? iter.decl->type : iter.node->type;
 
-            expr_t *init_list;
-
-            if (cur_expr->type == EXPR_INIT_LIST) {
-                // If init list, move the designated initializers to the
-                // existing init list
-                expr_t *front;
-                while (NULL !=
-                       (front = sl_pop_front(&desig_inits->init_list.exprs))) {
-                    sl_append(&cur_expr->init_list.exprs, &front->link);
-                }
-                init_list = cur_expr;
-            } else {
-                // Add desig_inits to the list
-                (*last)->next = &desig_inits->link;
-                desig_inits->link.next = cur->next;
-                if (exprs.tail == cur) {
-                    exprs.tail = &desig_inits->link;
+            // Handle anonymous struct/union
+            if (type->type == TYPE_STRUCT || type->type == TYPE_UNION) {
+                expr_t *desig_inits = NULL;
+                if (anon && has_desig_init) {
+                    assert(cur_anon != NULL);
+                    desig_inits = GET_ELEM(&anon_desig_init, cur_anon);
+                    cur_anon = cur_anon->next;
                 }
 
-                // If current expression isn't a designated initializer,
-                // place in the front of desig_inits
-                if (cur_expr->type != EXPR_DESIG_INIT) {
+                expr_t *init_list;
+
+                if (cur_expr->type == EXPR_INIT_LIST) {
+                    // If init list, move the designated initializers to the
+                    // existing init list
+                    if (desig_inits != NULL) {
+                        expr_t *front;
+                        while (NULL !=
+                               (front =
+                                sl_pop_front(&desig_inits->init_list.exprs))) {
+                            sl_append(&cur_expr->init_list.exprs, &front->link);
+                        }
+                    }
+                    init_list = cur_expr;
+                } else {
+                    if (desig_inits == NULL) {
+                        desig_inits = ast_expr_create(tunit, &cur_expr->mark,
+                                                      EXPR_INIT_LIST);
+                    }
+                    // Add desig_inits to the list
+                    *last = &desig_inits->link;
+                    desig_inits->link.next = cur->next;
+                    if (exprs.tail == cur) {
+                        exprs.tail = &desig_inits->link;
+                    }
+
+                    // If current expression isn't VOID
+                    // place in the front of desig_inits
                     if (cur_expr->type != EXPR_VOID) {
                         sl_prepend(&desig_inits->init_list.exprs,
                                    &cur_expr->link);
                     }
+
+                    // Remove cur_expr
                     cur = &desig_inits->link;
+                    init_list = desig_inits;
                 }
-                init_list = desig_inits;
+
+                ast_canonicalize_init_list(tunit, iter.decl->type, init_list);
             }
 
-            ast_canonicalize_init_list(tunit, iter.decl->type, init_list);
+            struct_iter_advance(&iter);
+            last = &cur->next;
         }
-
-        struct_iter_advance(&iter);
-        last = &cur;
     }
 
     // Update the expression with the new init list

@@ -1119,108 +1119,98 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, type_type_t type) {
 
 
 bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
+    assert(expr->type == EXPR_INIT_LIST);
     bool retval = true;
     type = ast_type_unmod(type);
+    expr->etype = type;
+
     switch (type->type) {
-    case TYPE_UNION:
+    case TYPE_UNION: {
+        ast_canonicalize_init_list(tcs->tunit, type, expr);
+        expr_t *head = sl_head(&expr->init_list.exprs);
+        assert(head == sl_tail(&expr->init_list.exprs));
+        if (head == NULL) {
+            return true;
+        }
+
+        struct_iter_t iter;
+        struct_iter_init(type, &iter);
+
+        type_t *dest_type;
+
+        if (head->type == EXPR_DESIG_INIT) {
+            // Find the member
+            do {
+                if (iter.node != NULL && iter.node->id != NULL &&
+                    strcmp(iter.node->id, head->desig_init.name) == 0) {
+                    break;
+                }
+            } while (struct_iter_advance(&iter));
+            head = head->desig_init.val;
+            dest_type = iter.node->type;
+        } else {
+            // Skip anonymous members that can't be struct/union
+            while (iter.node != NULL && iter.node->id == NULL) {
+                struct_iter_advance(&iter);
+            }
+
+            type_t *type = iter.node == NULL ?
+                iter.decl->type : iter.node->type;
+            dest_type = type;
+        }
+
+        if (head->type == EXPR_INIT_LIST) {
+            retval &= typecheck_init_list(tcs, dest_type, head);
+        } else {
+            retval &= typecheck_expr(tcs, head, TC_NOCONST);
+            if (!retval) {
+                return false;
+            }
+
+            retval &= typecheck_type_assignable(&head->mark, dest_type,
+                                                head->etype);
+        }
+        return retval;
+    }
     case TYPE_STRUCT: {
         struct_iter_t iter;
         struct_iter_init(type, &iter);
 
-        SL_FOREACH(cur_elem, &expr->init_list.exprs) {
-            expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
-            retval &= typecheck_expr(tcs, elem, TC_NOCONST);
+        SL_FOREACH(cur, &expr->init_list.exprs) {
+            expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
 
-            bool do_cont = false;
-            // If we encounter a designated initializer, find the
-            // decl with the correct name and continue from there
-            if (elem->type == EXPR_DESIG_INIT) {
-                if (iter.node == NULL) {
-                    struct_iter_reset(&iter);
-                }
-                if (strcmp(iter.node->id, elem->desig_init.name) != 0) {
-                    while (strcmp(iter.node->id, elem->desig_init.name) != 0) {
-                        struct_iter_advance(&iter);
-                        while (iter.node == NULL) {
-                            if (iter.decl == NULL) {
-                                logger_log(&expr->mark, LOG_ERR,
-                                           "unknown field %s specified in"
-                                           "initializer",
-                                           elem->desig_init.name);
-                                return false;
-                            }
-                            type_t *decl_type = ast_type_unmod(iter.decl->type);
-                            // Skip non struct/union anonymous members
-                            if (decl_type->type != TYPE_STRUCT &&
-                                decl_type->type != TYPE_UNION) {
-                                struct_iter_advance(&iter);
-                                continue;
-                            }
-                            elem = elem->desig_init.val;
-                            // TODO1: This isn't correct,
-                            // Doesn't correctly handle assigning to scalar
-                            // members of anonymous struct/union
-                            if (elem->type != EXPR_INIT_LIST) {
-                                logger_log(&expr->mark, LOG_ERR,
-                                           "invalid_initializer");
-                                return false;
-                            }
-                            // Decl, but no decl node. Anonymous member
-                            retval &= typecheck_init_list(tcs, decl_type, elem);
-                            struct_iter_advance(&iter);
-                            do_cont = true;
-                            break;
-                        }
-                        if (do_cont) {
-                            break;
-                        }
-                    }
-                }
-                elem = elem->desig_init.val;
+            // Skip anonymous members that can't be struct/union
+            while (iter.node != NULL && iter.node->id == NULL) {
+                struct_iter_advance(&iter);
             }
-            if (do_cont) {
+
+            if (cur_expr->type == EXPR_VOID) {
+                struct_iter_advance(&iter);
                 continue;
             }
-            while (iter.node == NULL) {
-                if (iter.decl == NULL) {
-                    logger_log(&expr->mark, LOG_WARN,
-                               "excess elements in struct initializer");
-                    return retval;
+            if (iter.node != NULL && iter.node->id == NULL) {
+                if (cur_expr->type == EXPR_INIT_LIST) {
+                    retval &= typecheck_init_list(tcs, iter.node->type,
+                                                  cur_expr);
                 } else {
-                    type_t *decl_type = ast_type_unmod(iter.decl->type);
-                    // Skip non struct/union anonymous members
-                    if (decl_type->type != TYPE_STRUCT &&
-                        decl_type->type != TYPE_UNION) {
-                        continue;
-                    }
-                    if (elem->type != EXPR_INIT_LIST) {
-                        logger_log(&expr->mark, LOG_ERR, "invalid_initializer");
+                    retval &= typecheck_expr(tcs, cur_expr, TC_NOCONST);
+                    if (!retval) {
                         return false;
                     }
-                    // Decl, but no decl node. Anonymous member
-                    retval &= typecheck_init_list(tcs, decl_type, elem);
-                    struct_iter_advance(&iter);
-                    do_cont = true;
-                    break;
+                    retval &= typecheck_type_assignable(&iter.node->mark,
+                                                        iter.node->type,
+                                                        cur_expr->etype);
                 }
             }
-            if (do_cont) {
-                continue;
+
+            if (iter.node == NULL && iter.decl != NULL &&
+                (iter.decl->type->type == TYPE_STRUCT ||
+                 iter.decl->type->type == TYPE_UNION)) {
+                assert(cur_expr->type == EXPR_INIT_LIST);
+                retval &= typecheck_init_list(tcs, iter.decl->type, cur_expr);
             }
-            switch (elem->type) {
-            case EXPR_DESIG_INIT:
-                assert(false); // Handled above
-                return false;
-            case EXPR_INIT_LIST:
-                retval &= typecheck_init_list(tcs, iter.node->type, elem);
-                struct_iter_advance(&iter);
-                break;
-            default:
-                retval &= typecheck_type_assignable(&elem->mark,
-                                                    iter.node->type,
-                                                    elem->etype);
-                struct_iter_advance(&iter);
-            }
+
+            struct_iter_advance(&iter);
         }
 
         return retval;
@@ -1368,7 +1358,6 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 assert(false);
                 return false;
             case EXPR_INIT_LIST:
-                decl_node->expr->etype = node_type;
                 retval &= typecheck_init_list(tcs, node_type,
                                               decl_node->expr);
 
