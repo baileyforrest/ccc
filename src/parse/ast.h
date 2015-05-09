@@ -305,12 +305,12 @@ struct expr_t {
 
         struct {                    /**< Offsetof parameters */
             decl_t *type;           /**< Type to get offsetof */
-            slist_t path;           /**< (str_node_t) Names in offset path */
+            slist_t path;           /**< (expr_t) Accesses is path */
         } offsetof_params;
 
         struct {                    /**< Member access of a compound type */
             expr_t *base;           /**< Expression to get type */
-            char *name;        /**< Name of member */
+            char *name;             /**< Name of member */
             oper_t op;              /**< Operation (., ->) */
         } mem_acc;
 

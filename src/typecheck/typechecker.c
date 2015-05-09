@@ -1652,28 +1652,39 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         decl_node_t *decl = sl_head(&expr->offsetof_params.type->decls);
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
-        compound = ast_type_unmod(compound);
-        str_node_t *head = sl_head(&expr->offsetof_params.path);
-        switch (compound->type) {
-        case TYPE_STRUCT:
-        case TYPE_UNION:
-            break;
-        default:
-            logger_log(&expr->mark, LOG_ERR,
-                       "request for member '%s' in something not a structure "
-                       "or union", head->str);
-            return false;
-        }
 
         SL_FOREACH(cur, &expr->offsetof_params.path) {
-            str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
-            type_t *mem_type = ast_type_find_member(compound, node->str,
-                                                    NULL, NULL);
-            if (mem_type == NULL) {
-                logger_log(&expr->mark, LOG_ERR,
-                           "compound type has no member '%s'",
-                           node->str);
-                return false;
+            compound = ast_type_unmod(compound);
+            expr_t *cur_expr = GET_ELEM(&expr->offsetof_params.path, cur);
+            switch (cur_expr->type) {
+            case EXPR_MEM_ACC:
+                if (compound->type != TYPE_STRUCT &&
+                    compound->type != TYPE_UNION) {
+                    logger_log(&cur_expr->mark, LOG_ERR,
+                               "request for member '%s' in something not a "
+                               "structure or union", cur_expr->mem_acc.name);
+                    return false;
+                }
+                compound = ast_type_find_member(compound,
+                                                cur_expr->mem_acc.name, NULL,
+                                                NULL);
+                if (compound == NULL) {
+                    logger_log(&cur_expr->mark, LOG_ERR,
+                               "compound type has no member '%s'",
+                               cur_expr->mem_acc.name);
+                    return false;
+                }
+                break;
+            case EXPR_ARR_IDX:
+                if (compound->type != TYPE_ARR) {
+                    logger_log(&cur_expr->mark, LOG_ERR,
+                               "subscripted value is not an array");
+                    return false;
+                }
+                compound = compound->arr.base;
+                break;
+            default:
+                assert(false);
             }
         }
 

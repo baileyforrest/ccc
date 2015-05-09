@@ -515,11 +515,23 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         ast_directed_print(dest, remain, ", ");
         bool first = true;
         SL_FOREACH(cur, &expr->offsetof_params.path) {
-            if (!first) {
-                ast_directed_print(dest, remain, ".");
+            expr_t *cur_expr = GET_ELEM(&expr->offsetof_params.path, cur);
+            switch (cur_expr->type) {
+            case EXPR_MEM_ACC:
+                if (!first) {
+                    ast_directed_print(dest, remain, ".");
+                }
+                ast_directed_print(dest, remain, "%s", cur_expr->mem_acc.name);
+                break;
+            case EXPR_ARR_IDX:
+                assert(!first);
+                ast_directed_print(dest, remain, "[");
+                ast_expr_print(cur_expr->arr_idx.index, 0, dest, remain);
+                ast_directed_print(dest, remain, "]");
+                break;
+            default:
+                assert(false);
             }
-            str_node_t *node = GET_ELEM(&expr->offsetof_params.path, cur);
-            ast_directed_print(dest, remain, "%s", node->str);
             first = false;
         }
         ast_directed_print(dest, remain, ")");

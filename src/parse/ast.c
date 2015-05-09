@@ -104,7 +104,7 @@ expr_t *ast_expr_create(trans_unit_t *tunit, fmark_t *mark, expr_type_t type) {
         sl_init(&node->cmpd.exprs, offsetof(expr_t, link));
         break;
     case EXPR_OFFSETOF:
-        sl_init(&node->offsetof_params.path, offsetof(str_node_t, link));
+        sl_init(&node->offsetof_params.path, offsetof(expr_t, link));
         break;
     case EXPR_INIT_LIST:
         sl_init(&node->init_list.exprs, offsetof(expr_t, link));
@@ -290,8 +290,6 @@ void ast_type_destroy(type_t *type) {
 void ast_expr_destroy(expr_t *expr) {
     switch (expr->type) {
     case EXPR_OFFSETOF:
-        SL_DESTROY_FUNC(&expr->offsetof_params.path, free);
-        break;
     case EXPR_VOID:
     case EXPR_PAREN:
     case EXPR_VAR:
