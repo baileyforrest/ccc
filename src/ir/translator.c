@@ -449,11 +449,12 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     case STMT_FOR: {
         ir_label_t *cond = trans_numlabel_create(ts);
         ir_label_t *body = trans_numlabel_create(ts);
+        ir_label_t *update = trans_numlabel_create(ts);
         ir_label_t *after = trans_numlabel_create(ts);
         ir_label_t *break_save = ts->break_target;
         ir_label_t *continue_save = ts->continue_target;
         ts->break_target = after;
-        ts->continue_target = cond;
+        ts->continue_target = update;
 
         typetab_t *typetab_save = NULL;
         // Loop header:
@@ -510,6 +511,17 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         // Only add 3rd expression and unconditional branch if last statement
         // wasn't a jump
         if (!stmt_jumps) {
+            // Unconditional branch to update
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            ir_stmt->br.cond = NULL;
+            ir_stmt->br.uncond = update;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+
+            // Update target
+            ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
+            ir_stmt->label = update;
+            trans_add_stmt(ts, ir_stmts, ir_stmt);
+
             if (stmt->for_params.expr3 != NULL) {
                 trans_expr(ts, false, stmt->for_params.expr3, ir_stmts);
             }
