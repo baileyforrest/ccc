@@ -59,126 +59,9 @@ static slist_t temp_files;
 
 status_t main_setup(int argc, char **argv);
 void main_destroy(void);
-
 char *main_compile_llvm(char *filepath, ir_trans_unit_t *ir, char *asm_path);
-void main_assemble(char *filename, char *asm_path);
-
+void main_assemble(char *filename, char *asm_path, char *obj_path);
 void main_link(void);
-
-status_t main_setup(int argc, char **argv) {
-    logger_init();
-    fdir_init();
-    sstore_init();
-
-    sl_init(&temp_files, offsetof(tempfile_t, link));
-
-    return optman_init(argc, argv);
-}
-
-void main_destroy(void) {
-    optman_destroy();
-    sstore_destroy();
-    fdir_destroy();
-
-    SL_DESTROY_FUNC(&temp_files, tempfile_destroy);
-}
-
-char *main_compile_llvm(char *filepath, ir_trans_unit_t *ir, char *asm_path) {
-    tempfile_t *llvm_tempfile = tempfile_create(filepath, LLVM_EXT);
-    sl_append(&temp_files, &llvm_tempfile->link);
-    ir_print(tempfile_file(llvm_tempfile), ir, filepath);
-    tempfile_close(llvm_tempfile);
-
-    tempfile_t *asm_tempfile;
-    if (asm_path == NULL) {
-        asm_tempfile = tempfile_create(filepath, ASM_EXT);
-    } else {
-        asm_tempfile = tempfile_create(asm_path, NULL);
-    }
-    sl_append(&temp_files, &asm_tempfile->link);
-    tempfile_close(asm_tempfile);
-
-    pid_t pid = fork();
-    if (pid == -1) {
-        puts(strerror(errno));
-        exit_err("fork failed");
-    } else if (pid == 0) {
-        execlp(LLC, LLC, tempfile_path(llvm_tempfile), "-o",
-               tempfile_path(asm_tempfile), (char *)NULL);
-        logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    int child_status;
-    waitpid(pid, &child_status, 0);
-    assert(child_status == 0);
-
-    return tempfile_path(asm_tempfile);
-}
-
-void main_assemble(char *filename, char *asm_path) {
-    tempfile_t *obj_tempfile = tempfile_create(filename, OBJ_EXT);
-    sl_append(&temp_files, &obj_tempfile->link);
-    tempfile_close(obj_tempfile);
-
-    // Shell out to as
-    // TODO1: Pass all options to as
-    pid_t pid = fork();
-    if (pid == -1) {
-        puts(strerror(errno));
-        exit_err("fork failed");
-    } else if (pid == 0) {
-        execlp(AS, AS, asm_path, "-o", tempfile_path(obj_tempfile), NULL);
-        logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    int child_status;
-    waitpid(pid, &child_status, 0);
-    assert(child_status == 0);
-
-    str_node_t *obj_node = emalloc(sizeof(str_node_t));
-    obj_node->str = tempfile_path(obj_tempfile);
-    sl_append(&optman.obj_files, &obj_node->link);
-}
-
-void main_link(void) {
-    // Shell out to linker
-    pid_t pid = fork();
-    if (pid == -1) {
-        puts(strerror(errno));
-        exit_err("fork failed");
-    } else if (pid == 0) {
-        vec_t argv;
-        vec_init(&argv, 0);
-
-        // Add exec name as argv[0]
-        vec_push_back(&argv, LD);
-
-        // output file option
-        vec_push_back(&argv, "-o");
-        vec_push_back(&argv, optman.output);
-
-
-        // Add the object files
-        SL_FOREACH(cur, &optman.obj_files) {
-            str_node_t *str = GET_ELEM(&optman.obj_files, cur);
-            vec_push_back(&argv, str->str);
-        }
-
-        // Add NULL terminator
-        vec_push_back(&argv, (char *)NULL);
-
-        execvp(LD, (char **)vec_elems(&argv));
-        logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    int ld_status;
-    waitpid(pid, &ld_status, 0);
-    if (ld_status != 0) {
-        logger_log(NULL, LOG_ERR, "ld returned %d exit status",
-                   WEXITSTATUS(ld_status));
-    }
-}
 
 int main(int argc, char **argv) {
     status_t status = CCC_OK;
@@ -238,20 +121,19 @@ int main(int argc, char **argv) {
 
         if (optman.output_opts & OUTPUT_ASM &&
             optman.output_opts & OUTPUT_EMIT_LLVM) {
-            if (optman.output == NULL) {
-                optman.output = format_basename_ext(filename, LLVM_EXT);
+            char *outname = optman.output;
+            if (outname == NULL) {
+                outname = format_basename_ext(filename, LLVM_EXT);
             }
-            FILE *output = fopen(optman.output, "w");
+            FILE *output = fopen(outname, "w");
             if (output == NULL) {
-                logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
-                           strerror(errno));
+                logger_log(NULL, LOG_ERR, "%s: %s", outname, strerror(errno));
                 goto next;
             }
 
             ir_print(output, ir, filename);
             if (EOF == fclose(output)) {
-                logger_log(NULL, LOG_ERR, "%s: %s", optman.output,
-                           strerror(errno));
+                logger_log(NULL, LOG_ERR, "%s: %s", outname, strerror(errno));
                 goto next;
             }
 
@@ -261,8 +143,9 @@ int main(int argc, char **argv) {
         // TODO1 Replace this with codegen when implemented
         char *asm_path = NULL;
         if (optman.output_opts & OUTPUT_ASM) {
-            if (optman.output == NULL) {
-                optman.output = format_basename_ext(filename, ASM_EXT);
+            asm_path = optman.output;
+            if (asm_path == NULL) {
+                asm_path = format_basename_ext(filename, ASM_EXT);
             }
             done = true;
         }
@@ -273,15 +156,17 @@ int main(int argc, char **argv) {
             goto next;
         }
 
+        char *obj_path = NULL;
         if (optman.output_opts & OUTPUT_OBJ) {
-            if (optman.output == NULL) {
-                optman.output = format_basename_ext(filename, OBJ_EXT);
+            obj_path = optman.output;
+            if (obj_path == NULL) {
+                obj_path = format_basename_ext(filename, OBJ_EXT);
             }
             done = true;
         } else {
             link = true;
         }
-        main_assemble(filename, asm_path);
+        main_assemble(filename, asm_path, obj_path);
 
     next:
         man_destroy(&manager);
@@ -296,6 +181,7 @@ int main(int argc, char **argv) {
     }
 
     if (link) {
+        main_link();
     }
 
 fail:
@@ -306,4 +192,128 @@ fail:
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
+}
+
+status_t main_setup(int argc, char **argv) {
+    logger_init();
+    fdir_init();
+    sstore_init();
+
+    sl_init(&temp_files, offsetof(tempfile_t, link));
+
+    return optman_init(argc, argv);
+}
+
+void main_destroy(void) {
+    optman_destroy();
+    sstore_destroy();
+    fdir_destroy();
+
+    SL_DESTROY_FUNC(&temp_files, tempfile_destroy);
+}
+
+char *main_compile_llvm(char *filepath, ir_trans_unit_t *ir, char *asm_path) {
+    tempfile_t *llvm_tempfile = tempfile_create(filepath, LLVM_EXT);
+    sl_append(&temp_files, &llvm_tempfile->link);
+    ir_print(tempfile_file(llvm_tempfile), ir, filepath);
+    tempfile_close(llvm_tempfile);
+
+    tempfile_t *asm_tempfile;
+    if (asm_path == NULL) {
+        asm_tempfile = tempfile_create(filepath, ASM_EXT);
+    } else {
+        asm_tempfile = tempfile_create(asm_path, NULL);
+    }
+    sl_append(&temp_files, &asm_tempfile->link);
+    tempfile_close(asm_tempfile);
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        puts(strerror(errno));
+        exit_err("fork failed");
+    } else if (pid == 0) {
+        execlp(LLC, LLC, tempfile_path(llvm_tempfile), "-o",
+               tempfile_path(asm_tempfile), (char *)NULL);
+        logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    int child_status;
+    waitpid(pid, &child_status, 0);
+    assert(child_status == 0);
+
+    return tempfile_path(asm_tempfile);
+}
+
+void main_assemble(char *filename, char *asm_path, char *obj_path) {
+    tempfile_t *obj_tempfile;
+    if (obj_path == NULL) {
+        obj_tempfile = tempfile_create(filename, OBJ_EXT);
+    } else {
+        obj_tempfile = tempfile_create(obj_path, NULL);
+    }
+    sl_append(&temp_files, &obj_tempfile->link);
+    tempfile_close(obj_tempfile);
+
+    // Shell out to as
+    // TODO1: Pass all options to as
+    pid_t pid = fork();
+    if (pid == -1) {
+        puts(strerror(errno));
+        exit_err("fork failed");
+    } else if (pid == 0) {
+        execlp(AS, AS, asm_path, "-o", tempfile_path(obj_tempfile), NULL);
+        logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    int child_status;
+    waitpid(pid, &child_status, 0);
+    assert(child_status == 0);
+
+    str_node_t *obj_node = emalloc(sizeof(str_node_t));
+    obj_node->str = tempfile_path(obj_tempfile);
+    sl_append(&optman.obj_files, &obj_node->link);
+}
+
+void main_link(void) {
+    if (optman.output == NULL) {
+        optman.output = DEFAULT_OUTPUT_NAME;
+    }
+
+    // Shell out to linker
+    pid_t pid = fork();
+    if (pid == -1) {
+        puts(strerror(errno));
+        exit_err("fork failed");
+    } else if (pid == 0) {
+        vec_t argv;
+        vec_init(&argv, 0);
+
+        // Add exec name as argv[0]
+        vec_push_back(&argv, LD);
+
+        // output file option
+        vec_push_back(&argv, "-o");
+        vec_push_back(&argv, optman.output);
+
+
+        // Add the object files
+        SL_FOREACH(cur, &optman.obj_files) {
+            str_node_t *str = GET_ELEM(&optman.obj_files, cur);
+            vec_push_back(&argv, str->str);
+        }
+
+        // Add NULL terminator
+        vec_push_back(&argv, (char *)NULL);
+
+        execvp(LD, (char **)vec_elems(&argv));
+        logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    int ld_status;
+    waitpid(pid, &ld_status, 0);
+    if (ld_status != 0) {
+        logger_log(NULL, LOG_ERR, "ld returned %d exit status",
+                   WEXITSTATUS(ld_status));
+    }
 }
