@@ -1941,6 +1941,47 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
         }
         break;
     }
+    case TYPE_UNION: {
+        assert(val == NULL || val->type == EXPR_INIT_LIST);
+
+        expr_t *head = sl_head(&val->init_list.exprs);
+        assert(head == sl_tail(&val->init_list.exprs));
+        val = head;
+
+        struct_iter_t iter;
+        struct_iter_init(ast_type, &iter);
+        type_t *dest_type;
+
+        if (val != NULL && val->type == EXPR_DESIG_INIT) {
+            // Find the member
+            do {
+                if (iter.node != NULL && iter.node->id != NULL &&
+                    strcmp(iter.node->id, val->desig_init.name) == 0) {
+                    break;
+                }
+            } while (struct_iter_advance(&iter));
+
+            val = val->desig_init.val;
+            dest_type = iter.node->type;
+        } else {
+            // Skip anonymous members that can't be struct/union
+            while (iter.node != NULL && iter.node->id == NULL) {
+                struct_iter_advance(&iter);
+            }
+            dest_type = iter.node == NULL ? iter.decl->type : iter.node->type;
+        }
+
+        ir_type_t *ir_dest_type = trans_type(ts, dest_type);
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = ir_dest_type;
+
+        addr = trans_ir_type_conversion(ts, ptr_type, false,
+                                        ir_expr_type(addr), false,
+                                        addr, ir_stmts);
+        ast_type = dest_type;
+        ir_type = ir_dest_type;
+        // FALL THROUGH
+    }
     default: {
         ir_expr_t *ir_val = val == NULL ? ir_expr_zero(ts->tunit, ir_type) :
             trans_expr(ts, false, val, ir_stmts);

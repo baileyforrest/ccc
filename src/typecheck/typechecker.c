@@ -1154,9 +1154,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 struct_iter_advance(&iter);
             }
 
-            type_t *type = iter.node == NULL ?
-                iter.decl->type : iter.node->type;
-            dest_type = type;
+            dest_type = iter.node == NULL ? iter.decl->type : iter.node->type;
         }
 
         if (head->type == EXPR_INIT_LIST) {
