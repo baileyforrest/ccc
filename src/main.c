@@ -218,22 +218,24 @@ char *main_compile_llvm(char *filepath, ir_trans_unit_t *ir, char *asm_path) {
     ir_print(tempfile_file(llvm_tempfile), ir, filepath);
     tempfile_close(llvm_tempfile);
 
-    tempfile_t *asm_tempfile;
+    char *outpath;
     if (asm_path == NULL) {
+        tempfile_t *asm_tempfile;
         asm_tempfile = tempfile_create(filepath, ASM_EXT);
+        sl_append(&temp_files, &asm_tempfile->link);
+        tempfile_close(asm_tempfile);
+        outpath = tempfile_path(llvm_tempfile);
     } else {
-        asm_tempfile = tempfile_create(asm_path, NULL);
+        outpath = asm_path;
     }
-    sl_append(&temp_files, &asm_tempfile->link);
-    tempfile_close(asm_tempfile);
 
     pid_t pid = fork();
     if (pid == -1) {
         puts(strerror(errno));
         exit_err("fork failed");
     } else if (pid == 0) {
-        execlp(LLC, LLC, tempfile_path(llvm_tempfile), "-o",
-               tempfile_path(asm_tempfile), (char *)NULL);
+        execlp(LLC, LLC, tempfile_path(llvm_tempfile), "-o", outpath,
+               (char *)NULL);
         logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -241,18 +243,20 @@ char *main_compile_llvm(char *filepath, ir_trans_unit_t *ir, char *asm_path) {
     waitpid(pid, &child_status, 0);
     assert(child_status == 0);
 
-    return tempfile_path(asm_tempfile);
+    return outpath;
 }
 
 void main_assemble(char *filename, char *asm_path, char *obj_path) {
-    tempfile_t *obj_tempfile;
+    char *objpath;
     if (obj_path == NULL) {
+        tempfile_t *obj_tempfile;
         obj_tempfile = tempfile_create(filename, OBJ_EXT);
+        sl_append(&temp_files, &obj_tempfile->link);
+        tempfile_close(obj_tempfile);
+        objpath = tempfile_path(obj_tempfile);
     } else {
-        obj_tempfile = tempfile_create(obj_path, NULL);
+        objpath = obj_path;
     }
-    sl_append(&temp_files, &obj_tempfile->link);
-    tempfile_close(obj_tempfile);
 
     // Shell out to as
     // TODO1: Pass all options to as
@@ -261,7 +265,7 @@ void main_assemble(char *filename, char *asm_path, char *obj_path) {
         puts(strerror(errno));
         exit_err("fork failed");
     } else if (pid == 0) {
-        execlp(AS, AS, asm_path, "-o", tempfile_path(obj_tempfile), NULL);
+        execlp(AS, AS, asm_path, "-o", objpath, NULL);
         logger_log(NULL, LOG_ERR, "Failed to exec %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -271,7 +275,7 @@ void main_assemble(char *filename, char *asm_path, char *obj_path) {
     assert(child_status == 0);
 
     str_node_t *obj_node = emalloc(sizeof(str_node_t));
-    obj_node->str = tempfile_path(obj_tempfile);
+    obj_node->str = objpath;
     sl_append(&optman.obj_files, &obj_node->link);
 }
 

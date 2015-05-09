@@ -236,7 +236,7 @@ char *format_basename_ext(char *path, char *ext) {
         return NULL;
     }
     size_t ext_len = strlen(ext);
-    if (ext_len + len + 1 > NAME_MAX) {
+    if (ext_len + len > NAME_MAX) {
         return NULL;
     }
     strncpy(namebuf, base, len);

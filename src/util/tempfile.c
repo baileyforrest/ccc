@@ -26,6 +26,8 @@
 #include "tempfile.h"
 
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "util/logger.h"
 
@@ -41,6 +43,10 @@ tempfile_t *tempfile_create(char *path, char *ext) {
         tf = emalloc(sizeof(*tf) + strlen(path) + 1);
         tf->tmp_path = (char *)tf + sizeof(*tf);
         strcpy(tf->tmp_path, path);
+        if (-1 == (tf->fd = open(tf->tmp_path, O_WRONLY | O_CREAT | O_TRUNC,
+                                 S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH))) {
+            goto fail;
+        }
     } else {
         char *filename = ccc_basename(path);
         size_t ext_len = strlen(ext);
