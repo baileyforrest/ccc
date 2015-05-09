@@ -155,23 +155,33 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
                     stmt->br.if_true->name, stmt->br.if_false->name);
         }
         break;
-    case IR_STMT_SWITCH:
+    case IR_STMT_SWITCH: {
+        ir_type_t *val_type = ir_expr_type(stmt->switch_params.expr);
         fprintf(stream, "switch ");
-        ir_type_print(stream, &SWITCH_VAL_TYPE, NULL);
+        ir_type_print(stream, val_type, NULL);
         fprintf(stream, " ");
         ir_expr_print(stream, stmt->switch_params.expr);
-        fprintf(stream, ", label %%%s [ ",
+        fprintf(stream, ", label %%%s [\n",
                 stmt->switch_params.default_case->name);
         SL_FOREACH(cur, &stmt->switch_params.cases) {
+            if (indent) {
+                fprintf(stream, INDENT);
+            }
+            fprintf(stream, "  ");
+
             ir_expr_label_pair_t *pair =
                 GET_ELEM(&stmt->switch_params.cases, cur);
-            ir_type_print(stream, &SWITCH_VAL_TYPE, NULL);
-            ir_expr_print(stream, pair->expr);
+            ir_type_print(stream, val_type, NULL);
             fprintf(stream, " ");
-            fprintf(stream, ", label %%%s ", pair->label->name);
+            ir_expr_print(stream, pair->expr);
+            fprintf(stream, ", label %%%s\n", pair->label->name);
+        }
+        if (indent) {
+            fprintf(stream, INDENT);
         }
         fprintf(stream, "]");
         break;
+    }
     case IR_STMT_INDIR_BR:
         // TODO0: Remove if unused
         break;

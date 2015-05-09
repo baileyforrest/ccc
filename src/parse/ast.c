@@ -162,7 +162,7 @@ stmt_t *ast_stmt_create(trans_unit_t *tunit, fmark_t *mark, stmt_type_t type) {
 
     switch (type) {
     case STMT_SWITCH:
-        sl_init(&node->switch_params.cases, offsetof(stmt_t, link));
+        sl_init(&node->switch_params.cases, offsetof(stmt_t, case_params.link));
         break;
 
     case STMT_COMPOUND:

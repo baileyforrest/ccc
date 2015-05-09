@@ -56,6 +56,11 @@ typedef struct ir_label_t ir_label_t;
 #define TYPE_IS_PTR(test)                                   \
     ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_PTR)
 
+#define STMT_LABELED(test)                                          \
+    ((test)->type == STMT_CASE ? (test)->case_params.stmt :         \
+     (test)->type == STMT_DEFAULT ? (test)->default_params.stmt :   \
+     (test)->type == STMT_LABEL ? (test)->label.stmt : NULL)
+
 
 /**
  * Modifiers for types. Should be stored in a bitmap

@@ -469,7 +469,6 @@ extern ir_type_t ir_type_x86_fp80;
 
 extern ir_type_t ir_type_i8_ptr;
 
-#define SWITCH_VAL_TYPE ir_type_i64
 #define NELEM_TYPE ir_type_i64
 #define BOOL_TYPE ir_type_i8
 
