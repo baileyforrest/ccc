@@ -37,6 +37,10 @@ $(DEST)/$(BIN_NAME): $(OBJS)
 clean:
 	$(RM) -r $(DEST)/*
 
+.PHONY: test
+test:
+	@./test/scripts/test_all.bash
+
 # Add dependency files, if they exist
 -include $(DEPS)
 
