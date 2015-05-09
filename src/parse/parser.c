@@ -1172,6 +1172,53 @@ fail:
     return status;
 }
 
+status_t par_mem_acc_list(lex_wrap_t *lex, mem_acc_list_t *list, bool nodot) {
+    status_t status = CCC_OK;
+    while (nodot || LEX_CUR(lex).type == DOT ||
+           LEX_CUR(lex).type == LBRACK) {
+        expr_t *access;
+        if (nodot || LEX_CUR(lex).type == DOT) {
+            if (nodot) {
+                nodot = false;
+            } else {
+                LEX_ADVANCE(lex);
+            }
+
+            if (LEX_CUR(lex).type != ID) { // Not a name
+                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                           "Parse Error: Expected <identifer>, Found: %s.",
+                           token_str(LEX_CUR(lex).type));
+                status = CCC_ESYNTAX;
+                goto fail;
+            }
+
+            access = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+                                     EXPR_MEM_ACC);
+            access->mem_acc.base = NULL;
+            access->mem_acc.name = LEX_CUR(lex).tab_entry->key;
+            access->mem_acc.op = OP_DOT;
+            LEX_ADVANCE(lex);
+        } else if (LEX_CUR(lex).type == LBRACK) {
+            LEX_ADVANCE(lex);
+            access = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+                                     EXPR_ARR_IDX);
+            access->arr_idx.array = NULL;
+
+            if (CCC_OK !=
+                (status = par_expression(lex, &access->arr_idx.index))) {
+                goto fail;
+            }
+            LEX_MATCH(lex, RBRACK);
+        } else {
+            break;
+        }
+        sl_append(&list->list, &access->link);
+    }
+
+fail:
+    return status;
+}
+
 status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *base = NULL;
@@ -1230,49 +1277,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             goto fail;
         }
         LEX_MATCH(lex, COMMA);
-
-        bool first = true;
-        while (first || LEX_CUR(lex).type == DOT ||
-               LEX_CUR(lex).type == LBRACK) {
-            expr_t *access;
-            if (first || LEX_CUR(lex).type == DOT) {
-                if (first) {
-                    first = false;
-                } else {
-                    LEX_ADVANCE(lex);
-                }
-
-                if (LEX_CUR(lex).type != ID) { // Not a name
-                    logger_log(&LEX_CUR(lex).mark, LOG_ERR,
-                               "Parse Error: Expected <identifer>, Found: %s.",
-                               token_str(LEX_CUR(lex).type));
-                    status = CCC_ESYNTAX;
-                    goto fail;
-                }
-
-                access = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
-                                         EXPR_MEM_ACC);
-                access->mem_acc.base = NULL;
-                access->mem_acc.name = LEX_CUR(lex).tab_entry->key;
-                access->mem_acc.op = OP_DOT;
-                LEX_ADVANCE(lex);
-            } else if (LEX_CUR(lex).type == LBRACK) {
-                LEX_ADVANCE(lex);
-                access = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
-                                       EXPR_ARR_IDX);
-                access->arr_idx.array = NULL;
-
-                if (CCC_OK !=
-                    (status = par_expression(lex, &access->arr_idx.index))) {
-                    goto fail;
-                }
-                LEX_MATCH(lex, RBRACK);
-            } else {
-                break;
-            }
-            sl_append(&base->offsetof_params.path, &access->link);
-        }
-
+        par_mem_acc_list(lex, &base->offsetof_params.path, true);
         LEX_MATCH(lex, RPAREN);
         break;
 

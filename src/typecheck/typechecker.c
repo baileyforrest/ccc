@@ -829,6 +829,55 @@ bool typecheck_type_conditional(fmark_t *mark, type_t *type) {
     return false;
 }
 
+bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
+                            mem_acc_list_t *list) {
+    SL_FOREACH(cur, &list->list) {
+        type = ast_type_unmod(type);
+        expr_t *cur_expr = GET_ELEM(&list->list, cur);
+        switch (cur_expr->type) {
+        case EXPR_MEM_ACC:
+            if (type->type != TYPE_STRUCT &&
+                type->type != TYPE_UNION) {
+                logger_log(&cur_expr->mark, LOG_ERR,
+                           "request for member '%s' in something not a "
+                           "structure or union", cur_expr->mem_acc.name);
+                return false;
+            }
+            type = ast_type_find_member(type, cur_expr->mem_acc.name, NULL,
+                                        NULL);
+            if (type == NULL) {
+                logger_log(&cur_expr->mark, LOG_ERR,
+                           "type type has no member '%s'",
+                           cur_expr->mem_acc.name);
+                return false;
+            }
+            break;
+        case EXPR_ARR_IDX:
+            if (type->type != TYPE_ARR) {
+                logger_log(&cur_expr->mark, LOG_ERR,
+                           "subscripted value is not an array");
+                return false;
+            }
+            if (!typecheck_expr(tcs, cur_expr->arr_idx.index, TC_CONST)) {
+                logger_log(&cur_expr->arr_idx.index->mark, LOG_ERR,
+                           "cannot apply 'offsetof' to a non constant "
+                           "address");
+                return false;
+            }
+            long long val;
+            typecheck_const_expr_eval(tcs->typetab, cur_expr->arr_idx.index,
+                                      &val);
+            cur_expr->arr_idx.const_idx = val;
+            type = type->arr.base;
+            break;
+        default:
+            assert(false);
+        }
+    }
+
+    return true;
+}
+
 bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
     if (!typecheck_expr(tcs, expr, TC_NOCONST)) {
         return false;
@@ -1652,48 +1701,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         decl_node_t *decl = sl_head(&expr->offsetof_params.type->decls);
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
-
-        SL_FOREACH(cur, &expr->offsetof_params.path) {
-            compound = ast_type_unmod(compound);
-            expr_t *cur_expr = GET_ELEM(&expr->offsetof_params.path, cur);
-            switch (cur_expr->type) {
-            case EXPR_MEM_ACC:
-                if (compound->type != TYPE_STRUCT &&
-                    compound->type != TYPE_UNION) {
-                    logger_log(&cur_expr->mark, LOG_ERR,
-                               "request for member '%s' in something not a "
-                               "structure or union", cur_expr->mem_acc.name);
-                    return false;
-                }
-                compound = ast_type_find_member(compound,
-                                                cur_expr->mem_acc.name, NULL,
-                                                NULL);
-                if (compound == NULL) {
-                    logger_log(&cur_expr->mark, LOG_ERR,
-                               "compound type has no member '%s'",
-                               cur_expr->mem_acc.name);
-                    return false;
-                }
-                break;
-            case EXPR_ARR_IDX:
-                if (compound->type != TYPE_ARR) {
-                    logger_log(&cur_expr->mark, LOG_ERR,
-                               "subscripted value is not an array");
-                    return false;
-                }
-                if (!typecheck_expr(tcs, cur_expr->arr_idx.index, TC_CONST)) {
-                    logger_log(&cur_expr->arr_idx.index->mark, LOG_ERR,
-                                "cannot apply 'offsetof' to a non constant "
-                               "address");
-                    return false;
-                }
-                compound = compound->arr.base;
-                break;
-            default:
-                assert(false);
-            }
-        }
-
+        retval &= typecheck_mem_acc_list(tcs, compound,
+                                         &expr->offsetof_params.path);
         expr->etype = tt_size_t;
         return true;
 

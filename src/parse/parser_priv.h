@@ -325,6 +325,8 @@ status_t par_non_binary_expression(lex_wrap_t *lex, bool *is_unary,
 status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
                              expr_t **result);
 
+status_t par_mem_acc_list(lex_wrap_t *lex, mem_acc_list_t *list, bool nodot);
+
 /**
  * Parses a unary expression.
  *

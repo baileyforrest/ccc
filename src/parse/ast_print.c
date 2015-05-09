@@ -513,27 +513,7 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         ast_directed_print(dest, remain, "__builtin_offsetof(");
         ast_decl_print(expr->offsetof_params.type, TYPE_VOID, 0, dest, remain);
         ast_directed_print(dest, remain, ", ");
-        bool first = true;
-        SL_FOREACH(cur, &expr->offsetof_params.path) {
-            expr_t *cur_expr = GET_ELEM(&expr->offsetof_params.path, cur);
-            switch (cur_expr->type) {
-            case EXPR_MEM_ACC:
-                if (!first) {
-                    ast_directed_print(dest, remain, ".");
-                }
-                ast_directed_print(dest, remain, "%s", cur_expr->mem_acc.name);
-                break;
-            case EXPR_ARR_IDX:
-                assert(!first);
-                ast_directed_print(dest, remain, "[");
-                ast_expr_print(cur_expr->arr_idx.index, 0, dest, remain);
-                ast_directed_print(dest, remain, "]");
-                break;
-            default:
-                assert(false);
-            }
-            first = false;
-        }
+        ast_mem_acc_list_print(&expr->offsetof_params.path, true, dest, remain);
         ast_directed_print(dest, remain, ")");
         break;
     }
@@ -601,6 +581,30 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
 
     default:
         assert(false);
+    }
+}
+
+void ast_mem_acc_list_print(mem_acc_list_t *list, bool nodot, char **dest,
+                            size_t *remain) {
+    SL_FOREACH(cur, &list->list) {
+        expr_t *cur_expr = GET_ELEM(&list->list, cur);
+        switch (cur_expr->type) {
+        case EXPR_MEM_ACC:
+            if (!nodot) {
+                ast_directed_print(dest, remain, ".");
+            }
+            ast_directed_print(dest, remain, "%s", cur_expr->mem_acc.name);
+            break;
+        case EXPR_ARR_IDX:
+            assert(!nodot);
+            ast_directed_print(dest, remain, "[");
+            ast_expr_print(cur_expr->arr_idx.index, 0, dest, remain);
+            ast_directed_print(dest, remain, "]");
+            break;
+        default:
+            assert(false);
+        }
+        nodot = false;
     }
 }
 

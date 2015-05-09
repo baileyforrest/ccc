@@ -26,7 +26,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "typecheck/typechecker.h"
 #include "util/logger.h"
 
 /**
@@ -104,7 +103,7 @@ expr_t *ast_expr_create(trans_unit_t *tunit, fmark_t *mark, expr_type_t type) {
         sl_init(&node->cmpd.exprs, offsetof(expr_t, link));
         break;
     case EXPR_OFFSETOF:
-        sl_init(&node->offsetof_params.path, offsetof(expr_t, link));
+        sl_init(&node->offsetof_params.path.list, offsetof(expr_t, link));
         break;
     case EXPR_INIT_LIST:
         sl_init(&node->init_list.exprs, offsetof(expr_t, link));
@@ -810,11 +809,7 @@ size_t ast_type_size(type_t *type) {
         return sizeof(ast_type_size);
     case TYPE_ARR: {
         size_t size = ast_type_size(type->arr.base);
-        long long len;
-        if (!typecheck_const_expr(type->arr.len, &len)) {
-            return -1;
-        }
-        return size * len;
+        return size * type->arr.nelems;
     }
     case TYPE_PTR:
         return sizeof(void *);
@@ -880,17 +875,23 @@ size_t ast_type_align(type_t *type) {
     return 0;
 }
 
-size_t ast_type_offset(type_t *type, slist_t *path) {
+size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
     size_t offset = 0;
-    SL_FOREACH(cur, path) {
+    SL_FOREACH(cur, &list->list) {
+        type = ast_type_unmod(type);
         size_t inner_offset;
-        str_node_t *node = GET_ELEM(path, cur);
-        if (type->type != TYPE_STRUCT || type->type != TYPE_UNION) {
-            return -1;
-        }
-        type = ast_type_find_member(type, node->str, &inner_offset, NULL);
-        if (type == NULL) {
-            return -1;
+        expr_t *cur_expr = GET_ELEM(&list->list, cur);
+
+        switch (cur_expr->type) {
+        case EXPR_MEM_ACC:
+            type = ast_type_find_member(type, cur_expr->mem_acc.name,
+                                        &inner_offset, NULL);
+            break;
+        case EXPR_ARR_IDX:
+            type = type->arr.base;
+            break;
+        default:
+            assert(false);
         }
         offset += inner_offset;
     }

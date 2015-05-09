@@ -135,6 +135,9 @@ bool typecheck_type_conditional(fmark_t *mark, type_t *type);
  */
 bool typecheck_type_integral(fmark_t *mark, type_t *type);
 
+bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
+                            mem_acc_list_t *list);
+
 /**
  * Typechecks the given expression and ensures its type can be used in a
  * conditional
