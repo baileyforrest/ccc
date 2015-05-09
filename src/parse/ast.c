@@ -707,6 +707,45 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
     return status;
 }
 
+type_t *ast_get_union_type(type_t *type, expr_t *expr, expr_t **head_loc) {
+    assert(type->type == TYPE_UNION);
+    assert(expr->type == EXPR_INIT_LIST);
+
+    expr_t *head = sl_head(&expr->init_list.exprs);
+    assert(head == sl_tail(&expr->init_list.exprs));
+    if (head == NULL) {
+        *head_loc = NULL;
+        return NULL;
+    }
+
+    struct_iter_t iter;
+    struct_iter_init(type, &iter);
+
+    type_t *dest_type;
+
+    if (head->type == EXPR_DESIG_INIT) {
+        // Find the member
+        do {
+            if (iter.node != NULL && iter.node->id != NULL &&
+                strcmp(iter.node->id, head->desig_init.name) == 0) {
+                break;
+            }
+        } while (struct_iter_advance(&iter));
+        head = head->desig_init.val;
+        dest_type = iter.node->type;
+    } else {
+        // Skip anonymous members that can't be struct/union
+        while (iter.node != NULL && iter.node->id == NULL) {
+            struct_iter_advance(&iter);
+        }
+
+        dest_type = iter.node == NULL ? iter.decl->type : iter.node->type;
+    }
+
+    *head_loc = head;
+    return dest_type;
+}
+
 size_t ast_type_size(type_t *type) {
     switch (type->type) {
     case TYPE_VOID:        return sizeof(void);

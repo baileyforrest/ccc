@@ -1035,8 +1035,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         type_t *etype = ast_type_unmod(expr->etype);
         switch (etype->type) {
         case TYPE_UNION:
-            // TODO0: This
-            break;
+            return trans_union_init(ts, expr->etype, expr);
         case TYPE_STRUCT:
             return trans_struct_init(ts, expr);
         case TYPE_ARR:
@@ -1051,8 +1050,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         break;
     }
     case EXPR_DESIG_INIT:
-        // TODO0: This
-        assert(false);
     default:
         assert(false);
     }
@@ -1712,6 +1709,15 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
 
         }
 
+        if (node->expr == NULL) {
+            gdecl->gdata.init = NULL;
+        } else {
+            ir_expr_t *init =
+                trans_expr(ts, false, node->expr, &gdecl->gdata.setup);
+            gdecl->gdata.init = init;
+            expr_type = ir_expr_type(init);
+        }
+
         ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
         ptr_type->ptr.base = expr_type;
 
@@ -1721,8 +1727,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
 
         gdecl->gdata.type = expr_type;
         gdecl->gdata.var = var_expr;
-        gdecl->gdata.init = node->expr == NULL ?
-            NULL : trans_expr(ts, false, node->expr, &gdecl->gdata.setup);
+
         gdecl->gdata.align = ast_type_align(node_type);
 
         symtab = &ts->tunit->globals;
@@ -1944,32 +1949,7 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
     case TYPE_UNION: {
         assert(val == NULL || val->type == EXPR_INIT_LIST);
 
-        expr_t *head = sl_head(&val->init_list.exprs);
-        assert(head == sl_tail(&val->init_list.exprs));
-        val = head;
-
-        struct_iter_t iter;
-        struct_iter_init(ast_type, &iter);
-        type_t *dest_type;
-
-        if (val != NULL && val->type == EXPR_DESIG_INIT) {
-            // Find the member
-            do {
-                if (iter.node != NULL && iter.node->id != NULL &&
-                    strcmp(iter.node->id, val->desig_init.name) == 0) {
-                    break;
-                }
-            } while (struct_iter_advance(&iter));
-
-            val = val->desig_init.val;
-            dest_type = iter.node->type;
-        } else {
-            // Skip anonymous members that can't be struct/union
-            while (iter.node != NULL && iter.node->id == NULL) {
-                struct_iter_advance(&iter);
-            }
-            dest_type = iter.node == NULL ? iter.decl->type : iter.node->type;
-        }
+        type_t *dest_type = ast_get_union_type(ast_type, val, &val);
 
         ir_type_t *ir_dest_type = trans_type(ts, dest_type);
         ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
@@ -2280,6 +2260,49 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
 
     return struct_lit;
 }
+
+ir_expr_t *trans_union_init(trans_state_t *ts, type_t *type, expr_t *expr) {
+    assert(expr->type == EXPR_INIT_LIST);
+    assert(expr->etype->type == TYPE_UNION);
+
+    expr_t *head;
+    type_t *elem_type = ast_get_union_type(type, expr, &head);
+    size_t total_size = ast_type_size(type);
+    size_t elem_size = ast_type_size(elem_type);
+
+    ir_type_t *ir_elem_type = trans_type(ts, elem_type);
+
+    ir_type_t *expr_type = ir_type_create(ts->tunit, IR_TYPE_STRUCT);
+    vec_push_back(&expr_type->struct_params.types, ir_elem_type);
+
+    ir_type_t *pad_type = NULL;
+    if (elem_size != total_size) {
+        assert(elem_size < total_size);
+        pad_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+        pad_type->arr.nelems = total_size - elem_size;
+        pad_type->arr.elem_type = &ir_type_i8;
+        vec_push_back(&expr_type->struct_params.types, pad_type);
+    }
+
+    ir_expr_t *struct_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+    sl_init(&struct_lit->const_params.struct_val, offsetof(ir_expr_t, link));
+    struct_lit->const_params.ctype = IR_CONST_STRUCT;
+    struct_lit->const_params.type = expr_type;
+
+    ir_expr_t *ir_elem = trans_expr(ts, false, head, NULL);
+    sl_append(&struct_lit->const_params.struct_val, &ir_elem->link);
+
+    if (elem_size != total_size) {
+        assert(pad_type != NULL);
+        ir_elem = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+        ir_elem->const_params.ctype = IR_CONST_UNDEF;
+        ir_elem->const_params.type = pad_type;
+        sl_append(&struct_lit->const_params.struct_val, &ir_elem->link);
+    }
+
+    return struct_lit;
+}
+
 
 void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                   ir_expr_t *dest, ir_expr_t *src, size_t len,

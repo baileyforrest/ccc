@@ -114,6 +114,7 @@ typedef enum ir_const_type_t {
     IR_CONST_STR,
     IR_CONST_ARR,
     IR_CONST_ZERO,
+    IR_CONST_UNDEF,
 } ir_const_type_t;
 
 typedef enum ir_oper_t {

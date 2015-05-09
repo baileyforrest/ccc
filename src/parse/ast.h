@@ -591,6 +591,8 @@ bool struct_iter_advance(struct_iter_t *iter);
 status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                                     expr_t *expr);
 
+type_t *ast_get_union_type(type_t *type, expr_t *expr, expr_t **head_loc);
+
 /**
  * Gets the size of a type
  *
