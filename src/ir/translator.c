@@ -1092,6 +1092,7 @@ ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
 
         case IR_CONST_STRUCT:
         case IR_CONST_ARR:
+        case IR_CONST_UNDEF:
         default:
             assert(false);
             is_true = false;

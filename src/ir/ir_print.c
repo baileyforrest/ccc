@@ -266,6 +266,9 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         case IR_CONST_ZERO:
             fprintf(stream, "zeroinitializer");
             break;
+        case IR_CONST_UNDEF:
+            fprintf(stream, "undef");
+            break;
         default:
             assert(false);
         }

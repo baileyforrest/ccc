@@ -400,6 +400,7 @@ void ir_expr_destroy(ir_expr_t *expr) {
         case IR_CONST_NULL:
         case IR_CONST_ZERO:
         case IR_CONST_STR:
+        case IR_CONST_UNDEF:
             break;
         case IR_CONST_ARR:
             sl_destroy(&expr->const_params.arr_val);
