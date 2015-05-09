@@ -56,7 +56,7 @@ void trans_gdecl_node(trans_state_t *ts, decl_node_t *node);
 
 void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
 
-// Returns true if the statement always returns, false otherwise
+// Returns true if the statement always jumps, false otherwise
 bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts);
 
 ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
