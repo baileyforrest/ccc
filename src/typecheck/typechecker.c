@@ -1681,6 +1681,12 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                                "subscripted value is not an array");
                     return false;
                 }
+                if (!typecheck_expr(tcs, cur_expr->arr_idx.index, TC_CONST)) {
+                    logger_log(&cur_expr->arr_idx.index->mark, LOG_ERR,
+                                "cannot apply 'offsetof' to a non constant "
+                               "address");
+                    return false;
+                }
                 compound = compound->arr.base;
                 break;
             default:
