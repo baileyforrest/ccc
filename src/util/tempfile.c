@@ -37,18 +37,23 @@ extern char *tempfile_path(tempfile_t *tf);
 
 tempfile_t *tempfile_create(char *path, char *ext) {
     tempfile_t *tf = NULL;
-    char *filename = ccc_basename(path);
-    size_t ext_len = strlen(ext);
+    if (ext == NULL) {
+        tf = emalloc(sizeof(*tf) + strlen(path) + 1);
+        tf->tmp_path = (char *)tf + sizeof(*tf);
+        strcpy(tf->tmp_path, path);
+    } else {
+        char *filename = ccc_basename(path);
+        size_t ext_len = strlen(ext);
 
-    // +2 one for null, one for the dot before extension
-    size_t tempfile_len = strlen(TMP_DIR) + strlen(filename) +
-        strlen(TMP_SUFFIX) + ext_len + 2;
-
-    tf = emalloc(sizeof(*tf) + tempfile_len);
-    tf->tmp_path = (char *)tf + sizeof(*tf);
-    sprintf(tf->tmp_path, "%s%s%s.%s", TMP_DIR, filename, TMP_SUFFIX, ext);
-    if (-1 == (tf->fd = mkstemps(tf->tmp_path, ext_len + 1))) {
-        goto fail;
+        // +2 one for null, one for the dot before extension
+        size_t tempfile_len = strlen(TMP_DIR) + strlen(filename) +
+            strlen(TMP_SUFFIX) + ext_len + 2;
+        tf = emalloc(sizeof(*tf) + tempfile_len);
+        tf->tmp_path = (char *)tf + sizeof(*tf);
+        sprintf(tf->tmp_path, "%s%s%s.%s", TMP_DIR, filename, TMP_SUFFIX, ext);
+        if (-1 == (tf->fd = mkstemps(tf->tmp_path, ext_len + 1))) {
+            goto fail;
+        }
     }
 
     if (NULL == (tf->stream = fdopen(tf->fd, "w"))) {

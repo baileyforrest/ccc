@@ -20,11 +20,14 @@
  * Implementations of misc utilities
  */
 
+#define _DEFAULT_SOURCE 1
 #include "util.h"
 
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "util/logger.h"
 #include "util/string_store.h"
@@ -34,7 +37,10 @@ extern bool ind_str_eq(const void *vstr1, const void *vstr2);
 extern uint32_t len_str_hash(const void *vstr);
 extern bool len_str_eq(const void *vstr1, const void *vstr2);
 
-static const char *const mem_err = "out of memory, giving up";
+void exit_err(char *msg) {
+    logger_log(NULL, LOG_ERR, msg);
+    exit(EXIT_FAILURE);
+}
 
 char *ccc_basename(char *path) {
     size_t path_len = strlen(path);
@@ -48,8 +54,7 @@ char *ccc_basename(char *path) {
 void *emalloc(size_t size) {
     void *result = malloc(size);
     if (result == NULL) {
-        logger_log(NULL, LOG_ERR, mem_err);
-        exit(EXIT_FAILURE);
+        exit_err(strerror(errno));
     }
     return result;
 }
@@ -57,8 +62,7 @@ void *emalloc(size_t size) {
 void *ecalloc(size_t nmemb, size_t size) {
     void *result = calloc(nmemb, size);
     if (result == NULL) {
-        logger_log(NULL, LOG_ERR, mem_err);
-        exit(EXIT_FAILURE);
+        exit_err(strerror(errno));
     }
     return result;
 }
@@ -66,8 +70,7 @@ void *ecalloc(size_t nmemb, size_t size) {
 void *erealloc(void *ptr, size_t size) {
     void *result = realloc(ptr, size);
     if (result == NULL) {
-        logger_log(NULL, LOG_ERR, mem_err);
-        exit(EXIT_FAILURE);
+        exit_err(strerror(errno));
     }
     return result;
 }
@@ -219,4 +222,25 @@ int print_str_encode(FILE *stream, char *str) {
     }
 
     return chars;
+}
+
+char *format_basename_ext(char *path, char *ext) {
+    static char namebuf[NAME_MAX + 1];
+
+    char *base = ccc_basename(path);
+    size_t len = strlen(base);
+    while (len && base[len - 1] != '.') {
+        --len;
+    }
+    if (len == 0) {
+        return NULL;
+    }
+    size_t ext_len = strlen(ext);
+    if (ext_len + len + 1 > NAME_MAX) {
+        return NULL;
+    }
+    strncpy(namebuf, base, len);
+    strcpy(namebuf + len, ext);
+
+    return namebuf;
 }

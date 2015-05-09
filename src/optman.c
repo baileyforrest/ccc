@@ -35,7 +35,6 @@
 
 //#define DEBUG_PARAMS
 
-#define DEFAULT_OUTPUT_NAME "a.out"
 #define DEFAULT_STD STD_C11
 
 typedef enum long_opt_idx_t {
@@ -53,7 +52,7 @@ static status_t optman_parse(int argc, char **argv);
 
 status_t optman_init(int argc, char **argv) {
     optman.exec_name = NULL;
-    optman.output = DEFAULT_OUTPUT_NAME;
+    optman.output = NULL;
     sl_init(&optman.include_paths, offsetof(len_str_node_node_t, link));
     sl_init(&optman.link_opts, offsetof(str_node_t, link));
     sl_init(&optman.src_files, offsetof(str_node_t, link));
@@ -88,7 +87,7 @@ void optman_destroy(void) {
 
 static status_t optman_parse(int argc, char **argv) {
     status_t status = CCC_OK;
-    optman.exec_name = argv[0];
+    optman.exec_name = ccc_basename(argv[0]);
 
     while (true) {
         int opt_idx = 0;

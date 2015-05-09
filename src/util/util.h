@@ -97,6 +97,8 @@ typedef struct len_str_node_node_t {
     len_str_node_t node;
 } len_str_node_node_t;
 
+void exit_err(char *msg);
+
 char *ccc_basename(char *path);
 
 /**
@@ -202,6 +204,8 @@ inline bool len_str_eq(const void *vstr1, const void *vstr2) {
 char *unescape_str(char *str);
 
 int print_str_encode(FILE *stream, char *str);
+
+char *format_basename_ext(char *path, char *ext);
 
 #define ASCII_LOWER \
 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': \
