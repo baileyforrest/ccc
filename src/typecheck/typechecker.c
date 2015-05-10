@@ -1498,6 +1498,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         retval &= typecheck_types_binop(&expr->mark, expr->bin.op,
                                         expr->bin.expr1->etype,
                                         expr->bin.expr2->etype);
+        type_t *umod1 = ast_type_unmod(expr->bin.expr1->etype);
+        type_t *umod2 = ast_type_unmod(expr->bin.expr2->etype);
         switch (expr->bin.op) {
         case OP_LT:
         case OP_GT:
@@ -1511,13 +1513,35 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             break;
         case OP_MINUS:
             // subtracting pointers evaluates to size_t
-            if (ast_type_unmod(expr->bin.expr1->etype)->type == TYPE_PTR &&
-                ast_type_unmod(expr->bin.expr2->etype)->type == TYPE_PTR) {
+            if (umod1->type == TYPE_PTR && umod2->type == TYPE_PTR) {
                 expr->etype = tt_size_t;
                 break;
             }
-            // FALL THROUGH
+            break;
+        case OP_PLUS: {
+            type_t *ptr_type = NULL;
+            if (TYPE_IS_PTR(umod1) && TYPE_IS_INTEGRAL(umod2)) {
+                ptr_type = umod1;
+            } else if (TYPE_IS_PTR(umod2) && TYPE_IS_INTEGRAL(umod1)) {
+                ptr_type = umod2;
+            }
+            if (ptr_type != NULL) {
+                if (ptr_type->type == TYPE_PTR) {
+                    expr->etype = ptr_type;
+                } else {
+                    type_t *new_ptr = ast_type_create(tcs->tunit,
+                                                      &ptr_type->mark,
+                                                      TYPE_PTR);
+                    new_ptr->ptr.base = typecheck_get_ptr_base(ptr_type);
+                    expr->etype = new_ptr;
+                }
+            }
+            break;
+        }
         default:
+            break;
+        }
+        if (expr->etype == NULL) {
             retval &= typecheck_type_max(tcs->tunit, &expr->mark,
                                          expr->bin.expr1->etype,
                                          expr->bin.expr2->etype,

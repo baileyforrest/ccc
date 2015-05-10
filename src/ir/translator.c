@@ -62,6 +62,9 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type) {
 
 ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                              ir_expr_t *expr) {
+    if (expr->type == IR_EXPR_VAR) {
+        return expr;
+    }
     ir_expr_t *temp = trans_temp_create(ts, ir_expr_type(expr));
 
     ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
@@ -1249,6 +1252,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
     bool is_float = false;
     bool is_signed = false;
     bool is_cmp = false;
+    bool is_ptr = false;
     int cmp_type;
     switch (type->type) {
 
@@ -1273,11 +1277,12 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         }
         break;
 
-    case TYPE_FUNC:
-    case TYPE_ARR:
     case TYPE_PTR:
+        is_ptr = true;
         break;
 
+    case TYPE_FUNC:
+    case TYPE_ARR:
     case TYPE_PAREN:
     case TYPE_VOID:
     case TYPE_STRUCT:
@@ -1286,6 +1291,32 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
     case TYPE_TYPEDEF:
     default:
         assert(false);
+    }
+
+    if (is_ptr) {
+        // Can only get a result pointer as addition of pointer with int
+        assert(op == OP_PLUS);
+        expr_t *ptr_expr;
+        expr_t *int_expr;
+        if (TYPE_IS_PTR(ast_type_unmod(left->etype))) {
+            assert(TYPE_IS_INTEGRAL(ast_type_unmod(right->etype)));
+            ptr_expr = left;
+            int_expr = right;
+        } else {
+            assert(TYPE_IS_PTR(ast_type_unmod(right->etype)));
+            assert(TYPE_IS_INTEGRAL(ast_type_unmod(left->etype)));
+            ptr_expr = right;
+            int_expr = right;
+        }
+
+        // Just treat p + x as &p[x]
+        expr_t *arr_idx = ast_expr_create(ts->ast_tunit, &ptr_expr->mark,
+                                          EXPR_ARR_IDX);
+        arr_idx->arr_idx.array = ptr_expr;
+        arr_idx->arr_idx.index = int_expr;
+        arr_idx->etype = type;
+
+        return trans_expr(ts, true, arr_idx, ir_stmts);
     }
 
     ir_oper_t ir_op;
