@@ -1536,9 +1536,11 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         base->const_val.type = type;
         expr_t *len = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
                                       EXPR_CONST_INT);
-        len->const_val.int_val = strlen(base->const_val.str_val) + 1;
+        size_t arr_len = strlen(base->const_val.str_val) + 1;
+        len->const_val.int_val = arr_len;
         len->const_val.type = tt_long;
         type->arr.len = len;
+        type->arr.nelems = arr_len;
         LEX_ADVANCE(lex);
         break;
     }
