@@ -674,7 +674,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
         case ID:
             // Type specifier only if its a typedef name
             if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) == NULL) {
-                return CCC_BACKTRACK;
+                goto done;
             }
 
             // Compound types are in another namespace, so if we get an
@@ -683,7 +683,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
                 bool has_specifier = *type != NULL &&
                 ((*type)->type != TYPE_MOD || (*type)->mod.base != NULL);
                 if (has_specifier) {
-                    return CCC_BACKTRACK;
+                    goto done;
                 }
             }
 
@@ -702,10 +702,16 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
             break;
 
         default:
-            return CCC_BACKTRACK;
+            goto done;
         }
     }
 
+done:
+    // If we parsed a type with no type specifier, then just make it an int
+    if (*type != NULL && (*type)->type == TYPE_MOD &&
+        (*type)->mod.base == NULL) {
+        (*type)->mod.base = tt_int;
+    }
 fail:
     return status;
 }
