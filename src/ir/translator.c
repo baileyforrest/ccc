@@ -1091,7 +1091,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
                 // If this is a pointer instead of an array, stop here because
                 // we need to do a load for the next index
-                if (arr_type->type == TYPE_PTR) {
+                if (arr_type->type == TYPE_PTR ||
+                    (arr_type->type == TYPE_ARR && arr_type->arr.nelems == 0)) {
                     last_array = true;
                     break;
                 }
@@ -1314,7 +1315,9 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
                                           EXPR_ARR_IDX);
         arr_idx->arr_idx.array = ptr_expr;
         arr_idx->arr_idx.index = int_expr;
-        arr_idx->etype = type;
+
+        // Set etype to ptr's base so that getelemptr's type is correctly set
+        arr_idx->etype = type->ptr.base;
 
         return trans_expr(ts, true, arr_idx, ir_stmts);
     }
@@ -1534,6 +1537,7 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         ir_type_t *type = ir_expr_type(expr_addr);
         assert(type->type == IR_TYPE_PTR);
 
+        // TODO1: This doesn't work for pointers
         ir_expr_t *ir_expr = trans_load_temp(ts, ir_stmts, expr_addr);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
 
@@ -1580,7 +1584,8 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         }
         // Don't load from structs
         if (type->ptr.base->type == IR_TYPE_STRUCT ||
-            type->ptr.base->type == IR_TYPE_ID_STRUCT) {
+            type->ptr.base->type == IR_TYPE_ID_STRUCT||
+            type->ptr.base->type == IR_TYPE_ARR) {
             return ir_expr;
         }
         return trans_load_temp(ts, ir_stmts, ir_expr);
@@ -2257,9 +2262,15 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
 
         return ir_type;
     case TYPE_ARR:
-        ir_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
-        ir_type->arr.nelems = type->arr.nelems;
-        ir_type->arr.elem_type = trans_type(ts, type->arr.base);
+        // Convert [] to *
+        if (type->arr.len == NULL) {
+            ir_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            ir_type->ptr.base = trans_type(ts, type->arr.base);
+        } else {
+            ir_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+            ir_type->arr.nelems = type->arr.nelems;
+            ir_type->arr.elem_type = trans_type(ts, type->arr.base);
+        }
         return ir_type;
     case TYPE_PTR:
         ir_type = ir_type_create(ts->tunit, IR_TYPE_PTR);

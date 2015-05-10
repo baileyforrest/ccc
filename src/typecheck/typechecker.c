@@ -277,6 +277,13 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
 
     case TYPE_ARR: {
         long long len1, len2;
+        if (t1->arr.len == NULL && t2->arr.len == NULL) {
+            return true;
+        }
+        if ((t1->arr.len == NULL && t2->arr.len != NULL) ||
+            (t2->arr.len == NULL && t1->arr.len != NULL)) {
+            return false;
+        }
         return typecheck_const_expr(t1->arr.len, &len1) &&
             typecheck_const_expr(t2->arr.len, &len2) &&
             (len1 == len2) && typecheck_type_equal(t1->arr.base, t2->arr.base);
@@ -408,6 +415,22 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
             typecheck_type_assignable(mark, umod_to->arr.base,
                                       umod_from->ptr.base)) {
             return true;
+        }
+        if (umod_from->type == TYPE_ARR &&
+            typecheck_type_assignable(mark, umod_to->arr.base,
+                                      umod_from->arr.base)) {
+            type_t *umod_to_b = ast_type_unmod(umod_to->arr.base);
+            type_t *umod_from_b = ast_type_unmod(umod_from->arr.base);
+
+            if (umod_to_b->type != TYPE_ARR || umod_from_b->type != TYPE_ARR) {
+                return true;
+            } else {
+                assert(umod_to_b->arr.len != NULL &&
+                       umod_from_b->arr.len != NULL);
+                if (umod_to_b->arr.nelems == umod_from_b->arr.nelems) {
+                    return true;
+                }
+            }
         }
         if (mark != NULL) {
             logger_log(mark, LOG_ERR,
