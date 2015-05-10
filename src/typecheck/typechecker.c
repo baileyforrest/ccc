@@ -1298,6 +1298,11 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
             }
         }
 
+        // Set array length to the number of elemes in the init list
+        if (type->arr.len == NULL) {
+            type->arr.nelems = len;
+        }
+
         if (decl_len >= 0 && decl_len < len) {
             logger_log(&expr->mark, LOG_WARN,
                        "excess elements in array initializer");

@@ -2263,7 +2263,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         return ir_type;
     case TYPE_ARR:
         // Convert [] to *
-        if (type->arr.len == NULL) {
+        if (type->arr.nelems == 0) {
             ir_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
             ir_type->ptr.base = trans_type(ts, type->arr.base);
         } else {
