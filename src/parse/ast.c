@@ -888,6 +888,8 @@ size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
                                         &inner_offset, NULL);
             break;
         case EXPR_ARR_IDX:
+            inner_offset = ast_type_size(type->arr.base) *
+                cur_expr->arr_idx.const_idx;
             type = type->arr.base;
             break;
         default:
@@ -915,63 +917,65 @@ type_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
     assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
     size_t cur_offset = 0;
     size_t cur_mem_num = 0;
+    type_t *result = NULL;
 
-    SL_FOREACH(cur, &type->struct_params.decls) {
-        decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
+    struct_iter_t iter;
+    struct_iter_init(type, &iter);
+    do {
+        type_t *cur_type = NULL;
+        if (iter.node != NULL && iter.node->id != NULL) {
+            cur_type = iter.node->type;
 
-        // Search in anonymous structs and unions too
-        if (sl_head(&decl->decls) == NULL) {
-            type_t *decl_type = ast_type_unmod(decl->type);
-            switch (decl_type->type) {
-            case TYPE_STRUCT:
-            case TYPE_UNION: {
-                size_t inner_offset;
-                size_t inner_memnum;
-                size_t *offset_p = offset == NULL ? NULL : &inner_offset;
-                size_t *mem_num_p = mem_num == NULL ? NULL : &inner_memnum;
-                type_t *inner_type =
-                    ast_type_find_member(decl_type, name, offset_p, mem_num_p);
-                if (inner_type != NULL) {
-                    if (offset != NULL) {
-                        *offset = cur_offset + inner_offset;
-                    }
-                    if (mem_num != NULL) {
-                        *mem_num = cur_mem_num + inner_memnum;
-                    }
-                    return inner_type;
-                }
-                break;
-            }
-            default:
-                break;
-            }
-        } else {
-            SL_FOREACH(cur_node, &decl->decls) {
-                decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
-                if (strcmp(node->id, name) == 0) {
-                    if (offset != NULL) {
-                        *offset = cur_offset;
-                    }
-                    if (mem_num != NULL) {
-                        *mem_num = cur_mem_num;
-                    }
-                    return node->type;
-                }
-
-                // Only add offsets for struct types
-                if (type->type == TYPE_STRUCT) {
-                    if (offset != NULL) {
-                        cur_offset += ast_type_size(node->type);
-                    }
-                    if (mem_num != NULL) {
-                        ++cur_mem_num;
-                    }
-                }
+            if (strcmp(iter.node->id, name) == 0) {
+                result = cur_type;
             }
         }
+
+        // Anonymous struct/union
+        if (iter.node == NULL && iter.decl != NULL &&
+            (iter.decl->type->type == TYPE_STRUCT ||
+             iter.decl->type->type == TYPE_UNION)) {
+            cur_type = iter.decl->type;
+
+            size_t inner_offset;
+            size_t inner_mem_num;
+            type_t *inner_type = ast_type_find_member(cur_type, name,
+                                                      &inner_offset,
+                                                      &inner_mem_num);
+            if (inner_type != NULL) {
+                result = inner_type;
+                cur_mem_num += inner_mem_num;
+                cur_offset += inner_offset;
+            }
+        }
+
+        if (cur_type != NULL) {
+            if (type->type == TYPE_STRUCT) {
+                size_t align = ast_type_align(cur_type);
+                size_t remain = cur_offset % align;
+                if (remain != 0) {
+                    cur_offset += align - remain;
+                }
+            }
+
+            if (result != NULL) {
+                break;
+            }
+
+            if (type->type == TYPE_STRUCT) {
+                cur_offset += ast_type_size(cur_type);
+            }
+        }
+    } while (struct_iter_advance(&iter));
+
+    if (offset != NULL) {
+        *offset = cur_offset;
     }
 
-    return NULL;
+    if (mem_num != NULL) {
+        *mem_num = cur_mem_num;
+    }
+    return result;
 }
 
 type_t *ast_type_untypedef(type_t *type) {
