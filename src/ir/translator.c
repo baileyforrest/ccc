@@ -1579,14 +1579,37 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
 
     case OP_DEREF: {
         assert(type->type == IR_TYPE_PTR);
+        type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
+
         if (addrof) {
             return ir_expr;
         }
-        // Don't load from structs
-        if (type->ptr.base->type == IR_TYPE_STRUCT ||
-            type->ptr.base->type == IR_TYPE_ID_STRUCT||
-            type->ptr.base->type == IR_TYPE_ARR) {
+        ir_type_t *base = type->ptr.base;
+
+        if (ptr_type->type == TYPE_ARR) {
+            // Arrays are refered to by pointers to the array
+            assert(base->type == IR_TYPE_ARR);
+
+            // Get the actual base and cast the array type to the appropriate
+            // pointer type
+            base = base->arr.elem_type;
+
+            ir_type_t *base_ptr = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            base_ptr->ptr.base = base;
+
+            ir_expr = trans_ir_type_conversion(ts, base_ptr, false,
+                                               ir_expr_type(ir_expr), false,
+                                               ir_expr, ir_stmts);
+        }
+
+        // Don't load from aggregate types
+        switch (base->type) {
+        case IR_TYPE_STRUCT:
+        case IR_TYPE_ID_STRUCT:
+        case IR_TYPE_ARR:
             return ir_expr;
+        default:
+            break;
         }
         return trans_load_temp(ts, ir_stmts, ir_expr);
     }

@@ -525,8 +525,8 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2) {
 
     case OP_MINUS:
         if (is_ptr1 && is_ptr2) {
-            type_t *umod_base1 = ast_type_unmod(typecheck_get_ptr_base(umod1));
-            type_t *umod_base2 = ast_type_unmod(typecheck_get_ptr_base(umod2));
+            type_t *umod_base1 = ast_type_unmod(ast_type_ptr_base(umod1));
+            type_t *umod_base2 = ast_type_unmod(ast_type_ptr_base(umod2));
             if (typecheck_type_equal(umod_base1, umod_base2)) {
                 return true;
             }
@@ -625,17 +625,6 @@ bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type) {
     return false;
 }
 
-type_t *typecheck_get_ptr_base(type_t *t1) {
-    switch (t1->type) {
-    case TYPE_FUNC: return t1;
-    case TYPE_PTR:  return t1->ptr.base;
-    case TYPE_ARR:  return t1->arr.base;
-    default:
-        assert(false);
-    }
-    return NULL;
-}
-
 bool typecheck_type_max(trans_unit_t *tunit, fmark_t *mark, type_t *t1,
                         type_t *t2, type_t **result) {
     t1 = ast_type_untypedef(t1);
@@ -727,8 +716,8 @@ bool typecheck_type_max(trans_unit_t *tunit, fmark_t *mark, type_t *t1,
         }
 
         if (is_ptr2) {
-            type_t *umod_base1 = ast_type_unmod(typecheck_get_ptr_base(umod1));
-            type_t *umod_base2 = ast_type_unmod(typecheck_get_ptr_base(umod2));
+            type_t *umod_base1 = ast_type_unmod(ast_type_ptr_base(umod1));
+            type_t *umod_base2 = ast_type_unmod(ast_type_ptr_base(umod2));
             if (typecheck_type_equal(umod_base1, umod_base2)) {
                 // If we're ever in a state where we need to "combine" two
                 // types, then pointer types must actually be a pointer
@@ -1363,7 +1352,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
         typetab_entry_t *entry = NULL;
         type_t *type_base = node_type;
         while (type_base->type == TYPE_PTR || type_base->type == TYPE_ARR) {
-            type_base = typecheck_get_ptr_base(type_base);
+            type_base = ast_type_ptr_base(type_base);
         }
 
         // Not a definiton if its a variable with extern, or a function
@@ -1560,7 +1549,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                     type_t *new_ptr = ast_type_create(tcs->tunit,
                                                       &ptr_type->mark,
                                                       TYPE_PTR);
-                    new_ptr->ptr.base = typecheck_get_ptr_base(ptr_type);
+                    new_ptr->ptr.base = ast_type_ptr_base(ptr_type);
                     expr->etype = new_ptr;
                 }
             }
@@ -1606,8 +1595,12 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             break;
         case OP_DEREF: {
             type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
-            assert(ptr_type->type == TYPE_PTR);
-            type_t *unmod = ast_type_unmod(ptr_type->ptr.base);
+            if (!TYPE_IS_PTR(ptr_type)) {
+                logger_log(&expr->unary.expr->mark, LOG_ERR,
+                           "invalid type argument of unary '*'");
+                return false;
+            }
+            type_t *unmod = ast_type_unmod(ast_type_ptr_base(ptr_type));
             if (unmod->type == TYPE_VOID) {
                 logger_log(&expr->mark, LOG_WARN,
                            "dereferencing a 'void *' pointer");
@@ -1618,7 +1611,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                            "dereferencing pointer to incomplete type");
                 retval = false;
             }
-            expr->etype = ptr_type->ptr.base;
+            expr->etype = unmod;
             break;
         }
         case OP_LOGICNOT:

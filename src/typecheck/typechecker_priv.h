@@ -99,15 +99,6 @@ bool typecheck_types_binop(fmark_t *mark, oper_t op, type_t *t1, type_t *t2);
 bool typecheck_type_unaryop(fmark_t *mark, oper_t op, type_t *type);
 
 /**
- * For a type where TYPECHECK_IS_PTR(t) == true, find the base of the pointer
- * type
- *
- * @param t1 pointer type to get base of
- * @return the base of the pointer type
- */
-type_t *typecheck_get_ptr_base(type_t *t1);
-
-/**
  * Returns true if from can be cast to to.
  *
  * @param mark Location of the type cast

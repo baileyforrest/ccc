@@ -1020,3 +1020,14 @@ type_t *ast_type_unmod(type_t *type) {
 
     return type;
 }
+
+type_t *ast_type_ptr_base(type_t *t1) {
+    switch (t1->type) {
+    case TYPE_FUNC: return t1;
+    case TYPE_PTR:  return t1->ptr.base;
+    case TYPE_ARR:  return t1->arr.base;
+    default:
+        assert(false);
+    }
+    return NULL;
+}

@@ -676,6 +676,15 @@ type_t *ast_type_untypedef(type_t *type);
 type_t *ast_type_unmod(type_t *type);
 
 /**
+ * For a type where TYPECHECK_IS_PTR(t) == true, find the base of the pointer
+ * type
+ *
+ * @param t1 pointer type to get base of
+ * @return the base of the pointer type
+ */
+type_t *ast_type_ptr_base(type_t *t1);
+
+/**
  * Get a string of a type modifier
  *
  * @param type_mod The type to get string for
