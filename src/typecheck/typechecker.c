@@ -1691,13 +1691,21 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     case EXPR_SIZEOF:
     case EXPR_ALIGNOF:
         if (expr->sizeof_params.type != NULL) {
-            decl_node_t *node = sl_head(&expr->sizeof_params.type->decls);
-            type_t *type = node != NULL ? node->type :
-                expr->sizeof_params.type->type;
+            type_t *type = DECL_TYPE(expr->sizeof_params.type);
+            type_t *old_type = type;
             type = ast_type_unmod(type);
+            // If there are no typedefs/modifiers, must be a raw type in
+            // the expression, so typecheck it
+            if (old_type == type) {
+                if (!typecheck_type(tcs, type)) {
+                    return false;
+                }
+            }
             if (type->type == TYPE_STRUCT || type->type == TYPE_UNION) {
                 // If the type hasn't been defined yet, then return an error
                 if (type->struct_params.esize == (size_t)-1) {
+                    logger_log(&expr->mark, LOG_ERR,
+                               "invalid application to incomplete type");
                     return false;
                 }
             }
@@ -2008,10 +2016,11 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                 long long val;
                 typecheck_const_expr_eval(tcs->typetab, type->mod.alignas_expr,
                                           &val);
-                if (val <= 0 || (val & (val - 1))) {
+                if (val < 0 || (val & (val - 1))) {
                     logger_log(&type->mod.alignas_expr->mark, LOG_ERR,
                                "requested alignment is not a positive power of"
                                " 2");
+                    return false;
                 }
                 type->mod.alignas_align = val;
             }

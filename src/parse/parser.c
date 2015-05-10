@@ -766,6 +766,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     case STAR:
     case ID:
     case LPAREN:
+    case LBRACK:
         break;
     default:
         return CCC_BACKTRACK;
