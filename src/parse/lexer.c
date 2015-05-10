@@ -744,37 +744,8 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         result->int_params.hasU = has_u;
         result->int_params.hasL = has_l;
         result->int_params.hasLL = has_ll;
-        if (has_u) {
-            if (has_l) {
-                result->int_params.int_val = strtoul(lexer->lexbuf, &end, 0);
-            } else if (has_ll) {
-                result->int_params.int_val = strtoull(lexer->lexbuf, &end, 0);
-            } else {
-                result->int_params.int_val = strtoul(lexer->lexbuf, &end, 0);
-                if (result->int_params.int_val > UINT_MAX) {
-                    errno = ERANGE;
-                }
-            }
-        } else {
-            if (has_l) {
-                result->int_params.int_val = strtol(lexer->lexbuf, &end, 0);
-            } else if (has_ll) {
-                result->int_params.int_val = strtoll(lexer->lexbuf, &end, 0);
-            } else {
-                result->int_params.int_val = strtol(lexer->lexbuf, &end, 0);
-
-                // Sign extend literal if necessary
-                if (result->int_params.int_val &
-                    (1 << (sizeof(int) * CHAR_BIT - 1))) {
-                    result->int_params.int_val |=
-                        ~0LL << (sizeof(int) * CHAR_BIT - 1);
-                }
-                if (result->int_params.int_val < INT_MIN ||
-                    result->int_params.int_val > INT_MAX) {
-                    errno = ERANGE;
-                }
-            }
-        }
+        result->int_params.isneg = false;
+        result->int_params.int_val = strtoull(lexer->lexbuf, &end, 0);
     }
     if (errno == ERANGE) {
         logger_log(&result->mark, LOG_ERR, "Overflow in numeric literal", cur);

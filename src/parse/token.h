@@ -170,6 +170,7 @@ typedef struct lexeme_t {
             bool hasU;             /**< Has U suffix */
             bool hasL;             /**< Has L suffix */
             bool hasLL;            /**< Has LL suffix */
+            bool isneg;
         } int_params;
         struct {
             long double float_val; /**< For floating point types */

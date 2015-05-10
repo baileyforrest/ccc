@@ -35,6 +35,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "util/htable.h"
 #include "util/logger.h"
@@ -1390,13 +1391,11 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
 
         if (op == OP_UMINUS && LEX_CUR(lex).type == INTLIT) {
+            LEX_CUR(lex).int_params.isneg = true;
             // Handle unary minus of integer literals differently
             if (CCC_OK != (status = par_primary_expression(lex, &base))) {
                 goto fail;
             }
-            assert(base->type == EXPR_CONST_INT);
-            base->const_val.int_val =
-                -(unsigned long long)base->const_val.int_val;
         } else {
             base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_UNARY);
             base->unary.op = op;
@@ -1582,17 +1581,75 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     }
     case INTLIT: {
         base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CONST_INT);
-        base->const_val.int_val = LEX_CUR(lex).int_params.int_val;
+        unsigned long long intval = LEX_CUR(lex).int_params.int_val;
+        bool neg = LEX_CUR(lex).int_params.isneg;
+
+        bool has_u = LEX_CUR(lex).int_params.hasU;
         type_t *type;
-        if (LEX_CUR(lex).int_params.hasLL) {
-            type = tt_long_long;
-        } else if (LEX_CUR(lex).int_params.hasL) {
-            type = tt_long;
+        bool need_u = false;
+        bool need_ull = false, need_ll = false, need_l = false;
+        if (intval > LLONG_MAX) {
+            need_ull = true;
         } else {
-            type = tt_int;
+            if (has_u) {
+                if (intval > ULONG_MAX) {
+                    need_ll = true;
+                } else if (intval > UINT_MAX) {
+                    need_l = true;
+                }
+            } else {
+                if (intval > LONG_MAX ||
+                    (neg && -(long long)intval < LONG_MIN)) {
+                    need_ll = true;
+                } else if (intval > INT_MAX ||
+                           (neg && -(long long)intval < INT_MIN)) {
+                    need_l = true;
+                }
+            }
+        }
+        base->const_val.int_val = neg ? -intval : intval;
+
+        type_t *explicit;
+        if (LEX_CUR(lex).int_params.hasLL) {
+            explicit = tt_long_long;
+        } else if (LEX_CUR(lex).int_params.hasL) {
+            explicit = tt_long;
+        } else {
+            explicit = tt_int;
         }
 
-        if (LEX_CUR(lex).int_params.hasU) {
+        if (need_ull) {
+            type = tt_long_long;
+            need_u = true;
+
+            if (!LEX_CUR(lex).int_params.hasLL ||
+                !LEX_CUR(lex).int_params.hasU) {
+                logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+                           "integer constant is so large that it is unsigned");
+            }
+        } else if (need_ll) {
+            type = tt_long_long;
+        } else if (need_l) {
+            type = tt_long;
+        } else {
+            type = explicit;
+        }
+
+        if (has_u) {
+            need_u = true;
+
+            // If this is a negative number paired with U, then we need to
+            // truncate to the expected data with
+            if (neg) {
+                int explicit_bits = ast_type_size(explicit) * CHAR_BIT;
+                int ll_bits = ast_type_size(tt_long_long) * CHAR_BIT;
+                if (ll_bits != explicit_bits) {
+                    base->const_val.int_val &= ((1LL << explicit_bits) - 1);
+                }
+            }
+        }
+
+        if (need_u) {
             type_t *type_mod = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
                                                TYPE_MOD);
             type_mod->mod.type_mod = TMOD_UNSIGNED;
