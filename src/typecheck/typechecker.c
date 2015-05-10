@@ -1916,6 +1916,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
 }
 
 bool typecheck_type(tc_state_t *tcs, type_t *type) {
+    if (type->typechecked) {
+        return true;
+    }
+    type->typechecked = true;
     bool retval = true;
 
     switch(type->type) {

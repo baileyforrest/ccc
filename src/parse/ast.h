@@ -128,6 +128,7 @@ struct type_t {
     // No storage link because there are static types
     fmark_t mark;                /**< File mark */
     type_type_t type;            /**< Type of type type */
+    bool typechecked;
 
     union {
         struct {                 /**< Struct/union params */
