@@ -1617,13 +1617,14 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         } else {
             explicit = tt_int;
         }
+        size_t explicit_size = ast_type_size(explicit);
+        size_t ll_size = ast_type_size(tt_long_long);
 
         if (need_ull) {
             type = tt_long_long;
             need_u = true;
 
-            if (!LEX_CUR(lex).int_params.hasLL ||
-                !LEX_CUR(lex).int_params.hasU) {
+            if (!LEX_CUR(lex).int_params.hasU && explicit_size < ll_size) {
                 logger_log(&LEX_CUR(lex).mark, LOG_WARN,
                            "integer constant is so large that it is unsigned");
             }
@@ -1641,8 +1642,8 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             // If this is a negative number paired with U, then we need to
             // truncate to the expected data with
             if (neg) {
-                int explicit_bits = ast_type_size(explicit) * CHAR_BIT;
-                int ll_bits = ast_type_size(tt_long_long) * CHAR_BIT;
+                int explicit_bits = explicit_size * CHAR_BIT;
+                int ll_bits = ll_size * CHAR_BIT;
                 if (ll_bits != explicit_bits) {
                     base->const_val.int_val &= ((1LL << explicit_bits) - 1);
                 }
