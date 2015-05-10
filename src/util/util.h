@@ -203,8 +203,6 @@ inline bool len_str_eq(const void *vstr1, const void *vstr2) {
 
 char *unescape_str(char *str);
 
-int print_str_encode(FILE *stream, char *str);
-
 char *format_basename_ext(char *path, char *ext);
 
 #define ASCII_LOWER \

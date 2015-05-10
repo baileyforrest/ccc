@@ -93,6 +93,7 @@ ir_trans_unit_t *trans_translate(trans_unit_t *ast) {
 ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast) {
     ir_trans_unit_t *tunit = ir_trans_unit_create();
     ts->tunit = tunit;
+    ts->ast_tunit = ast;
     ts->typetab = &ast->typetab;
 
     // Add this translation unit's function declaration to symbol table
@@ -811,7 +812,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                                 expr->assign.expr->etype, ir_stmts);
         }
         type_t *max_type;
-        bool result = typecheck_type_max(NULL, expr->assign.expr->etype,
+        bool result = typecheck_type_max(ts->ast_tunit, NULL,
+                                         expr->assign.expr->etype,
                                          expr->etype, &max_type);
         assert(result && max_type != NULL);
         ir_expr_t *dest;
@@ -938,10 +940,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         sl_link_t *cur_sig = func_sig->func.params.head;
         sl_link_t *cur_expr = expr->call.params.head;
         while (cur_sig != NULL) {
-            assert(cur_expr != NULL);
             decl_t *decl = GET_ELEM(&func_sig->func.params, cur_sig);
             decl_node_t *node = sl_head(&decl->decls);
             type_t *sig_type = node == NULL ? decl->type : node->type;
+            if (sig_type->type == TYPE_VOID) {
+                break;
+            }
+            assert(cur_expr != NULL);
 
             expr_t *param = GET_ELEM(&expr->call.params, cur_expr);
             ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
@@ -964,9 +969,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             assert(cur_expr == NULL);
         }
 
+        type_t *return_type = ast_type_unmod(expr->call.func->etype->func.type);
         ir_expr_t *result;
         // Void returning function, don't create a temp
-        if (expr->call.func->etype->func.type->type == TYPE_VOID) {
+        if (return_type->type == TYPE_VOID) {
             ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
             ir_stmt->expr = call;
             trans_add_stmt(ts, ir_stmts, ir_stmt);
@@ -1393,8 +1399,8 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         type_t *left_type = ast_type_untypedef(left->etype);
         type_t *right_type = ast_type_untypedef(right->etype);
         type_t *max_type;
-        bool success = typecheck_type_max(NULL, left->etype, right->etype,
-                                          &max_type);
+        bool success = typecheck_type_max(ts->ast_tunit, NULL, left->etype,
+                                          right->etype, &max_type);
         // Must be valid if typechecked
         assert(success && max_type != NULL);
         is_float = TYPE_IS_FLOAT(max_type);
@@ -2206,6 +2212,14 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             decl_t *decl = GET_ELEM(&type->func.params, cur);
             decl_node_t *node = sl_head(&decl->decls);
             type_t *ptype = node == NULL ? decl->type : node->type;
+
+            // Just exit if its a void paramed function
+            if (ptype->type == TYPE_VOID) {
+                // Ensure sure there's only one parameter
+                assert(sl_head(&type->func.params) ==
+                       sl_tail(&type->func.params));
+                break;
+            }
             ir_type_t *param_type = trans_type(ts, ptype);
             vec_push_back(&ir_type->func.params, param_type);
         }

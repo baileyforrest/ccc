@@ -33,6 +33,7 @@ void ir_stmt_destroy(ir_stmt_t *stmt);
 
 void ir_gdecl_destroy(ir_gdecl_t *gdecl);
 
+int ir_print_str_encode(FILE *stream, char *str);
 
 void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree);
 

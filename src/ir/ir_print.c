@@ -24,10 +24,28 @@
 #include "ir_priv.h"
 
 #include <assert.h>
+#include <ctype.h>
 
 #define INDENT "    "
 #define DATALAYOUT "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 #define TRIPLE "x86_64-unknown-linux-gnu"
+
+int ir_print_str_encode(FILE *stream, char *str) {
+    int chars = 0;
+
+    int cur;
+    while ((cur = *(str++))) {
+        if (isprint(cur) && cur != '"') {
+            putc(cur, stream);
+            ++chars;
+        } else {
+            chars += fprintf(stream, "\\%.2X", cur);
+        }
+    }
+
+    return chars;
+}
+
 
 void ir_print(FILE *stream, ir_trans_unit_t *irtree, const char *module_name) {
     assert(stream != NULL);
@@ -254,7 +272,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             break;
         case IR_CONST_STR: {
             fprintf(stream, " c\"");
-            print_str_encode(stream, expr->const_params.str_val);
+            ir_print_str_encode(stream, expr->const_params.str_val);
             fprintf(stream, "\\00\"");
             break;
         }

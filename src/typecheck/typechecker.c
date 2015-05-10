@@ -613,8 +613,8 @@ type_t *typecheck_get_ptr_base(type_t *t1) {
     return NULL;
 }
 
-bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
-                        type_t **result) {
+bool typecheck_type_max(trans_unit_t *tunit, fmark_t *mark, type_t *t1,
+                        type_t *t2, type_t **result) {
     t1 = ast_type_untypedef(t1);
     t2 = ast_type_untypedef(t2);
 
@@ -707,7 +707,18 @@ bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2,
             type_t *umod_base1 = ast_type_unmod(typecheck_get_ptr_base(umod1));
             type_t *umod_base2 = ast_type_unmod(typecheck_get_ptr_base(umod2));
             if (typecheck_type_equal(umod_base1, umod_base2)) {
-                *result = t1;
+                // If we're ever in a state where we need to "combine" two
+                // types, then pointer types must actually be a pointer
+                if (umod1->type == TYPE_PTR) {
+                    *result = t1;
+                } else if (umod2->type == TYPE_PTR) {
+                    *result = t2;
+                } else {
+                    type_t *ptr_type = ast_type_create(tunit, &umod_base1->mark,
+                                                       TYPE_PTR);
+                    ptr_type->ptr.base = umod_base1;
+                    *result = ptr_type;
+                }
                 return true;
             }
         }
@@ -1507,7 +1518,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             }
             // FALL THROUGH
         default:
-            retval &= typecheck_type_max(&expr->mark, expr->bin.expr1->etype,
+            retval &= typecheck_type_max(tcs->tunit, &expr->mark,
+                                         expr->bin.expr1->etype,
                                          expr->bin.expr2->etype,
                                          &expr->etype);
         }
@@ -1576,7 +1588,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             ast_type_unmod(expr->cond.expr3->etype)->type == TYPE_VOID) {
             expr->etype = tt_void;
         } else {
-            retval &= typecheck_type_max(&expr->mark, expr->cond.expr2->etype,
+            retval &= typecheck_type_max(tcs->tunit, &expr->mark,
+                                         expr->cond.expr2->etype,
                                          expr->cond.expr3->etype,
                                          &expr->etype);
         }

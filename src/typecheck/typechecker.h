@@ -77,6 +77,7 @@ bool typecheck_type_equal(type_t *t1, type_t *t2);
  *     NULL if they are not compatible
  * @return true if the node typechecks, false otherwise
  */
-bool typecheck_type_max(fmark_t *mark, type_t *t1, type_t *t2, type_t **result);
+bool typecheck_type_max(trans_unit_t *tunit, fmark_t *mark, type_t *t1,
+                        type_t *t2, type_t **result);
 
 #endif /* _TYPECHECKER_H_ */

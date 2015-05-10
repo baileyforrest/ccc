@@ -208,22 +208,6 @@ char *unescape_str(char *str) {
     return sstore_insert(unescaped);
 }
 
-int print_str_encode(FILE *stream, char *str) {
-    int chars = 0;
-
-    int cur;
-    while ((cur = *(str++))) {
-        if (isprint(cur)) {
-            putc(cur, stream);
-            ++chars;
-        } else {
-            chars += fprintf(stream, "\\%.2X", cur);
-        }
-    }
-
-    return chars;
-}
-
 char *format_basename_ext(char *path, char *ext) {
     static char namebuf[NAME_MAX + 1];
 

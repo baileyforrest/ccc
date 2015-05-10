@@ -27,6 +27,7 @@
 
 typedef struct trans_state_t {
     typetab_t *typetab;
+    trans_unit_t *ast_tunit;
     ir_trans_unit_t *tunit;
     ir_gdecl_t *func;
     ir_label_t *break_target;
@@ -36,7 +37,7 @@ typedef struct trans_state_t {
     bool branch_next_labeled;
 } trans_state_t;
 
-#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL, 0, false, false }
+#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL, NULL, 0, false, false }
 
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt);
