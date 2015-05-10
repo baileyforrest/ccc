@@ -412,7 +412,6 @@ typedef struct ir_gdecl_t {
             ir_expr_t *var;
             ir_expr_t *init;
             size_t align;
-            ir_inst_stream_t setup;
         } gdata;
 
         struct {

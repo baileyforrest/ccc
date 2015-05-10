@@ -250,7 +250,6 @@ ir_gdecl_t *ir_gdecl_create(ir_gdecl_type_t type) {
     case IR_GDECL_ID_STRUCT:
         break;
     case IR_GDECL_GDATA:
-        dl_init(&gdecl->gdata.setup.list, offsetof(ir_stmt_t, link));
         gdecl->gdata.flags = 0;
         break;
     case IR_GDECL_FUNC:

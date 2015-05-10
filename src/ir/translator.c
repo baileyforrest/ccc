@@ -62,7 +62,7 @@ ir_expr_t *trans_temp_create(trans_state_t *ts, ir_type_t *type) {
 
 ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                              ir_expr_t *expr) {
-    if (expr->type == IR_EXPR_VAR) {
+    if (expr->type == IR_EXPR_VAR || stream == NULL) {
         return expr;
     }
     ir_expr_t *temp = trans_temp_create(ts, ir_expr_type(expr));
@@ -1655,16 +1655,6 @@ ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
     if (typecheck_type_equal(dest, src)) {
         return src_expr;
     }
-    // Special case: If we're assigning array to pointer, and src_expr
-    // is already a pointer, then do no conversion if pointed types are equal
-    if (dest->type == TYPE_PTR && src->type == TYPE_ARR &&
-        ir_expr_type(src_expr)->type == IR_TYPE_PTR) {
-        type_t *pointed_dest = ast_type_unmod(dest->ptr.base);
-        type_t *pointed_src = ast_type_unmod(src->arr.base);
-        if (typecheck_type_equal(pointed_dest, pointed_src)) {
-            return src_expr;
-        }
-    }
 
     ir_type_t *dest_type = trans_type(ts, dest);
     ir_type_t *src_type = ir_expr_type(src_expr);
@@ -1865,8 +1855,9 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         if (node->expr == NULL) {
             gdecl->gdata.init = NULL;
         } else {
-            ir_expr_t *init =
-                trans_expr(ts, false, node->expr, &gdecl->gdata.setup);
+            ir_expr_t *init = trans_expr(ts, false, node->expr, NULL);
+            init = trans_type_conversion(ts, node_type, node->expr->etype,
+                                         init, NULL);
             gdecl->gdata.init = init;
             expr_type = ir_expr_type(init);
         }

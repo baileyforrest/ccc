@@ -76,7 +76,7 @@ void ir_trans_unit_print(FILE *stream, ir_trans_unit_t *irtree) {
 void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
     switch (gdecl->type) {
     case IR_GDECL_GDATA:
-        ir_expr_print(stream, gdecl->gdata.var);
+        ir_expr_print(stream, gdecl->gdata.var, false);
         if (gdecl->linkage == IR_LINKAGE_DEFAULT) {
             fprintf(stream, " =");
         } else {
@@ -97,7 +97,7 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
         ir_type_print(stream, gdecl->gdata.type, NULL);
         if (gdecl->gdata.init != NULL) {
             fprintf(stream, " ");
-            ir_expr_print(stream, gdecl->gdata.init);
+            ir_expr_print(stream, gdecl->gdata.init, true);
         }
         fprintf(stream, ", align %zd", gdecl->gdata.align);
         break;
@@ -119,7 +119,7 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
             ir_expr_t *expr = GET_ELEM(&gdecl->func.params, cur);
             ir_type_print(stream, ir_expr_type(expr), NULL);
             fprintf(stream, " ");
-            ir_expr_print(stream, expr);
+            ir_expr_print(stream, expr, false);
             if (expr != sl_tail(&gdecl->func.params)) {
                 fprintf(stream, ", ");
             }
@@ -152,14 +152,14 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         fprintf(stream, "\n%s:", stmt->label->name);
         break;
     case IR_STMT_EXPR:
-        ir_expr_print(stream, stmt->expr);
+        ir_expr_print(stream, stmt->expr, false);
         break;
     case IR_STMT_RET:
         fprintf(stream, "ret ");
         ir_type_print(stream, stmt->ret.type, NULL);
         if (stmt->ret.val != NULL) {
             fprintf(stream, " ");
-            ir_expr_print(stream, stmt->ret.val);
+            ir_expr_print(stream, stmt->ret.val, false);
         }
         break;
     case IR_STMT_BR:
@@ -168,7 +168,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
             fprintf(stream, "label %%%s", stmt->br.uncond->name);
         } else {
             fprintf(stream, "i1 ");
-            ir_expr_print(stream, stmt->br.cond);
+            ir_expr_print(stream, stmt->br.cond, false);
             fprintf(stream, ", label %%%s, label %%%s",
                     stmt->br.if_true->name, stmt->br.if_false->name);
         }
@@ -178,7 +178,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         fprintf(stream, "switch ");
         ir_type_print(stream, val_type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, stmt->switch_params.expr);
+        ir_expr_print(stream, stmt->switch_params.expr, false);
         fprintf(stream, ", label %%%s [\n",
                 stmt->switch_params.default_case->name);
         SL_FOREACH(cur, &stmt->switch_params.cases) {
@@ -191,7 +191,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
                 GET_ELEM(&stmt->switch_params.cases, cur);
             ir_type_print(stream, val_type, NULL);
             fprintf(stream, " ");
-            ir_expr_print(stream, pair->expr);
+            ir_expr_print(stream, pair->expr, false);
             fprintf(stream, ", label %%%s\n", pair->label->name);
         }
         if (indent) {
@@ -204,19 +204,19 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         // TODO0: Remove if unused
         break;
     case IR_STMT_ASSIGN:
-        ir_expr_print(stream, stmt->assign.dest);
+        ir_expr_print(stream, stmt->assign.dest, false);
         fprintf(stream, " = ");
-        ir_expr_print(stream, stmt->assign.src);
+        ir_expr_print(stream, stmt->assign.src, false);
         break;
     case IR_STMT_STORE:
         fprintf(stream, "store ");
         ir_type_print(stream, stmt->store.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, stmt->store.val);
+        ir_expr_print(stream, stmt->store.val, false);
         fprintf(stream, ", ");
         ir_type_print(stream, stmt->store.type, NULL);
         fprintf(stream, "* ");
-        ir_expr_print(stream, stmt->store.ptr);
+        ir_expr_print(stream, stmt->store.ptr, false);
         break;
     default:
         assert(false);
@@ -224,7 +224,7 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
     fprintf(stream, "\n");
 }
 
-void ir_expr_print(FILE *stream, ir_expr_t *expr) {
+void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
     switch (expr->type) {
     case IR_EXPR_VAR:
         expr->var.local ? fprintf(stream, "%%") : fprintf(stream, "@");
@@ -263,7 +263,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
                 ir_expr_t *elem = GET_ELEM(&expr->const_params.struct_val, cur);
                 ir_type_print(stream, ir_expr_type(elem), NULL);
                 fprintf(stream, " ");
-                ir_expr_print(stream, elem);
+                ir_expr_print(stream, elem, false);
                 if (elem != sl_tail(&expr->const_params.struct_val)) {
                     fprintf(stream, ", ");
                 }
@@ -283,7 +283,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
                 ir_expr_t *elem = GET_ELEM(&expr->const_params.arr_val, cur);
                 ir_type_print(stream, ir_expr_type(elem), NULL);
                 fprintf(stream, " ");
-                ir_expr_print(stream, elem);
+                ir_expr_print(stream, elem, false);
                 if (elem != sl_tail(&expr->const_params.arr_val)) {
                     fprintf(stream, ", ");
                 }
@@ -305,9 +305,9 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         fprintf(stream, "%s ", ir_oper_str(expr->binop.op));
         ir_type_print(stream, expr->binop.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->binop.expr1);
+        ir_expr_print(stream, expr->binop.expr1, false);
         fprintf(stream, ", ");
-        ir_expr_print(stream, expr->binop.expr2);
+        ir_expr_print(stream, expr->binop.expr2, false);
         break;
     }
     case IR_EXPR_ALLOCA:
@@ -326,47 +326,59 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         fprintf(stream, "load ");
         ir_type_print(stream, expr->load.type, NULL);
         fprintf(stream, "* ");
-        ir_expr_print(stream, expr->load.ptr);
+        ir_expr_print(stream, expr->load.ptr, true);
         break;
     case IR_EXPR_GETELEMPTR:
         fprintf(stream, "getelementptr ");
+        if (recurse) {
+            fprintf(stream, "(");
+        }
         ir_type_print(stream, expr->getelemptr.ptr_type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->getelemptr.ptr_val);
+        ir_expr_print(stream, expr->getelemptr.ptr_val, false);
         fprintf(stream, ", ");
         SL_FOREACH(cur, &expr->getelemptr.idxs) {
             ir_expr_t *elem = GET_ELEM(&expr->getelemptr.idxs, cur);
             ir_type_print(stream, ir_expr_type(elem), NULL);
             fprintf(stream, " ");
-            ir_expr_print(stream, elem);
+            ir_expr_print(stream, elem, false);
             if (elem != sl_tail(&expr->getelemptr.idxs)) {
                 fprintf(stream, ", ");
             }
         }
+        if (recurse) {
+            fprintf(stream, ")");
+        }
         break;
     case IR_EXPR_CONVERT:
         fprintf(stream, "%s ", ir_convert_str(expr->convert.type));
+        if (recurse) {
+            fprintf(stream, "(");
+        }
         ir_type_print(stream, expr->convert.src_type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->convert.val);
+        ir_expr_print(stream, expr->convert.val, false);
         fprintf(stream, " to ");
         ir_type_print(stream, expr->convert.dest_type, NULL);
+        if (recurse) {
+            fprintf(stream, ")");
+        }
         break;
     case IR_EXPR_ICMP:
         fprintf(stream, "icmp %s ", ir_icmp_str(expr->icmp.cond));
         ir_type_print(stream, expr->icmp.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->icmp.expr1);
+        ir_expr_print(stream, expr->icmp.expr1, false);
         fprintf(stream, ", ");
-        ir_expr_print(stream, expr->icmp.expr2);
+        ir_expr_print(stream, expr->icmp.expr2, false);
         break;
     case IR_EXPR_FCMP:
         fprintf(stream, "fcmp %s ", ir_fcmp_str(expr->fcmp.cond));
         ir_type_print(stream, expr->fcmp.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->fcmp.expr1);
+        ir_expr_print(stream, expr->fcmp.expr1, false);
         fprintf(stream, ", ");
-        ir_expr_print(stream, expr->fcmp.expr2);
+        ir_expr_print(stream, expr->fcmp.expr2, false);
         break;
     case IR_EXPR_PHI: {
         fprintf(stream, "phi ");
@@ -375,7 +387,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
         SL_FOREACH(cur, &expr->phi.preds) {
             ir_expr_label_pair_t *pair = GET_ELEM(&expr->phi.preds, cur);
             fprintf(stream, "[ ");
-            ir_expr_print(stream, pair->expr);
+            ir_expr_print(stream, pair->expr, false);
             fprintf(stream, ", %%%s", pair->label->name);
             fprintf(stream, " ]");
             if (pair != sl_tail(&expr->phi.preds)) {
@@ -386,15 +398,15 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
     }
     case IR_EXPR_SELECT:
         fprintf(stream, "select i1 ");
-        ir_expr_print(stream, expr->select.cond);
+        ir_expr_print(stream, expr->select.cond, false);
         fprintf(stream, ", ");
         ir_type_print(stream, expr->select.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->select.expr1);
+        ir_expr_print(stream, expr->select.expr1, false);
         fprintf(stream, ", ");
         ir_type_print(stream, expr->select.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->select.expr1);
+        ir_expr_print(stream, expr->select.expr1, false);
         break;
     case IR_EXPR_CALL: {
         assert(expr->call.func_sig->type == IR_TYPE_FUNC);
@@ -409,14 +421,14 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr) {
             ir_type_print(stream, func_sig->func.type, NULL);
         }
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->call.func_ptr);
+        ir_expr_print(stream, expr->call.func_ptr, false);
         fprintf(stream, "(");
 
         SL_FOREACH(cur, &expr->call.arglist) {
             ir_expr_t *elem = GET_ELEM(&expr->call.arglist, cur);
             ir_type_print(stream, ir_expr_type(elem), NULL);
             fprintf(stream, " ");
-            ir_expr_print(stream, elem);
+            ir_expr_print(stream, elem, false);
             if (elem != sl_tail(&expr->call.arglist)) {
                 fprintf(stream, ", ");
             }

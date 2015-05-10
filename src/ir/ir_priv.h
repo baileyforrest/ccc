@@ -41,7 +41,7 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl);
 
 void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent);
 
-void ir_expr_print(FILE *stream, ir_expr_t *expr);
+void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse);
 
 void ir_type_print(FILE *stream, ir_type_t *type, char *func_name);
 
