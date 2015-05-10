@@ -93,13 +93,33 @@ typedef struct lex_wrap_t {
         LEX_ADVANCE(wrap);                                              \
     } while (0)
 
+/**
+ * Check if current token is what is expected. Like LEX_MATCH,
+ * but without advancing
+ *
+ * @param wrap Wrapper to match with
+ * @param token Token to match
+ */
+// TODO1: Replace some parser code with this
+#define LEX_CHECK(wrap, token)                                          \
+    do {                                                                \
+        token_t cur = LEX_CUR(wrap).type;                               \
+        if (cur != (token)) {                                           \
+            logger_log(&LEX_CUR(wrap).mark, LOG_ERR,                    \
+                       "expected '%s' before '%s' token",               \
+                       token_str(token), token_str(cur));               \
+            status = CCC_ESYNTAX;                                       \
+            goto fail;                                                  \
+        }                                                               \
+    } while (0)
+
 #define DECL_SPEC_STORAGE_CLASS \
     AUTO: case REGISTER: case STATIC: case EXTERN: case TYPEDEF: case INLINE
 
 #define DECL_SPEC_TYPE_SPEC_NO_ID \
     VOID: case BOOL: case CHAR: case SHORT: case INT: case LONG: case FLOAT: \
 case DOUBLE: case SIGNED: case UNSIGNED: case STRUCT: case UNION: case ENUM: \
-case VA_LIST
+case VA_LIST: case ALIGNAS
 
 
 #define DECL_SPEC_TYPE_QUALIFIER CONST: case VOLATILE

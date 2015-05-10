@@ -51,7 +51,7 @@ static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 // size_t is unsigned long.
 static type_t stt_size_t = {
     SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD,
-    { .mod = { TMOD_UNSIGNED, &stt_long } }
+    { .mod = { TMOD_UNSIGNED, NULL, NULL, 0, &stt_long } }
 };
 
 static type_t stt_va_list = TYPE_LITERAL(TYPE_VA_LIST, va_list);

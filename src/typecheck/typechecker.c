@@ -1992,6 +1992,31 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                        "multiple storage classes in declaration specifiers");
             retval = false;
         }
+
+        if (type->mod.type_mod & TMOD_ALIGNAS) {
+            if (type->mod.alignas_type != NULL) {
+                assert(type->mod.alignas_expr == NULL);
+                type_t *align_type = DECL_TYPE(type->mod.alignas_type);
+                type->mod.alignas_align = ast_type_align(align_type);
+            } else {
+                if (!typecheck_expr(tcs, type->mod.alignas_expr, TC_CONST)) {
+                    logger_log(&type->mod.alignas_expr->mark, LOG_ERR,
+                               "requested alignment is not an integer"
+                               " constant");
+                    return false;
+                }
+                long long val;
+                typecheck_const_expr_eval(tcs->typetab, type->mod.alignas_expr,
+                                          &val);
+                if (val <= 0 || (val & (val - 1))) {
+                    logger_log(&type->mod.alignas_expr->mark, LOG_ERR,
+                               "requested alignment is not a positive power of"
+                               " 2");
+                }
+                type->mod.alignas_align = val;
+            }
+        }
+
         return retval;
 
     case TYPE_PAREN:

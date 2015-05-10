@@ -61,6 +61,11 @@ typedef struct ir_label_t ir_label_t;
      (test)->type == STMT_DEFAULT ? (test)->default_params.stmt :   \
      (test)->type == STMT_LABEL ? (test)->label.stmt : NULL)
 
+// TODO: Replace this idiom in the code with this
+#define DECL_TYPE(decl) \
+    (sl_head(&decl->decls) == NULL ? \
+     decl->type : ((decl_node_t *)sl_head(&decl->decls))->type)
+
 
 /**
  * Modifiers for types. Should be stored in a bitmap
@@ -77,6 +82,7 @@ typedef enum type_mod_t {
     TMOD_CONST    = 1 << 7,
     TMOD_VOLATILE = 1 << 8,
     TMOD_INLINE   = 1 << 9,
+    TMOD_ALIGNAS  = 1 << 10,
 } type_mod_t;
 
 /**
@@ -146,6 +152,9 @@ struct type_t {
 
         struct {                 /**< Modified type params */
             type_mod_t type_mod; /**< Bitset of type modifiers */
+            decl_t *alignas_type;
+            expr_t *alignas_expr;
+            size_t alignas_align;
             type_t *base;        /**< Base type */
         } mod;
 

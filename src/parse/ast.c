@@ -857,8 +857,15 @@ size_t ast_type_align(type_t *type) {
     case TYPE_TYPEDEF:
         return ast_type_align(type->typedef_params.base);
 
-    case TYPE_MOD:
-        return ast_type_align(type->mod.base);
+    case TYPE_MOD: {
+        size_t alignas_align = 0;
+        if (type->mod.type_mod & TMOD_ALIGNAS) {
+            alignas_align = type->mod.alignas_align;
+        }
+        size_t base_align = ast_type_align(type->mod.base);
+
+        return MAX(base_align, alignas_align);
+    }
 
     case TYPE_PAREN:
         return ast_type_align(type->paren_base);

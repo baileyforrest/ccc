@@ -341,7 +341,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
 
     // TODO1: This is nasty, find better solution for this
     // Handle repeat end nodes
-    if (*end_node != NULL) {
+    if (*end_node != NULL && LEX_CUR(lex).type != ALIGNAS) {
         bool okay = false;
         switch ((*end_node)->type) {
         case TYPE_INT:
@@ -452,10 +452,17 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
 
         // Don't give a base type for signed/unsigned. No base type defaults to
         // int
+    case ALIGNAS:
     case SIGNED:
     case UNSIGNED: {
-        type_mod_t mod = LEX_CUR(lex).type == SIGNED ? TMOD_SIGNED :
-            TMOD_UNSIGNED;
+        type_mod_t mod;
+        switch (LEX_CUR(lex).type) {
+        case ALIGNAS:  mod = TMOD_ALIGNAS;  break;
+        case SIGNED:   mod = TMOD_SIGNED;   break;
+        case UNSIGNED: mod = TMOD_UNSIGNED; break;
+        default:
+            assert(false);
+        }
         if (mod_node == NULL) {
             mod_node = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
                                        TYPE_MOD);
@@ -472,6 +479,28 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             status = CCC_ESYNTAX;
         }
         mod_node->mod.type_mod |= mod;
+        if (mod == TMOD_ALIGNAS) {
+            LEX_ADVANCE(lex);
+            LEX_MATCH(lex, LPAREN);
+            if (CCC_OK !=
+                (status = par_type_name(lex, false,
+                                        &mod_node->mod.alignas_type))) {
+                if (status != CCC_BACKTRACK) {
+                    goto fail;
+                }
+            }
+
+            // Failed to parse a typename, parse an expression instead
+            if (status == CCC_BACKTRACK) {
+                if (CCC_OK !=
+                    (status =
+                     par_oper_expression(lex, OP_NOP, NULL,
+                                         &(*type)->mod.alignas_expr))) {
+                    goto fail;
+                }
+            }
+            LEX_CHECK(lex, RPAREN);
+        }
 
         break;
     }
