@@ -1430,16 +1430,13 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
 
     // Comparisons need to be handled separately
     if (is_cmp) {
-        type_t *left_type = ast_type_untypedef(left->etype);
-        type_t *right_type = ast_type_untypedef(right->etype);
         type_t *max_type;
         bool success = typecheck_type_max(ts->ast_tunit, NULL, left->etype,
                                           right->etype, &max_type);
         // Must be valid if typechecked
         assert(success && max_type != NULL);
         is_float = TYPE_IS_FLOAT(max_type);
-        is_signed = !TYPE_IS_UNSIGNED(left_type) &&
-            !TYPE_IS_UNSIGNED(right_type);
+        is_signed = !TYPE_IS_UNSIGNED(max_type);
 
         switch (op) {
         case OP_LT:

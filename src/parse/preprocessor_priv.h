@@ -46,6 +46,7 @@ typedef struct pp_file_t {
 /**
  * Mapping from macro paramater to value
  */
+// TODO1: Look into replacing expand_val and raw_val with streams
 typedef struct pp_param_map_elem_t {
     sl_link_t link;       /**< List link */
     len_str_t key;        /**< Macro paramater being mappend */

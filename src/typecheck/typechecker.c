@@ -644,10 +644,19 @@ bool typecheck_type_max(trans_unit_t *tunit, fmark_t *mark, type_t *t1,
     bool is_ptr2 = TYPE_IS_PTR(umod2);
 
     if (is_numeric1 && is_numeric2) {
-        if (umod1->type >= umod2->type) {
+        if (umod1->type > umod2->type) {
             *result = t1;
-        } else {
+        } else if (umod2->type > umod1->type) {
             *result = t2;
+        } else {
+            // If they are the same magnitude of integer, then unsigned wins
+            if (TYPE_IS_UNSIGNED(t1)) {
+                *result = t1;
+            } else if (TYPE_IS_UNSIGNED(t2)) {
+                *result = t2;
+            } else {
+                *result = t1;
+            }
         }
         return true;
     }
