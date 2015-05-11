@@ -53,6 +53,10 @@ typedef struct ir_label_t ir_label_t;
     ((test)->type == TYPE_BOOL ||                                       \
      ((test)->type == TYPE_MOD && (test)->mod.type_mod & TMOD_UNSIGNED))
 
+#define TYPE_HAS_MOD(test, modname)                                 \
+     ((test)->type == TYPE_MOD && (test)->mod.type_mod & modname)
+
+
 #define TYPE_IS_PTR(test)                                   \
     ((test)->type >= TYPE_FUNC && (test)->type <= TYPE_PTR)
 

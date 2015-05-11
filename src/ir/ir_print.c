@@ -212,11 +212,11 @@ void ir_stmt_print(FILE *stream, ir_stmt_t *stmt, bool indent) {
         fprintf(stream, "store ");
         ir_type_print(stream, stmt->store.type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, stmt->store.val, false);
+        ir_expr_print(stream, stmt->store.val, true);
         fprintf(stream, ", ");
         ir_type_print(stream, stmt->store.type, NULL);
         fprintf(stream, "* ");
-        ir_expr_print(stream, stmt->store.ptr, false);
+        ir_expr_print(stream, stmt->store.ptr, true);
         break;
     default:
         assert(false);

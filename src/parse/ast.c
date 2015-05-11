@@ -995,14 +995,6 @@ type_t *ast_type_untypedef(type_t *type) {
         case TYPE_PAREN:
             type = type->paren_base;
             break;
-        case TYPE_MOD:
-            // If the modifier is only typedef, then remove it
-            if (type->mod.type_mod & ~TMOD_TYPEDEF) {
-                done = true;
-            } else {
-                type = type->mod.base;
-            }
-            break;
         default:
             done = true;
         }

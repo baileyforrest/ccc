@@ -188,19 +188,39 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         break;
     }
     case GDECL_DECL: {
-        // Ignore typedefs
-        type_t *type = gdecl->decl->type;
-        if (type->type == TYPE_MOD && type->mod.type_mod & TMOD_TYPEDEF) {
-            return;
+        type_t *type = ast_type_untypedef(gdecl->decl->type);
+
+        bool is_extern = false;
+        if (type->type == TYPE_MOD) {
+            // Ignore typedefs
+            if (type->mod.type_mod & TMOD_TYPEDEF) {
+                return;
+            }
+            if (type->mod.type_mod & TMOD_EXTERN) {
+                is_extern = true;
+            }
         }
 
         // Keep track of global decls, so they are only translated if used
         SL_FOREACH(cur, &gdecl->decl->decls) {
             decl_node_t *node = GET_ELEM(&gdecl->decl->decls, cur);
+            type_t *node_type = ast_type_untypedef(node->type);
+
+            // Translate nodes that are not function decls and are not external
+            // Lazily translate the others if they are used
+            if (node_type->type != TYPE_FUNC && !is_extern) {
+                trans_gdecl_node(ts, node);
+                continue;
+            }
+
             ht_ptr_elem_t *elem = emalloc(sizeof(*elem));
             elem->key = node->id;
             elem->val = node;
-            ht_insert(&ts->tunit->global_decls, &elem->link);
+            status_t status = ht_insert(&ts->tunit->global_decls, &elem->link);
+            if (status != CCC_OK) {
+                assert(status == CCC_DUPLICATE);
+                free(elem);
+            }
         }
         break;
     }
@@ -1863,21 +1883,28 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         while (mod_check->type == TYPE_PTR) {
             mod_check = ast_type_untypedef(mod_check->ptr.base);
         }
+        bool external = false;
         if (mod_check->type == TYPE_MOD) {
             if (mod_check->mod.type_mod & TMOD_STATIC) {
                 gdecl->linkage = IR_LINKAGE_INTERNAL;
             } else if (mod_check->mod.type_mod & TMOD_EXTERN) {
                 gdecl->linkage = IR_LINKAGE_EXTERNAL;
+                external = true;
             }
 
         }
 
-        if (node->expr == NULL) {
+        if (external) {
             gdecl->gdata.init = NULL;
         } else {
-            ir_expr_t *init = trans_expr(ts, false, node->expr, NULL);
-            init = trans_type_conversion(ts, node_type, node->expr->etype,
-                                         init, NULL);
+            ir_expr_t *init;
+            if (node->expr != NULL) {
+                init = trans_expr(ts, false, node->expr, NULL);
+                init = trans_type_conversion(ts, node_type, node->expr->etype,
+                                             init, NULL);
+            } else {
+                init = ir_expr_zero(ts->tunit, expr_type);
+            }
             gdecl->gdata.init = init;
             expr_type = ir_expr_type(init);
         }

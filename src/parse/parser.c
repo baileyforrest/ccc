@@ -793,8 +793,21 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
 
     // Add typedefs to the typetable on the top of the stack
     if (is_typedef) {
+        // Remove the typedef from the type inserted into type table
+        type_t *typedef_base;
+        if (decl_node->type->type != TYPE_MOD) {
+            typedef_base = decl_node->type;
+        } else if ((decl_node->type->mod.type_mod & ~TMOD_TYPEDEF) == 0) {
+            typedef_base = decl_node->type->mod.base;
+        } else {
+            typedef_base = ast_type_create(lex->tunit, &decl_node->type->mark,
+                                           TYPE_MOD);
+            typedef_base->mod.base = decl_node->type->mod.base;
+            typedef_base->mod.type_mod =
+                decl_node->type->mod.type_mod & ~TMOD_TYPEDEF;
+        }
         if (CCC_OK !=
-            (status = tt_insert(lex->typetab, decl_node->type, TT_TYPEDEF,
+            (status = tt_insert(lex->typetab, typedef_base, TT_TYPEDEF,
                                 decl_node->id, NULL))) {
             if (status != CCC_DUPLICATE) {
                 goto fail;
