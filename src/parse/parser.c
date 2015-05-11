@@ -1577,32 +1577,21 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         unsigned long long intval = LEX_CUR(lex).int_params.int_val;
         base->const_val.int_val = intval;
 
-        bool has_u = LEX_CUR(lex).int_params.hasU;
         type_t *type;
         bool need_u = false;
         bool need_ll = false, need_l = false;
         if (intval > LLONG_MAX) {
             need_ll = true;
             need_u = true;
-        } else {
-            if (has_u) {
-                if (intval > ULONG_MAX) {
-                    need_ll = true;
-                } else if (intval > UINT_MAX) {
-                    need_l = true;
-                }
-            } else {
-                if (intval > ULONG_MAX) {
-                    need_ll = true;
-                } else if (intval > LONG_MAX) {
-                    need_l = true;
-                    need_u = true;
-                } else if (intval > UINT_MAX) {
-                    need_l = true;
-                } else if (intval > INT_MAX) {
-                    need_u = true;
-                }
-            }
+        } else if (intval > ULONG_MAX) {
+            need_ll = true;
+        } else if (intval > LONG_MAX) {
+            need_l = true;
+            need_u = true;
+        } else if (intval > UINT_MAX) {
+            need_l = true;
+        } else if (intval > INT_MAX) {
+            need_u = true;
         }
 
         type_t *explicit;
@@ -1624,15 +1613,15 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
                 logger_log(&LEX_CUR(lex).mark, LOG_WARN,
                            "integer constant is so large that it is unsigned");
             }
-        } else if (need_ll) {
+        } else if (need_ll && explicit_size < ll_size) {
             type = tt_long_long;
-        } else if (need_l) {
+        } else if (need_l && explicit_size < ast_type_size(tt_long_long)) {
             type = tt_long;
         } else {
             type = explicit;
         }
 
-        if (has_u) {
+        if (LEX_CUR(lex).int_params.hasU) {
             need_u = true;
         }
 
