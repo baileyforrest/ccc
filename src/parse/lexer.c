@@ -726,10 +726,6 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         } while(!done);
     }
 
-    // TODO1: Is this correct?
-    // Set hex numbers as unsigned
-    has_u = has_u || is_hex;
-
     lexer->next_char = cur;
     if (err) {
         return status;
@@ -795,7 +791,6 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         result->int_params.hasU = has_u;
         result->int_params.hasL = has_l;
         result->int_params.hasLL = has_ll;
-        result->int_params.isneg = false;
         result->int_params.int_val = strtoull(lexer->lexbuf, &end, 0);
     }
     if (errno == ERANGE) {
