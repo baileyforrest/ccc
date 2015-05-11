@@ -589,12 +589,14 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     status_t status = CCC_OK;
 
     bool has_e = false;
-    bool has_dot = false;
     bool has_f = false;
     bool has_u = false;
     bool has_l = false;
     bool has_ll = false;
     bool is_hex = false;
+
+    char *dot_loc = NULL;
+    char *p_loc = NULL;
 
     size_t offset = 0;
 
@@ -614,10 +616,10 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
             }
             break;
         case '.':
-            if (has_dot) {
+            if (dot_loc != NULL) {
                 err = true;
             }
-            has_dot = true;
+            dot_loc = &lexer->lexbuf[offset];
             break;
         case 'f':
         case 'F':
@@ -654,6 +656,14 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
                 err = true;
             }
             break;
+        case 'p':
+        case 'P':
+            if (p_loc != NULL) {
+                err = true;
+            }
+
+            p_loc = &lexer->lexbuf[offset];
+            break;
         case ASCII_DIGIT:
             if (has_f || has_u || has_l || has_ll) {
                 err = true;
@@ -666,15 +676,13 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
             }
             break;
 
-            // _ and all letters other than X, U, L, E, F and hex letters
-        case 'g': case 'h':
-        case 'i': case 'j': case 'k': case 'm': case 'n': case 'o': case 'p':
-        case 'q': case 'r': case 's': case 't': case 'v': case 'w': case 'y':
-        case 'z':
-        case 'G': case 'H':
-        case 'I': case 'J': case 'K': case 'M': case 'N': case 'O': case 'P':
-        case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W': case 'Y':
-        case 'Z':
+            // _ and all letters other than X, U, L, E, F, P, and hex letters
+        case 'g': case 'h': case 'i': case 'j': case 'k': case 'm': case 'n':
+        case 'o': case 'q': case 'r': case 's': case 't': case 'v': case 'w':
+        case 'y': case 'z':
+        case 'G': case 'H': case 'I': case 'J': case 'K': case 'M': case 'N':
+        case 'O': case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W':
+        case 'Y': case 'Z':
         case '_':
             err = true;
             break;
@@ -690,9 +698,10 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         }
     }
 
-    bool is_float = has_e || has_dot || has_f;
+    bool is_float = has_e || (dot_loc != NULL) || has_f;
 
-    if (!err && is_float && (has_u || has_ll || is_hex)) {
+    if ((is_float && (has_u || has_ll || (is_hex && p_loc == NULL))) ||
+        (!is_float && p_loc != NULL)) {
         err = true;
     }
 
@@ -728,7 +737,49 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
 
     char *end;
     errno = 0;
-    if (is_float) {
+    if (is_float && is_hex) {
+        assert(p_loc != NULL && dot_loc != NULL);
+        result->type = FLOATLIT;
+        result->float_params.hasF = has_f;
+        result->float_params.hasL = has_l;
+        result->float_params.float_val = 0;
+
+        long long head;
+        if (dot_loc == lexer->lexbuf + 2) {
+            // Account for the case 0x.NNNpN
+            head = 0;
+            end = dot_loc;
+        } else {
+            head = strtoll(lexer->lexbuf, &end, 16);
+        }
+        if (errno == 0 && end == dot_loc) {
+            long long frac;
+            if (dot_loc + 1 == p_loc) {
+                // account for 0xNN.pN
+                frac = 0;
+                end = p_loc;
+            } else {
+                frac = strtoll(dot_loc + 1, &end, 16);
+            }
+            if (errno == 0 && end == p_loc) {
+                ptrdiff_t digits = end - (dot_loc + 1);
+
+                long long exp = strtoll(p_loc + 1, &end, 10);
+                if (errno == 0) {
+
+                    long double dfrac = frac;
+
+                    // Each hex digit is 4 bits of precision
+                    dfrac /= pow(2.0, digits * 4);
+
+                    long double val = (long double)head + dfrac;
+
+                    val *= powl(2.0, exp);
+                    result->float_params.float_val = val;
+                }
+            }
+        }
+    } else if (is_float) {
         result->type = FLOATLIT;
         result->float_params.hasF = has_f;
         result->float_params.hasL = has_l;

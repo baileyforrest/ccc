@@ -11,8 +11,8 @@ void testmain() {
     expect(17, 0x11);
     expect(17, 0X11);
     expect(511, 0777);
-    expect(11, 0b1011);  // GNU extension
-    expect(11, 0B1011);  // GNU extension
+    //expect(11, 0b1011);  // GNU extension
+    //expect(11, 0B1011);  // GNU extension
 
     expect(3, 3L);
     expect(3, 3LL);
