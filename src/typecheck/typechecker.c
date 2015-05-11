@@ -1422,6 +1422,15 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                         decl_node->expr->init_list.nelems;
                 }
                 break;
+            case EXPR_CONST_STR:
+                // If we're assigning to an array without a size, set the
+                // array's size to string's length
+                if (node_type->type == TYPE_ARR &&
+                    node_type->arr.len == NULL) {
+                    node_type->arr.nelems =
+                        strlen(decl_node->expr->const_val.str_val) + 1;
+                }
+                // FALL THROUGH
             default:
                 retval &= typecheck_type_assignable(&decl_node->mark, node_type,
                                                     decl_node->expr->etype);

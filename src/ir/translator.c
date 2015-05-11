@@ -2055,6 +2055,14 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
         break;
     }
     case TYPE_ARR: {
+        if (val->type == EXPR_CONST_STR) {
+            assert(val->etype->type == TYPE_ARR);
+            size_t len = val->etype->arr.nelems;
+            ir_expr_t *string_expr = trans_string(ts, val->const_val.str_val);
+            string_expr = trans_assign_temp(ts, ir_stmts, string_expr);
+            trans_memcpy(ts, ir_stmts, addr, string_expr, len, 1, false);
+            return;
+        }
         assert(val == NULL || val->type == EXPR_INIT_LIST);
         assert(ir_type->type == IR_TYPE_ARR);
 
