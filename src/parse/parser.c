@@ -708,9 +708,10 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
     }
 
 done:
-    // If we parsed a type with no type specifier, then just make it an int
-    if (*type != NULL && (*type)->type == TYPE_MOD &&
-        (*type)->mod.base == NULL) {
+    if (*type == NULL) {
+        status = CCC_BACKTRACK;
+    } else if ((*type)->type == TYPE_MOD && (*type)->mod.base == NULL) {
+        // If we parsed a type with no type specifier, then just make it an int
         (*type)->mod.base = tt_int;
     }
 fail:
