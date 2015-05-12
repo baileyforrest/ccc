@@ -1754,9 +1754,25 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     }
 
     case EXPR_SIZEOF:
-    case EXPR_ALIGNOF:
-        if (expr->sizeof_params.type != NULL) {
-            type_t *type = DECL_TYPE(expr->sizeof_params.type);
+    case EXPR_ALIGNOF: {
+        type_t *type = expr->sizeof_params.type == NULL ? NULL :
+            DECL_TYPE(expr->sizeof_params.type);
+
+        if (type != NULL && type->type == TYPE_TYPEDEF &&
+            type->typedef_params.type == TYPE_VOID) {
+            // If type went out of scope, replace it with variable
+            typetab_entry_t *entry =
+                tt_lookup(tcs->typetab, type->typedef_params.name);
+            if (entry->entry_type != TT_TYPEDEF) {
+                expr_t *var_expr = ast_expr_create(tcs->tunit, &expr->mark,
+                                                   EXPR_VAR);
+                var_expr->var_id = type->typedef_params.name;
+                expr->sizeof_params.type = NULL;
+                expr->sizeof_params.expr = var_expr;
+                type = NULL;
+            }
+        }
+        if (type != NULL) {
             type_t *old_type = type;
             type = ast_type_unmod(type);
             // If there are no typedefs/modifiers, must be a raw type in
@@ -1781,6 +1797,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         expr->etype = tt_size_t;
         return retval;
+    }
 
     case EXPR_OFFSETOF:
         retval &= typecheck_decl(tcs, expr->offsetof_params.type, TYPE_VOID);
@@ -2050,8 +2067,10 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                 return false;
             }
         }
-        // Don't typecheck typedef's referenced type to avoid typechecking
-        // multiple times
+
+        if (type->typedef_params.type == TYPE_VOID) {
+            retval &= typecheck_type(tcs, type->typedef_params.base);
+        }
         return retval;
 
     case TYPE_MOD:

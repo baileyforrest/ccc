@@ -254,6 +254,10 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
 
     case STMT_DECL: {
+        // Ignore typedefs
+        if (TYPE_HAS_MOD(stmt->decl->type, TMOD_TYPEDEF)) {
+            break;
+        }
         SL_FOREACH(cur, &stmt->decl->decls) {
             decl_node_t *node = GET_ELEM(&stmt->decl->decls, cur);
             trans_decl_node(ts, node, IR_DECL_NODE_LOCAL, ir_stmts);
