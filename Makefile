@@ -38,7 +38,7 @@ clean:
 	$(RM) -r $(DEST)/*
 
 .PHONY: test
-test:
+test: all
 	@./test/scripts/test_all.bash
 
 # Add dependency files, if they exist

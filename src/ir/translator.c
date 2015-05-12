@@ -179,7 +179,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         if (!returns) {
             ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_RET);
             ir_stmt->ret.type = ir_gdecl->func.type->func.type;
-            ir_stmt->ret.val = NULL;
+            ir_stmt->ret.val = ir_expr_zero(ts->tunit, ir_stmt->ret.type);
             trans_add_stmt(ts, &ir_gdecl->func.body, ir_stmt);
         }
 

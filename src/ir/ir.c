@@ -546,6 +546,7 @@ ir_expr_t *ir_expr_zero(ir_trans_unit_t *tunit, ir_type_t *type) {
     case IR_TYPE_VOID:
     case IR_TYPE_FUNC:
     case IR_TYPE_OPAQUE:
+        return NULL;
     default:
         assert(false);
     }
