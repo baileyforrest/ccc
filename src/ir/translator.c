@@ -1561,11 +1561,10 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
     case OP_POSTINC:
     case OP_POSTDEC: {
         ir_expr_t *expr_addr = trans_expr(ts, true, expr->unary.expr, ir_stmts);
-        ir_type_t *type = ir_expr_type(expr_addr);
-        assert(type->type == IR_TYPE_PTR);
 
         // TODO1: This doesn't work for pointers
         ir_expr_t *ir_expr = trans_load_temp(ts, ir_stmts, expr_addr);
+        ir_type_t *type = ir_expr_type(ir_expr);
         ir_expr_t *op_expr = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
 
         switch (op) {
@@ -1575,10 +1574,10 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         case OP_POSTDEC: op_expr->binop.op = IR_OP_SUB; break;
         default: assert(false);
         }
-        ir_expr_t *other = ir_int_const(ts->tunit, type->ptr.base, 1);
+        ir_expr_t *other = ir_int_const(ts->tunit, type, 1);
         op_expr->binop.expr1 = ir_expr;
         op_expr->binop.expr2 = other;
-        op_expr->binop.type = type->ptr.base;
+        op_expr->binop.type = type;
 
         ir_expr_t *temp = trans_assign_temp(ts, ir_stmts, op_expr);
         trans_assign(ts, expr_addr, expr->unary.expr->etype, temp, expr->etype,
@@ -1599,6 +1598,17 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
     }
 
     ir_expr_t *ir_expr = trans_expr(ts, false, expr->unary.expr, ir_stmts);
+    switch (op) {
+    case OP_UMINUS:
+    case OP_UPLUS:
+    case OP_BITNOT:
+        ir_expr = trans_type_conversion(ts, expr->etype,
+                                        expr->unary.expr->etype, ir_expr,
+                                        ir_stmts);
+        break;
+    default:
+        break;
+    }
     ir_type_t *type = ir_expr_type(ir_expr);
     switch (op) {
     case OP_UPLUS:

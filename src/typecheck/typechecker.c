@@ -1577,10 +1577,16 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             break;
         }
         if (expr->etype == NULL) {
+            type_t *etype;
             retval &= typecheck_type_max(tcs->tunit, &expr->mark,
                                          expr->bin.expr1->etype,
                                          expr->bin.expr2->etype,
-                                         &expr->etype);
+                                         &etype);
+            // Integers are the minimum size for arithmetic operators
+            if (TYPE_IS_INTEGRAL(etype) && etype->type < TYPE_INT) {
+                etype = tt_int;
+            }
+            expr->etype = etype;
         }
         return retval;
 
@@ -1637,6 +1643,15 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         case OP_LOGICNOT:
             expr->etype = tt_bool;
+            break;
+        case OP_UMINUS:
+        case OP_UPLUS:
+        case OP_BITNOT:
+            expr->etype = expr->unary.expr->etype;
+            // Integers are the minimum size for arithmetic operators
+            if (TYPE_IS_INTEGRAL(expr->etype) && expr->etype->type < TYPE_INT) {
+                expr->etype = tt_int;
+            }
             break;
         default:
             expr->etype = expr->unary.expr->etype;
