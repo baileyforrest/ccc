@@ -257,6 +257,20 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
                 return CCC_BACKTRACK;
             }
 
+            // If these are the next character, the id must be the variable name
+            // if there's already a type specifer
+            switch (LEX_NEXT(lex).type) {
+            case ASSIGN:
+            case SEMI:
+            case COMMA:
+                if (*type != NULL && ((*type)->type != TYPE_MOD ||
+                                      (*type)->mod.base != NULL)) {
+                    return CCC_BACKTRACK;
+                }
+            default:
+                break;
+            }
+
             // Allow repeat typedefs
             // Repeat typedef if this is a typedef, an entry exists, and the
             // next character is a semicolon or comma

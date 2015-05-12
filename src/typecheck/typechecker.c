@@ -2040,7 +2040,18 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
     }
 
     case TYPE_TYPEDEF:
-        // Don't typecheck typedefs to avoid typechecking multiple times
+        if (type->typedef_params.type == TYPE_VOID) {
+            // Make sure the typedef is still in scope
+            typetab_entry_t *entry =
+                tt_lookup(tcs->typetab, type->typedef_params.name);
+            if (entry == NULL || entry->entry_type != TT_TYPEDEF) {
+                logger_log(&type->mark, LOG_ERR, "unexpected identifier '%s'",
+                           type->typedef_params.name);
+                return false;
+            }
+        }
+        // Don't typecheck typedef's referenced type to avoid typechecking
+        // multiple times
         return retval;
 
     case TYPE_MOD:
