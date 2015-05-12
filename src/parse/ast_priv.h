@@ -138,6 +138,6 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain);
  *
  * @param type_mod Typemodifer mask to print
  */
-void ast_type_mod_print(type_mod_t type_mod, char **dest, size_t *remain);
+void ast_type_mod_print(type_t *type, char **dest, size_t *remain);
 
 #endif /* _AST_PRIV_H_ */

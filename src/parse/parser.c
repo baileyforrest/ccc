@@ -381,9 +381,18 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         end_node = type;
     }
 
+    bool allowed = false;
+    switch (LEX_CUR(lex).type) {
+    case ALIGNAS:
+    case NORETURN:
+        allowed = true;
+    default:
+        break;
+    }
+
     // TODO1: This is nasty, find better solution for this
     // Handle repeat end nodes
-    if (*end_node != NULL && LEX_CUR(lex).type != ALIGNAS) {
+    if (!allowed && *end_node != NULL) {
         bool okay = false;
         switch ((*end_node)->type) {
         case TYPE_INT:
@@ -495,11 +504,13 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         // Don't give a base type for signed/unsigned. No base type defaults to
         // int
     case ALIGNAS:
+    case NORETURN:
     case SIGNED:
     case UNSIGNED: {
         type_mod_t mod;
         switch (LEX_CUR(lex).type) {
         case ALIGNAS:  mod = TMOD_ALIGNAS;  break;
+        case NORETURN: mod = TMOD_NORETURN; break;
         case SIGNED:   mod = TMOD_SIGNED;   break;
         case UNSIGNED: mod = TMOD_UNSIGNED; break;
         default:

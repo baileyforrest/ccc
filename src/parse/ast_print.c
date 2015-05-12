@@ -365,7 +365,7 @@ void ast_decl_node_print(decl_node_t *decl_node, type_t *type, char **dest,
                 size_t remain = PRINT_BUF_SIZE - 1;
                 char *cur = print_buf;
                 PUT_CUR('*');
-                ast_type_mod_print(type->ptr.type_mod, &cur, &remain);
+                ast_type_mod_print(type, &cur, &remain);
                 ALLOC_COPY_NODE();
                 sl_append(&temp, &node->link);
             }
@@ -757,7 +757,7 @@ void ast_type_print(type_t *type, int indent, char **dest, size_t *remain) {
         break;
 
     case TYPE_MOD:
-        ast_type_mod_print(type->mod.type_mod, dest, remain);
+        ast_type_mod_print(type, dest, remain);
         if (type->mod.base != NULL) {
             ast_type_print(type->mod.base, 0, dest, remain);
         }
@@ -784,13 +784,19 @@ const char *ast_type_mod_str(type_mod_t type_mod) {
     case TMOD_CONST:    return "const";
     case TMOD_VOLATILE: return "volatile";
     case TMOD_INLINE:   return "inline";
+    case TMOD_ALIGNAS:  return "_Alignas";
+    case TMOD_NORETURN: return "_Noreturn";
     default:
         assert(false);
     }
     return NULL;
 }
 
-void ast_type_mod_print(type_mod_t type_mod, char **dest, size_t *remain) {
+void ast_type_mod_print(type_t *type, char **dest, size_t *remain) {
+    assert(type->type == TYPE_MOD || type->type == TYPE_PTR);
+    type_mod_t type_mod = type->type == TYPE_MOD ?
+        type->mod.type_mod : type->ptr.type_mod;
+
     if (type_mod & TMOD_TYPEDEF) {
         ast_directed_print(dest, remain, "%s ", ast_type_mod_str(TMOD_TYPEDEF));
     }
@@ -823,5 +829,21 @@ void ast_type_mod_print(type_mod_t type_mod, char **dest, size_t *remain) {
     if (type_mod & TMOD_VOLATILE) {
         ast_directed_print(dest, remain, "%s ",
                     ast_type_mod_str(TMOD_VOLATILE));
+    }
+
+    if (type_mod & TMOD_NORETURN) {
+        ast_directed_print(dest, remain, "%s ",
+                    ast_type_mod_str(TMOD_NORETURN));
+    }
+
+    if (type_mod & TMOD_ALIGNAS) {
+        ast_directed_print(dest, remain, "%s(",
+                    ast_type_mod_str(TMOD_ALIGNAS));
+        if (type->mod.alignas_type != NULL) {
+            ast_decl_print(type->mod.alignas_type, TYPE_VOID, 0, dest, remain);
+        } else {
+            assert(type->mod.alignas_expr != NULL);
+            ast_expr_print(type->mod.alignas_expr, 0, dest, remain);
+        }
     }
 }
