@@ -2213,6 +2213,22 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
     case TYPE_PTR:
         return typecheck_type(tcs, type->ptr.base);
 
+    case TYPE_STATIC_ASSERT: {
+        if (!typecheck_expr(tcs, type->sa_params.expr, TC_CONST)) {
+            logger_log(&type->sa_params.expr->mark, LOG_ERR,
+                       "expression in static assertion is not constant");
+            return false;
+        }
+        long long value;
+        typecheck_const_expr_eval(tcs->typetab, type->sa_params.expr, &value);
+        if (value == 0) {
+            logger_log(&type->mark, LOG_ERR,
+                       "static assertion failed: \"%s\"", type->sa_params.msg);
+            return false;
+        }
+        return retval;
+    }
+
     default:
         assert(false);
     }

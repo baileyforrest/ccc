@@ -339,6 +339,33 @@ fail:
 status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
 
+    if (LEX_CUR(lex).type == STATIC_ASSERT) {
+        if (*type != NULL) {
+            logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                       "Unexpected token %s", token_str(LEX_CUR(lex).type));
+            return CCC_ESYNTAX;
+        }
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, LPAREN);
+        type_t *sa_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+                                          TYPE_STATIC_ASSERT);
+        if (CCC_OK !=
+            (status = par_oper_expression(lex, OP_NOP, NULL,
+                                          &sa_type->sa_params.expr))) {
+            return CCC_ESYNTAX;
+        }
+        LEX_MATCH(lex, COMMA);
+        LEX_CHECK(lex, STRING);
+        sa_type->sa_params.msg = LEX_CUR(lex).tab_entry->key;
+        LEX_ADVANCE(lex);
+        LEX_MATCH(lex, RPAREN);
+        LEX_CHECK(lex, SEMI);
+
+        *type = sa_type;
+
+        return CCC_OK;
+    }
+
     type_t *new_node = NULL;
 
     // Check first node for mod node

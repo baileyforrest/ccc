@@ -82,6 +82,7 @@ type_t *ast_type_create(trans_unit_t *tunit, fmark_t *mark, type_type_t type) {
     case TYPE_PAREN:
     case TYPE_ARR:
     case TYPE_PTR:
+    case TYPE_STATIC_ASSERT:
         break;
     default:
         assert(false);
@@ -279,6 +280,7 @@ void ast_type_destroy(type_t *type) {
     case TYPE_FUNC:
     case TYPE_ARR:
     case TYPE_PTR:
+    case TYPE_STATIC_ASSERT:
         break;
     default:
         assert(false);

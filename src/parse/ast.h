@@ -126,6 +126,8 @@ typedef enum type_type_t {
     TYPE_PTR,     /**< Pointer */
 
     TYPE_VA_LIST, /**< va_list */
+
+    TYPE_STATIC_ASSERT, /** Type to hold static assert information */
 } type_type_t;
 
 /**
@@ -185,6 +187,11 @@ struct type_t {
             type_t *base;        /**< Base type pointed to */
             type_mod_t type_mod; /**< Modifiers */
         } ptr;
+
+        struct {
+            expr_t *expr;
+            char *msg;
+        } sa_params;
     };
 };
 
