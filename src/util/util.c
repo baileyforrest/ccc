@@ -117,6 +117,7 @@ char *unescape_str(char *str) {
             case 'r': state = NORMAL; *(dest++) = 0x0d; break;
             case 't': state = NORMAL; *(dest++) = 0x09; break;
             case 'v': state = NORMAL; *(dest++) = 0x0b; break;
+            case 'e': state = NORMAL; *(dest++) = 0x1b; break;
 
             case 'x':
                 state = HEX0;

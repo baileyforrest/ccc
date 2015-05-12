@@ -1439,8 +1439,14 @@ status_t par_cast_expression(lex_wrap_t *lex, expr_t **result) {
 
     expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CAST);
     expr->cast.cast = type;
-    if (CCC_OK !=
-        (status = par_cast_expression(lex, &expr->cast.base))) {
+
+    if (LEX_CUR(lex).type == LBRACE) {
+        // Try to parse compound literal
+        if (CCC_OK != (status = par_initializer(lex, &expr->cast.base))) {
+            goto fail;
+        }
+    } else if (CCC_OK !=
+               (status = par_cast_expression(lex, &expr->cast.base))) {
         goto fail;
     }
 

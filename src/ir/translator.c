@@ -77,9 +77,19 @@ ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
 
 ir_expr_t *trans_load_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                            ir_expr_t *expr) {
-    ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
     ir_type_t *type = ir_expr_type(expr);
     assert(type->type == IR_TYPE_PTR);
+
+    // Don't load from aggregate types
+    switch (type->ptr.base->type) {
+    case IR_TYPE_STRUCT:
+    case IR_TYPE_ID_STRUCT:
+    case IR_TYPE_ARR:
+        return expr;
+    default:
+        break;
+    }
+    ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
     load->load.type = type->ptr.base;
     load->load.ptr = expr;
 
@@ -806,17 +816,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 // If we're taking address of variable, just return it
                 return entry->var.access;
             }
-            ir_type_t *type = ir_expr_type(entry->var.access)->ptr.base;
-
-            // Structs and arrays are always refered to by addresses
-            switch (type->type) {
-            case IR_TYPE_STRUCT:
-            case IR_TYPE_ID_STRUCT:
-            case IR_TYPE_ARR:
-                return entry->var.access;
-            default:
-                break;
-            }
 
             return trans_load_temp(ts, ir_stmts, entry->var.access);
         } else {
@@ -949,9 +948,16 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         return trans_assign_temp(ts, ir_stmts, phi);
     }
     case EXPR_CAST: {
-        ir_expr_t *src_expr = trans_expr(ts, false, expr->cast.base, ir_stmts);
-        return trans_type_conversion(ts, expr->etype, expr->cast.base->etype,
-                                     src_expr, ir_stmts);
+        if (expr->cast.base->type == EXPR_INIT_LIST) {
+            return trans_compound_literal(ts, addrof, ir_stmts,
+                                          expr->cast.base);
+        } else {
+            ir_expr_t *src_expr = trans_expr(ts, false, expr->cast.base,
+                                             ir_stmts);
+            return trans_type_conversion(ts, expr->etype,
+                                         expr->cast.base->etype, src_expr,
+                                         ir_stmts);
+        }
     }
     case EXPR_CALL: {
         ir_expr_t *call = ir_expr_create(ts->tunit, IR_EXPR_CALL);
@@ -1619,15 +1625,6 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
                                                ir_expr, ir_stmts);
         }
 
-        // Don't load from aggregate types
-        switch (base->type) {
-        case IR_TYPE_STRUCT:
-        case IR_TYPE_ID_STRUCT:
-        case IR_TYPE_ARR:
-            return ir_expr;
-        default:
-            break;
-        }
         return trans_load_temp(ts, ir_stmts, ir_expr);
     }
 
@@ -1899,9 +1896,19 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         } else {
             ir_expr_t *init;
             if (node->expr != NULL) {
-                init = trans_expr(ts, false, node->expr, NULL);
-                init = trans_type_conversion(ts, node_type, node->expr->etype,
-                                             init, NULL);
+                if (node->expr->type == EXPR_CONST_STR &&
+                    node_type->type == TYPE_ARR) {
+                    init = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+                    init->const_params.ctype = IR_CONST_STR;
+                    init->const_params.type = trans_type(ts, node->expr->etype);
+                    init->const_params.str_val =
+                        unescape_str(node->expr->const_val.str_val);
+
+                } else {
+                    init = trans_expr(ts, false, node->expr, NULL);
+                    init = trans_type_conversion(ts, node_type,
+                                                 node->expr->etype, init, NULL);
+                }
             } else {
                 init = ir_expr_zero(ts->tunit, expr_type);
             }
@@ -2334,8 +2341,10 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     return NULL;
 }
 
-ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
-                                       ir_expr_t *init, size_t align) {
+ir_expr_t *trans_create_anon_global(trans_state_t *ts, ir_type_t *type,
+                                    ir_expr_t *init, size_t align,
+                                    ir_linkage_t linkage,
+                                    ir_gdata_flags_t flags) {
     char namebuf[MAX_GLOBAL_NAME];
 
     snprintf(namebuf, MAX_GLOBAL_NAME, "%s%d", GLOBAL_PREFIX,
@@ -2350,8 +2359,8 @@ ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
     var->var.local = false;
 
     ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
-    global->linkage = IR_LINKAGE_PRIVATE;
-    global->gdata.flags = IR_GDATA_CONSTANT | IR_GDATA_UNNAMED_ADDR;
+    global->linkage = linkage;
+    global->gdata.flags = flags;
     global->gdata.type = type;
     global->gdata.var = var;
     global->gdata.init = init;
@@ -2380,7 +2389,9 @@ ir_expr_t *trans_string(trans_state_t *ts, char *str) {
     arr_lit->const_params.type = type;
     arr_lit->const_params.str_val = unescaped;
 
-    ir_expr_t *var = trans_create_private_global(ts, type, arr_lit, 1);
+    ir_expr_t *var =
+        trans_create_anon_global(ts, type, arr_lit, 1, IR_LINKAGE_PRIVATE,
+                                 IR_GDATA_CONSTANT | IR_GDATA_UNNAMED_ADDR);
 
     ir_expr_t *elem_ptr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
     ir_type_t *elem_ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
@@ -2616,4 +2627,47 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
     }
 
     return false;
+}
+
+ir_expr_t *trans_compound_literal(trans_state_t *ts, bool addrof,
+                                  ir_inst_stream_t *ir_stmts, expr_t *expr) {
+    assert(expr->type == EXPR_INIT_LIST);
+
+    ir_type_t *type = trans_type(ts, expr->etype);
+
+    ir_expr_t *addr;
+    if (ts->func == NULL) { // Global
+        ir_expr_t *init = trans_expr(ts, false, expr, NULL);
+        addr = trans_create_anon_global(ts, type, init,
+                                        ast_type_align(expr->etype),
+                                        IR_LINKAGE_INTERNAL,
+                                        IR_GDATA_NOFLAG);
+    } else { // Local
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = type;
+        ir_expr_t *alloc = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
+        alloc->alloca.type = ptr_type;
+        alloc->alloca.elem_type = type;
+        alloc->alloca.nelem_type = NULL;
+        alloc->alloca.align = ast_type_align(expr->etype);
+
+        addr = trans_temp_create(ts, type);
+
+        // Assign to temp
+        // Note we can't use trans_assign_temp because its an alloca
+        ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+        stmt->assign.dest = addr;
+        stmt->assign.src = alloc;
+        trans_add_stmt(ts, &ts->func->func.prefix, stmt);
+
+        // Store the initalizer
+        trans_initializer(ts, ir_stmts, expr->etype, type, addr, expr);
+
+    }
+
+    if (addrof) {
+        return addr;
+    } else {
+        return trans_load_temp(ts, ir_stmts, addr);
+    }
 }

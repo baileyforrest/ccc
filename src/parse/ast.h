@@ -70,6 +70,10 @@ typedef struct ir_label_t ir_label_t;
     (sl_head(&decl->decls) == NULL ? \
      decl->type : ((decl_node_t *)sl_head(&decl->decls))->type)
 
+#define DECL_MARK(decl) \
+    (sl_head(&decl->decls) == NULL ? \
+     &decl->mark : &((decl_node_t *)sl_head(&decl->decls))->mark)
+
 
 /**
  * Modifiers for types. Should be stored in a bitmap

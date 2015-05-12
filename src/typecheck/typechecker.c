@@ -1594,7 +1594,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         switch (expr->unary.op) {
         case OP_ADDR:
-            if (!typecheck_expr_lvalue(tcs, expr->unary.expr)) {
+            // We can take address of compound literals
+            if (!(expr->unary.expr->type == EXPR_CAST &&
+                  expr->unary.expr->cast.base->type == EXPR_INIT_LIST) &&
+                !typecheck_expr_lvalue(tcs, expr->unary.expr)) {
                 return false;
             }
             expr->etype = emalloc(sizeof(type_t));
@@ -1659,20 +1662,19 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         return retval;
 
     case EXPR_CAST: {
-        if (!typecheck_expr(tcs, expr->cast.base, TC_NOCONST)) {
-            return false;
-        }
-        decl_node_t *node = sl_head(&expr->cast.cast->decls);
-        if (node == NULL) {
-            retval &= typecheck_type_cast(&expr->cast.cast->mark,
-                                          expr->cast.cast->type,
-                                          expr->cast.base->etype);
-            expr->etype = expr->cast.cast->type;
+        type_t *cast_type = DECL_TYPE(expr->cast.cast);
+
+        if (expr->cast.base->type == EXPR_INIT_LIST) {
+            // Compound literal
+            retval &= typecheck_init_list(tcs, cast_type, expr->cast.base);
         } else {
-            retval &= typecheck_type_cast(&node->mark, node->type,
+            if (!typecheck_expr(tcs, expr->cast.base, TC_NOCONST)) {
+                return false;
+            }
+            retval &= typecheck_type_cast(DECL_MARK(expr->cast.cast), cast_type,
                                           expr->cast.base->etype);
-            expr->etype = node->type;
         }
+        expr->etype = cast_type;
         return retval;
     }
 

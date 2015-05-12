@@ -389,6 +389,7 @@ typedef enum ir_linkage_t {
 } ir_linkage_t;
 
 typedef enum ir_gdata_flags_t {
+    IR_GDATA_NOFLAG       = 0,
     IR_GDATA_CONSTANT     = 1 << 0, // If false, then global
     IR_GDATA_UNNAMED_ADDR = 1 << 1,
 } ir_gdata_flags_t;

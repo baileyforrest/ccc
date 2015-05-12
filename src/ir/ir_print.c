@@ -357,7 +357,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
         }
         ir_type_print(stream, expr->convert.src_type, NULL);
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->convert.val, false);
+        ir_expr_print(stream, expr->convert.val, true);
         fprintf(stream, " to ");
         ir_type_print(stream, expr->convert.dest_type, NULL);
         if (recurse) {

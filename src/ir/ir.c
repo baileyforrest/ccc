@@ -512,11 +512,39 @@ ir_expr_t *ir_expr_zero(ir_trans_unit_t *tunit, ir_type_t *type) {
         return expr;
     }
 
+    case IR_TYPE_ID_STRUCT:
+        return ir_expr_zero(tunit, type->id_struct.type);
+
+    case IR_TYPE_ARR: {
+        ir_expr_t *expr = ir_expr_create(tunit, IR_EXPR_CONST);
+        expr->const_params.ctype = IR_CONST_ARR;
+        expr->const_params.type = type;
+        sl_init(&expr->const_params.arr_val, offsetof(ir_expr_t, link));
+
+        for (size_t i = 0; i < type->arr.nelems; ++i) {
+            ir_expr_t *zero = ir_expr_zero(tunit, type->arr.elem_type);
+            sl_append(&expr->const_params.arr_val, &zero->link);
+        }
+
+        return expr;
+    }
+    case IR_TYPE_STRUCT: {
+        ir_expr_t *expr = ir_expr_create(tunit, IR_EXPR_CONST);
+        expr->const_params.ctype = IR_CONST_STRUCT;
+        expr->const_params.type = type;
+        sl_init(&expr->const_params.struct_val, offsetof(ir_expr_t, link));
+
+        VEC_FOREACH(cur, &type->struct_params.types) {
+            ir_type_t *cur_type = vec_get(&type->struct_params.types, cur);
+            ir_expr_t *zero = ir_expr_zero(tunit, cur_type);
+            sl_append(&expr->const_params.struct_val, &zero->link);
+        }
+
+        return expr;
+    }
+
     case IR_TYPE_VOID:
     case IR_TYPE_FUNC:
-    case IR_TYPE_ARR:
-    case IR_TYPE_STRUCT:
-    case IR_TYPE_ID_STRUCT:
     case IR_TYPE_OPAQUE:
     default:
         assert(false);

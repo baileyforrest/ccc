@@ -112,8 +112,10 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type);
 
 ir_oper_t trans_op(oper_t op);
 
-ir_expr_t *trans_create_private_global(trans_state_t *ts, ir_type_t *type,
-                                       ir_expr_t *init, size_t align);
+ir_expr_t *trans_create_anon_global(trans_state_t *ts, ir_type_t *type,
+                                    ir_expr_t *init, size_t align,
+                                    ir_linkage_t linkage,
+                                    ir_gdata_flags_t flags);
 
 ir_expr_t *trans_string(trans_state_t *ts, char *str);
 
@@ -134,6 +136,10 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
 bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
                              slist_t *indexs);
+
+ir_expr_t *trans_compound_literal(trans_state_t *ts, bool addrof,
+                                  ir_inst_stream_t *ir_stmts,
+                                  expr_t *expr);
 
 
 #endif /* _TRANSLATOR_PRIV_H */
