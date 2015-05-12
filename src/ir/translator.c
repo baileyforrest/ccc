@@ -1337,7 +1337,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
             assert(TYPE_IS_PTR(ast_type_unmod(right->etype)));
             assert(TYPE_IS_INTEGRAL(ast_type_unmod(left->etype)));
             ptr_expr = right;
-            int_expr = right;
+            int_expr = left;
         }
 
         // Just treat p + x as &p[x]
@@ -1449,6 +1449,13 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         pred->label = right_label;
         sl_append(&ir_expr->phi.preds, &pred->link);
 
+        ir_expr = trans_assign_temp(ts, ir_stmts, ir_expr);
+
+        // Result of comparison is an int (C11 S 6.8.5)
+        ir_expr = trans_ir_type_conversion(ts, trans_type(ts, tt_int), false,
+                                           &ir_type_i1, false, ir_expr,
+                                           ir_stmts);
+
         if (left_loc != NULL) {
             *left_loc = ir_expr;
         }
@@ -1518,7 +1525,13 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         if (left_loc != NULL) {
             *left_loc = left_expr;
         }
-        return cmp;
+
+        ir_expr_t *result = trans_assign_temp(ts, ir_stmts, cmp);
+
+        // Result of comparison is an int (C11 S 6.8.5)
+        result = trans_ir_type_conversion(ts, trans_type(ts, tt_int), false,
+                                          &ir_type_i1, false, result, ir_stmts);
+        return result;
     }
 
     // Basic bin op case
@@ -1618,9 +1631,6 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
         assert(type->type == IR_TYPE_PTR);
         type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
 
-        if (addrof) {
-            return ir_expr;
-        }
         ir_type_t *base = type->ptr.base;
 
         if (ptr_type->type == TYPE_ARR) {
@@ -1639,6 +1649,9 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
                                                ir_expr, ir_stmts);
         }
 
+        if (addrof) {
+            return ir_expr;
+        }
         return trans_load_temp(ts, ir_stmts, ir_expr);
     }
 

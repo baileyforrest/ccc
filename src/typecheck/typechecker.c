@@ -1544,7 +1544,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case OP_NE:
         case OP_LOGICAND:
         case OP_LOGICOR:
-            expr->etype = tt_bool;
+            // C11 S 6.8.5
+            expr->etype = tt_int;
             break;
         case OP_MINUS:
             // subtracting pointers evaluates to size_t
