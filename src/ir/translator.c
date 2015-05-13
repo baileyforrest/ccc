@@ -185,6 +185,7 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
             trans_decl_node(ts, arg, IR_DECL_NODE_FUNC_PARAM, NULL);
         }
 
+        ts->ignore_until_label = false;
         trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
 
         ir_stmt_t *last = ir_inst_stream_tail(&ir_gdecl->func.body);
@@ -257,6 +258,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
             trans_add_stmt(ts, ir_stmts, branch);
         }
     }
+
     bool jumps = false;
     switch (stmt->type) {
     case STMT_NOP:
@@ -275,6 +277,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     }
 
     case STMT_LABEL: {
+        ts->ignore_until_label = false;
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = trans_label_create(ts, stmt->label.label);
         if (branch != NULL) {
@@ -287,6 +290,10 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_CASE: {
+        ts->ignore_until_label = false;
+        ts->cur_case_jumps = false;
+        ts->break_count = 0;
+
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = stmt->case_params.label;
         if (branch != NULL) {
@@ -298,6 +305,7 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_DEFAULT: {
+        ts->ignore_until_label = false;
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
         ir_stmt->label = stmt->default_params.label;
         if (branch != NULL) {
@@ -310,6 +318,15 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     }
 
     case STMT_IF: {
+        if (ts->ignore_until_label) {
+            if (trans_stmt(ts, stmt->if_params.true_stmt, ir_stmts)) {
+                return true;
+            } else if (stmt->if_params.false_stmt != NULL) {
+                return trans_stmt(ts, stmt->if_params.false_stmt, ir_stmts);
+            }
+            return false;
+        }
+
         ir_label_t *if_true = trans_numlabel_create(ts);
         ir_label_t *if_false = stmt->if_params.false_stmt == NULL ?
             NULL : trans_numlabel_create(ts);
@@ -368,6 +385,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_SWITCH: {
+        if (ts->ignore_until_label) {
+            return trans_stmt(ts, stmt->switch_params.stmt, ir_stmts);
+        }
         // Just translate the default case if there are no labels
         if (sl_head(&stmt->switch_params.cases) == NULL) {
             if (stmt->switch_params.default_stmt != NULL) {
@@ -438,6 +458,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     }
 
     case STMT_DO: {
+        if (ts->ignore_until_label) {
+            return trans_stmt(ts, stmt->do_params.stmt, ir_stmts);
+        }
         ir_label_t *body = trans_numlabel_create(ts);
         ir_label_t *after = trans_numlabel_create(ts);
 
@@ -486,6 +509,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_WHILE: {
+        if (ts->ignore_until_label) {
+            return trans_stmt(ts, stmt->while_params.stmt, ir_stmts);
+        }
         ir_label_t *cond = trans_numlabel_create(ts);
         ir_label_t *body = trans_numlabel_create(ts);
         ir_label_t *after = trans_numlabel_create(ts);
@@ -545,6 +571,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_FOR: {
+        if (ts->ignore_until_label) {
+            return trans_stmt(ts, stmt->for_params.stmt, ir_stmts);
+        }
         ir_label_t *cond = trans_numlabel_create(ts);
         ir_label_t *body = trans_numlabel_create(ts);
         ir_label_t *update = trans_numlabel_create(ts);
@@ -647,6 +676,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     }
 
     case STMT_GOTO: {
+        if (ts->ignore_until_label) {
+            return false;
+        }
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         ir_stmt->br.uncond = trans_label_create(ts, stmt->goto_params.label);
@@ -655,6 +687,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_CONTINUE: {
+        if (ts->ignore_until_label) {
+            return false;
+        }
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         assert(ts->continue_target != NULL);
@@ -664,6 +699,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_BREAK: {
+        if (ts->ignore_until_label) {
+            return false;
+        }
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
         ir_stmt->br.cond = NULL;
         assert(ts->break_target != NULL);
@@ -674,6 +712,9 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_RETURN: {
+        if (ts->ignore_until_label) {
+            return false;
+        }
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_RET);
         assert(ts->func->type == IR_GDECL_FUNC &&
                ts->func->func.type->type == IR_TYPE_FUNC);
@@ -700,53 +741,36 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ts->typetab = &stmt->compound.typetab;
 
         bool has_jump = false;
-        bool ignore_until_label = false;
 
+        bool set_ignore = false;
         bool is_switch = false;
         if (ts->in_switch) {
             is_switch = true;
             ts->in_switch = false;
-            ignore_until_label = true;
+            ts->ignore_until_label = true;
+            ts->cur_case_jumps = false;
+            set_ignore = true;
         }
         bool switch_has_jump = true;
-        bool cur_case_jumps = false;
 
         SL_FOREACH(cur, &stmt->compound.stmts) {
             stmt_t *cur_stmt = GET_ELEM(&stmt->compound.stmts, cur);
-            stmt_t *labeled = STMT_LABELED(cur_stmt);
-            if (ignore_until_label) {
-                if (labeled == NULL) {
-                    continue;
-                }
-            }
 
-            switch (cur_stmt->type) {
-            case STMT_CASE:
-                cur_case_jumps = false;
-                ts->break_count = 0;
-                // FALL THROUGH
-            case STMT_DEFAULT:
-            case STMT_LABEL: {
-                if (ignore_until_label) {
-                    ignore_until_label = false;
-                } else {
-                    ts->branch_next_labeled = true;
-                }
-            }
-            default:
-                break;
+            if (STMT_LABELED(cur_stmt) != NULL && !ts->ignore_until_label) {
+                ts->branch_next_labeled = true;
             }
 
             // If we encounter a statement which always jumps, ignore all
             // statements until a labeled statement
             if (trans_stmt(ts, cur_stmt, ir_stmts)) {
+                ts->ignore_until_label = true;
+                set_ignore = true;
                 has_jump = true;
-                ignore_until_label = true;
 
                 // If we encounter a statement which always jumps, and there
                 // were no breaks, then the current case jumps
                 if (ts->break_count == 0) {
-                    cur_case_jumps = true;
+                    ts->cur_case_jumps = true;
                 }
             }
 
@@ -761,10 +785,10 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         if (is_switch) {
             // Switch always jumps if all previous cases jumped, and the current
             // case jumps
-            jumps = switch_has_jump && cur_case_jumps;
+            jumps = switch_has_jump && ts->cur_case_jumps;
 
             // If last case didn't jump, add unconditional jump to break target
-            if (!cur_case_jumps) {
+            if (!ts->cur_case_jumps) {
                 ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_BR);
                 ir_stmt->br.cond = NULL;
                 ir_stmt->br.uncond = ts->break_target;
@@ -773,10 +797,17 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         } else {
             jumps = has_jump;
         }
+
+        if (set_ignore) {
+            ts->ignore_until_label = false;
+        }
         break;
     }
 
     case STMT_EXPR:
+        if (ts->ignore_until_label) {
+            return false;
+        }
         trans_expr(ts, false, stmt->expr.expr, ir_stmts);
         break;
     default:
@@ -1998,7 +2029,7 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         stmt->assign.src = src;
         trans_add_stmt(ts, &ts->func->func.prefix, stmt);
 
-        if (node->expr != NULL) {
+        if (node->expr != NULL && !ts->ignore_until_label) {
             trans_initializer(ts, ir_stmts, node_type, expr_type, var_expr,
                               node->expr);
         }

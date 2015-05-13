@@ -35,9 +35,12 @@ typedef struct trans_state_t {
     int break_count;
     bool in_switch;
     bool branch_next_labeled;
+    bool ignore_until_label;
+    bool cur_case_jumps;
 } trans_state_t;
 
-#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL, NULL, 0, false, false }
+#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL, NULL, 0, false, false, \
+            false, false }
 
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt);
