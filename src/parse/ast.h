@@ -53,6 +53,11 @@ typedef struct ir_label_t ir_label_t;
     ((test)->type == TYPE_BOOL ||                                       \
      ((test)->type == TYPE_MOD && (test)->mod.type_mod & TMOD_UNSIGNED))
 
+#define TYPE_IS_AGGREGATE(test)                                     \
+    ((test)->type == TYPE_STRUCT || (test)->type == TYPE_UNION ||   \
+     ((test)->type == TYPE_ARR && (test)->arr.nelems != 0))
+
+
 #define TYPE_HAS_MOD(test, modname)                                 \
      ((test)->type == TYPE_MOD && (test)->mod.type_mod & modname)
 

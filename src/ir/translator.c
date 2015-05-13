@@ -1036,6 +1036,20 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
             ir_expr = trans_type_conversion(ts, sig_type, param->etype, ir_expr,
                                             ir_stmts);
+
+            // If the function parameter is aggregate, we must load it
+            // we can't use trans_load_temp because it purposely doesn't load
+            // aggregate types
+            if (TYPE_IS_AGGREGATE(ast_type_unmod(sig_type))) {
+                ir_type_t *type = ir_expr_type(ir_expr);
+                assert(type->type == IR_TYPE_PTR);
+
+                ir_expr_t *load = ir_expr_create(ts->tunit, IR_EXPR_LOAD);
+                load->load.type = type->ptr.base;
+                load->load.ptr = ir_expr;
+
+                ir_expr = trans_assign_temp(ts, ir_stmts, load);
+            }
             sl_append(&call->call.arglist, &ir_expr->link);
 
             cur_sig = cur_sig->next;
