@@ -1957,15 +1957,15 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
     type_t *node_type = ast_type_untypedef(node->type);
     ir_expr_t *var_expr = ir_expr_create(ts->tunit, IR_EXPR_VAR);
     ir_type_t *expr_type = trans_type(ts, node_type);
+    ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+    ptr_type->ptr.base = expr_type;
+
 
     ir_symtab_t *symtab;
     ir_expr_t *access;
 
     switch (type) {
     case IR_DECL_NODE_FDEFN: {
-        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ptr_type->ptr.base = expr_type;
-
         var_expr->var.type = ptr_type;
         var_expr->var.name = node->id;
         var_expr->var.local = false;
@@ -2026,10 +2026,8 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
             }
             gdecl->gdata.init = init;
             expr_type = ir_expr_type(init);
+            ptr_type->ptr.base = expr_type;
         }
-
-        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ptr_type->ptr.base = expr_type;
 
         var_expr->var.type = ptr_type;
         var_expr->var.name = node->id;
@@ -2045,11 +2043,67 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         break;
     }
     case IR_DECL_NODE_LOCAL: {
-        ir_inst_stream_t *ir_stmts = context;
-        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ptr_type->ptr.base = expr_type;
+        // storage class specifers (auto/register/static/extern) are attached
+        // to the base type, need to remove pointers
+        type_t *mod_check = node_type;
+        while (mod_check->type == TYPE_PTR) {
+            mod_check = ast_type_untypedef(mod_check->ptr.base);
+        }
+        ir_linkage_t linkage = IR_LINKAGE_DEFAULT;
+        if (mod_check->type == TYPE_MOD) {
+            if (mod_check->mod.type_mod & TMOD_STATIC) {
+                linkage = IR_LINKAGE_INTERNAL;
+            } else if (mod_check->mod.type_mod & TMOD_EXTERN) {
+                linkage = IR_LINKAGE_EXTERNAL;
+            }
+        }
+        // TODO1: Handle extern, need to not translate this, add it to the
+        // gdecls hashtable
 
         symtab = &ts->func->func.locals;
+        access = var_expr;
+
+        if (linkage == IR_LINKAGE_INTERNAL) {
+            char namebuf[MAX_GLOBAL_NAME];
+            snprintf(namebuf, sizeof(namebuf), "%s.%s",
+                     ts->func->func.name, node->id);
+            var_expr->var.type = ptr_type;
+            var_expr->var.name = sstore_lookup(namebuf);
+            var_expr->var.local = false;
+
+            ir_expr_t *init;
+            // TODO1: This is copied from GDATA, move to function
+            if (node->expr != NULL) {
+                if (node->expr->type == EXPR_CONST_STR &&
+                    node_type->type == TYPE_ARR) {
+                    init = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+                    init->const_params.ctype = IR_CONST_STR;
+                    init->const_params.type = trans_type(ts, node->expr->etype);
+                    init->const_params.str_val =
+                        unescape_str(node->expr->const_val.str_val);
+
+                } else {
+                    init = trans_expr(ts, false, node->expr, NULL);
+                    init = trans_type_conversion(ts, node_type,
+                                                 node->expr->etype, init, NULL);
+                }
+            } else {
+                init = ir_expr_zero(ts->tunit, expr_type);
+            }
+
+            ir_gdecl_t *global = ir_gdecl_create(IR_GDECL_GDATA);
+            global->linkage = linkage;
+            global->gdata.flags = IR_GDATA_NOFLAG;
+            global->gdata.type = expr_type;
+            global->gdata.var = var_expr;
+            global->gdata.init = init;
+            global->gdata.align = ast_type_align(node->type);
+            sl_append(&ts->tunit->decls, &global->link);
+
+            break;
+        }
+
+        ir_inst_stream_t *ir_stmts = context;
 
         var_expr->var.type = ptr_type;
         var_expr->var.name = trans_decl_node_name(symtab, node->id);
@@ -2073,13 +2127,9 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
                               node->expr);
         }
 
-        access = var_expr;
         break;
     }
     case IR_DECL_NODE_FUNC_PARAM: {
-        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ptr_type->ptr.base = expr_type;
-
         symtab = &ts->func->func.locals;
 
         var_expr->var.type = expr_type;
