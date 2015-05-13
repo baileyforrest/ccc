@@ -172,12 +172,14 @@ static void test_switch() {
     }
     expect(a, 5);
 
+    /* This is a GCC extension
     switch (7) {
     case 1 ... 2: fail("switch");
     case 3: fail("switch");
     case 5 ... 10: break;
     default: fail("switch");
     }
+    */
 
     a = 0;
     int count = 27;
@@ -240,6 +242,7 @@ static void test_label() {
     expect(8, z);
 }
 
+/* GCC extension
 static void test_computed_goto() {
     struct { void *x, *y, *z, *a; } t = { &&x, &&y, &&z, &&a };
     int acc = 0;
@@ -263,6 +266,7 @@ static void test_computed_goto() {
  L:
     ;
 }
+*/
 
 static void test_logor() {
     expect(1, 0 || 3);
@@ -279,6 +283,6 @@ void testmain() {
     test_switch();
     test_goto();
     test_label();
-    test_computed_goto();
+    //test_computed_goto(); GCC extension
     test_logor();
 }

@@ -43,7 +43,12 @@ void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt) {
     if (stmt->type == IR_STMT_LABEL) {
         ts->func->func.last_label = stmt->label;
+
+        // If we added a labeled statement, indicate that if the next statement
+        // is labeled, we need to add a jump to that statement
+        ts->branch_next_labeled = true;
     }
+
     ir_inst_stream_append(stream, stmt);
 }
 
@@ -167,27 +172,29 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         assert(node->type->type == TYPE_FUNC);
         SL_FOREACH(cur, &node->type->func.params) {
             decl_t *decl = GET_ELEM(&node->type->func.params, cur);
-            decl_node_t *node = sl_head(&decl->decls);
-            assert(node != NULL);
+            decl_node_t *arg = sl_head(&decl->decls);
+            // Just exit if its a void paramed function
+            if (decl->type->type == TYPE_VOID && arg == NULL) {
+                // Ensure sure there's only one parameter
+                assert(sl_head(&node->type->func.params) ==
+                       sl_tail(&node->type->func.params));
+                break;
+            }
+            assert(arg != NULL);
 
-            trans_decl_node(ts, node, IR_DECL_NODE_FUNC_PARAM, NULL);
+            trans_decl_node(ts, arg, IR_DECL_NODE_FUNC_PARAM, NULL);
         }
 
-        bool returns = trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
+        trans_stmt(ts, gdecl->fdefn.stmt, &ir_gdecl->func.body);
+
+        ir_stmt_t *last = ir_inst_stream_tail(&ir_gdecl->func.body);
 
         // If the function didn't return, add a return
-        if (!returns) {
+        if (last == NULL || last->type != IR_STMT_RET) {
             ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_RET);
             ir_stmt->ret.type = ir_gdecl->func.type->func.type;
             ir_stmt->ret.val = ir_expr_zero(ts->tunit, ir_stmt->ret.type);
             trans_add_stmt(ts, &ir_gdecl->func.body, ir_stmt);
-        }
-
-        // Remove trailing labels
-        ir_stmt_t *last = ir_inst_stream_tail(&ir_gdecl->func.body);
-        while (last->type == IR_STMT_LABEL) {
-            dl_remove(&ir_gdecl->func.body.list, &last->link);
-            last = ir_inst_stream_tail(&ir_gdecl->func.body);
         }
 
         sl_append(ir_gdecls, &ir_gdecl->link);
@@ -241,12 +248,14 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
 
 bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
     ir_stmt_t *branch = NULL;
-    if (ts->branch_next_labeled && STMT_LABELED(stmt) != NULL) {
+    if (ts->branch_next_labeled) {
         ts->branch_next_labeled = false;
-        branch = ir_stmt_create(ts->tunit, IR_STMT_BR);
-        branch->br.cond = NULL;
-        branch->br.uncond = NULL;
-        trans_add_stmt(ts, ir_stmts, branch);
+        if (STMT_LABELED(stmt) != NULL) {
+            branch = ir_stmt_create(ts->tunit, IR_STMT_BR);
+            branch->br.cond = NULL;
+            branch->br.uncond = NULL;
+            trans_add_stmt(ts, ir_stmts, branch);
+        }
     }
     bool jumps = false;
     switch (stmt->type) {
@@ -271,9 +280,6 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         if (branch != NULL) {
             branch->br.uncond = ir_stmt->label;
         }
-        if (STMT_LABELED(stmt->label.stmt) != NULL) {
-            ts->branch_next_labeled = true;
-        }
 
         trans_add_stmt(ts, ir_stmts, ir_stmt);
         jumps = trans_stmt(ts, stmt->label.stmt, ir_stmts);
@@ -286,9 +292,6 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         if (branch != NULL) {
             branch->br.uncond = ir_stmt->label;
         }
-        if (STMT_LABELED(stmt->case_params.stmt) != NULL) {
-            ts->branch_next_labeled = true;
-        }
 
         trans_add_stmt(ts, ir_stmts, ir_stmt);
         jumps = trans_stmt(ts, stmt->case_params.stmt, ir_stmts);
@@ -299,9 +302,6 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ir_stmt->label = stmt->default_params.label;
         if (branch != NULL) {
             branch->br.uncond = ir_stmt->label;
-        }
-        if (STMT_LABELED(stmt->default_params.stmt) != NULL) {
-            ts->branch_next_labeled = true;
         }
 
         trans_add_stmt(ts, ir_stmts, ir_stmt);
@@ -368,6 +368,14 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         break;
     }
     case STMT_SWITCH: {
+        // Just translate the default case if there are no labels
+        if (sl_head(&stmt->switch_params.cases) == NULL) {
+            if (stmt->switch_params.default_stmt != NULL) {
+                return trans_stmt(ts, stmt->switch_params.default_stmt,
+                                  ir_stmts);
+            }
+            return false;
+        }
         ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_SWITCH);
         ir_expr_t *switch_expr =
             trans_expr(ts, false, stmt->switch_params.expr, ir_stmts);
@@ -401,15 +409,22 @@ bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts) {
         ts->break_target = after;
         ts->break_count = 0;
 
-        stmt->switch_params.default_stmt->default_params.label = label;
-        ir_stmt->switch_params.default_case = label;
+        bool has_default;
+        if (stmt->switch_params.default_stmt != NULL) {
+            has_default = true;
+            stmt->switch_params.default_stmt->default_params.label = label;
+            ir_stmt->switch_params.default_case = label;
+        } else {
+            has_default = false;
+            ir_stmt->switch_params.default_case = after;
+        }
         trans_add_stmt(ts, ir_stmts, ir_stmt);
 
         ts->in_switch = true;
         jumps = trans_stmt(ts, stmt->switch_params.stmt, ir_stmts);
         ts->in_switch = false;
 
-        if (!jumps) {
+        if (!jumps || !has_default) {
             // Preceeding label
             ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_LABEL);
             ir_stmt->label = after;
