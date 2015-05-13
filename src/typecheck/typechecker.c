@@ -248,22 +248,11 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
         while (ptype1 != NULL && ptype2 != NULL) {
             decl_t *decl1 = GET_ELEM(&t1->func.params, ptype1);
             decl_t *decl2 = GET_ELEM(&t2->func.params, ptype2);
-            decl_node_t *node1 = sl_head(&decl1->decls);
-            decl_node_t *node2 = sl_head(&decl2->decls);
-            assert(node1 == sl_tail(&decl1->decls));
-            assert(node2 == sl_tail(&decl2->decls));
-            if ((node1 == NULL && node2 != NULL) ||
-                (node1 != NULL && node2 == NULL)) {
+
+            type_t *decl_type1 = DECL_TYPE(decl1);
+            type_t *decl_type2 = DECL_TYPE(decl2);
+            if (!typecheck_type_equal(decl_type1, decl_type2)) {
                 return false;
-            }
-            if (node1 == NULL) {
-                if (!typecheck_type_equal(decl1->type, decl1->type)) {
-                    return false;
-                }
-            } else {
-                if (!typecheck_type_equal(node1->type, node2->type)) {
-                    return false;
-                }
             }
             ptype1 = ptype1->next;
             ptype2 = ptype2->next;
@@ -276,17 +265,8 @@ bool typecheck_type_equal(type_t *t1, type_t *t2) {
     }
 
     case TYPE_ARR: {
-        long long len1, len2;
-        if (t1->arr.len == NULL && t2->arr.len == NULL) {
-            return true;
-        }
-        if ((t1->arr.len == NULL && t2->arr.len != NULL) ||
-            (t2->arr.len == NULL && t1->arr.len != NULL)) {
-            return false;
-        }
-        return typecheck_const_expr(t1->arr.len, &len1) &&
-            typecheck_const_expr(t2->arr.len, &len2) &&
-            (len1 == len2) && typecheck_type_equal(t1->arr.base, t2->arr.base);
+        return t1->arr.nelems == t2->arr.nelems &&
+            typecheck_type_equal(t1->arr.base, t2->arr.base);
     }
     case TYPE_PTR:
         return (t1->ptr.type_mod == t2->ptr.type_mod) &&
@@ -475,6 +455,10 @@ bool typecheck_type_assignable(fmark_t *mark, type_t *to, type_t *from) {
         }
 
         goto fail;
+
+        // Can't assign to functions
+    case TYPE_FUNC:
+        break;
     default:
         assert(false);
     }
@@ -1245,7 +1229,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 struct_iter_advance(&iter);
                 continue;
             }
-            if (iter.node != NULL && iter.node->id == NULL) {
+            if (iter.node != NULL && iter.node->id != NULL) {
                 if (cur_expr->type == EXPR_INIT_LIST) {
                     retval &= typecheck_init_list(tcs, iter.node->type,
                                                   cur_expr);
@@ -1496,7 +1480,17 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             logger_log(&expr->mark, LOG_ERR, "Expected constant value");
             return false;
         }
-        expr->etype = entry->type;
+
+        if (entry->type->type == TYPE_FUNC) {
+            // If we're using a function as a variable, etype is function
+            // pointer
+            type_t *ptr_type = ast_type_create(tcs->tunit, &expr->mark,
+                                               TYPE_PTR);
+            ptr_type->ptr.base = entry->type;
+            expr->etype = ptr_type;
+        } else {
+            expr->etype = entry->type;
+        }
         return retval;
     }
 
@@ -1607,6 +1601,15 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                 !typecheck_expr_lvalue(tcs, expr->unary.expr)) {
                 return false;
             }
+
+            // Address of function pointer is the same thing
+            if (expr->unary.expr->type == EXPR_VAR &&
+                expr->unary.expr->etype->type == TYPE_PTR &&
+                expr->unary.expr->etype->ptr.base->type == TYPE_FUNC) {
+                expr->etype = expr->unary.expr->etype;
+                break;
+            }
+
             expr->etype = emalloc(sizeof(type_t));
             // If we have a translation unit, save etypes on it because we'll
             // need them later
@@ -2196,6 +2199,14 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                         retval = false;
                     }
                 }
+            }
+
+            // If a paramater is a function, convert it to a function pointer
+            if (node != NULL && node->type->type == TYPE_FUNC) {
+                type_t *ptr_type = ast_type_create(tcs->tunit,
+                                                   &node->type->mark, TYPE_PTR);
+                ptr_type->ptr.base = node->type;
+                node->type = ptr_type;
             }
 
             retval &= typecheck_decl(tcs, decl, decl_type);

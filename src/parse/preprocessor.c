@@ -59,10 +59,13 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC), // stdlib available
 
+    // Required for compatability
+    PREDEF_MACRO_LIT("__alignof__", "_Alignof", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__FUNCTION__", "__func__", MACRO_BASIC),
+
 #ifdef __x86_64__
     PREDEF_MACRO_LIT("__x86_64__", "1", MACRO_BASIC),
 #endif
-    PREDEF_MACRO_LIT("__alignof__", "_Alignof", MACRO_BASIC),
 
     // TODO1: Conditionally compile or handle these better
     PREDEF_MACRO_LIT("char16_t", "short", MACRO_BASIC),

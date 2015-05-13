@@ -124,6 +124,9 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
                 fprintf(stream, ", ");
             }
         }
+        if (gdecl->func.type->func.varargs) {
+            fprintf(stream, ", ...");
+        }
         fprintf(stream, ")");
 
         fprintf(stream, " {\n");

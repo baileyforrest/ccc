@@ -827,9 +827,18 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 
             // Search through scopes until we find this expression's entry
             if ((tt_ent->entry_type == TT_VAR ||
-                 tt_ent->entry_type == TT_ENUM_ID) &&
-                tt_ent->type == expr->etype) {
-                break;
+                 tt_ent->entry_type == TT_ENUM_ID)) {
+                if (tt_ent->type == expr->etype) {
+                    break;
+                }
+
+                // Function expressions evaluate to function pointers
+                if (expr->type == EXPR_VAR && tt_ent->type->type == TYPE_FUNC) {
+                    assert(expr->etype->type == TYPE_PTR);
+                    if (expr->etype->ptr.base == tt_ent->type) {
+                        break;
+                    }
+                }
             }
 
             tt = tt->last;
@@ -854,9 +863,12 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         // Must be valid if typechecked
         assert(entry != NULL && entry->type == IR_SYMTAB_ENTRY_VAR);
 
-        if (ir_expr_type(entry->var.access)->type == IR_TYPE_PTR) {
-            if (addrof) {
+        ir_type_t *entry_type = ir_expr_type(entry->var.access);
+
+        if (entry_type->type == IR_TYPE_PTR) {
+            if (addrof || entry_type->ptr.base->type == IR_TYPE_FUNC) {
                 // If we're taking address of variable, just return it
+                // Also can't dereference a function
                 return entry->var.access;
             }
 
@@ -1005,6 +1017,9 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_CALL: {
         ir_expr_t *call = ir_expr_create(ts->tunit, IR_EXPR_CALL);
         type_t *func_sig = expr->call.func->etype;
+        if (func_sig->type == TYPE_PTR) {
+            func_sig = func_sig->ptr.base;
+        }
         call->call.func_sig = trans_type(ts, func_sig);
         call->call.func_ptr = trans_expr(ts, false, expr->call.func, ir_stmts);
         assert(func_sig->type == TYPE_FUNC);
@@ -1038,7 +1053,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             assert(cur_expr == NULL);
         }
 
-        type_t *return_type = ast_type_unmod(expr->call.func->etype->func.type);
+        type_t *return_type = ast_type_unmod(func_sig->func.type);
         ir_expr_t *result;
         // Void returning function, don't create a temp
         if (return_type->type == TYPE_VOID) {
@@ -1665,13 +1680,17 @@ ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
 
     case OP_DEREF: {
         assert(type->type == IR_TYPE_PTR);
+
+        // Derefernce of a function pointer is unchanged
+        if (type->ptr.base->type == IR_TYPE_FUNC) {
+            return ir_expr;
+        }
         type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
 
         ir_type_t *base = type->ptr.base;
 
-        if (ptr_type->type == TYPE_ARR) {
+        if (ptr_type->type == TYPE_ARR && base->type == IR_TYPE_ARR) {
             // Arrays are refered to by pointers to the array
-            assert(base->type == IR_TYPE_ARR);
 
             // Get the actual base and cast the array type to the appropriate
             // pointer type
@@ -1788,7 +1807,6 @@ ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
         }
     }
 
-    ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     ir_convert_t convert_op;
     switch (dest_type->type) {
     case IR_TYPE_INT: {
@@ -1871,6 +1889,8 @@ ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
     default:
         assert(false);
     }
+
+    ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
     convert->convert.type = convert_op;
     convert->convert.src_type = src_type;
     convert->convert.val = src_expr;
@@ -1917,14 +1937,18 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
     ir_expr_t *access;
 
     switch (type) {
-    case IR_DECL_NODE_FDEFN:
-        var_expr->var.type = expr_type;
+    case IR_DECL_NODE_FDEFN: {
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = expr_type;
+
+        var_expr->var.type = ptr_type;
         var_expr->var.name = node->id;
         var_expr->var.local = false;
 
         symtab = &ts->tunit->globals;
         access = var_expr;
         break;
+    }
     case IR_DECL_NODE_GLOBAL: {
         ir_gdecl_t *gdecl = context;
         assert(gdecl->type == IR_GDECL_GDATA);
@@ -2706,14 +2730,14 @@ ir_expr_t *trans_compound_literal(trans_state_t *ts, bool addrof,
         alloc->alloca.nelem_type = NULL;
         alloc->alloca.align = ast_type_align(expr->etype);
 
-        addr = trans_temp_create(ts, type);
+        addr = trans_temp_create(ts, ptr_type);
 
         // Assign to temp
         // Note we can't use trans_assign_temp because its an alloca
         ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
         stmt->assign.dest = addr;
         stmt->assign.src = alloc;
-        trans_add_stmt(ts, &ts->func->func.prefix, stmt);
+        trans_add_stmt(ts, ir_stmts, stmt);
 
         // Store the initalizer
         trans_initializer(ts, ir_stmts, expr->etype, type, addr, expr);
