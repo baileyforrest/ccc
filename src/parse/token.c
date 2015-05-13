@@ -184,6 +184,8 @@ const char *token_str(token_t token) {
     case VA_ARG:        return "__builtin_va_arg";
     case VA_END:        return "__builtin_va_end";
     case VA_COPY:       return "__builtin_va_copy";
+
+    case FUNC:          return "__func__";
     }
     assert(false);
     return NULL;

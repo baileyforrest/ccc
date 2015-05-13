@@ -942,6 +942,12 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
         assert(func_save == NULL); // Can't have nested functions in C
         tcs->func = gdecl;
 
+        decl_node_t *node = sl_head(&gdecl->decl->decls);
+        assert(node != NULL && node->id != NULL);
+
+        // Set the current function we're in
+        log_function = node->id;
+
         retval &= typecheck_decl(tcs, gdecl->decl, TYPE_VOID);
         retval &= typecheck_stmt(tcs, gdecl->fdefn.stmt);
         SL_FOREACH(cur, &gdecl->fdefn.gotos) {
@@ -957,6 +963,7 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
         }
 
         // Restore old state
+        log_function = NULL;
         tcs->func = func_save;
         break;
     }

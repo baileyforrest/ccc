@@ -42,6 +42,7 @@ typedef struct lex_wrap_t {
     typetab_t *typetab;              /**< Type table on top of stack */
     lexeme_t lexemes[LEX_LOOKAHEAD]; /**< Ring buffer of lexemes */
     int lex_idx;                     /**< Index of current lexeme */
+    char *function;                  /**< Current function. NULL if none */
 } lex_wrap_t;
 
 /**

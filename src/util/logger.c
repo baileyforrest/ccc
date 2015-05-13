@@ -32,6 +32,8 @@
 void logger_log_line(fmark_t *mark);
 
 
+char *log_function = NULL;
+
 typedef struct logger_t {
     bool has_error;
     bool has_warning;
@@ -89,6 +91,13 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
         vfprintf(stderr, fmt, ap);
         fprintf(stderr, "\n");
         return;
+    }
+
+    static char *last_func = NULL;
+    if (log_function != NULL && last_func != log_function) {
+        fprintf(stderr, "%s: In function '%s':\n", mark->filename,
+                log_function);
+        last_func = log_function;
     }
 
     fprintf(stderr, "%s:%d:%d %s ", mark->filename, mark->line, mark->col,

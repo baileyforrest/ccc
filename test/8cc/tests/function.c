@@ -184,7 +184,7 @@ void testmain() {
     t9();
     expect(7, t10(3, 4.0));
     func_ptr_call();
-    //func_name();
+    func_name();
     local_static();
     empty();
     empty2();

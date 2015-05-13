@@ -100,6 +100,8 @@ static symtab_entry_t s_reserved[] = {
 
     { SL_LINK_LIT, "double"        , DOUBLE        },
     { SL_LINK_LIT, "float"         , FLOAT         },
+
+    { SL_LINK_LIT, "__func__"      , FUNC          },
 };
 
 /**

@@ -37,11 +37,11 @@
 #include <stdlib.h>
 #include <limits.h>
 
+#include "optman.h"
+
 #include "util/htable.h"
 #include "util/logger.h"
 #include "typecheck/typechecker.h"
-
-#include "optman.h"
 
 status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
     assert(lexer != NULL);
@@ -227,9 +227,18 @@ status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
     }
     */
 
+    decl_node_t *node = sl_head(&gdecl->decl->decls);
+    assert(node != NULL && node->id != NULL);
+
+    // Set the current function we're in
+    log_function = node->id;
+    lex->function = node->id;
+
     if (CCC_OK != (status = par_compound_statement(lex, &gdecl->fdefn.stmt))) {
         goto fail;
     }
+    log_function = NULL;
+    lex->function = NULL;
 
 fail:
     return status;
@@ -1626,20 +1635,29 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
         break;
 
+    case FUNC:
     case STRING: {
+        bool is_func = LEX_CUR(lex).type == FUNC;
+
         base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CONST_STR);
-        base->const_val.str_val = LEX_CUR(lex).tab_entry->key;
+        if (is_func) {
+            if (lex->function == NULL) {
+                logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+                           "'%s' is not defined outside of function scope",
+                           token_str(LEX_CUR(lex).type));
+                base->const_val.str_val = "";
+            } else {
+                base->const_val.str_val = lex->function;
+            }
+        } else {
+            base->const_val.str_val = LEX_CUR(lex).tab_entry->key;
+        }
         type_t *type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
                                        TYPE_ARR);
         type->arr.base = tt_char;
         base->const_val.type = type;
-        expr_t *len = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
-                                      EXPR_CONST_INT);
-        size_t arr_len = strlen(base->const_val.str_val) + 1;
-        len->const_val.int_val = arr_len;
-        len->const_val.type = tt_long;
-        type->arr.len = len;
-        type->arr.nelems = arr_len;
+        type->arr.len = NULL;
+        type->arr.nelems = strlen(base->const_val.str_val) + 1;
         LEX_ADVANCE(lex);
         break;
     }

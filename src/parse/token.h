@@ -150,6 +150,8 @@ typedef enum token_t {
     STRING,        // string
     INTLIT,        // Integral literal
     FLOATLIT,      // Float literal
+
+    FUNC,          // __func__
 } token_t;
 
 typedef struct symtab_entry_t symtab_entry_t; // Forward definition

@@ -35,6 +35,13 @@ typedef enum log_type_t {
 } log_type_t;
 
 /**
+ * Name of current function
+ *
+ * NULL if none
+ */
+extern char *log_function;
+
+/**
  * Initializes logger
  */
 void logger_init(void);
