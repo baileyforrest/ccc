@@ -2171,8 +2171,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             decl_node_t *node = sl_head(&decl->decls);
             assert(node == sl_tail(&decl->decls));
 
-            type_t *arg_type = DECL_TYPE(decl);
-            if (arg_type->type == TYPE_VOID) {
+            if (node == NULL && decl->type->type == TYPE_VOID) {
                 void_typed = true;
                 break;
             }
