@@ -344,6 +344,9 @@ static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result) {
         case '_':
             lexer->lexbuf[len++] = cur;
             break;
+        case '\\': // ignore next character
+            NEXT_CHAR_NOERR(lexer, cur);
+            break;
         default:
             done = true;
         }

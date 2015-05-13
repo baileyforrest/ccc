@@ -434,17 +434,22 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     if (macro_param) {
         // If we're stringifying, and current character is a \ or "
         // we need to escape
-        if (stringify && (ts_cur(stream) == '"' || ts_cur(stream) == '\\' ||
-                          ts_cur(stream) == '\n')) {
-            if (!pp->stringify_esc) {
-                pp->stringify_esc = true;
-                return '\\';
-            } else {
-                pp->stringify_esc = false;
-            }
-            if (ts_cur(stream) == '\n') {
-                ts_advance(stream);
-                return 'n';
+        if (stringify) {
+            if((ts_cur(stream) == '"' || ts_cur(stream) == '\\' ||
+                ts_cur(stream) == '\n')) {
+                if (!pp->stringify_esc) {
+                    pp->stringify_esc = true;
+                    return '\\';
+                } else {
+                    pp->stringify_esc = false;
+                }
+                if (ts_cur(stream) == '\n') {
+                    ts_advance(stream);
+                    return 'n';
+                }
+            } else if (isspace(ts_cur(stream))) {
+                ts_skip_ws_and_comment(stream, true);
+                return ' ';
             }
         }
         return ts_advance(stream);
@@ -592,6 +597,11 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             ts_skip_ws_and_comment(stream, false);
             char *start = ts_location(stream);
             size_t len = ts_advance_identifier(stream);
+
+            // Single # isn't an error
+            if (len == 0) {
+                return -(int)CCC_RETRY;
+            }
             len_str_t lookup = { start, len };
             pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
 

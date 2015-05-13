@@ -23,6 +23,7 @@
 #include "text_stream.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 
 extern inline char *ts_location(tstream_t *ts);
@@ -83,19 +84,20 @@ size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines) {
             }
             continue;
         }
-        switch (ts_cur(ts)) {
-        case '\n':
-            if (skip_newlines) {
-                ts_advance(ts);
+        int cur = ts_cur(ts);
+        if (isspace(cur)) {
+            if (cur == '\n') {
+                if (skip_newlines) {
+                    ts_advance(ts);
+                } else {
+                    done = true;
+                }
             } else {
-                done = true;
+                ts_advance(ts);
             }
-            break;
-        case ' ':
-        case '\t':
-            // Skip white space
-            ts_advance(ts);
-            break;
+            continue;
+        }
+        switch (cur) {
         case '/':
             ts_advance(ts);
             if (ts_end(ts)) {
