@@ -1087,8 +1087,19 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 val = ast_type_size(expr->sizeof_params.type->type);
             }
         } else {
-            assert(expr->sizeof_params.expr != NULL);
-            val = ast_type_size(expr->sizeof_params.expr->etype);
+            expr_t *sz_expr = expr->sizeof_params.expr;
+            assert(sz_expr != NULL);
+
+            if (sz_expr->type == EXPR_VAR) {
+                // Function's etypes are function pointers, but the size
+                // is not a pointer size
+                typetab_entry_t *entry = tt_lookup(ts->typetab,
+                                                   sz_expr->var_id);
+                assert(entry != NULL);
+                val = ast_type_size(entry->type);
+            } else {
+                val = ast_type_size(sz_expr->etype);
+            }
         }
 
         return ir_int_const(ts->tunit, trans_type(ts, expr->etype), val);
