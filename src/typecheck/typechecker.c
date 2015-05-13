@@ -2160,6 +2160,9 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                 tcs->typetab = &tcs->func->fdefn.stmt->compound.typetab;
             }
         }
+
+        bool void_typed = false;
+
         // If this is only a function declaration, we don't want to add the
         // parameters to any symbol table
         type_type_t decl_type = save_tab == NULL ? TYPE_FUNC : TYPE_VOID;
@@ -2167,6 +2170,12 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             decl_t *decl = GET_ELEM(&type->func.params, cur);
             decl_node_t *node = sl_head(&decl->decls);
             assert(node == sl_tail(&decl->decls));
+
+            type_t *arg_type = DECL_TYPE(decl);
+            if (arg_type->type == TYPE_VOID) {
+                void_typed = true;
+                break;
+            }
 
             // Make sure param names are not duplicated
             if (node != NULL && node->id != NULL) {
@@ -2193,6 +2202,17 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             retval &= typecheck_decl(tcs, decl, decl_type);
         }
 
+        if (void_typed) {
+            if (sl_head(&type->func.params) != sl_tail(&type->func.params)) {
+                logger_log(&type->mark, LOG_ERR,
+                           "'void' must be the only parameter");
+                retval = false;
+            } else {
+                // If void typed, remove the paramaters
+                sl_clear(&type->func.params);
+            }
+        }
+
         if (save_tab != NULL) {
             tcs->typetab = save_tab;
         }
@@ -2207,6 +2227,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             if (nelems < 0) {
                 logger_log(&type->arr.len->mark, LOG_ERR,
                            "size of array is negative");
+                retval = false;
             }
             type->arr.nelems = nelems;
         }

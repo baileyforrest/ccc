@@ -173,13 +173,6 @@ void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls) {
         SL_FOREACH(cur, &node->type->func.params) {
             decl_t *decl = GET_ELEM(&node->type->func.params, cur);
             decl_node_t *arg = sl_head(&decl->decls);
-            // Just exit if its a void paramed function
-            if (decl->type->type == TYPE_VOID && arg == NULL) {
-                // Ensure sure there's only one parameter
-                assert(sl_head(&node->type->func.params) ==
-                       sl_tail(&node->type->func.params));
-                break;
-            }
             assert(arg != NULL);
 
             trans_decl_node(ts, arg, IR_DECL_NODE_FUNC_PARAM, NULL);
@@ -1022,9 +1015,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             decl_t *decl = GET_ELEM(&func_sig->func.params, cur_sig);
             decl_node_t *node = sl_head(&decl->decls);
             type_t *sig_type = node == NULL ? decl->type : node->type;
-            if (sig_type->type == TYPE_VOID) {
-                break;
-            }
             assert(cur_expr != NULL);
 
             expr_t *param = GET_ELEM(&expr->call.params, cur_expr);
@@ -2374,14 +2364,6 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             decl_t *decl = GET_ELEM(&type->func.params, cur);
             decl_node_t *node = sl_head(&decl->decls);
             type_t *ptype = node == NULL ? decl->type : node->type;
-
-            // Just exit if its a void paramed function
-            if (ptype->type == TYPE_VOID) {
-                // Ensure sure there's only one parameter
-                assert(sl_head(&type->func.params) ==
-                       sl_tail(&type->func.params));
-                break;
-            }
             ir_type_t *param_type = trans_type(ts, ptype);
             vec_push_back(&ir_type->func.params, param_type);
         }

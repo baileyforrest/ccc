@@ -100,6 +100,11 @@ void sl_destroy(slist_t *slist);
         sl_destroy(slist);                                          \
     } while (0)
 
+inline void sl_clear(slist_t *slist) {
+    slist->head = NULL;
+    slist->tail = NULL;
+}
+
 /**
  * Return slist head
  *

@@ -29,8 +29,9 @@
 #include "util.h"
 
 // Extern declarations for the inline functions
-extern inline void *sl_head(slist_t *slist);
-extern inline void *sl_tail(slist_t *slist);
+extern void sl_clear(slist_t *slist);
+extern void *sl_head(slist_t *slist);
+extern void *sl_tail(slist_t *slist);
 
 void sl_init(slist_t *slist, size_t head_offset) {
     slist->head = NULL;
