@@ -152,12 +152,10 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     case '[': result->type = LBRACK; break;
     case ']': result->type = RBRACK; break;
     case '?': result->type = COND; break;
-    case ':': result->type = COLON; break;
     case '~': result->type = BITNOT; break;
     case '=': CHECK_NEXT_EQ(ASSIGN, EQ); break;
     case '*': CHECK_NEXT_EQ(STAR, STAREQ); break;
     case '/': CHECK_NEXT_EQ(DIV, DIVEQ); break;
-    case '%': CHECK_NEXT_EQ(MOD, MODEQ); break;
     case '!': CHECK_NEXT_EQ(LOGICNOT, NE); break;
     case '^': CHECK_NEXT_EQ(BITXOR, BITXOREQ); break;
     case '.': {
@@ -176,6 +174,26 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         status = CCC_ESYNTAX;
         break;
     }
+    case ':': {
+        NEXT_CHAR_NOERR(lexer, next);
+        switch (next) {
+        case '>': result->type = RBRACK; break; // digraph: :> = ]
+        default:
+            result->type = COLON;
+            lexer->next_char = next;
+        }
+        break;
+    }
+    case '%':
+        NEXT_CHAR_NOERR(lexer, next);
+        switch (next) {
+        case '=': result->type = MODEQ; break;
+        case '>': result->type = RBRACE; break; // digraph %> = }
+        default:
+            result->type = MOD;
+            lexer->next_char = next;
+        }
+        break;
     case '+': {
         NEXT_CHAR_NOERR(lexer, next);
         switch(next) {
@@ -238,6 +256,8 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
         NEXT_CHAR_NOERR(lexer, next);
         switch (next) {
         case '=': result->type = LE; break;
+        case ':': result->type = LBRACK; break; // digraph <: = [
+        case '%': result->type = LBRACE; break; // digraph <% = {
         case '<': CHECK_NEXT_EQ(LSHIFT, LSHIFTEQ); break;
         default:
             result->type = LT;
