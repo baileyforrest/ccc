@@ -66,22 +66,12 @@ size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines) {
     size_t num_chars = 0;
     bool done = false;
     bool comment = false;
-    while (!done && !ts_end(ts)) {
-        num_chars++;
-
+    for (;!done && !ts_end(ts); ++num_chars) {
         if (comment) {
-            if (ts_advance(ts) != '*') {
-                continue;
-            }
-            /* Found '*' */
-
-            if (ts_end(ts)) {
-                continue;
-            }
-
-            if (ts_advance(ts) == '/') {
+            if (ts_last(ts) == '*' && ts_cur(ts) == '/') {
                 comment = false;
             }
+            ts_advance(ts);
             continue;
         }
         int cur = ts_cur(ts);
@@ -99,13 +89,15 @@ size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines) {
         }
         switch (cur) {
         case '/':
-            ts_advance(ts);
-            if (ts_end(ts)) {
-                break;
-            }
-            if (ts_cur(ts) == '*') {
+            if (ts_next(ts) == '*') {
                 comment = true;
+                ts_advance(ts);
+
+                ++num_chars;
+                ts_advance(ts);
+                continue;
             }
+            done = true;
             break;
         case '\\':
             ts_advance(ts);
