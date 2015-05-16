@@ -61,12 +61,32 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC), // stdlib available
 
+    // We don't support these C features
+    PREDEF_MACRO_LIT("__STDC_NO_ATOMICS__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__STDC_NO_COMPLEX__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__STDC_NO_THREADS__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__STDC_NO_VLA__", "1", MACRO_BASIC),
+
     // Required for compatability
     PREDEF_MACRO_LIT("__alignof__", "_Alignof", MACRO_BASIC),
     PREDEF_MACRO_LIT("__FUNCTION__", "__func__", MACRO_BASIC),
 
 #ifdef __x86_64__
+    PREDEF_MACRO_LIT("__amd64", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__amd64__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__x86_64", "1", MACRO_BASIC),
     PREDEF_MACRO_LIT("__x86_64__", "1", MACRO_BASIC),
+#endif
+
+#ifdef __linux
+    PREDEF_MACRO_LIT("__linux", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__linux__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__gnu_linux__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__unix", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__unix__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("_LP64", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__LP64__", "1", MACRO_BASIC),
+    PREDEF_MACRO_LIT("__ELF__", "1", MACRO_BASIC),
 #endif
 
     // TODO1: Conditionally compile or handle these better
