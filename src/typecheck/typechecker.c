@@ -36,6 +36,7 @@ void tc_state_init(tc_state_t *tcs) {
     tcs->last_switch = NULL;
     tcs->last_loop = NULL;
     tcs->last_break = NULL;
+    tcs->ignore_undef = false;
 }
 
 void tc_state_destroy(tc_state_t *tcs) {
@@ -53,10 +54,11 @@ bool typecheck_ast(trans_unit_t *ast) {
     return retval;
 }
 
-bool typecheck_const_expr(expr_t *expr, long long *result) {
+bool typecheck_const_expr(expr_t *expr, long long *result, bool ignore_undef) {
     bool retval;
     tc_state_t tcs;
     tc_state_init(&tcs);
+    tcs.ignore_undef = ignore_undef;
     if (typecheck_expr(&tcs, expr, TC_CONST)) {
         typecheck_const_expr_eval(tcs.typetab, expr, result);
         retval = true;
@@ -159,10 +161,16 @@ void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
         return;
     case EXPR_VAR: {
         typetab_entry_t *entry = tt_lookup(typetab, expr->var_id);
-        if (entry->entry_type == TT_ENUM_ID) {
+        // If entry isn't defined, return 0
+        if (entry == NULL) {
+            *result = 0;
+        } else if (entry->entry_type == TT_ENUM_ID) {
             *result = entry->enum_val;
             return;
+        } else {
+            assert(false);
         }
+        break;
     }
     case EXPR_VOID:
     case EXPR_ASSIGN:
@@ -1477,6 +1485,11 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         return retval;
 
     case EXPR_VAR: {
+        // Do nothing if we're ignoring undefined variables
+        if (tcs->ignore_undef) {
+            expr->etype = tt_int;
+            return retval;
+        }
         typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
         if (entry == NULL ||
             (entry->entry_type != TT_VAR && entry->entry_type != TT_ENUM_ID)) {

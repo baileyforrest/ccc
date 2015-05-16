@@ -42,6 +42,7 @@ typedef struct tc_state_t {
     stmt_t *last_switch;
     stmt_t *last_loop;
     stmt_t *last_break;
+    bool ignore_undef;
 } tc_state_t;
 
 /**

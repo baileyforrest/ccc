@@ -689,8 +689,8 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
         goto fail1;
     }
 
-    long long value;
-    if (!typecheck_const_expr(expr, &value)) {
+    long long value = 0;
+    if (!typecheck_const_expr(expr, &value, true)) {
         logger_log(&stream->mark, LOG_ERR,
                    "Failed to typecheck and parse conditional in #%s",
                    directive);

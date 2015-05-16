@@ -41,9 +41,10 @@ bool typecheck_ast(trans_unit_t *ast);
  *
  * @param ast The AST to typecheck
  * @param result Location to store the result
+ * @param If true, undefined variables are ignored
  * @return true if the tranlation unit typechecks, false otherwise
  */
-bool typecheck_const_expr(expr_t *expr, long long *result);
+bool typecheck_const_expr(expr_t *expr, long long *result, bool ignore_undef);
 
 /**
  * Evaluates a given constant expression expression.

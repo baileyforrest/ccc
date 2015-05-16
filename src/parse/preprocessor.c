@@ -814,6 +814,9 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         memcpy(stream, &lookahead, sizeof(tstream_t));
         return pp_handle_special_macro(pp, stream, macro);
     case MACRO_DEFINED:
+        if (!pp->pp_if) {
+            return ts_advance(stream);
+        }
         return pp_handle_defined(pp, &lookahead, stream);
     case MACRO_PRAGMA:
         return pp_directive_pragma_helper(pp, PRAGMA_UNDER);
