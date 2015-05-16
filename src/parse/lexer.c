@@ -323,6 +323,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'v':
     case 'w': case 'x': case 'y': case 'z':
 
+    case '$':
     case '_':
         status = lex_id(lexer, cur, result);
         break;
@@ -362,6 +363,7 @@ static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result) {
         case ASCII_UPPER:
         case ASCII_DIGIT:
         case '_':
+        case '$':
             lexer->lexbuf[len++] = cur;
             break;
         case '\\': // ignore next character
