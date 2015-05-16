@@ -160,11 +160,25 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     case '^': CHECK_NEXT_EQ(BITXOR, BITXOREQ); break;
     case '.': {
         NEXT_CHAR_NOERR(lexer, next);
-        if (next != '.') {
+        bool done = false;
+        switch (next) {
+        case ASCII_DIGIT:
+            lexer->next_char = next;
+            status = lex_number(lexer, cur, result);
+            done = true;
+            break;
+        case '.':
+            break;
+        default:
             result->type = DOT;
             lexer->next_char = next;
+            done = true;
             break;
         }
+        if (done) {
+            break;
+        }
+
         NEXT_CHAR_NOERR(lexer, next);
         if (next == '.') {
             result->type = ELIPSE;
