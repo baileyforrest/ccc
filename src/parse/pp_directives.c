@@ -442,21 +442,50 @@ status_t pp_directive_define_helper(tstream_t *stream, pp_macro_t **result,
 
             new_macro->num_params++;
             size_t param_len = ts_advance_identifier(stream);
+            bool vararg = false;
 
             if (param_len == 0) {
-                logger_log(&stream->mark, LOG_ERR,
-                           "Macro missing paramater name");
-                status = CCC_ESYNTAX;
-                goto fail;
+                if (ts_cur(stream) == '.' && ts_next(stream) == '.') {
+                    ts_advance(stream);
+                    ts_advance(stream);
+                    if (ts_cur(stream) != '.') {
+                        logger_log(&stream->mark, LOG_ERR,
+                                   "\".\" may not appear in macro parameter"
+                                   " list");
+                        status = CCC_ESYNTAX;
+                        goto fail;
+                    }
+
+                    ts_advance(stream);
+                    ts_skip_ws_and_comment(stream, false);
+                    if (ts_cur(stream) != ')') {
+                        logger_log(&stream->mark, LOG_ERR,
+                                   "missing ')' in macro parameter list");
+                        status = CCC_ESYNTAX;
+                        goto fail;
+                    }
+                    vararg = true;
+                } else {
+                    logger_log(&stream->mark, LOG_ERR,
+                               "paramater name missing");
+                    status = CCC_ESYNTAX;
+                    goto fail;
+                }
             }
 
             // Allocate paramater with string in one chunk
-            len_str_node_t *string =
-                emalloc(sizeof(len_str_node_t) + param_len + 1);
-            string->str.len = param_len;
-            string->str.str = (char *)string + sizeof(*string);
-            strncpy(string->str.str, cur, param_len);
-            string->str.str[param_len] = '\0';
+            len_str_node_t *string;
+            if (vararg) {
+                string = emalloc(sizeof(len_str_node_t));
+                string->str.len = 0;
+                string->str.str = NULL;
+            } else {
+                string = emalloc(sizeof(len_str_node_t) + param_len + 1);
+                string->str.len = param_len;
+                string->str.str = (char *)string + sizeof(*string);
+                strncpy(string->str.str, cur, param_len);
+                string->str.str[param_len] = '\0';
+            }
 
             sl_append(&new_macro->params, &string->link);
 

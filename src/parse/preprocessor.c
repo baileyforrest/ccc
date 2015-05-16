@@ -41,6 +41,9 @@
 #include "util/text_stream.h"
 #include "util/util.h"
 
+#define VA_ARG_NAME "__VA_ARGS__"
+#define VA_ARG_LEN (sizeof(VA_ARG_NAME) - 1)
+
 #define PREDEF_MACRO_LIT(name, word, type)                              \
     { SL_LINK_LIT, LEN_STR_LIT(name),                                   \
       TSTREAM_LIT(word, NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 0, 0), \
@@ -856,6 +859,12 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             bool done = false;
 
             SL_FOREACH(cur_link, &macro->params) {
+                // Get current paramater in macro
+                len_str_node_t *param_str = GET_ELEM(&macro->params, cur_link);
+
+                bool vararg = param_str->str.str == NULL;
+                assert(vararg ? param_str == sl_tail(&macro->params) : true);
+
                 ts_skip_ws_and_comment(&lookahead, false);
                 num_params++;
                 tstream_t cur_param;
@@ -879,7 +888,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     } else if (num_parens > 0 && ts_cur(&lookahead) == ')') {
                         num_parens--;
                     } else if (num_parens == 0) {
-                        if (ts_cur(&lookahead) == ',') { // end of current param
+                        // end of current param
+                        if (ts_cur(&lookahead) == ',' && !vararg) {
                             break;
                         }
                         if (ts_cur(&lookahead) == ')') { // end of all params
@@ -940,12 +950,14 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     }
                 }
 
-                // Get current paramater in macro
-                len_str_node_t *param_str = GET_ELEM(&macro->params, cur_link);
-
                 // Insert the paramater mapping into the instance's hash table
-                param_elem->key.str = param_str->str.str;
-                param_elem->key.len = param_str->str.len;
+                if (vararg) {
+                    param_elem->key.str = VA_ARG_NAME;
+                    param_elem->key.len = VA_ARG_LEN;
+                } else {
+                    param_elem->key.str = param_str->str.str;
+                    param_elem->key.len = param_str->str.len;
+                }
                 param_elem->expand_val.str =
                     (char *)param_elem + sizeof(*param_elem);
                 param_elem->expand_val.len = offset;
