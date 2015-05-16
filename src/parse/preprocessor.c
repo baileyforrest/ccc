@@ -662,6 +662,13 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         } else {
             // In macro, must be stringification, concatenation handled abave
             ts_advance(stream);
+
+            // If we're in a macro without paramaters, just return #
+            pp_macro_t *macro = macro_inst->macro;
+            if (macro != NULL && sl_head(&macro->params) == NULL) {
+                return '#';
+            }
+            ts_skip_ws_and_comment(stream, false);
             char *start = ts_location(stream);
             size_t len = ts_advance_identifier(stream);
             len_str_t lookup = { start, len };
