@@ -473,6 +473,13 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     memcpy(&pp->last_mark, &stream->mark, sizeof(fmark_t));
 
     int cur_char = ts_cur(stream);
+
+    // Handle %: = # digraph
+    if (cur_char == '%' && ts_next(stream) == ':') {
+        cur_char = '#';
+        ts_advance(stream);
+    }
+
     int next_char = ts_next(stream);
     int last_char = ts_last(stream);
 
@@ -556,15 +563,38 @@ int pp_nextchar_helper(preprocessor_t *pp) {
          cur_char == '#')) {
         ts_skip_ws_and_comment(&lookahead, false);
 
+        bool first = true;
+
         // Skip multiple ## with only white space around them
         while (!ts_end(&lookahead)) {
             if (ts_cur(&lookahead) == '#' && ts_next(&lookahead) == '#') {
                 concat = true;
                 ts_advance(&lookahead);
                 ts_advance(&lookahead);
+
+                // Handle %:%: digraph
+            } else if (first && ts_next(&lookahead) == '%') {
+                // If first, and we encountered the digraph, then ts_cur
+                // points to # and ts_next points to %
+                ts_advance(&lookahead);
+                ts_advance(&lookahead);
+                if (ts_cur(&lookahead) == ':') {
+                    concat = true;
+                    ts_advance(&lookahead);
+                }
+            } else if (ts_cur(&lookahead) == '%' &&
+                       ts_next(&lookahead) == ':') {
+                ts_advance(&lookahead);
+                ts_advance(&lookahead);
+                if (ts_cur(&lookahead) == '%' && ts_next(&lookahead) == ':') {
+                    concat = true;
+                    ts_advance(&lookahead);
+                    ts_advance(&lookahead);
+                }
             } else {
                 break;
             }
+            first = false;
             ts_skip_ws_and_comment(&lookahead, false);
         }
         if (concat) {
@@ -636,6 +666,11 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 pp_lookup_macro_param(pp, &lookup);
 
             if (param == NULL) {
+                // If this is a mapped stream, just return the #
+                if (macro_inst->macro == NULL) {
+                    ts_advance(stream);
+                    return '#';
+                }
                 logger_log(&stream->mark, LOG_ERR,
                            "'#' Is not followed by a macro paramater");
                 ts_advance(stream);
@@ -700,6 +735,16 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 ts_skip_ws_and_comment(&lookahead, false);
                 if (ts_cur(&lookahead) == '#' && ts_cur(&lookahead) == '#') {
                     concat = true;
+                }
+
+                // Handle %:%: = ## digraph
+                if (ts_cur(&lookahead) == '%' && ts_next(&lookahead) == ':') {
+                    ts_advance(&lookahead);
+                    ts_advance(&lookahead);
+                    if (ts_cur(&lookahead) == '%' &&
+                        ts_next(&lookahead) == ':') {
+                        concat = true;
+                    }
                 }
             }
 
