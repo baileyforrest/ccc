@@ -863,7 +863,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     case MACRO_DATE:
     case MACRO_TIME:
         memcpy(stream, &lookahead, sizeof(tstream_t));
-        return pp_handle_special_macro(pp, stream, macro);
+        return pp_handle_special_macro(pp, macro);
     case MACRO_DEFINED:
         if (!pp->pp_if) {
             return ts_advance(stream);
@@ -1081,10 +1081,13 @@ fail:
     return error;
 }
 
-int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
-                            pp_macro_t *macro) {
+int pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro) {
     static bool date_err = false;
     static bool time_err = false;
+
+    pp_file_t *file = sl_tail(&pp->file_insts);
+    assert(file != NULL);
+    tstream_t *stream = &file->stream;
 
     // Found a parameter, set param state in pp
     pp_macro_inst_t *macro_inst = pp_macro_inst_create(macro,

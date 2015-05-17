@@ -176,12 +176,10 @@ int pp_nextchar_helper(preprocessor_t *pp);
  * Handle special macros (e.g. __FILE__)
  *
  * @param pp The preprocessor to handle special macros for
- * @param stream The stream at the current special macro
  * @param macro The special macro
  * @return Returns the return value for pp_nextchar
  */
-int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
-                            pp_macro_t *macro);
+int pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro);
 /**
  * Handle the defined operator
  *
