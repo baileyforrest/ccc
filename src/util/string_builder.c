@@ -24,7 +24,7 @@
 
 #include "util/util.h"
 
-#define GROWTH_FUNC(size) ((size) < 16 ? 16 : ((size) >> 1) + (size))
+#define GROWTH_FUNC(size) ((size) < 16 ? 16 : (((size) >> 1) + (size)))
 
 extern char *sb_buf(string_builder_t *sb);
 extern size_t sb_len(string_builder_t *sb);

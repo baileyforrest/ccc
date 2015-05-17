@@ -114,8 +114,8 @@ status_t pp_map_file(const char *filename, pp_file_t **result);
  * @param stream The stream to map
  * @param Stream's buffered, destroyed with macro inst. NULL if none
  */
-void pp_map_stream(preprocessor_t *pp, tstream_t *stream, char *buf,
-                   pp_macro_inst_flag_t flags);
+void pp_map_stream(preprocessor_t *pp, tstream_t *stream,
+                   pp_macro_t *macro, char *buf, pp_macro_inst_flag_t flags);
 
 /**
  * Creates a macro

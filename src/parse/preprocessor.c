@@ -287,12 +287,12 @@ fail:
     return status;
 }
 
-void pp_map_stream(preprocessor_t *pp, tstream_t *src, char *buf,
-                   pp_macro_inst_flag_t flags) {
-    pp_macro_inst_t *macro = pp_macro_inst_create(NULL, flags);
-    macro->buf = buf;
-    memcpy(&macro->stream, src, sizeof(tstream_t));
-    sl_prepend(&pp->macro_insts, &macro->link);
+void pp_map_stream(preprocessor_t *pp, tstream_t *src, pp_macro_t *macro,
+                   char *buf, pp_macro_inst_flag_t flags) {
+    pp_macro_inst_t *macro_inst = pp_macro_inst_create(macro, flags);
+    macro_inst->buf = buf;
+    memcpy(&macro_inst->stream, src, sizeof(tstream_t));
+    sl_prepend(&pp->macro_insts, &macro_inst->link);
 }
 
 pp_macro_t *pp_macro_create(char *name, size_t len) {
@@ -978,22 +978,29 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     param_elem->expand_val.len = 0;
                 } else {
                     sb_init(&sb, buf_len);
-                    pp_map_stream(pp, &cur_param, NULL, MACRO_INST_MAPPED);
+                    pp_map_stream(pp, &cur_param, NULL, NULL,
+                                  MACRO_INST_MAPPED);
 
                     while (true) {
                         int cur = pp_nextchar_helper(pp);
-                        if (cur == CCC_RETRY) {
+                        if (cur == -(int)CCC_RETRY) {
                             continue;
                         }
-                        if (cur == PP_EOF) {
+                        if (cur == -(int)PP_EOF) {
                             break;
                         }
                         sb_append_char(&sb, cur);
                     }
-
-                    sb_compact(&sb);
-                    param_elem->expand_val.str = sb_buf(&sb);
-                    param_elem->expand_val.len = sb_len(&sb);
+                    if (sb_len(&sb) == 0) {
+                        // If there is nothing in the paramater, set it to the
+                        // empty string
+                        param_elem->expand_val.str = "";
+                        param_elem->expand_val.len = 0;
+                        sb_destroy(&sb);
+                    } else {
+                        param_elem->expand_val.str = sb_buf(&sb);
+                        param_elem->expand_val.len = sb_len(&sb);
+                    }
                 }
 
                 // Insert the paramater mapping into the instance's hash table
@@ -1041,7 +1048,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     sl_prepend(&pp->macro_insts, &new_macro_inst->link);
 
     tstream_t evaluated;
-    memcpy(&evaluated, new_macro_inst, sizeof(tstream_t));
+    memcpy(&evaluated, &new_macro_inst->stream, sizeof(tstream_t));
 
     // Evaluate the stream and map it
     string_builder_t sb;
@@ -1049,18 +1056,17 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     while (true) {
         int cur = pp_nextchar_helper(pp);
-        if (cur == CCC_RETRY) {
+        if (cur == -(int)CCC_RETRY) {
             continue;
         }
-        if (cur == PP_EOF) {
+        if (cur == -(int)PP_EOF) {
             break;
         }
         sb_append_char(&sb, cur);
     }
-    sb_compact(&sb);
     evaluated.cur = sb_buf(&sb);
     evaluated.end = sb_buf(&sb) + sb_len(&sb);
-    pp_map_stream(pp, &evaluated, sb_buf(&sb), MACRO_INST_NOEXPAND);
+    pp_map_stream(pp, &evaluated, macro, sb_buf(&sb), MACRO_INST_NONE);
 
     // Set current to the end of the macro and params
     memcpy(stream, &lookahead, sizeof(tstream_t));
