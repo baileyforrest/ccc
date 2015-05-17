@@ -479,20 +479,14 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         // If we're stringifying, and current character is a \ or "
         // we need to escape
         if (stringify) {
-            if((ts_cur(stream) == '"' || ts_cur(stream) == '\\' ||
-                ts_cur(stream) == '\n')) {
+            if(ts_cur(stream) == '"' || ts_cur(stream) == '\\') {
                 if (!pp->stringify_esc) {
                     pp->stringify_esc = true;
                     return '\\';
                 } else {
                     pp->stringify_esc = false;
                 }
-                if (ts_cur(stream) == '\n') {
-                    ts_advance(stream);
-                    return 'n';
-                }
-            } else if (isspace(ts_cur(stream))) {
-                ts_skip_ws_and_comment(stream, true);
+            } else if (ts_skip_ws_and_comment(stream, true) > 0) {
                 return ' ';
             }
         }
@@ -840,15 +834,21 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         }
     }
 
+    bool in_macro = false;
     bool recursive = false;
-    // Protect against recursive macros
+
     SL_FOREACH(cur, &pp->macro_insts) {
         pp_macro_inst_t *macro_inst = GET_ELEM(&pp->macro_insts, cur);
-        if (macro_inst->macro != NULL && macro_inst->macro == macro) {
-            recursive = true;
-            break;
+        if (macro_inst->macro != NULL) {
+            in_macro = true;
+
+            if (macro_inst->macro == macro) {
+                recursive = true;
+            }
         }
     }
+
+    // Protect against recursive macros
     if (recursive) {
         return ts_advance(stream);
     }
@@ -931,6 +931,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     }
                     if (ts_cur(&lookahead) == '/' &&
                         ts_next(&lookahead) == '*') {
+                        space_start = ts_location(&lookahead);
                         ts_skip_ws_and_comment(&lookahead, false);
                         continue;
                     }
@@ -1017,7 +1018,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
                 // If we're in a macro, then the macro's parameters need to be
                 // expanded. Otherwise, they are not
-                if (macro_inst == NULL) {
+                if (!in_macro) {
                     param_elem->raw_val.str = cur_param.cur;
                     param_elem->raw_val.len = cur_len;
                 } else {
