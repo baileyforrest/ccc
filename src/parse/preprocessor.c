@@ -287,8 +287,10 @@ fail:
     return status;
 }
 
-void pp_map_stream(preprocessor_t *pp, tstream_t *src) {
-    pp_macro_inst_t *macro = pp_macro_inst_create(NULL);
+void pp_map_stream(preprocessor_t *pp, tstream_t *src, char *buf,
+                   pp_macro_inst_flag_t flags) {
+    pp_macro_inst_t *macro = pp_macro_inst_create(NULL, flags);
+    macro->buf = buf;
     memcpy(&macro->stream, src, sizeof(tstream_t));
     sl_prepend(&pp->macro_insts, &macro->link);
 }
@@ -323,7 +325,8 @@ void pp_macro_destroy(pp_macro_t *macro) {
     free(macro);
 }
 
-pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro) {
+pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro,
+                                      pp_macro_inst_flag_t flags) {
     pp_macro_inst_t *macro_inst = emalloc(sizeof(pp_macro_inst_t));
     sl_init(&macro_inst->param_insts, offsetof(pp_param_inst_t, link));
 
@@ -342,6 +345,8 @@ pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro) {
         memcpy(&macro_inst->stream, &macro->stream, sizeof(tstream_t));
     }
     macro_inst->macro = macro;
+    macro_inst->buf = NULL;
+    macro_inst->flags = flags;
 
     return macro_inst;
 }
@@ -359,18 +364,20 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     }
     SL_DESTROY_FUNC(&macro_inst->param_insts, free);
     HT_DESTROY_FUNC(&macro_inst->param_map, pp_param_map_elem_destroy);
+    free(macro_inst->buf);
     free(macro_inst);
 }
 
 tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
-                         bool *macro_param) {
+                         bool *noexpand) {
+    assert(pp != NULL);
+    assert(stringify != NULL);
+    assert(noexpand != NULL);
+
     tstream_t *stream = NULL; // Stream to work on
-    if (stringify != NULL) {
-        *stringify = false;
-    }
-    if (macro_param != NULL) {
-        *macro_param = false;
-    }
+
+    *stringify = false;
+    *noexpand = false;
 
     // Try to find an incomplete macro on the stack
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
@@ -381,11 +388,9 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
         while (param_inst != NULL) {
             stream = &param_inst->stream;
 
-            if (!ts_end(stream)) { // Found an unfinished file
-                if (macro_param != NULL) {
-                    *macro_param = true;
-                }
-                if (stringify != NULL && param_inst->stringify) {
+            if (!ts_end(stream)) { // Found an unfinished parameter
+                *noexpand = true;
+                if (param_inst->stringify) {
                     *stringify = true;
                 }
                 return stream;
@@ -409,11 +414,16 @@ tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
         stream = &macro_inst->stream;
 
         if (!ts_end(stream)) { // Found an unfinished macro
+            if (macro_inst->flags & MACRO_INST_NOEXPAND) {
+                *noexpand = true;
+            }
             return stream;
         }
 
         macro_inst = sl_pop_front(&pp->macro_insts);
-        if (macro_inst->macro == NULL) {
+
+        // For mapped streams, we need to signal an EOF
+        if (macro_inst->flags & MACRO_INST_MAPPED) {
             pp_macro_inst_destroy(macro_inst);
             return NULL;
         }
@@ -458,11 +468,11 @@ pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
 }
 
 int pp_nextchar_helper(preprocessor_t *pp) {
-    bool stringify, macro_param;
-    tstream_t *stream = pp_get_stream(pp, &stringify, &macro_param);
+    bool stringify, noexpand;
+    tstream_t *stream = pp_get_stream(pp, &stringify, &noexpand);
 
     // Macros already have parameters evaluated, just continue
-    if (macro_param) {
+    if (noexpand) {
         // If we're stringifying, and current character is a \ or "
         // we need to escape
         if (stringify) {
@@ -872,7 +882,10 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     }
 
     int error;
-    pp_macro_inst_t *new_macro_inst = pp_macro_inst_create(macro);
+
+    // Create macro as mapped so we get PP_EOF after evaluating macro's stream
+    pp_macro_inst_t *new_macro_inst = pp_macro_inst_create(macro,
+                                                           MACRO_INST_MAPPED);
 
     // -1 means non function style macro
     if (macro->num_params >= 0) {
@@ -965,7 +978,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     param_elem->expand_val.len = 0;
                 } else {
                     sb_init(&sb, buf_len);
-                    pp_map_stream(pp, &cur_param);
+                    pp_map_stream(pp, &cur_param, NULL, MACRO_INST_MAPPED);
 
                     while (true) {
                         int cur = pp_nextchar_helper(pp);
@@ -1027,6 +1040,28 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     // Add new macro instance to the stack
     sl_prepend(&pp->macro_insts, &new_macro_inst->link);
 
+    tstream_t evaluated;
+    memcpy(&evaluated, new_macro_inst, sizeof(tstream_t));
+
+    // Evaluate the stream and map it
+    string_builder_t sb;
+    sb_init(&sb, 0);
+
+    while (true) {
+        int cur = pp_nextchar_helper(pp);
+        if (cur == CCC_RETRY) {
+            continue;
+        }
+        if (cur == PP_EOF) {
+            break;
+        }
+        sb_append_char(&sb, cur);
+    }
+    sb_compact(&sb);
+    evaluated.cur = sb_buf(&sb);
+    evaluated.end = sb_buf(&sb) + sb_len(&sb);
+    pp_map_stream(pp, &evaluated, sb_buf(&sb), MACRO_INST_NOEXPAND);
+
     // Set current to the end of the macro and params
     memcpy(stream, &lookahead, sizeof(tstream_t));
     return -(int)CCC_RETRY;
@@ -1043,7 +1078,8 @@ int pp_handle_special_macro(preprocessor_t *pp, tstream_t *stream,
     static bool time_err = false;
 
     // Found a parameter, set param state in pp
-    pp_macro_inst_t *macro_inst = pp_macro_inst_create(macro);
+    pp_macro_inst_t *macro_inst = pp_macro_inst_create(macro,
+                                                       MACRO_INST_NOEXPAND);
 
     time_t t;
     struct tm *tm;

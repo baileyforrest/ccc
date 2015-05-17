@@ -709,7 +709,7 @@ status_t pp_directive_if_helper(preprocessor_t *pp, const char *directive,
     manager_t manager;
     man_init(&manager, &pp->macros);
 
-    pp_map_stream(&manager.pp, &lookahead);
+    pp_map_stream(&manager.pp, &lookahead, NULL, MACRO_INST_MAPPED);
 
     expr_t *expr = NULL;
     if (CCC_OK != (status = man_parse_expr(&manager, &expr))) {

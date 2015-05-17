@@ -54,15 +54,23 @@ typedef struct pp_param_map_elem_t {
     len_str_t raw_val;    /**< Macro paramater raw value */
 } pp_param_map_elem_t;
 
+typedef enum pp_macro_inst_flag_t {
+    MACRO_INST_NONE     = 0,
+    MACRO_INST_MAPPED   = 1 << 0,
+    MACRO_INST_NOEXPAND = 1 << 1,
+} pp_macro_inst_flag_t;
+
 /**
  * Represents the macro invocation
  */
 typedef struct pp_macro_inst_t {
-    sl_link_t link;      /**< List link */
-    pp_macro_t *macro;   /**< The macro this is an instance of */
-    slist_t param_insts; /**< Stack of macro parameters */
-    htable_t param_map;  /**< Mapping of strings to paramater values */
-    tstream_t stream;    /**< Text stream of macro instance */
+    sl_link_t link;             /**< List link */
+    pp_macro_t *macro;          /**< The macro this is an instance of */
+    char *buf;                  /**< Strings buffer. NULL if not owned */
+    slist_t param_insts;        /**< Stack of macro parameters */
+    htable_t param_map;         /**< Mapping of strings to paramater values */
+    tstream_t stream;           /**< Text stream of macro instance */
+    pp_macro_inst_flag_t flags;
 } pp_macro_inst_t;
 
 /**
@@ -104,8 +112,10 @@ status_t pp_map_file(const char *filename, pp_file_t **result);
  *
  * @param pp The preprocessor to map a stream for
  * @param stream The stream to map
+ * @param Stream's buffered, destroyed with macro inst. NULL if none
  */
-void pp_map_stream(preprocessor_t *pp, tstream_t *stream);
+void pp_map_stream(preprocessor_t *pp, tstream_t *stream, char *buf,
+                   pp_macro_inst_flag_t flags);
 
 /**
  * Creates a macro
@@ -122,7 +132,8 @@ pp_macro_t *pp_macro_create(char *name, size_t len);
  * @param macro to create instace of
  * @return Returns a newly created macro instance
  */
-pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro);
+pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro,
+                                      pp_macro_inst_flag_t flags);
 
 /**
  * Destroys a macro instance. Does free macro_inst.
@@ -136,13 +147,13 @@ void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst);
  *
  * @param pp The preprocessor to fetch characters from
  * @param stringify Set to true if the closing quote of a stringification
- *     occured. Ignored if NULL.
- * @param macro_param Set to true if returned stream is a macro parameter.
- *     Ignored if NULL.
+ *     occured.
+ * @param noexpand Set to true if returned stream is already expanded and does
+ *     does not need to be evaluated.
  * @return The next stream in the preprocessor, NULL if none
  */
 tstream_t *pp_get_stream(preprocessor_t *pp, bool *stringify,
-                         bool *macro_param);
+                         bool *noexpand);
 
 /**
  * Lookups up a macro parameter in a preprocessor. Ignores mapped macros
