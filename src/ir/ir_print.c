@@ -240,12 +240,37 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
             break;
         case IR_CONST_FLOAT:
             assert(expr->const_params.type->type == IR_TYPE_FLOAT);
+
             // We need to cast because llvm requires constants be only
             // values that can be represented
             switch (expr->const_params.type->float_params.type) {
-            case IR_FLOAT_FLOAT:
-                fprintf(stream, "%f", (float)expr->const_params.float_val);
+            case IR_FLOAT_FLOAT: {
+                // TODO1: This isn't portable
+                union {
+                    float f;
+                    uint32_t i;
+                } converter = { (float)expr->const_params.float_val };
+                uint32_t fval = converter.i;
+
+                uint64_t dval = 0UL;
+
+                if (fval & (1UL << 31)) { // Sign bit
+                    dval |= (1UL << 63);
+                }
+
+                // Exponent
+                int fexp = ((fval >> 23) & 0xff) - 127; // remove 32 bit bias
+                uint64_t dexp = fexp + 1023; // Add 64 bit bias
+
+                dval |= dexp << 52;
+
+                // Mantissa
+                uint64_t fman = fval & 0x7fffff;
+                dval |= (fman << (52 - 23));
+
+                fprintf(stream, "0x%lx", dval);
                 break;
+            }
             case IR_FLOAT_DOUBLE:
                 fprintf(stream, "%f", (double)expr->const_params.float_val);
                 break;

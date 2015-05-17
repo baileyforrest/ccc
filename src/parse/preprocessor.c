@@ -62,6 +62,9 @@ static pp_macro_t s_predef_macros[] = {
     PREDEF_MACRO_LIT("__STDC_VERSION__", "201112L", MACRO_BASIC), // C11
     PREDEF_MACRO_LIT("__STDC_HOSTED__", "1", MACRO_BASIC), // stdlib available
 
+    PREDEF_MACRO_LIT("__STDC_UTF_16__", "1", MACRO_BASIC), // UTF16 supported
+    PREDEF_MACRO_LIT("__STDC_UTF_32__", "1", MACRO_BASIC), // UTF32 supported
+
     // We don't support these C features
     PREDEF_MACRO_LIT("__STDC_NO_ATOMICS__", "1", MACRO_BASIC),
     PREDEF_MACRO_LIT("__STDC_NO_COMPLEX__", "1", MACRO_BASIC),
