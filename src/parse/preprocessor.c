@@ -38,6 +38,7 @@
 
 #include "util/htable.h"
 #include "util/slist.h"
+#include "util/string_builder.h"
 #include "util/text_stream.h"
 #include "util/util.h"
 
@@ -345,12 +346,19 @@ pp_macro_inst_t *pp_macro_inst_create(pp_macro_t *macro) {
     return macro_inst;
 }
 
+static void pp_param_map_elem_destroy(pp_param_map_elem_t *elem) {
+    if (elem->expand_val.len != 0) {
+        free(elem->expand_val.str);
+    }
+    free(elem);
+}
+
 void pp_macro_inst_destroy(pp_macro_inst_t *macro_inst) {
     if (macro_inst == NULL) {
         return;
     }
     SL_DESTROY_FUNC(&macro_inst->param_insts, free);
-    HT_DESTROY_FUNC(&macro_inst->param_map, free);
+    HT_DESTROY_FUNC(&macro_inst->param_map, pp_param_map_elem_destroy);
     free(macro_inst);
 }
 
@@ -947,34 +955,32 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
                 size_t buf_len = cur_len + 1;
                 pp_param_map_elem_t *param_elem =
-                    emalloc(sizeof(pp_param_map_elem_t) + buf_len);
-                size_t offset = 0;
+                    emalloc(sizeof(pp_param_map_elem_t));
+                string_builder_t sb;
+
                 if (cur_len == 0) {
-                    *((char *)param_elem + sizeof(*param_elem)) = '\0';
+                    // If there is nothing in the paramater, set it to the
+                    // empty string
+                    param_elem->expand_val.str = "";
+                    param_elem->expand_val.len = 0;
                 } else {
+                    sb_init(&sb, buf_len);
                     pp_map_stream(pp, &cur_param);
 
                     while (true) {
-                        char *loc =
-                            (char *)param_elem + sizeof(*param_elem) + offset;
                         int cur = pp_nextchar_helper(pp);
                         if (cur == CCC_RETRY) {
                             continue;
                         }
                         if (cur == PP_EOF) {
-                            *loc = '\0';
                             break;
                         }
-                        *loc = cur;
-
-                        offset++;
-                        if (offset == buf_len) {
-                            buf_len <<= 1; // 2.0 growth factor
-                            param_elem = erealloc(param_elem,
-                                                  sizeof(*param_elem) +
-                                                  buf_len);
-                        }
+                        sb_append_char(&sb, cur);
                     }
+
+                    sb_compact(&sb);
+                    param_elem->expand_val.str = sb_buf(&sb);
+                    param_elem->expand_val.len = sb_len(&sb);
                 }
 
                 // Insert the paramater mapping into the instance's hash table
@@ -985,9 +991,6 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     param_elem->key.str = param_str->str.str;
                     param_elem->key.len = param_str->str.len;
                 }
-                param_elem->expand_val.str =
-                    (char *)param_elem + sizeof(*param_elem);
-                param_elem->expand_val.len = offset;
 
                 // If we're in a macro, then the macro's parameters need to be
                 // expanded. Otherwise, they are not

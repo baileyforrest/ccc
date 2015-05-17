@@ -43,14 +43,14 @@ void sb_destroy(string_builder_t *sb) {
 }
 
 void sb_compact(string_builder_t *sb) {
-    sb->buf = realloc(sb->buf, sb->len + 1);
+    sb->buf = erealloc(sb->buf, sb->len + 1);
     sb->capacity = sb->len;
 }
 
 void sb_append_char(string_builder_t *sb, char val) {
     if (sb->len == sb->capacity) {
         sb->capacity = GROWTH_FUNC(sb->capacity);
-        sb->buf = realloc(sb->buf, sb->capacity + 1);
+        sb->buf = erealloc(sb->buf, sb->capacity + 1);
     }
 
     sb->buf[sb->len++] = val;
