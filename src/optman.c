@@ -28,12 +28,8 @@
 #include <assert.h>
 #include <getopt.h>
 
-#include "parse/pp_directives.h"
-
 #include "util/logger.h"
 #include "util/text_stream.h"
-
-//#define DEBUG_PARAMS
 
 #define DEFAULT_STD STD_C11
 
@@ -70,9 +66,7 @@ status_t optman_init(int argc, char **argv) {
 }
 
 static void optman_macro_node_destroy(macro_node_t *node) {
-    // Change type to basic so it can be destroyed
-    node->macro->type = MACRO_BASIC;
-    pp_macro_destroy(node->macro);
+    // TODO0: This
     free(node);
 }
 
@@ -115,19 +109,9 @@ static status_t optman_parse(int argc, char **argv) {
 
         bool opt_err = false;
 
-#ifdef DEBUG_PARAMS
-        if (c != 0 && c != '?') {
-            printf("option %c, arg: %s\n", c, optarg);
-        }
-#endif  /* DEBUG_PARAMS */
-
         // Option argument
         switch (c) {
         case 0:
-#ifdef DEBUG_PARAMS
-            printf("option %s, arg: %s\n", long_options[opt_idx].name,
-                   optarg);
-#endif /* DEBUG_PARAMS */
             switch (opt_idx) {
             case LOPT_STD:
                 if (strcmp("C11", optarg) == 0) {
@@ -209,18 +193,12 @@ static status_t optman_parse(int argc, char **argv) {
             break;
 
         case 'D': { // Define macros
+            // TODO0: This
             macro_node_t *node = emalloc(sizeof(macro_node_t));
             tstream_t stream;
             ts_init(&stream, optarg, optarg + strlen(optarg),
-                    COMMAND_LINE_FILENAME, COMMAND_LINE_FILENAME, NULL, 0, 0);
+                    COMMAND_LINE_FILENAME, NULL);
 
-            if (CCC_OK !=
-                (status =
-                 pp_directive_define_helper(&stream, &node->macro, true,
-                                            NULL))) {
-                goto fail;
-            }
-            node->macro->type = MACRO_CLI_OPT;
             sl_append(&optman.macros, &node->link);
             break;
         }
@@ -254,9 +232,6 @@ static status_t optman_parse(int argc, char **argv) {
     for (int i = optind; i < argc; ++i) {
         char *param = argv[i];
         size_t len = strlen(param);
-#ifdef DEBUG_PARAMS
-        printf("No param: %s\n", param);
-#endif /* DEBUG_PARAMS */
 
         str_node_t *node = emalloc(sizeof(str_node_t));
         node->str = param;
@@ -275,6 +250,5 @@ static status_t optman_parse(int argc, char **argv) {
         }
     }
 
-fail:
     return status;
 }

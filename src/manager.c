@@ -26,26 +26,23 @@
 
 #include "ir/translator.h"
 
+#include "lex/lexer.h"
+#include "lex/symtab.h"
+
 #include "parse/ast.h"
-#include "parse/lexer.h"
 #include "parse/parser.h"
-#include "parse/preprocessor.h"
-#include "parse/symtab.h"
 
 void man_init(manager_t *manager, htable_t *macros) {
     assert(manager != NULL);
 
-    pp_init(&manager->pp, macros);
+    manager->tokens = NULL;
 
-    // If macros != NULL, then this is for evaluating preprocessor if, so then
-    // don't initialize with symbols. This is important because the static
-    // entries can only be in one table at a time
-    bool sym = macros == NULL ? IS_SYM : NOT_SYM;
-    st_init(&manager->symtab, sym);
-    st_init(&manager->string_tab, NOT_SYM);
+    bool preload = macros != NULL;
+    st_init(&manager->symtab, preload);
 
-    lexer_init(&manager->lexer, &manager->pp, &manager->symtab,
-               &manager->string_tab);
+    token_man_init(&manager->token_man);
+    lexer_init(&manager->lexer, &manager->token_man, &manager->symtab);
+
     manager->ast = NULL;
     manager->ir = NULL;
     manager->parse_destroyed = false;
@@ -57,11 +54,10 @@ void man_destroy(manager_t *manager) {
     }
 
     if (!manager->parse_destroyed) {
-        pp_destroy(&manager->pp);
         lexer_destroy(&manager->lexer);
         ast_destroy(manager->ast);
     }
-    st_destroy(&manager->string_tab);
+
     st_destroy(&manager->symtab);
     man_destroy_ir(manager);
 }
@@ -70,7 +66,6 @@ void man_destroy_parse(manager_t *manager) {
     assert(!manager->parse_destroyed);
     manager->parse_destroyed = true;
 
-    pp_destroy(&manager->pp);
     lexer_destroy(&manager->lexer);
     ast_destroy(manager->ast);
 }
@@ -83,7 +78,7 @@ void man_destroy_ir(manager_t *manager) {
 status_t man_parse(manager_t *manager, trans_unit_t **ast) {
     assert(manager != NULL);
     assert(ast != NULL);
-    status_t status = parser_parse(&manager->lexer, &manager->ast);
+    status_t status = parser_parse(manager->tokens, &manager->ast);
     *ast = manager->ast;
     return status;
 }
@@ -92,7 +87,7 @@ status_t man_parse_expr(manager_t *manager, expr_t **expr) {
     assert(manager != NULL);
     assert(expr != NULL);
     manager->ast = ast_trans_unit_create(true);
-    return parser_parse_expr(&manager->lexer, manager->ast, expr);
+    return parser_parse_expr(manager->tokens, manager->ast, expr);
 }
 
 ir_trans_unit_t *man_translate(manager_t *manager) {
@@ -105,11 +100,9 @@ ir_trans_unit_t *man_translate(manager_t *manager) {
 status_t man_dump_tokens(manager_t *manager) {
     status_t status = CCC_OK;
 
-    lexeme_t cur_token;
-    do {
-        lexer_next_token(&manager->lexer, &cur_token);
-        token_print(&cur_token);
-    } while(cur_token.type != TOKEN_EOF);
+    VEC_FOREACH(cur, manager->tokens) {
+        token_print(vec_get(manager->tokens, cur));
+    }
 
     return status;
 }

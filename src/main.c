@@ -79,11 +79,6 @@ int main(int argc, char **argv) {
         manager_t manager;
         man_init(&manager, NULL);
 
-        if (CCC_OK != (status = pp_open(&manager.pp, filename))) {
-            done = true;
-            goto next;
-        }
-
         if (optman.dump_opts & DUMP_TOKENS) {
             printf("//@ Tokens %s\n", filename);
             man_dump_tokens(&manager);

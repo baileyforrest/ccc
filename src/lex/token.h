@@ -26,6 +26,7 @@
 #include "util/file_directory.h"
 
 typedef enum token_t {
+    TOKEN_EOF,
     HASH,          // #
     HASHHASH,      // ##
 
@@ -175,18 +176,26 @@ typedef struct lexeme_t {
         symtab_entry_t *tab_entry; /**< For id types */
         char *str_val;
         struct {
-            long long int_val;     /**< For integral types */
             bool hasU;             /**< Has U suffix */
             bool hasL;             /**< Has L suffix */
             bool hasLL;            /**< Has LL suffix */
+            long long int_val;     /**< For integral types */
         } int_params;
         struct {
-            long double float_val; /**< For floating point types */
             bool hasF;             /**< Has F suffix */
             bool hasL;             /**< Has L suffix */
+            long double float_val; /**< For floating point types */
         } float_params;
     };
 } lexeme_t;
+
+typedef struct token_man_t {
+    slist_t tokens;
+} token_man_t;
+
+void token_man_init(token_man_t *tm);
+void token_man_destroy(token_man_t *tm);
+lexeme_t *token_create(token_man_t *tm);
 
 /**
  * Prints a token

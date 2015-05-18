@@ -38,11 +38,12 @@
 
 #define INIT_LEXBUF_SIZE 128
 
-void lexer_init(lexer_t *lexer, symtab_t *symtab) {
+void lexer_init(lexer_t *lexer, token_man_t *token_man, symtab_t *symtab) {
     assert(lexer != NULL);
     assert(symtab != NULL);
 
     lexer->symtab = symtab;
+    lexer->token_man = token_man;
     sb_init(&lexer->lexbuf, INIT_LEXBUF_SIZE);
 }
 
@@ -57,10 +58,8 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     assert(result != NULL);
     status_t status = CCC_OK;
 
-    int cur;
-    while ((cur = lex_getc_splice(stream)) != EOF) {
-        ts_ungetc(cur, stream);
-        lexeme_t *lexeme = emalloc(sizeof(lexeme_t));
+    while (true) {
+        lexeme_t *lexeme = token_create(lexer->token_man);
 
         if (CCC_OK != (status = lex_next_token(lexer, stream, lexeme))) {
             free(lexeme);
@@ -68,6 +67,9 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
         }
 
         vec_push_back(result, lexeme);
+        if (lexeme->type == TOKEN_EOF) {
+            break;
+        }
     }
 
     return status;

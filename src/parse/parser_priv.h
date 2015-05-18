@@ -37,12 +37,11 @@
  * Container for lexer containing lex context
  */
 typedef struct lex_wrap_t {
-    trans_unit_t *tunit;             /**< Current tranlation unit */
-    lexer_t *lexer;                  /**< Lexer */
-    typetab_t *typetab;              /**< Type table on top of stack */
-    lexeme_t lexemes[LEX_LOOKAHEAD]; /**< Ring buffer of lexemes */
-    int lex_idx;                     /**< Index of current lexeme */
-    char *function;                  /**< Current function. NULL if none */
+    trans_unit_t *tunit; /**< Current tranlation unit */
+    typetab_t *typetab;  /**< Type table on top of stack */
+    vec_t *tokens;       /**< Token stream */
+    size_t offset;       /**< Offset into tokens */
+    char *function;      /**< Current function. NULL if none */
 } lex_wrap_t;
 
 /**
@@ -50,7 +49,7 @@ typedef struct lex_wrap_t {
  *
  * @param Lexer wrapper to get lexeme from
  */
-#define LEX_CUR(wrap) ((wrap)->lexemes[(wrap)->lex_idx])
+#define LEX_CUR(wrap) ((lexeme_t *)vec_get((wrap)->tokens, (wrap)->offset))
 
 /**
  * Get the next lexeme
@@ -58,21 +57,18 @@ typedef struct lex_wrap_t {
  * @param Lexer wrapper to get lexeme from
  */
 #define LEX_NEXT(wrap) \
-    ((wrap)->lexemes[((wrap)->lex_idx + 1) & (LEX_LOOKAHEAD - 1)])
+    ((lexeme_t *)vec_get((wrap)->tokens, (wrap)->offset + 1))
 
 /**
  * Advance lexer wrapper to next token
  *
  * @param wrap Wrapper to advance
  */
-#define LEX_ADVANCE(wrap)                                               \
-    do {                                                                \
-        if (CCC_OK !=                                                   \
-            (status = lexer_next_token((wrap)->lexer,                   \
-                                       &LEX_CUR(wrap)))) {              \
-            goto fail;                                                  \
-        }                                                               \
-        (wrap)->lex_idx = ((wrap)->lex_idx + 1) & (LEX_LOOKAHEAD - 1);  \
+#define LEX_ADVANCE(wrap)                                       \
+    do {                                                        \
+        if ((wrap)->offset < vec_size((wrap)->tokens) - 1) {    \
+            ++(wrap)->offset;                                   \
+        }                                                       \
     } while (0)
 
 /**
@@ -83,9 +79,9 @@ typedef struct lex_wrap_t {
  */
 #define LEX_MATCH(wrap, token)                                          \
     do {                                                                \
-        token_t cur = LEX_CUR(wrap).type;                               \
+        token_t cur = LEX_CUR(wrap)->type;                              \
         if (cur != (token)) {                                           \
-            logger_log(&LEX_CUR(wrap).mark, LOG_ERR,                    \
+            logger_log(&LEX_CUR(wrap)->mark, LOG_ERR,                   \
                        "expected '%s' before '%s' token",               \
                        token_str(token), token_str(cur));               \
             status = CCC_ESYNTAX;                                       \
@@ -104,9 +100,9 @@ typedef struct lex_wrap_t {
 // TODO1: Replace some parser code with this
 #define LEX_CHECK(wrap, token)                                          \
     do {                                                                \
-        token_t cur = LEX_CUR(wrap).type;                               \
+        token_t cur = LEX_CUR(wrap)->type;                              \
         if (cur != (token)) {                                           \
-            logger_log(&LEX_CUR(wrap).mark, LOG_ERR,                    \
+            logger_log(&LEX_CUR(wrap)->mark, LOG_ERR,                   \
                        "expected '%s' before '%s' token",               \
                        token_str(token), token_str(cur));               \
             status = CCC_ESYNTAX;                                       \

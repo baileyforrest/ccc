@@ -33,6 +33,7 @@
  */
 typedef struct lexer_t {
     symtab_t *symtab;         /**< Symbol table */
+    token_man_t *token_man;   /**< Symbol table */
     string_builder_t lexbuf;
 } lexer_t;
 
@@ -41,7 +42,7 @@ typedef struct lexer_t {
  *
  * @param lexer The lexer to initialize
  */
-void lexer_init(lexer_t *lexer, symtab_t *symtab);
+void lexer_init(lexer_t *lexer, token_man_t *token_man, symtab_t *symtab);
 
 /**
  * Destroys a lexer object

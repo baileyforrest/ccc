@@ -39,50 +39,37 @@
 
 #include "optman.h"
 
+#include "lex/symtab.h"
+
 #include "util/htable.h"
 #include "util/logger.h"
+
 #include "typecheck/typechecker.h"
 
-status_t parser_parse(lexer_t *lexer, trans_unit_t **result) {
-    assert(lexer != NULL);
+status_t parser_parse(vec_t *tokens, trans_unit_t **result) {
+    assert(tokens != NULL);
+    assert(vec_size(tokens) > 0);
     assert(result != NULL);
-    status_t status = CCC_OK;
 
     lex_wrap_t lex;
-    lex.lexer = lexer;
-    for (int i = 0; i < LEX_LOOKAHEAD; ++i) {
-        if (CCC_OK != (status = lexer_next_token(lex.lexer, &lex.lexemes[i]))) {
-            goto fail;
-        }
-    }
-    lex.lex_idx = 0;
+    lex.tokens = tokens;
+    lex.offset = 0;
 
-    status = par_translation_unit(&lex, result);
-
-fail:
-    return status;
+    return par_translation_unit(&lex, result);
 }
 
-status_t parser_parse_expr(lexer_t *lexer, trans_unit_t *tunit,
+status_t parser_parse_expr(vec_t *tokens, trans_unit_t *tunit,
                            expr_t **result) {
-    assert(lexer != NULL);
+    assert(tokens != NULL);
+    assert(vec_size(tokens) > 0);
     assert(result != NULL);
-    status_t status = CCC_OK;
+
     lex_wrap_t lex;
-
-    lex.lexer = lexer;
     lex.tunit = tunit;
-    for (int i = 0; i < LEX_LOOKAHEAD; ++i) {
-        if (CCC_OK != (status = lexer_next_token(lex.lexer, &lex.lexemes[i]))) {
-            goto fail;
-        }
-    }
-    lex.lex_idx = 0;
+    lex.tokens = tokens;
+    lex.offset = 0;
 
-    status = par_expression(&lex, result);
-
-fail:
-    return status;
+    return par_expression(&lex, result);
 }
 
 /**
@@ -126,7 +113,7 @@ status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result) {
     lex->typetab = &tunit->typetab; // Set top type table to translation units
     lex->tunit = tunit;
 
-    while (LEX_CUR(lex).type != TOKEN_EOF) {
+    while (LEX_CUR(lex)->type != TOKEN_EOF) {
         gdecl_t *gdecl;
         if (CCC_OK != (status = par_external_declaration(lex, &gdecl))) {
             goto fail;
@@ -141,9 +128,9 @@ fail:
 
 status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     status_t status = CCC_OK;
-    gdecl_t *gdecl = ast_gdecl_create(lex->tunit, &LEX_CUR(lex).mark,
+    gdecl_t *gdecl = ast_gdecl_create(lex->tunit, &LEX_CUR(lex)->mark,
                                       GDECL_DECL);
-    gdecl->decl = ast_decl_create(lex->tunit, &LEX_CUR(lex).mark);
+    gdecl->decl = ast_decl_create(lex->tunit, &LEX_CUR(lex)->mark);
 
     if (CCC_OK !=
         (status = par_declaration_specifiers(lex, &gdecl->decl->type))) {
@@ -152,7 +139,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
         }
     }
     if (gdecl->decl->type == NULL) {
-        logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+        logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                    "Data definition has no type or storage class");
 
         // When no type is specified, assume it is int
@@ -172,7 +159,7 @@ status_t par_external_declaration(lex_wrap_t *lex, gdecl_t **result) {
     }
 
     // Skip function pointers/declarations
-    if (LEX_CUR(lex).type == SEMI) {
+    if (LEX_CUR(lex)->type == SEMI) {
         LEX_ADVANCE(lex);
         goto done;
     }
@@ -218,7 +205,7 @@ status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
     ht_init(&gdecl->fdefn.labels, &s_gdecl_ht_params);
 
     /* TODO2: Handle K & R style function signature
-    while (LEX_CUR(lex).type != RPAREN) {
+    while (LEX_CUR(lex)->type != RPAREN) {
         stmt_t *param = NULL;
         if (CCC_OK != (status = par_declaration(lex, &param))) {
             goto fail;
@@ -249,7 +236,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
     *type = NULL; // Set to NULL so sub functions will allocate
 
     while (true) {
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
             // Storage class specifiers
         case DECL_SPEC_STORAGE_CLASS:
             if(CCC_OK != (status = par_storage_class_specifier(lex, type))) {
@@ -261,14 +248,14 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
         case ID: {
             // Type specifier only if its a typedef name
             typetab_entry_t *entry =
-                tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key);
+                tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key);
             if (entry == NULL) {
                 return CCC_BACKTRACK;
             }
 
             // If these are the next character, the id must be the variable name
             // if there's already a type specifer
-            switch (LEX_NEXT(lex).type) {
+            switch (LEX_NEXT(lex)->type) {
             case ASSIGN:
             case SEMI:
             case COMMA:
@@ -285,7 +272,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
             // next character is a semicolon or comma
             if (*type != NULL && (*type)->type == TYPE_MOD &&
                 ((*type)->mod.type_mod & TMOD_TYPEDEF) &&
-                (LEX_NEXT(lex).type == SEMI || LEX_NEXT(lex).type == COMMA)) {
+                (LEX_NEXT(lex)->type == SEMI || LEX_NEXT(lex)->type == COMMA)) {
                 return CCC_BACKTRACK;
             }
             // FALL THROUGH
@@ -315,14 +302,14 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
     // Allocate new type mod node if one isn't assigned
     if (*type == NULL || (*type)->type != TYPE_MOD) {
-        type_t *new_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+        type_t *new_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                            TYPE_MOD);
         new_type->mod.base = *type;
         new_type->mod.type_mod = TMOD_NONE;
         *type = new_type;
     }
     type_mod_t tmod;
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case AUTO:     tmod = TMOD_AUTO;     break;
     case REGISTER: tmod = TMOD_REGISTER; break;
     case STATIC:   tmod = TMOD_STATIC;   break;
@@ -333,7 +320,7 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
         assert(false);
     }
     if ((*type)->mod.type_mod & tmod) {
-        logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+        logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                    "Duplicate storage class specifer: %s",
                    ast_type_mod_str(tmod));
     }
@@ -341,22 +328,21 @@ status_t par_storage_class_specifier(lex_wrap_t *lex, type_t **type) {
     (*type)->mod.type_mod |= tmod;
     LEX_ADVANCE(lex);
 
-fail:
     return status;
 }
 
 status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
 
-    if (LEX_CUR(lex).type == STATIC_ASSERT) {
+    if (LEX_CUR(lex)->type == STATIC_ASSERT) {
         if (*type != NULL) {
-            logger_log(&LEX_CUR(lex).mark, LOG_ERR,
-                       "Unexpected token %s", token_str(LEX_CUR(lex).type));
+            logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
+                       "Unexpected token %s", token_str(LEX_CUR(lex)->type));
             return CCC_ESYNTAX;
         }
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
-        type_t *sa_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+        type_t *sa_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                           TYPE_STATIC_ASSERT);
         if (CCC_OK !=
             (status = par_oper_expression(lex, OP_NOP, NULL,
@@ -365,7 +351,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         }
         LEX_MATCH(lex, COMMA);
         LEX_CHECK(lex, STRING);
-        sa_type->sa_params.msg = LEX_CUR(lex).tab_entry->key;
+        sa_type->sa_params.msg = LEX_CUR(lex)->str_val;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, RPAREN);
         LEX_CHECK(lex, SEMI);
@@ -391,7 +377,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     }
 
     bool allowed = false;
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case ALIGNAS:
     case NORETURN:
         allowed = true;
@@ -405,7 +391,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         bool okay = false;
         switch ((*end_node)->type) {
         case TYPE_INT:
-            switch (LEX_CUR(lex).type) {
+            switch (LEX_CUR(lex)->type) {
                 // Just have int overwritten with the correct type
             case SHORT:
                 *end_node = tt_short;
@@ -424,7 +410,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             }
             break;
         case TYPE_SHORT:
-            switch (LEX_CUR(lex).type) {
+            switch (LEX_CUR(lex)->type) {
             case INT:
             case UNSIGNED:
             case SIGNED:
@@ -435,7 +421,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             }
             break;
         case TYPE_LONG:
-            switch (LEX_CUR(lex).type) {
+            switch (LEX_CUR(lex)->type) {
             case INT:
             case UNSIGNED:
             case SIGNED:
@@ -454,7 +440,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             }
             break;
         case TYPE_LONG_LONG:
-            switch (LEX_CUR(lex).type) {
+            switch (LEX_CUR(lex)->type) {
             case INT:
             case UNSIGNED:
             case SIGNED:
@@ -465,7 +451,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             }
             break;
         case TYPE_DOUBLE:
-            if (LEX_CUR(lex).type == LONG) {
+            if (LEX_CUR(lex)->type == LONG) {
                 okay = true;
                 *end_node = tt_long_double;
             }
@@ -480,20 +466,20 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         }
 
         // We found a node that is type, so we cannot have two
-        logger_log(&LEX_CUR(lex).mark, LOG_ERR, "Multiple type specifers");
+        logger_log(&LEX_CUR(lex)->mark, LOG_ERR, "Multiple type specifers");
         status = CCC_ESYNTAX;
         goto fail;
     }
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case ID: { // typedef name
         // Type specifier only if its a typedef name
         typetab_entry_t *entry =
-            tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key);
+            tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key);
         assert(entry != NULL); // Must be checked before calling
-        new_node = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+        new_node = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                    TYPE_TYPEDEF);
-        new_node->typedef_params.name = LEX_CUR(lex).tab_entry->key;
+        new_node->typedef_params.name = LEX_CUR(lex)->tab_entry->key;
         new_node->typedef_params.base = entry->type;
         new_node->typedef_params.type = TYPE_VOID;
         *end_node = new_node;
@@ -517,7 +503,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     case SIGNED:
     case UNSIGNED: {
         type_mod_t mod;
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
         case ALIGNAS:  mod = TMOD_ALIGNAS;  break;
         case NORETURN: mod = TMOD_NORETURN; break;
         case SIGNED:   mod = TMOD_SIGNED;   break;
@@ -526,7 +512,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
             assert(false);
         }
         if (mod_node == NULL) {
-            mod_node = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+            mod_node = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        TYPE_MOD);
             new_node = mod_node;
             mod_node->mod.base = *type;
@@ -535,7 +521,7 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         }
 
         if (mod_node->mod.type_mod & mod) {
-            logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+            logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                        "Duplicate type specifer: %s",
                        ast_type_mod_str(mod));
             status = CCC_ESYNTAX;
@@ -587,7 +573,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     char *name = NULL;
 
     type_type_t btype;
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case STRUCT: btype = TYPE_STRUCT; break;
     case UNION:  btype = TYPE_UNION;  break;
     case ENUM:   btype = TYPE_ENUM;   break;
@@ -598,16 +584,16 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
 
     typetab_entry_t *entry = NULL;
     type_t *entry_type;
-    if (LEX_CUR(lex).type == ID) {
-        name = LEX_CUR(lex).tab_entry->key;
+    if (LEX_CUR(lex)->type == ID) {
+        name = LEX_CUR(lex)->tab_entry->key;
         entry = tt_lookup_compound(lex->typetab, name);
 
         LEX_ADVANCE(lex);
 
         // Not a definition
-        if (LEX_CUR(lex).type != LBRACE && entry != NULL) {
+        if (LEX_CUR(lex)->type != LBRACE && entry != NULL) {
             if (entry->type->type != btype) {
-                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+                logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                            "Incorrect type specifer %s. Expected: %s.",
                            ast_basic_type_str(entry->type->type),
                            ast_basic_type_str(btype));
@@ -615,7 +601,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
                 goto fail;
             }
             type_t *typedef_type = ast_type_create(lex->tunit,
-                                                   &LEX_CUR(lex).mark,
+                                                   &LEX_CUR(lex)->mark,
                                                    TYPE_TYPEDEF);
             typedef_type->typedef_params.name = name;
             typedef_type->typedef_params.base = entry->type;
@@ -627,14 +613,14 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
 
         // If we're defining a new type, and the last entry is in a different
         // scope than this one, then we need to create a new entry
-        if (LEX_CUR(lex).type == LBRACE && entry != NULL &&
+        if (LEX_CUR(lex)->type == LBRACE && entry != NULL &&
             entry->typetab != lex->typetab) {
             entry = NULL;
         }
     }
 
     if (entry == NULL) { // Allocate a new type if it doesn't exist
-        new_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark, btype);
+        new_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark, btype);
         if (btype == TYPE_ENUM) {
             new_type->enum_params.name = name;
             new_type->enum_params.type = tt_int;
@@ -654,10 +640,10 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         }
     }
 
-    if (LEX_CUR(lex).type != LBRACE) {
+    if (LEX_CUR(lex)->type != LBRACE) {
         if (name != NULL) {
             type_t *typedef_type = ast_type_create(lex->tunit,
-                                                   &LEX_CUR(lex).mark,
+                                                   &LEX_CUR(lex)->mark,
                                                    TYPE_TYPEDEF);
             typedef_type->typedef_params.name = name;
             typedef_type->typedef_params.base = entry_type;
@@ -666,7 +652,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
             *type = typedef_type;
             return CCC_OK;
         } else { // Can't have a compound type without a name or definition
-            logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+            logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                        "Compound type without name or definition");
             status = CCC_ESYNTAX;
             goto fail;
@@ -675,7 +661,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
 
     if (entry != NULL) {
         if (entry->struct_defined) {
-            logger_log(&LEX_CUR(lex).mark, LOG_ERR, "redefinition of '%s'",
+            logger_log(&LEX_CUR(lex)->mark, LOG_ERR, "redefinition of '%s'",
                        entry->key);
             logger_log(&entry->type->mark, LOG_NOTE, "originally defined here");
             status = CCC_ESYNTAX;
@@ -731,11 +717,11 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
     *type = NULL; // Set to NULL so sub functions will allocate
 
     while (true) {
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
             // Type specifiers:
         case ID:
             // Type specifier only if its a typedef name
-            if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) == NULL) {
+            if (tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key) == NULL) {
                 goto done;
             }
 
@@ -782,14 +768,14 @@ fail:
 status_t par_struct_declarator_list(lex_wrap_t *lex, type_t *base,
                                     type_t *decl_type) {
     status_t status = CCC_OK;
-    decl_t *decl = ast_decl_create(lex->tunit, &LEX_CUR(lex).mark);
+    decl_t *decl = ast_decl_create(lex->tunit, &LEX_CUR(lex)->mark);
     decl->type = decl_type;
 
-    if (LEX_CUR(lex).type != SEMI) {
+    if (LEX_CUR(lex)->type != SEMI) {
         if (CCC_OK != (status = par_struct_declarator(lex, decl))) {
             goto fail;
         }
-        while (LEX_CUR(lex).type == COMMA) {
+        while (LEX_CUR(lex)->type == COMMA) {
             LEX_ADVANCE(lex);
             if (CCC_OK != (status = par_struct_declarator(lex, decl))) {
                 goto fail;
@@ -807,18 +793,18 @@ status_t par_struct_declarator(lex_wrap_t *lex, decl_t *decl) {
     status_t status = CCC_OK;
     decl_node_t *dnode = NULL;
 
-    if (LEX_CUR(lex).type != COLON) {
+    if (LEX_CUR(lex)->type != COLON) {
         if (CCC_OK != (status = par_declarator_base(lex, decl))) {
             goto fail;
         }
         dnode = sl_tail(&decl->decls);
     } else {
-        dnode = ast_decl_node_create(lex->tunit, &LEX_CUR(lex).mark);
+        dnode = ast_decl_node_create(lex->tunit, &LEX_CUR(lex)->mark);
         dnode->type = decl->type;
         sl_append(&decl->decls, &dnode->link);
     }
 
-    if (LEX_CUR(lex).type == COLON) {
+    if (LEX_CUR(lex)->type == COLON) {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_oper_expression(lex, OP_NOP, NULL,
                                                     &dnode->expr))) {
@@ -831,7 +817,7 @@ fail:
 }
 
 status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case STAR:
     case ID:
     case LPAREN:
@@ -842,7 +828,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
     }
     status_t status = CCC_OK;
     decl_node_t *decl_node = ast_decl_node_create(lex->tunit,
-                                                  &LEX_CUR(lex).mark);
+                                                  &LEX_CUR(lex)->mark);
     decl_node->type = decl->type;
     if (CCC_OK != (status = par_declarator(lex, decl_node, NULL))) {
         goto fail;
@@ -893,7 +879,7 @@ status_t par_declarator(lex_wrap_t *lex, decl_node_t *decl_node,
     status_t status = CCC_OK;
 
     type_t **lpatch = &decl_node->type;
-    while (LEX_CUR(lex).type == STAR) {
+    while (LEX_CUR(lex)->type == STAR) {
         if (CCC_OK != (status = par_pointer(lex, lpatch))) {
             goto fail;
         }
@@ -929,7 +915,7 @@ status_t par_pointer(lex_wrap_t *lex, type_t **base_ptr) {
         mods = new_type->mod.type_mod;
     } else {
         mods = TMOD_NONE;
-        new_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark, TYPE_PTR);
+        new_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark, TYPE_PTR);
     }
     new_type->type = TYPE_PTR;
     new_type->ptr.type_mod = mods;
@@ -947,7 +933,7 @@ fail:
 status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
     status_t status = CCC_OK;
     type_mod_t mod;
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case CONST:    mod = TMOD_CONST;    break;
     case VOLATILE: mod = TMOD_VOLATILE; break;
     default:
@@ -960,17 +946,13 @@ status_t par_type_qualifier(lex_wrap_t *lex, type_t **type) {
     if (*type != NULL && (*type)->type == TYPE_MOD) {
         mod_node = *type;
     } else {
-        mod_node = ast_type_create(lex->tunit, &LEX_CUR(lex).mark, TYPE_MOD);
+        mod_node = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark, TYPE_MOD);
         mod_node->mod.type_mod = TMOD_NONE;
         mod_node->mod.base = *type;
         *type = mod_node;
     }
     mod_node->mod.type_mod |= mod;
 
-    return status;
-
-fail:
-    // Nothing to clean up here
     return status;
 }
 
@@ -981,7 +963,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
     type_t **lpatch = NULL;
     type_t **last_node = NULL;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case LPAREN: {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_declarator(lex, node, &lpatch))) {
@@ -991,7 +973,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
 
         if (optman.dump_opts & DUMP_AST) {
             // Only create paren node if we're printing AST
-            type_t *paren_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+            type_t *paren_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                                  TYPE_PAREN);
             paren_type->paren_base = *lpatch;
             *lpatch = paren_type;
@@ -1001,7 +983,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
     }
 
     case ID:
-        node->id = LEX_CUR(lex).tab_entry->key;
+        node->id = LEX_CUR(lex)->tab_entry->key;
         LEX_ADVANCE(lex);
         break;
 
@@ -1014,16 +996,16 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
     last_node = &base;
     bool done = false;
     while (!done) {
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
         case LBRACK: // Array dimension
             LEX_ADVANCE(lex);
-            type_t *arr_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+            type_t *arr_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                                TYPE_ARR);
             arr_type->arr.base = *last_node;
             *last_node = arr_type;
             last_node = &arr_type->arr.base;
 
-            if (LEX_CUR(lex).type == RBRACK) {
+            if (LEX_CUR(lex)->type == RBRACK) {
                 LEX_ADVANCE(lex);
             } else {
                 if (CCC_OK !=
@@ -1036,7 +1018,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             break;
         case LPAREN:
             LEX_ADVANCE(lex);
-            type_t *func_type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+            type_t *func_type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                                 TYPE_FUNC);
             func_type->func.varargs = false;
 
@@ -1045,8 +1027,8 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             last_node = &func_type->func.type;
 
             /* TODO2: Support K & R decl syntax
-            if (LEX_CUR(lex).type == ID) {
-                while (LEX_CUR(lex).type == ID) {
+            if (LEX_CUR(lex)->type == ID) {
+                while (LEX_CUR(lex)->type == ID) {
                     LEX_ADVANCE(lex);
                 }
                 LEX_MATCH(lex, RPAREN);
@@ -1099,7 +1081,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
         new_left = false;
         oper_t op1 = OP_NOP;
 
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
             // Binary operators
         case STAR:     op1 = OP_TIMES;    break;
         case DIV:      op1 = OP_DIV;      break;
@@ -1128,7 +1110,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
                 return CCC_OK;
             }
             LEX_ADVANCE(lex);
-            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        EXPR_COND);
             new_node->cond.expr1 = left;
 
@@ -1168,7 +1150,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
         }
 
         oper_t op2 = OP_NOP;
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
             // Binary operators
         case STAR:     op2 = OP_TIMES;    break;
         case DIV:      op2 = OP_DIV;      break;
@@ -1193,7 +1175,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
             // Cond takes lowest precedence, if there was a previous operator,
             // combine left and right and return
             if (prev_op != OP_NOP) {
-                new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+                new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                            EXPR_BIN);
                 new_node->type = EXPR_BIN;
                 new_node->bin.op = op1;
@@ -1203,13 +1185,13 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
                 return CCC_OK;
             }
             LEX_ADVANCE(lex);
-            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        EXPR_BIN);
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
             new_node->bin.expr2 = right;
 
-            expr_t *cond_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            expr_t *cond_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                                 EXPR_COND);
             cond_node->cond.expr1 = new_node;
 
@@ -1233,7 +1215,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
             return CCC_OK;
         }
         default: { // Not binary 2, just combine the left and light
-            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        EXPR_BIN);
             new_node->bin.op = op1;
             new_node->bin.expr1 = left;
@@ -1246,7 +1228,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
         if (par_get_binary_prec(op1) >= par_get_binary_prec(op2)) {
             // op1 has greater or equal precedence, so combine left and right
             // and restart loop with new left
-            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        EXPR_BIN);
             new_node->type = EXPR_BIN;
             new_node->bin.op = op1;
@@ -1262,7 +1244,7 @@ status_t par_oper_expression(lex_wrap_t *lex, oper_t prev_op, expr_t *left,
         } else {
             // op2 has greater precedence, parse expression with right as the
             // left side, then combine with the current left
-            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            new_node = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        EXPR_BIN);
             new_node->type = EXPR_BIN;
             new_node->bin.op = op1;
@@ -1286,33 +1268,33 @@ fail:
 
 status_t par_mem_acc_list(lex_wrap_t *lex, mem_acc_list_t *list, bool nodot) {
     status_t status = CCC_OK;
-    while (nodot || LEX_CUR(lex).type == DOT ||
-           LEX_CUR(lex).type == LBRACK) {
+    while (nodot || LEX_CUR(lex)->type == DOT ||
+           LEX_CUR(lex)->type == LBRACK) {
         expr_t *access;
-        if (nodot || LEX_CUR(lex).type == DOT) {
+        if (nodot || LEX_CUR(lex)->type == DOT) {
             if (nodot) {
                 nodot = false;
             } else {
                 LEX_ADVANCE(lex);
             }
 
-            if (LEX_CUR(lex).type != ID) { // Not a name
-                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+            if (LEX_CUR(lex)->type != ID) { // Not a name
+                logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                            "Parse Error: Expected <identifer>, Found: %s.",
-                           token_str(LEX_CUR(lex).type));
+                           token_str(LEX_CUR(lex)->type));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
 
-            access = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            access = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                      EXPR_MEM_ACC);
             access->mem_acc.base = NULL;
-            access->mem_acc.name = LEX_CUR(lex).tab_entry->key;
+            access->mem_acc.name = LEX_CUR(lex)->tab_entry->key;
             access->mem_acc.op = OP_DOT;
             LEX_ADVANCE(lex);
-        } else if (LEX_CUR(lex).type == LBRACK) {
+        } else if (LEX_CUR(lex)->type == LBRACK) {
             LEX_ADVANCE(lex);
-            access = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            access = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                      EXPR_ARR_IDX);
             access->arr_idx.array = NULL;
 
@@ -1335,11 +1317,11 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *base = NULL;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case INC:
     case DEC: {
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_UNARY);
-        oper_t op = LEX_CUR(lex).type == INC ? OP_PREINC : OP_PREDEC;
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_UNARY);
+        oper_t op = LEX_CUR(lex)->type == INC ? OP_PREINC : OP_PREDEC;
         LEX_ADVANCE(lex);
         base->unary.op = op;
         if (CCC_OK != (status = par_unary_expression(lex, &base->unary.expr))) {
@@ -1351,10 +1333,10 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
     case SIZEOF:
     case ALIGNOF: {
         expr_type_t btype =
-            LEX_CUR(lex).type == SIZEOF ? EXPR_SIZEOF : EXPR_ALIGNOF;
+            LEX_CUR(lex)->type == SIZEOF ? EXPR_SIZEOF : EXPR_ALIGNOF;
         LEX_ADVANCE(lex);
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, btype);
-        if (LEX_CUR(lex).type == LPAREN) {
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, btype);
+        if (LEX_CUR(lex)->type == LPAREN) {
             if (CCC_OK !=
                 (status = par_type_name(lex, true,
                                         &base->sizeof_params.type))) {
@@ -1382,7 +1364,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
     }
     case OFFSETOF:
         LEX_ADVANCE(lex);
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_OFFSETOF);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_OFFSETOF);
         LEX_MATCH(lex, LPAREN);
         if (CCC_OK != (status = par_type_name(lex, false,
                                               &base->offsetof_params.type))) {
@@ -1397,7 +1379,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
 
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_VA_START);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_VA_START);
         if (CCC_OK != par_assignment_expression(lex, &base->vastart.ap)) {
             goto fail;
         }
@@ -1411,7 +1393,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
 
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_VA_ARG);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_VA_ARG);
         if (CCC_OK != par_assignment_expression(lex, &base->vaarg.ap)) {
             goto fail;
         }
@@ -1425,7 +1407,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
 
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_VA_END);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_VA_END);
         if (CCC_OK != par_assignment_expression(lex, &base->vaend.ap)) {
             goto fail;
         }
@@ -1435,7 +1417,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
 
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_VA_COPY);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_VA_COPY);
         if (CCC_OK != par_assignment_expression(lex, &base->vacopy.dest)) {
             goto fail;
         }
@@ -1453,7 +1435,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
     case BITNOT:
     case LOGICNOT: {
         oper_t op;
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
         case BITAND:   op = OP_ADDR;     break;
         case STAR:     op = OP_DEREF;    break;
         case PLUS:     op = OP_UPLUS;    break;
@@ -1465,7 +1447,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
         }
         LEX_ADVANCE(lex);
 
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_UNARY);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_UNARY);
         base->unary.op = op;
         if (CCC_OK !=
             (status = par_cast_expression(lex, &base->unary.expr))) {
@@ -1485,7 +1467,7 @@ fail:
 
 status_t par_cast_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
-    if (LEX_CUR(lex).type != LPAREN) {
+    if (LEX_CUR(lex)->type != LPAREN) {
         // No paren, just parse a unary expression
         return par_unary_expression(lex, result);
     }
@@ -1498,10 +1480,10 @@ status_t par_cast_expression(lex_wrap_t *lex, expr_t **result) {
         return par_unary_expression(lex, result);
     }
 
-    expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CAST);
+    expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_CAST);
     expr->cast.cast = type;
 
-    if (LEX_CUR(lex).type == LBRACE) {
+    if (LEX_CUR(lex)->type == LBRACE) {
         // Try to parse compound literal
         if (CCC_OK != (status = par_initializer(lex, &expr->cast.base))) {
             goto fail;
@@ -1527,10 +1509,10 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
     expr = base;
 
     while (base != NULL) {
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
         case LBRACK: // Array index
             LEX_ADVANCE(lex);
-            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                    EXPR_ARR_IDX);
             expr->arr_idx.array = base;
 
@@ -1544,17 +1526,17 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
 
         case LPAREN: // Function call
             LEX_ADVANCE(lex);
-            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CALL);
+            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_CALL);
             expr->call.func = base;
 
-            while (LEX_CUR(lex).type != RPAREN) {
+            while (LEX_CUR(lex)->type != RPAREN) {
                 expr_t *param;
                 if (CCC_OK !=
                     (status = par_assignment_expression(lex, &param))) {
                     goto fail;
                 }
                 sl_append(&expr->call.params, &param->link);
-                if (LEX_CUR(lex).type == RPAREN) {
+                if (LEX_CUR(lex)->type == RPAREN) {
                     break;
                 }
                 LEX_MATCH(lex, COMMA);
@@ -1565,20 +1547,20 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
 
         case DOT: // Structure access direct or indirect
         case DEREF: {
-            oper_t op = LEX_CUR(lex).type == DOT ? OP_DOT : OP_ARROW;
+            oper_t op = LEX_CUR(lex)->type == DOT ? OP_DOT : OP_ARROW;
             LEX_ADVANCE(lex);
 
-            if (LEX_CUR(lex).type != ID) { // Not a name
-                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+            if (LEX_CUR(lex)->type != ID) { // Not a name
+                logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                            "Parse Error: Expected <identifer>, Found: %s.",
-                           token_str(LEX_CUR(lex).type));
+                           token_str(LEX_CUR(lex)->type));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
-            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                    EXPR_MEM_ACC);
             expr->mem_acc.base = base;
-            expr->mem_acc.name = LEX_CUR(lex).tab_entry->key;
+            expr->mem_acc.name = LEX_CUR(lex)->tab_entry->key;
             expr->mem_acc.op = op;
             LEX_ADVANCE(lex);
             base = expr;
@@ -1587,9 +1569,9 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
 
         case INC:
         case DEC: {
-            oper_t op = LEX_CUR(lex).type == INC ? OP_POSTINC : OP_POSTDEC;
+            oper_t op = LEX_CUR(lex)->type == INC ? OP_POSTINC : OP_POSTDEC;
             LEX_ADVANCE(lex);
-            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_UNARY);
+            expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_UNARY);
             expr->unary.op = op;
             expr->unary.expr = base;
             base = expr;
@@ -1610,13 +1592,13 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
     expr_t *base = NULL;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case LPAREN:
         LEX_ADVANCE(lex);
         // Try to parse as paren expression
         if (optman.dump_opts & DUMP_AST) {
             // Only create the paren node if we're printing ast
-            base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_PAREN);
+            base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_PAREN);
             if (CCC_OK !=
                 (status = par_expression(lex, &base->paren_base))) {
                 goto fail;
@@ -1630,29 +1612,29 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         LEX_MATCH(lex, RPAREN);
         break;
     case ID:
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_VAR);
-        base->var_id = LEX_CUR(lex).tab_entry->key;
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_VAR);
+        base->var_id = LEX_CUR(lex)->tab_entry->key;
         LEX_ADVANCE(lex);
         break;
 
     case FUNC:
     case STRING: {
-        bool is_func = LEX_CUR(lex).type == FUNC;
+        bool is_func = LEX_CUR(lex)->type == FUNC;
 
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CONST_STR);
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_CONST_STR);
         if (is_func) {
             if (lex->function == NULL) {
-                logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+                logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                            "'%s' is not defined outside of function scope",
-                           token_str(LEX_CUR(lex).type));
+                           token_str(LEX_CUR(lex)->type));
                 base->const_val.str_val = "";
             } else {
                 base->const_val.str_val = lex->function;
             }
         } else {
-            base->const_val.str_val = LEX_CUR(lex).tab_entry->key;
+            base->const_val.str_val = LEX_CUR(lex)->str_val;
         }
-        type_t *type = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+        type_t *type = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        TYPE_ARR);
         type->arr.base = tt_char;
         base->const_val.type = type;
@@ -1662,8 +1644,8 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         break;
     }
     case INTLIT: {
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_CONST_INT);
-        unsigned long long intval = LEX_CUR(lex).int_params.int_val;
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_CONST_INT);
+        unsigned long long intval = LEX_CUR(lex)->int_params.int_val;
         base->const_val.int_val = intval;
 
         type_t *type;
@@ -1684,9 +1666,9 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         }
 
         type_t *explicit;
-        if (LEX_CUR(lex).int_params.hasLL) {
+        if (LEX_CUR(lex)->int_params.hasLL) {
             explicit = tt_long_long;
-        } else if (LEX_CUR(lex).int_params.hasL) {
+        } else if (LEX_CUR(lex)->int_params.hasL) {
             explicit = tt_long;
         } else {
             explicit = tt_int;
@@ -1698,8 +1680,8 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             type = tt_long_long;
             need_u = true;
 
-            if (!LEX_CUR(lex).int_params.hasU && explicit_size < ll_size) {
-                logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+            if (!LEX_CUR(lex)->int_params.hasU && explicit_size < ll_size) {
+                logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                            "integer constant is so large that it is unsigned");
             }
         } else if (need_ll && explicit_size < ll_size) {
@@ -1710,12 +1692,12 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             type = explicit;
         }
 
-        if (LEX_CUR(lex).int_params.hasU) {
+        if (LEX_CUR(lex)->int_params.hasU) {
             need_u = true;
         }
 
         if (need_u) {
-            type_t *type_mod = ast_type_create(lex->tunit, &LEX_CUR(lex).mark,
+            type_t *type_mod = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                                TYPE_MOD);
             type_mod->mod.type_mod = TMOD_UNSIGNED;
             type_mod->mod.base = type;
@@ -1726,12 +1708,12 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         break;
     }
     case FLOATLIT: {
-        base = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+        base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                EXPR_CONST_FLOAT);
-        base->const_val.float_val = LEX_CUR(lex).float_params.float_val;
-        if (LEX_CUR(lex).float_params.hasF) {
+        base->const_val.float_val = LEX_CUR(lex)->float_params.float_val;
+        if (LEX_CUR(lex)->float_params.hasF) {
             base->const_val.type = tt_float;
-        } else if (LEX_CUR(lex).float_params.hasL) {
+        } else if (LEX_CUR(lex)->float_params.hasL) {
             base->const_val.type = tt_long_double;
         } else {
             base->const_val.type = tt_double;
@@ -1740,9 +1722,9 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         break;
     }
     default:
-        logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+        logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                    "Unexpected token %s. Expected primary expression.",
-                   token_str(LEX_CUR(lex).type));
+                   token_str(LEX_CUR(lex)->type));
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -1760,13 +1742,13 @@ status_t par_expression(lex_wrap_t *lex, expr_t **result) {
         goto fail;
     }
 
-    if (LEX_CUR(lex).type == COMMA) {
-        expr_t *cmpd = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+    if (LEX_CUR(lex)->type == COMMA) {
+        expr_t *cmpd = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                        EXPR_CMPD);
         sl_append(&cmpd->cmpd.exprs, &expr->link);
         expr = cmpd;
 
-        while (LEX_CUR(lex).type == COMMA) {
+        while (LEX_CUR(lex)->type == COMMA) {
             LEX_ADVANCE(lex);
             expr_t *cur = NULL;
             if (CCC_OK != (status = par_assignment_expression(lex, &cur))) {
@@ -1793,7 +1775,7 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t **result) {
 
     bool is_assign = true;
     oper_t op;
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case ASSIGN:   op = OP_NOP;    break;
     case STAREQ:   op = OP_TIMES;  break;
     case DIVEQ:    op = OP_DIV;    break;
@@ -1812,7 +1794,7 @@ status_t par_assignment_expression(lex_wrap_t *lex, expr_t **result) {
     if (is_assign) {
         LEX_ADVANCE(lex);
 
-        expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark, EXPR_ASSIGN);
+        expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_ASSIGN);
         expr->assign.dest = left;
         expr->assign.op = op;
 
@@ -1839,9 +1821,9 @@ status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result) {
     decl_t *decl = NULL;
 
     if (match_parens) {
-        switch (LEX_NEXT(lex).type) {
+        switch (LEX_NEXT(lex)->type) {
         case ID: {
-            if (tt_lookup(lex->typetab, LEX_NEXT(lex).tab_entry->key)
+            if (tt_lookup(lex->typetab, LEX_NEXT(lex)->tab_entry->key)
                 == NULL) {
                 return CCC_BACKTRACK;
             }
@@ -1861,7 +1843,7 @@ status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result) {
             goto fail;
         }
     }
-    decl = ast_decl_create(lex->tunit, &LEX_CUR(lex).mark);
+    decl = ast_decl_create(lex->tunit, &LEX_CUR(lex)->mark);
     decl->type = base;
 
     if (CCC_BACKTRACK != (status = par_declarator_base(lex, decl))) {
@@ -1888,7 +1870,7 @@ status_t par_parameter_type_list(lex_wrap_t *lex, type_t *func) {
         }
     }
 
-    if (LEX_CUR(lex).type != ELIPSE) {
+    if (LEX_CUR(lex)->type != ELIPSE) {
         return CCC_OK;
     }
     LEX_ADVANCE(lex);
@@ -1904,10 +1886,10 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
         if (status != CCC_OK) {
             goto fail;
         }
-        if (LEX_CUR(lex).type != RPAREN) {
+        if (LEX_CUR(lex)->type != RPAREN) {
             LEX_MATCH(lex, COMMA);
-            if (LEX_CUR(lex).type == RPAREN) {
-                logger_log(&LEX_CUR(lex).mark, LOG_ERR,
+            if (LEX_CUR(lex)->type == RPAREN) {
+                logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                            "Unexpected token %s", token_str(COMMA));
                 status = CCC_ESYNTAX;
                 goto fail;
@@ -1932,7 +1914,7 @@ status_t par_parameter_declaration(lex_wrap_t *lex, type_t *func) {
         }
     }
 
-    decl = ast_decl_create(lex->tunit, &LEX_CUR(lex).mark);
+    decl = ast_decl_create(lex->tunit, &LEX_CUR(lex)->mark);
     decl->type = type;
 
     // Declarators are optional
@@ -1959,7 +1941,7 @@ status_t par_enumerator_list(lex_wrap_t *lex, type_t *type) {
     }
 
     // Trailing comma on last entry is allowed
-    while (LEX_CUR(lex).type == COMMA) {
+    while (LEX_CUR(lex)->type == COMMA) {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_enumerator(lex, type))) {
             if (status == CCC_BACKTRACK) {
@@ -1977,16 +1959,16 @@ fail:
 
 status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     status_t status = CCC_OK;
-    if (LEX_CUR(lex).type != ID) {
+    if (LEX_CUR(lex)->type != ID) {
         return CCC_BACKTRACK;
     }
-    decl_node_t *node = ast_decl_node_create(lex->tunit, &LEX_CUR(lex).mark);
+    decl_node_t *node = ast_decl_node_create(lex->tunit, &LEX_CUR(lex)->mark);
     node->type = type->enum_params.type;
-    node->id = LEX_CUR(lex).tab_entry->key;
+    node->id = LEX_CUR(lex)->tab_entry->key;
     LEX_ADVANCE(lex);
 
     // Parse enum value if there is one
-    if (LEX_CUR(lex).type == ASSIGN) {
+    if (LEX_CUR(lex)->type == ASSIGN) {
         LEX_ADVANCE(lex);
         if (CCC_OK !=
             (status = par_oper_expression(lex, OP_NOP, NULL, &node->expr))) {
@@ -2002,7 +1984,7 @@ fail:
 status_t par_declaration(lex_wrap_t *lex, decl_t **decl, bool partial) {
     status_t status = CCC_OK;
     if (*decl == NULL) {
-        (*decl) = ast_decl_create(lex->tunit, &LEX_CUR(lex).mark);
+        (*decl) = ast_decl_create(lex->tunit, &LEX_CUR(lex)->mark);
         (*decl)->type = NULL;
 
         // Must match at least one declaration specifier
@@ -2019,7 +2001,7 @@ status_t par_declaration(lex_wrap_t *lex, decl_t **decl, bool partial) {
         return CCC_OK;
     }
 
-    while (LEX_CUR(lex).type == COMMA) {
+    while (LEX_CUR(lex)->type == COMMA) {
         LEX_ADVANCE(lex);
         if (CCC_OK != (status = par_init_declarator(lex, *decl, false))) {
             if (status == CCC_BACKTRACK) {
@@ -2044,9 +2026,9 @@ status_t par_init_declarator(lex_wrap_t *lex, decl_t *decl, bool partial) {
 
     bool is_typedef = decl->type != NULL && decl->type->type == TYPE_MOD &&
         (decl->type->mod.type_mod & TMOD_TYPEDEF);
-    if (LEX_CUR(lex).type == ASSIGN) {
+    if (LEX_CUR(lex)->type == ASSIGN) {
         if (is_typedef) {
-            logger_log(&LEX_CUR(lex).mark, LOG_WARN,
+            logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                        "Typedef '%s' is initialized", decl_node->id);
             status = CCC_ESYNTAX;
             goto fail;
@@ -2065,7 +2047,7 @@ status_t par_initializer(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
 
     // Not left bracket, so its an expression
-    if (LEX_CUR(lex).type != LBRACE) {
+    if (LEX_CUR(lex)->type != LBRACE) {
         return par_assignment_expression(lex, result);
     }
     LEX_ADVANCE(lex);
@@ -2080,24 +2062,24 @@ fail:
 
 status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
     status_t status = CCC_OK;
-    expr_t *expr = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+    expr_t *expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                    EXPR_INIT_LIST);
     while (true) {
-        if (LEX_CUR(lex).type == COMMA) {
+        if (LEX_CUR(lex)->type == COMMA) {
             LEX_ADVANCE(lex);
         }
-        if (LEX_CUR(lex).type == RBRACE) { // Trailing commas allowed
+        if (LEX_CUR(lex)->type == RBRACE) { // Trailing commas allowed
             break;
         }
         expr_t *cur = NULL;
-        if (LEX_CUR(lex).type == DOT) { // Designated initalizer
+        if (LEX_CUR(lex)->type == DOT) { // Designated initalizer
             LEX_ADVANCE(lex);
-            if (LEX_CUR(lex).type != ID || LEX_NEXT(lex).type != ASSIGN) {
+            if (LEX_CUR(lex)->type != ID || LEX_NEXT(lex)->type != ASSIGN) {
                 goto fail;
             }
-            cur = ast_expr_create(lex->tunit, &LEX_CUR(lex).mark,
+            cur = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                   EXPR_DESIG_INIT);
-            cur->desig_init.name = LEX_CUR(lex).tab_entry->key;
+            cur->desig_init.name = LEX_CUR(lex)->tab_entry->key;
             LEX_ADVANCE(lex); // Skip the ID
             LEX_ADVANCE(lex); // Skip the =
             if (CCC_OK != (status = par_initializer(lex,
@@ -2121,10 +2103,10 @@ fail:
 
 
 status_t par_statement(lex_wrap_t *lex, stmt_t **result) {
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case ID:
         // If next character isn't a colon, then its an expression statement
-        if (LEX_NEXT(lex).type != COLON) {
+        if (LEX_NEXT(lex)->type != COLON) {
             return par_expression_statement(lex, result);
         }
         // FALL THROUGH
@@ -2157,10 +2139,10 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case ID:
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_LABEL);
-        stmt->label.label = LEX_CUR(lex).tab_entry->key;
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_LABEL);
+        stmt->label.label = LEX_CUR(lex)->tab_entry->key;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, COLON);
         if (CCC_OK != (status = par_statement(lex, &stmt->label.stmt))) {
@@ -2170,7 +2152,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
 
     case CASE:
         LEX_ADVANCE(lex);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_CASE);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_CASE);
 
         if (CCC_OK !=
             (status =
@@ -2187,7 +2169,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
     case DEFAULT:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, COLON);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_DEFAULT);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_DEFAULT);
 
         if (CCC_OK !=
             (status = par_statement(lex, &stmt->default_params.stmt))) {
@@ -2209,11 +2191,11 @@ status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case IF:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_IF);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_IF);
 
         if (CCC_OK !=
             (status = par_expression(lex, &stmt->if_params.expr))) {
@@ -2226,7 +2208,7 @@ status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
             goto fail;
         }
 
-        if (LEX_CUR(lex).type == ELSE) {
+        if (LEX_CUR(lex)->type == ELSE) {
             LEX_ADVANCE(lex);
             if (CCC_OK !=
                 (status = par_statement(lex, &stmt->if_params.false_stmt))) {
@@ -2238,7 +2220,7 @@ status_t par_selection_statement(lex_wrap_t *lex, stmt_t **result) {
     case SWITCH:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_SWITCH);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_SWITCH);
 
         if (CCC_OK !=
             (status = par_expression(lex, &stmt->switch_params.expr))) {
@@ -2266,10 +2248,10 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case DO:
         LEX_ADVANCE(lex);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_DO);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_DO);
 
         if (CCC_OK != (status = par_statement(lex, &stmt->do_params.stmt))) {
             goto fail;
@@ -2288,7 +2270,7 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
     case WHILE:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_WHILE);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_WHILE);
 
         if (CCC_OK !=
             (status = par_expression(lex, &stmt->while_params.expr))) {
@@ -2304,13 +2286,13 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
     case FOR:
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, LPAREN);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_FOR);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_FOR);
 
-        if (LEX_CUR(lex).type != SEMI) {
+        if (LEX_CUR(lex)->type != SEMI) {
             bool expr = false;
-            switch (LEX_CUR(lex).type) {
+            switch (LEX_CUR(lex)->type) {
             case ID:
-                if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) ==
+                if (tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key) ==
                     NULL) {
                     expr = true;
                     break;
@@ -2338,7 +2320,7 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         }
         LEX_MATCH(lex, SEMI);
 
-        if (LEX_CUR(lex).type != SEMI) {
+        if (LEX_CUR(lex)->type != SEMI) {
             if (CCC_OK !=
                 (status = par_expression(lex, &stmt->for_params.expr2))) {
                 goto fail;
@@ -2346,7 +2328,7 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
         }
         LEX_MATCH(lex, SEMI);
 
-        if (LEX_CUR(lex).type != RPAREN) {
+        if (LEX_CUR(lex)->type != RPAREN) {
             if (CCC_OK !=
                 (status = par_expression(lex, &stmt->for_params.expr3))) {
                 goto fail;
@@ -2383,35 +2365,35 @@ status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt = NULL;
 
-    switch (LEX_CUR(lex).type) {
+    switch (LEX_CUR(lex)->type) {
     case GOTO:
         LEX_ADVANCE(lex);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_GOTO);
-        if (LEX_CUR(lex).type != ID) {
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_GOTO);
+        if (LEX_CUR(lex)->type != ID) {
             status = CCC_ESYNTAX;
             goto fail;
         }
-        stmt->goto_params.label = LEX_CUR(lex).tab_entry->key;
+        stmt->goto_params.label = LEX_CUR(lex)->tab_entry->key;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, SEMI);
         break;
 
     case CONTINUE:
         LEX_ADVANCE(lex);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_CONTINUE);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_CONTINUE);
         LEX_MATCH(lex, SEMI);
         break;
     case BREAK:
         LEX_ADVANCE(lex);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_BREAK);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_BREAK);
         LEX_MATCH(lex, SEMI);
         break;
 
     case RETURN:
         LEX_ADVANCE(lex);
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_RETURN);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_RETURN);
 
-        if (LEX_CUR(lex).type != SEMI
+        if (LEX_CUR(lex)->type != SEMI
             && CCC_OK !=
             (status = par_expression(lex, &stmt->return_params.expr))) {
             goto fail;
@@ -2432,18 +2414,18 @@ fail:
 status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt;
-    stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_COMPOUND);
+    stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_COMPOUND);
     tt_init(&stmt->compound.typetab, lex->typetab);
     // Add new typetab table to top of stack
     lex->typetab = &stmt->compound.typetab;
 
     LEX_MATCH(lex, LBRACE);
-    while (LEX_CUR(lex).type != RBRACE) {
+    while (LEX_CUR(lex)->type != RBRACE) {
         stmt_t *cur = NULL;
         bool is_decl = false;
 
         // Inside a compound statement, there can either be decls or statements
-        switch (LEX_CUR(lex).type) {
+        switch (LEX_CUR(lex)->type) {
             // Cases for declaration specifier
         case DECL_SPEC_STORAGE_CLASS:
         case DECL_SPEC_TYPE_SPEC_NO_ID:
@@ -2452,11 +2434,11 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
             break;
         case ID:
             // Can't be a decl if next token is a colon (its a label)
-            if (LEX_NEXT(lex).type == COLON) {
+            if (LEX_NEXT(lex)->type == COLON) {
                 break;
             }
             // Type specifier only if its a typedef name
-            if (tt_lookup(lex->typetab, LEX_CUR(lex).tab_entry->key) != NULL) {
+            if (tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key) != NULL) {
                 is_decl = true;
             }
             break;
@@ -2465,7 +2447,7 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
         }
 
         if (is_decl) {
-            cur = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_DECL);
+            cur = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_DECL);
             if(CCC_OK != (status = par_declaration(lex, &cur->decl, false))) {
                 goto fail;
             }
@@ -2493,10 +2475,10 @@ status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result) {
     status_t status = CCC_OK;
     stmt_t *stmt;
 
-    if (LEX_CUR(lex).type == SEMI) {
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_NOP);
+    if (LEX_CUR(lex)->type == SEMI) {
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_NOP);
     } else {
-        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex).mark, STMT_EXPR);
+        stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_EXPR);
         if (CCC_OK != (status = par_expression(lex, &stmt->expr.expr))) {
             goto fail;
         }

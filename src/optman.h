@@ -30,7 +30,7 @@
 #include "util/util.h"
 #include "util/status.h"
 
-#include "parse/preprocessor.h"
+#include "lex/cpp.h"
 
 /**
  * Options for dumping at various stages of the compilation
@@ -91,7 +91,7 @@ typedef enum output_opts_t {
 
 typedef struct macro_node_t {
     sl_link_t link;
-    pp_macro_t *macro;
+    // TODO0: This
 } macro_node_t;
 
 /**

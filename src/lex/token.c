@@ -27,8 +27,25 @@
 
 #include "lex/symtab.h"
 
-#define CASE_BASIC_PRINT(token) \
-    case token: printf(#token "\n"); break
+typedef struct lexeme_node_t {
+    sl_link_t link;
+    lexeme_t lexeme;
+} lexeme_node_t;
+
+void token_man_init(token_man_t *tm) {
+    sl_init(&tm->tokens, offsetof(lexeme_node_t, link));
+}
+
+void token_man_destroy(token_man_t *tm) {
+    SL_DESTROY_FUNC(&tm->tokens, free);
+}
+
+lexeme_t *token_create(token_man_t *tm) {
+    lexeme_node_t *result = emalloc(sizeof(lexeme_node_t));
+    sl_append(&tm->tokens, &result->link);
+
+    return &result->lexeme;
+}
 
 void token_print(lexeme_t *token) {
     assert(token != NULL);
@@ -69,6 +86,7 @@ void token_print(lexeme_t *token) {
 
 const char *token_str(token_t token) {
     switch (token) {
+    case TOKEN_EOF:     return "";
     case HASH:          return "#";
     case HASHHASH:      return "##";
     case SPACE:         return " ";

@@ -36,11 +36,11 @@
  * Compilation manager structure. Manages data structures necessary for compiles
  */
 typedef struct manager_t {
-    preprocessor_t pp;
-    lexer_t lexer;
-    trans_unit_t *ast;
+    vec_t *tokens;
     symtab_t symtab;
-    symtab_t string_tab;
+    lexer_t lexer;
+    token_man_t token_man;
+    trans_unit_t *ast;
     ir_trans_unit_t *ir;
     bool parse_destroyed;
 } manager_t;
