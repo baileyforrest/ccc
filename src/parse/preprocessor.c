@@ -236,24 +236,27 @@ void pp_last_mark(preprocessor_t *pp, fmark_t *result) {
     memcpy(result, &pp->last_mark, sizeof(fmark_t));
 }
 
-int pp_nextchar(preprocessor_t *pp) {
-    int result = PP_EOF;
+status_t pp_nextchar(preprocessor_t *pp, int *nextchar) {
+    status_t status = CCC_OK;
+
     while (!pp->ignore) {
-        if (-(int)CCC_RETRY != (result = pp_nextchar_helper(pp))) {
-            return result;
+        if (CCC_RETRY != (status = pp_nextchar_helper(pp, nextchar))) {
+            return status;
         }
     }
 
-    while (pp->ignore || result == -(int)CCC_RETRY) {
+    while (pp->ignore || status == CCC_RETRY) {
         // Fetch characters until another directive is run to tell us to stop
         // ignoring
-        result = pp_nextchar_helper(pp);
-        if (pp->ignore && result == PP_EOF) { // Only go to end of current file
+        status = pp_nextchar_helper(pp, nextchar);
+        if (pp->ignore && *nextchar == PP_EOF) {
+            // Only go to end of current file
             logger_log(&pp->last_mark, LOG_ERR, "Unexpected EOF");
-            return PP_EOF;
+            return CCC_ESYNTAX;
         }
     }
-    return result;
+
+    return status;
 }
 
 pp_file_t *pp_file_create(void) {
@@ -470,7 +473,9 @@ pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
     return NULL;
 }
 
-int pp_nextchar_helper(preprocessor_t *pp) {
+status_t pp_nextchar_helper(preprocessor_t *pp, int *nextchar) {
+    status_t status = CCC_OK;
+
     bool stringify, noexpand;
     tstream_t *stream = pp_get_stream(pp, &stringify, &noexpand);
 
@@ -482,20 +487,24 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             if(ts_cur(stream) == '"' || ts_cur(stream) == '\\') {
                 if (!pp->stringify_esc) {
                     pp->stringify_esc = true;
-                    return '\\';
+                    *nextchar = '\\';
+                    return status;
                 } else {
                     pp->stringify_esc = false;
                 }
             } else if (ts_skip_ws_and_comment(stream, true) > 0) {
-                return ' ';
+                *nextchar = ' ';
+                return status;
             }
         }
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
     // Handle closing quote of stringification
     if (stringify) {
-        return '"';
+        *nextchar = '"';
+        return status;
     }
     pp_macro_inst_t *macro_inst = sl_head(&pp->macro_insts);
 
@@ -504,7 +513,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         if (pp->block_comment) {
             logger_log(NULL, LOG_ERR, "unterminated comment");
         }
-        return PP_EOF;
+        *nextchar = PP_EOF;
+        return status;
     }
 
     // Get copy of current location, the last mark
@@ -540,7 +550,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             pp->line_comment = false;
         }
         ts_advance(stream);
-        return ' ';
+        *nextchar = ' ';
+        return status;
     }
 
     if (pp->block_comment) {
@@ -548,7 +559,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             pp->block_comment = false;
         }
         ts_advance(stream);
-        return ' ';
+        *nextchar = ' ';
+        return status;
     }
 
     // Found a character on line, don't process new directives
@@ -558,7 +570,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     if (!pp->string && !pp->char_string && cur_char == '\'') {
         pp->char_string = true;
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
     if (pp->char_string && cur_char == '\'' &&
@@ -569,7 +582,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     // Handle strings
     if (!pp->string && !pp->char_string && cur_char == '"') {
         pp->string = true;
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
     if (pp->string && cur_char == '"' &&
@@ -587,7 +601,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         } else {
             pp->ignore_escape = false;
         }
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
 
@@ -654,7 +669,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             if (pp->char_line) {
                 logger_log(&stream->mark, LOG_ERR, "Stray '#' in program");
                 ts_advance(stream);
-                return -(int)CCC_ESYNTAX;
+                return CCC_ESYNTAX;
             }
 
             if (pp->in_directive) {
@@ -668,7 +683,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
             // Single # isn't an error
             if (len == 0) {
-                return -(int)CCC_RETRY;
+                return CCC_RETRY;
             }
             len_str_t lookup = { start, len };
             pp_directive_t *directive = ht_lookup(&pp->directives, &lookup);
@@ -677,12 +692,12 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Invalid preprocessing directive %.*s", len, start);
                 ts_skip_line(stream, &pp->block_comment); // Skip rest of line
-                return -(int)CCC_ESYNTAX;
+                return CCC_ESYNTAX;
             }
 
             // Perform directive action
             pp->in_directive = true;
-            status_t status = directive->action(pp);
+            status = directive->action(pp);
             pp->in_directive = false;
 
             if (directive->skip_line) {
@@ -690,10 +705,10 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             }
 
             if (status != CCC_OK) {
-                return -(int)status;
+                return status;
             }
             // Tell caller to fetch another character
-            return -(int)CCC_RETRY;
+            return CCC_RETRY;
         } else {
             // In macro, must be stringification, concatenation handled abave
             ts_advance(stream);
@@ -701,7 +716,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             // If we're in a macro without paramaters, just return #
             pp_macro_t *macro = macro_inst->macro;
             if (macro != NULL && sl_head(&macro->params) == NULL) {
-                return '#';
+                *nextchar = '#';
+                return status;
             }
             ts_skip_ws_and_comment(stream, false);
             char *start = ts_location(stream);
@@ -714,12 +730,13 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 // If this is a mapped stream, just return the #
                 if (macro_inst->macro == NULL) {
                     ts_advance(stream);
-                    return '#';
+                    *nextchar = '#';
+                    return status;
                 }
                 logger_log(&stream->mark, LOG_ERR,
                            "'#' Is not followed by a macro paramater");
                 ts_advance(stream);
-                return -(int)CCC_ESYNTAX;
+                return CCC_ESYNTAX;
             }
 
             pp_param_inst_t *param_inst = emalloc(sizeof(pp_param_inst_t));
@@ -730,7 +747,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             sl_prepend(&macro_inst->param_insts, &param_inst->link);
 
             // We are stringifying, so return a double quote
-            return '"';
+            *nextchar = '"';
+            return status;
         }
     }
 
@@ -741,7 +759,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     case ASCII_UPPER:
     case ASCII_DIGIT:
     case '_':
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     default:
         break;
         // Fall through, need to look for macros parameters
@@ -755,7 +774,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     case '_':
         break;
     default:
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
     char *start = ts_location(&lookahead);
@@ -809,14 +829,15 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
             // Add to stack of upper most macro, not cur_macro_inst
             sl_prepend(&macro_inst->param_insts, &param_inst->link);
-            return -(int)CCC_RETRY;
+            return CCC_RETRY;
         }
 
     }
 
     // Don't expand macros if we're concatenating
     if (concat) {
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
     // Look up in the macro table
@@ -828,9 +849,11 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             memcpy(stream, &lookahead, sizeof(tstream_t));
 
             // Replace undefined macros with 0
-            return '0';
+            *nextchar = '0';
+            return status;
         } else {
-            return ts_advance(stream);
+            *nextchar = ts_advance(stream);
+            return status;
         }
     }
 
@@ -850,7 +873,8 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Protect against recursive macros
     if (recursive) {
-        return ts_advance(stream);
+        *nextchar = ts_advance(stream);
+        return status;
     }
 
     switch (macro->type) {
@@ -866,11 +890,14 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         return pp_handle_special_macro(pp, macro);
     case MACRO_DEFINED:
         if (!pp->pp_if) {
-            return ts_advance(stream);
+            *nextchar = ts_advance(stream);
+            return status;
         }
-        return pp_handle_defined(pp, &lookahead, stream);
+        *nextchar = pp_handle_defined(pp, &lookahead, stream);
+        return status;
     case MACRO_PRAGMA:
-        return pp_directive_pragma_helper(pp, PRAGMA_UNDER);
+        *nextchar = pp_directive_pragma_helper(pp, PRAGMA_UNDER);
+        return status;
     default:
         assert(false);
     }
@@ -880,11 +907,10 @@ int pp_nextchar_helper(preprocessor_t *pp) {
         if (ts_cur(&lookahead) != '(') {
             // If macro requires params, but none are provided, this is just
             // treated as identifier
-            return ts_advance(stream);
+            *nextchar = ts_advance(stream);
+            return status;
         }
     }
-
-    int error;
 
     // Create macro as mapped so we get PP_EOF after evaluating macro's stream
     pp_macro_inst_t *new_macro_inst = pp_macro_inst_create(macro,
@@ -900,7 +926,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                 logger_log(&stream->mark, LOG_ERR,
                            "unterminated argument list invoking macro \"%.*s\"",
                            lookup.len, lookup.str);
-                error = -(int)CCC_ESYNTAX;
+                status = CCC_ESYNTAX;
                 goto fail;
             }
             ts_advance(&lookahead); // Skip the rparen
@@ -961,7 +987,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                     && (num_params != macro->num_params || !done)) {
                     logger_log(&stream->mark, LOG_ERR,
                                "Unexpected EOF while scanning macro paramaters");
-                    error = -(int)CCC_ESYNTAX;
+                    status = CCC_ESYNTAX;
                     goto fail;
                 }
 
@@ -986,14 +1012,15 @@ int pp_nextchar_helper(preprocessor_t *pp) {
                                   MACRO_INST_MAPPED);
 
                     while (true) {
-                        int cur = pp_nextchar_helper(pp);
-                        if (cur == -(int)CCC_RETRY) {
+                        int nextchar = 0;
+                        status_t status = pp_nextchar_helper(pp, &nextchar);
+                        if (status == CCC_RETRY) {
                             continue;
                         }
-                        if (cur == -(int)PP_EOF) {
+                        if (nextchar == PP_EOF) {
                             break;
                         }
-                        sb_append_char(&sb, cur);
+                        sb_append_char(&sb, nextchar);
                     }
                     if (sb_len(&sb) == 0) {
                         // If there is nothing in the paramater, set it to the
@@ -1038,7 +1065,7 @@ int pp_nextchar_helper(preprocessor_t *pp) {
             if ((done && num_params != macro->num_params) || !done) {
                 logger_log(&stream->mark, LOG_ERR,
                            "Incorrect number of macro paramaters");
-                error = -(int)CCC_ESYNTAX;
+                status = CCC_ESYNTAX;
                 goto fail;
             }
         }
@@ -1059,14 +1086,15 @@ int pp_nextchar_helper(preprocessor_t *pp) {
     sb_init(&sb, 0);
 
     while (true) {
-        int cur = pp_nextchar_helper(pp);
-        if (cur == -(int)CCC_RETRY) {
+        int nextchar = 0;
+        status_t status = pp_nextchar_helper(pp, &nextchar);
+        if (status == CCC_RETRY) {
             continue;
         }
-        if (cur == -(int)PP_EOF) {
+        if (nextchar == PP_EOF) {
             break;
         }
-        sb_append_char(&sb, cur);
+        sb_append_char(&sb, nextchar);
     }
     evaluated.cur = sb_buf(&sb);
     evaluated.end = sb_buf(&sb) + sb_len(&sb);
@@ -1074,15 +1102,15 @@ int pp_nextchar_helper(preprocessor_t *pp) {
 
     // Set current to the end of the macro and params
     memcpy(stream, &lookahead, sizeof(tstream_t));
-    return -(int)CCC_RETRY;
+    return CCC_RETRY;
 
 fail:
     ts_advance(stream); // Skip character to prevent infinite loop
     pp_macro_inst_destroy(new_macro_inst);
-    return error;
+    return status;
 }
 
-int pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro) {
+status_t pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro) {
     static bool date_err = false;
     static bool time_err = false;
 
@@ -1154,7 +1182,7 @@ int pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro) {
     macro_inst->stream.end = pp->macro_buf + len + 1; // +1 for leading quote
     sl_prepend(&pp->macro_insts, &macro_inst->link);
 
-    return -(int)CCC_RETRY;
+    return CCC_RETRY;
 }
 
 int pp_handle_defined(preprocessor_t *pp, tstream_t *lookahead,

@@ -54,15 +54,18 @@
  * @param lexer Lexer to get characters from
  * @param dest Variable to assign to
  */
-#define NEXT_CHAR_NOERR(lexer, dest)            \
-    do {                                        \
-        if (lexer->next_char) {                 \
-            dest = lexer->next_char;            \
-            lexer->next_char = 0;               \
-        } else {                                \
-            dest = pp_nextchar(lexer->pp);      \
-        }                                       \
-    } while (dest < 0)
+#define NEXT_CHAR_NOERR(lexer, dest)                    \
+    do {                                                \
+        if (lexer->next_char) {                         \
+            dest = lexer->next_char;                    \
+            lexer->next_char = 0;                       \
+        } else {                                        \
+            status_t status = CCC_OK;                   \
+            do {                                        \
+                status = pp_nextchar(lexer->pp, &dest); \
+            } while (status != CCC_OK);                 \
+        }                                               \
+    } while (0)
 
 typedef enum lex_str_type_t {
     LEX_STR_CHAR,

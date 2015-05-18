@@ -131,7 +131,10 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
 
     // Find the starting character
     while (!done) {
-        int next = pp_nextchar(pp);
+        int next = 0;
+        if (CCC_OK != (status = pp_nextchar(pp, &next))) {
+            goto fail;
+        }
         if (next == PP_EOF) {
             logger_log(&pp->last_mark, LOG_ERR,
                        "Unexpected EOF in #include");
@@ -163,7 +166,10 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     int offset = 0;
     done = false;
     while (!done && offset < MAX_PATH_LEN) {
-        int next = pp_nextchar(pp);
+        int next = 0;
+        if (CCC_OK != (status = pp_nextchar(pp, &next))) {
+            goto fail;
+        }
         if (next == PP_EOF) {
             logger_log(&pp->last_mark, LOG_ERR,
                        "Unexpected EOF in #include");
@@ -193,7 +199,10 @@ status_t pp_directive_include_helper(preprocessor_t *pp, bool next) {
     done = false;
     int last = -1;
     while (!done) {
-        int next = pp_nextchar(pp);
+        int next = 0;
+        if (CCC_OK != (status = pp_nextchar(pp, &next))) {
+            goto fail;
+        }
         switch (next) {
         case PP_EOF:
             done = true;
@@ -842,13 +851,18 @@ status_t pp_directive_line(preprocessor_t *pp) {
     char filename[MAX_LINE];
     size_t offset = 0;
     int last = -1;
-    int cur = pp_nextchar(pp);
+    int cur = 0;
+    if (CCC_OK != (status = pp_nextchar(pp, &cur))) {
+        goto fail;
+    }
 
     bool done = false;
 
     // Read until end of line. Use pp_nextchar so macros are expanded
     while (offset < sizeof(linebuf)) {
-        cur = pp_nextchar(pp);
+        if (CCC_OK != (status = pp_nextchar(pp, &cur))) {
+            goto fail;
+        }
         if ((done = (cur == '\n' && last != '\\'))) {
             break;
         }

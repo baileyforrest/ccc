@@ -168,18 +168,19 @@ pp_param_map_elem_t *pp_lookup_macro_param(preprocessor_t *pp,
  * Helper function to fetch characters with macro substitution
  *
  * @param pp The preprocessor to fetch characters from
- * @return Returns the return value for pp_nextchar
+ * @nextchar Location to store the next character
+ * @return CCC_OK on success, error code on error
  */
-int pp_nextchar_helper(preprocessor_t *pp);
+status_t pp_nextchar_helper(preprocessor_t *pp, int *nextchar);
 
 /**
  * Handle special macros (e.g. __FILE__)
  *
  * @param pp The preprocessor to handle special macros for
  * @param macro The special macro
- * @return Returns the return value for pp_nextchar
+ * @return CCC_OK on success, error code on error
  */
-int pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro);
+status_t pp_handle_special_macro(preprocessor_t *pp, pp_macro_t *macro);
 /**
  * Handle the defined operator
  *

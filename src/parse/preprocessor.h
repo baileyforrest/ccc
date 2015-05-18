@@ -143,9 +143,9 @@ void pp_last_mark(preprocessor_t *pp, fmark_t *mark);
  * Fetch next character from preprocessor
  *
  * @param pp The preprocessor to get characters from
- * @return the next character. PP_EOF on end of input. Negative value on error.
- *     It is a negated status_t
+ * @nextchar location to store the next character. PP_EOF on end of input.
+ * @return CCC_OK on success, error code on error
  */
-int pp_nextchar(preprocessor_t *pp);
+status_t pp_nextchar(preprocessor_t *pp, int *nextchar);
 
 #endif /* _PREPROCESSOR_H_ */
