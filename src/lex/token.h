@@ -1,21 +1,21 @@
 /*
-  Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
-
-  This file is part of CCC.
-
-  CCC is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  CCC is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with CCC.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
+ *
+ * This file is part of CCC.
+ *
+ * CCC is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * CCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
+ */
 /**
  * Token types
  */
@@ -26,7 +26,13 @@
 #include "util/file_directory.h"
 
 typedef enum token_t {
-    TOKEN_EOF,           // end of file
+    HASH,          // #
+    HASHHASH,      // ##
+
+    SPACE,         // ' '
+    NEWLINE,       // '\n'
+    BACKSLASH,     // '\\'
+
     // Delimiters
     LBRACE,        // {
     RBRACE,        // }
@@ -166,7 +172,8 @@ typedef struct lexeme_t {
     fmark_t mark;                  /**< Location of lexeme */
 
     union {
-        symtab_entry_t *tab_entry; /**< For string/id types */
+        symtab_entry_t *tab_entry; /**< For id types */
+        char *str_val;
         struct {
             long long int_val;     /**< For integral types */
             bool hasU;             /**< Has U suffix */

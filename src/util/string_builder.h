@@ -45,6 +45,8 @@ void sb_destroy(string_builder_t *sb);
 
 void sb_compact(string_builder_t *sb);
 
+void sb_clear(string_builder_t *sb);
+
 void sb_append_char(string_builder_t *sb, char val);
 
 #endif /* _STRING_BUILDER_H_ */

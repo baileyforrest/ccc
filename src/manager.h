@@ -25,9 +25,10 @@
 
 #include "ir/ir.h"
 
+#include "lex/lexer.h"
+#include "lex/symtab.h"
+
 #include "parse/ast.h"
-#include "parse/lexer.h"
-#include "parse/symtab.h"
 
 #include "util/status.h"
 

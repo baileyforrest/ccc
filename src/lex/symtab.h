@@ -20,7 +20,7 @@
 #ifndef _SYMTAB_H_
 #define _SYMTAB_H_
 
-#include "parse/token.h"
+#include "lex/token.h"
 
 #include "util/status.h"
 #include "util/htable.h"
@@ -32,10 +32,6 @@
  */
 typedef struct symtab_t {
     htable_t hashtab; /**< Hash table backing store */
-    /** If true, used for symbols, otherwise used for something else
-      * (e.g. strings)
-      */
-    bool is_sym;
 } symtab_t;
 
 /**
@@ -47,17 +43,12 @@ typedef struct symtab_entry_t {
     token_t type;   /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;
 
-#define IS_SYM true
-#define NOT_SYM false
-
 /**
  * Initalizes a symbol table
  *
  * @param sym_tab Symbol table to initialize
- * @param is_sym IS_SYM if symbol table. else NOT_SYM. if IS_SYM, then table
- *     will be populated with reserved words
  */
-void st_init(symtab_t *table, bool is_sym);
+void st_init(symtab_t *table, bool reserved);
 
 /**
  * Does not destroy sym_tab. Destroys a symbol table.
@@ -78,8 +69,6 @@ void st_destroy(symtab_t *table);
  * @param Pointer to an entry pointer if success, otherwise unchanged
  * @return CCC_OK on success, error code on failure
  */
-status_t st_lookup(symtab_t *table, char *str, token_t type,
-                   symtab_entry_t **entry);
-
+symtab_entry_t *st_lookup(symtab_t *table, char *str, token_t type);
 
 #endif /* _SYMTAB_H_ */

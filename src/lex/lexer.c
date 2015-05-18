@@ -21,131 +21,106 @@
  */
 // TODO2: Support unicode literals
 #include "lexer.h"
+#include "lexer_priv.h"
 
 #include <stdio.h>
 
 #include <assert.h>
 #include <ctype.h>
-#include <uchar.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <wchar.h>
 
+#include "util/char_class.h"
 #include "util/logger.h"
+#include "util/string_store.h"
 
-/** Initial size of lexer internal buffer */
-#define INIT_LEXEME_SIZE 512
+#define INIT_LEXBUF_SIZE 128
 
-/** 1.5 Growth rate */
-#define LEXBUF_NEW_SIZE(lexer) (lexer->lexbuf_size + (lexer->lexbuf_size >> 1))
-
-#define LEXBUF_TEST_GROW(lexer, len)                                    \
-    do {                                                                \
-        if (len == lexer->lexbuf_size) {                                \
-            lexer->lexbuf_size = LEXBUF_NEW_SIZE(lexer);                \
-            lexer->lexbuf = erealloc(lexer->lexbuf, lexer->lexbuf_size); \
-        }                                                               \
-    } while (0)
-
-/**
- * Gets next character from preprocessor ignoring errors
- *
- * @param lexer Lexer to get characters from
- * @param dest Variable to assign to
- */
-#define NEXT_CHAR_NOERR(lexer, dest)                    \
-    do {                                                \
-        if (lexer->next_char) {                         \
-            dest = lexer->next_char;                    \
-            lexer->next_char = 0;                       \
-        } else {                                        \
-            status_t status = CCC_OK;                   \
-            do {                                        \
-                status = pp_nextchar(lexer->pp, &dest); \
-            } while (status != CCC_OK);                 \
-        }                                               \
-    } while (0)
-
-typedef enum lex_str_type_t {
-    LEX_STR_CHAR,
-    LEX_STR_LCHAR,
-    LEX_STR_U8,
-    LEX_STR_U16,
-    LEX_STR_U32,
-} lex_str_type_t;
-
-static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result);
-
-static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type);
-
-static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
-                         lex_str_type_t type);
-
-static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
-                           lex_str_type_t type);
-
-
-/**
- * Lex a number value
- *
- * @param lexer Lexer to use
- * @param cur First input character
- * @param result Location to store the result
- */
-static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result);
-
-
-void lexer_init(lexer_t *lexer, preprocessor_t *pp, symtab_t *symtab,
-                    symtab_t *string_tab) {
+void lexer_init(lexer_t *lexer, symtab_t *symtab) {
     assert(lexer != NULL);
-    assert(pp != NULL);
     assert(symtab != NULL);
-    assert(string_tab != NULL);
 
-    lexer->pp = pp;
     lexer->symtab = symtab;
-    lexer->string_tab = string_tab;
-    lexer->next_char = 0;
-    lexer->lexbuf = emalloc(INIT_LEXEME_SIZE);
-    lexer->lexbuf_size = INIT_LEXEME_SIZE;
+    sb_init(&lexer->lexbuf, INIT_LEXBUF_SIZE);
 }
 
 void lexer_destroy(lexer_t *lexer) {
     assert(lexer != NULL);
-    free(lexer->lexbuf);
+    sb_destroy(&lexer->lexbuf);
 }
 
-#define CHECK_NEXT_EQ(noeq, iseq)               \
-    do {                                        \
-        NEXT_CHAR_NOERR(lexer, next);       \
-        if (next == '=') {                      \
-            result->type = iseq;                \
-        } else {                                \
-            result->type = noeq;                \
-            lexer->next_char = next;            \
-        }                                       \
-    } while (0)
-
-status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
+status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     assert(lexer != NULL);
+    assert(stream != NULL);
     assert(result != NULL);
     status_t status = CCC_OK;
 
     int cur;
+    while ((cur = lex_getc_splice(stream)) != EOF) {
+        ts_ungetc(cur, stream);
+        lexeme_t *lexeme = emalloc(sizeof(lexeme_t));
 
-    do { // Skip spaces and backlash
-        NEXT_CHAR_NOERR(lexer, cur);
-        if (!(isspace(cur) || cur == '\\')) {
-            break;
+        if (CCC_OK != (status = lex_next_token(lexer, stream, lexeme))) {
+            free(lexeme);
+            return status;
         }
-    } while (true);
 
-    pp_last_mark(lexer->pp, &result->mark);
+        vec_push_back(result, lexeme);
+    }
+
+    return status;
+}
+
+int lex_if_next_eq(tstream_t *stream, int test, token_t noeq, token_t iseq) {
+    int next = lex_getc_splice(stream);
+    if (next == test) {
+        return iseq;
+    }
+    ts_ungetc(next, stream);
+    return noeq;
+}
+
+int lex_getc_splice(tstream_t *stream) {
+    while (true) {
+        int cur = ts_getc(stream);
+        if (cur != '\\') {
+            return cur;
+        }
+
+        int next = ts_getc(stream);
+        if (next != '\n') {
+            ts_ungetc(next, stream);
+            return cur;
+        }
+    }
+}
+
+status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
+    assert(lexer != NULL);
+    assert(stream != NULL);
+    assert(result != NULL);
+
+    status_t status = CCC_OK;
+
+    memcpy(&result->mark, &stream->mark, sizeof(fmark_t));
+    int cur = lex_getc_splice(stream);
+
+    // Combine spaces
+    if (isspace(cur) && cur != '\n') {
+        while (isspace(cur) && cur != '\n') {
+            cur = lex_getc_splice(stream);
+        }
+
+        ts_ungetc(cur, stream);
+        result->type = SPACE;
+
+        return status;
+    }
 
     int next;
     switch (cur) {
-    case PP_EOF: result->type = TOKEN_EOF; break;
     case '{': result->type = LBRACE; break;
     case '}': result->type = RBRACE; break;
     case '(': result->type = LPAREN; break;
@@ -156,25 +131,56 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
     case ']': result->type = RBRACK; break;
     case '?': result->type = COND; break;
     case '~': result->type = BITNOT; break;
-    case '=': CHECK_NEXT_EQ(ASSIGN, EQ); break;
-    case '*': CHECK_NEXT_EQ(STAR, STAREQ); break;
-    case '/': CHECK_NEXT_EQ(DIV, DIVEQ); break;
-    case '!': CHECK_NEXT_EQ(LOGICNOT, NE); break;
-    case '^': CHECK_NEXT_EQ(BITXOR, BITXOREQ); break;
+    case '=': result->type = lex_if_next_eq(stream, '=', ASSIGN, EQ); break;
+    case '*': result->type = lex_if_next_eq(stream, '=', STAR, STAREQ); break;
+    case '!': result->type = lex_if_next_eq(stream, '=', LOGICNOT, NE); break;
+    case '^': result->type = lex_if_next_eq(stream, '=', BITXOR, BITXOREQ);
+        break;
+        // digraph: :> = ]
+    case ':': result->type = lex_if_next_eq(stream, '>', COLON, RBRACK); break;
+    case '#': result->type = lex_if_next_eq(stream, '#', HASH, HASHHASH); break;
+
+    case '/': {
+        next = lex_getc_splice(stream);
+        switch (next) {
+            // Single line comment
+        case '/':
+            while ((next = lex_getc_splice(stream)) != '\n')
+                continue;
+            result->type = SPACE;
+            break;
+
+            // Multi line comment
+        case '*': {
+            while (true) {
+                if (lex_getc_splice(stream) == '*' &&
+                    lex_getc_splice(stream) == '/') {
+                    break;
+                }
+            }
+            result->type = SPACE;
+            break;
+        }
+
+        case '=': result->type = DIVEQ; break;
+        default: result->type = DIV; break;
+        }
+        break;
+    }
     case '.': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         bool done = false;
         switch (next) {
         case ASCII_DIGIT:
-            lexer->next_char = next;
-            status = lex_number(lexer, cur, result);
+            ts_ungetc(next, stream);
+            status = lex_number(lexer, stream, cur, result);
             done = true;
             break;
         case '.':
             break;
         default:
+            ts_ungetc(next, stream);
             result->type = DOT;
-            lexer->next_char = next;
             done = true;
             break;
         }
@@ -182,140 +188,132 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
             break;
         }
 
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         if (next == '.') {
             result->type = ELIPSE;
             break;
         }
-        logger_log(&result->mark, LOG_ERR, "Unexpected token: ..");
+        logger_log(&result->mark, LOG_ERR, "Invalid token: ..");
         status = CCC_ESYNTAX;
         break;
     }
-    case ':': {
-        NEXT_CHAR_NOERR(lexer, next);
-        switch (next) {
-        case '>': result->type = RBRACK; break; // digraph: :> = ]
-        default:
-            result->type = COLON;
-            lexer->next_char = next;
-        }
-        break;
-    }
     case '%':
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch (next) {
         case '=': result->type = MODEQ; break;
         case '>': result->type = RBRACE; break; // digraph %> = }
         default:
+            ts_ungetc(next, stream);
             result->type = MOD;
-            lexer->next_char = next;
         }
         break;
     case '+': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch(next) {
         case '+': result->type = INC; break;
         case '=': result->type = PLUSEQ; break;
         default:
+            ts_ungetc(next, stream);
             result->type = PLUS;
-            lexer->next_char = next;
         }
         break;
     }
     case '-': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch(next) {
         case '-': result->type = DEC; break;
         case '=': result->type = MINUSEQ; break;
         case '>': result->type = DEREF; break;
         default:
+            ts_ungetc(next, stream);
             result->type = MINUS;
-            lexer->next_char = next;
         }
         break;
     }
     case '|': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch(next) {
         case '|': result->type = LOGICOR; break;
         case '=': result->type = BITOREQ; break;
         default:
+            ts_ungetc(next, stream);
             result->type = BITOR;
-            lexer->next_char = next;
             break;
         }
         break;
     }
     case '&': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch(next) {
         case '&': result->type = LOGICAND; break;
         case '=': result->type = BITANDEQ; break;
         default:
+            ts_ungetc(next, stream);
             result->type = BITAND;
-            lexer->next_char = next;
             break;
         }
         break;
     }
     case '>': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch (next) {
         case '=': result->type = GE; break;
-        case '>': CHECK_NEXT_EQ(RSHIFT, RSHIFTEQ); break;
+        case '>': result->type = lex_if_next_eq(stream, '=', RSHIFT, RSHIFTEQ);
+            break;
         default:
+            ts_ungetc(next, stream);
             result->type = GT;
-            lexer->next_char = next;
         }
         break;
     }
     case '<': {
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch (next) {
         case '=': result->type = LE; break;
         case ':': result->type = LBRACK; break; // digraph <: = [
         case '%': result->type = LBRACE; break; // digraph <% = {
-        case '<': CHECK_NEXT_EQ(LSHIFT, LSHIFTEQ); break;
+        case '<': result->type = lex_if_next_eq(stream, '=', LSHIFT, LSHIFTEQ);
+            break;
         default:
+            ts_ungetc(next, stream);
             result->type = LT;
-            lexer->next_char = next;
         }
         break;
     }
 
     case 'L':
-        NEXT_CHAR_NOERR(lexer, next);
+        next = lex_getc_splice(stream);
         switch (next) {
         case '"':
             cur = next;
-            status = lex_string(lexer, cur, result, LEX_STR_LCHAR);
+            status = lex_string(lexer, stream, result, LEX_STR_LCHAR);
             break;
         case '\'':
             cur = next;
-            status = lex_char(lexer, cur, result, LEX_STR_LCHAR);
+            status = lex_char_lit(lexer, stream, result, LEX_STR_LCHAR);
             break;
         default:
-            lexer->next_char = next;
-            status = lex_id(lexer, cur, result);
+            ts_ungetc(next, stream);
+            status = lex_id(lexer, stream, result);
         }
         break;
     case 'U':
         /*
-          NEXT_CHAR_NOERR(lexer, next);
+          next = lex_getc_splice(stream);
           switch (next) {
           case '"':
           break;
           case '\'':
           break;
           default:
-          lexer->next_char = next;
+          ts_ungetc(next, stream);
           status = lex_id(lexer, cur, result);
           }
           break;
         */
     case 'u':
         /*
-          NEXT_CHAR_NOERR(lexer, next);
+          next = lex_getc_splice(stream);
           switch (next) {
           case '"':
           break;
@@ -324,7 +322,7 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
           case '8':
           break;
           default:
-          lexer->next_char = next;
+          ts_ungetc(next, stream);
           status = lex_id(lexer, cur, result);
           }
           break;
@@ -342,95 +340,63 @@ status_t lexer_next_token(lexer_t *lexer, lexeme_t *result) {
 
     case '$':
     case '_':
-        status = lex_id(lexer, cur, result);
+        ts_ungetc(cur, stream);
+        status = lex_id(lexer, stream, result);
         break;
 
     case '"': // String Literals
-        status = lex_string(lexer, cur, result, LEX_STR_CHAR);
+        status = lex_string(lexer, stream, result, LEX_STR_CHAR);
         break;
     case '\'': // Character literals
-        status = lex_char(lexer, cur, result, LEX_STR_CHAR);
+        status = lex_char_lit(lexer, stream, result, LEX_STR_CHAR);
         break;
     case ASCII_DIGIT:
-        status = lex_number(lexer, cur, result);
-        // Skip whitespace
+        status = lex_number(lexer, stream, cur, result);
         break;
     default:
         logger_log(&result->mark, LOG_ERR, "Unexpected character: %c", cur);
         status = CCC_ESYNTAX;
-    } // switch (cur)
+    }
 
     return status;
 }
 
-static status_t lex_id(lexer_t *lexer, int cur, lexeme_t *result) {
+status_t lex_id(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
     status_t status = CCC_OK;
     result->type = ID;
-
-    size_t len = 0;
-    lexer->lexbuf[len++] = cur;
+    sb_clear(&lexer->lexbuf);
 
     bool done = false;
     while (!done) {
-        LEXBUF_TEST_GROW(lexer, len);
+        int cur = lex_getc_splice(stream);
 
-        NEXT_CHAR_NOERR(lexer, cur);
         switch (cur) {
-        case ASCII_LOWER:
-        case ASCII_UPPER:
-        case ASCII_DIGIT:
-        case '_':
-        case '$':
-            lexer->lexbuf[len++] = cur;
-            break;
-        case '\\': // ignore next character
-            NEXT_CHAR_NOERR(lexer, cur);
+        case ID_CHARS:
+            sb_append_char(&lexer->lexbuf, cur);
             break;
         default:
+            ts_ungetc(cur, stream);
             done = true;
         }
     }
 
-    if (!done) {
-        logger_log(&result->mark, LOG_ERR, "Identifer too long!");
-        status = CCC_ESYNTAX;
-
-        // Skip over the rest of the identifier
-        while (!done) {
-            NEXT_CHAR_NOERR(lexer, cur);
-            switch (cur) {
-            case ASCII_LOWER:
-            case ASCII_UPPER:
-            case ASCII_DIGIT:
-            case '_':
-                break;
-            default:
-                done = true;
-            }
-        }
-    }
-    lexer->next_char = cur;
-    lexer->lexbuf[len] = '\0';
-
-    if (CCC_OK !=
-        (status = st_lookup(lexer->symtab, lexer->lexbuf, ID,
-                            &result->tab_entry))) {
-        logger_log(&result->mark, LOG_ERR, "Failed to add identifier!");
-        status = CCC_ESYNTAX;
-        goto fail;
-    }
+    result->tab_entry = st_lookup(lexer->symtab, sb_buf(&lexer->lexbuf), ID);
     result->type = result->tab_entry->type;
 
-fail:
     return status;
 }
 
-static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
+char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
+                         lex_str_type_t type) {
+    int cur = lex_getc_splice(stream);
     if (cur != '\\') {
         return cur;
     }
     bool is_oct = false;
-    NEXT_CHAR_NOERR(lexer, cur);
+
+    cur = lex_getc_splice(stream);
+    sb_clear(&lexer->lexbuf);
+
     switch (cur) {
     case 'a':  return '\a';
     case 'b':  return '\b';
@@ -449,69 +415,65 @@ static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
         is_oct = true;
         // FALL THROUGH
     case 'x': {
-        size_t offset = 0;
-        lexer->lexbuf[offset++] = '0';
+        sb_append_char(&lexer->lexbuf, '0');
         if (!is_oct) {
-            lexer->lexbuf[offset++] = 'x';
+            sb_append_char(&lexer->lexbuf, 'x');
         }
 
         bool overflow = false;
         bool done = false;
         do {
-            NEXT_CHAR_NOERR(lexer, cur);
+            cur = lex_getc_splice(stream);
             switch (cur) {
             case '8': case '9':
             case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
             case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
                 if (!is_oct) {
-                    lexer->next_char = cur;
                     done = true;
                     break;
                 }
             case OCT_DIGIT:
-                LEXBUF_TEST_GROW(lexer, offset);
-                lexer->lexbuf[offset++] = cur;
+                sb_append_char(&lexer->lexbuf, cur);
                 break;
             default:
-                lexer->next_char = cur;
                 done = true;
             }
         } while(!done);
-        lexer->lexbuf[offset] = '\0';
+        ts_ungetc(cur, stream);
 
         errno = 0;
 
-        long long hexnum = strtol(lexer->lexbuf, NULL, 0);
+        long long hexnum = strtol(sb_buf(&lexer->lexbuf), NULL, 0);
         if (errno == ERANGE) {
             overflow = true;
         }
         switch (type) {
         case LEX_STR_CHAR:
-            overflow = hexnum > UCHAR_MAX;
+            overflow |= hexnum > UCHAR_MAX;
             break;
         case LEX_STR_LCHAR:
-            overflow = hexnum > (long long)WCHAR_MAX - (long long)WCHAR_MIN;
+            overflow |= hexnum > (long long)WCHAR_MAX - (long long)WCHAR_MIN;
             break;
         case LEX_STR_U8:
-            overflow = hexnum > UINT8_MAX;
+            overflow |= hexnum > UINT8_MAX;
             break;
         case LEX_STR_U16:
-            overflow = hexnum > UINT16_MAX;
+            overflow |= hexnum > UINT16_MAX;
             break;
         case LEX_STR_U32:
-            overflow = hexnum > UINT32_MAX;
+            overflow |= hexnum > UINT32_MAX;
             break;
         }
 
         if (overflow) {
             if (is_oct) {
-                logger_log(&lexer->pp->last_mark, LOG_WARN,
+                logger_log(&stream->mark, LOG_WARN,
                            "Overflow in character constant '\\%s'",
-                           lexer->lexbuf + 1);
+                           sb_buf(&lexer->lexbuf));
             } else {
-                logger_log(&lexer->pp->last_mark, LOG_WARN,
+                logger_log(&stream->mark, LOG_WARN,
                            "Overflow in character constant '\\x%s'",
-                           lexer->lexbuf + 2);
+                           sb_buf(&lexer->lexbuf));
             }
         }
         return hexnum;
@@ -523,25 +485,23 @@ static char32_t lex_single_char(lexer_t *lexer, int cur, lex_str_type_t type) {
         // TODO2: Handle utf16
 
     default:
-        logger_log(&lexer->pp->last_mark, LOG_WARN,
+        logger_log(&stream->mark, LOG_WARN,
                    "Unknown escape sequence: '\\%c'", cur);
         return cur;
     }
 }
 
-static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
-                         lex_str_type_t type) {
+status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
+                      lex_str_type_t type) {
     status_t status = CCC_OK;
     result->type = INTLIT;
-
-    NEXT_CHAR_NOERR(lexer, cur);
     result->int_params.hasU = false;
     result->int_params.hasL = false;
     result->int_params.hasLL = false;
 
-    result->int_params.int_val = lex_single_char(lexer, cur, type);
+    result->int_params.int_val = lex_single_char(lexer, stream, type);
 
-    NEXT_CHAR_NOERR(lexer, cur);
+    int cur = lex_getc_splice(stream);
     if (cur != '\'') {
         logger_log(&result->mark, LOG_ERR,
                    "Unexpected junk in character literal");
@@ -549,36 +509,35 @@ static status_t lex_char(lexer_t *lexer, int cur, lexeme_t *result,
     }
 
     // skip over junk in character literal
-    while (cur != '\'') {
-        NEXT_CHAR_NOERR(lexer, cur);
+    while (cur != '\'' && cur != EOF) {
+        cur = lex_getc_splice(stream);
     }
 
     return status;
 }
 
-static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
-                           lex_str_type_t type) {
+status_t lex_string(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
+                    lex_str_type_t type) {
     // TODO2: Make sure wide character literals take up more space
     (void)type;
     status_t status = CCC_OK;
     result->type = STRING;
 
-    size_t len = 0;
+    sb_clear(&lexer->lexbuf);
 
     bool done = false;
     do {
-        LEXBUF_TEST_GROW(lexer, len);
-
-        NEXT_CHAR_NOERR(lexer, cur);
+        int cur = lex_getc_splice(stream);
 
         // Reached the end, an unescaped quote
         if (cur == '"' &&
-            (len == 0 || lexer->lexbuf[len - 1] != '\\')) {
+            (sb_len(&lexer->lexbuf) == 0 ||
+             sb_buf(&lexer->lexbuf)[sb_len(&lexer->lexbuf) - 1] != '\\')) {
 
             // Concatenate strings. Skip until non whitespace character,
             // then if we find another quote, skip that quote
             do {
-                NEXT_CHAR_NOERR(lexer, cur);
+                cur = lex_getc_splice(stream);
                 if (!isspace(cur)) {
                     done = true;
                 }
@@ -586,48 +545,20 @@ static status_t lex_string(lexer_t *lexer, int cur, lexeme_t *result,
             if (cur == '"') {
                 done = false;
             } else {
-                lexer->next_char = cur;
+                ts_ungetc(cur, stream);
             }
         } else {
-            lexer->lexbuf[len++] = cur;
+            cur = lex_getc_splice(stream);
         }
     } while (!done);
 
-    if (!done) {
-        logger_log(&result->mark, LOG_ERR, "String too long!");
-        status = CCC_ESYNTAX;
+    result->str_val = sstore_lookup(sb_buf(&lexer->lexbuf));
 
-        // Skip over the rest of the String
-        while (!done) {
-            NEXT_CHAR_NOERR(lexer, cur);
-            if (cur == PP_EOF) {
-                logger_log(&result->mark, LOG_ERR,
-                           "Unterminated String!");
-                status = CCC_ESYNTAX;
-                break;
-            }
-            if (cur == '"' &&
-                (len == 0 || lexer->lexbuf[len - 1] != '\\')) {
-                done = true;
-            }
-        }
-    }
-    lexer->lexbuf[len] = '\0';
-
-    if (CCC_OK !=
-        (status = st_lookup(lexer->symtab, lexer->lexbuf, STRING,
-                            &result->tab_entry))) {
-        logger_log(&result->mark, LOG_ERR, "Failed to add String!");
-        status = CCC_ESYNTAX;
-        goto fail;
-    }
-
-fail:
     return status;
 }
 
-
-static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
+status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
+                    lexeme_t *result) {
     status_t status = CCC_OK;
 
     bool has_e = false;
@@ -637,16 +568,15 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
     bool has_ll = false;
     bool is_hex = false;
 
-    char *dot_loc = NULL;
-    char *p_loc = NULL;
-
-    size_t offset = 0;
+    size_t dot_off = (size_t)-1;
+    size_t p_off = (size_t)-1;
 
     int last = -1;
     bool done = false;
     bool err = false;
+
+    sb_clear(&lexer->lexbuf);
     while (!done && !err) {
-        LEXBUF_TEST_GROW(lexer, offset);
         switch (cur) {
         case 'e':
         case 'E':
@@ -658,10 +588,10 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
             }
             break;
         case '.':
-            if (dot_loc != NULL) {
+            if (dot_off != (size_t)-1) {
                 err = true;
             }
-            dot_loc = &lexer->lexbuf[offset];
+            dot_off = sb_len(&lexer->lexbuf);
             break;
         case 'f':
         case 'F':
@@ -691,8 +621,7 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
             break;
         case 'x':
         case 'X':
-            if (last == '0' &&
-                (offset == 1 || (offset == 2 && lexer->lexbuf[0] == '-'))) {
+            if (last == '0' && (sb_len(&lexer->lexbuf) == 1)) {
                 is_hex = true;
             } else {
                 err = true;
@@ -700,11 +629,11 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
             break;
         case 'p':
         case 'P':
-            if (p_loc != NULL) {
+            if (p_off != (size_t)-1) {
                 err = true;
             }
 
-            p_loc = &lexer->lexbuf[offset];
+            p_off = sb_len(&lexer->lexbuf);
             break;
         case ASCII_DIGIT:
             if (has_f || has_u || has_l || has_ll) {
@@ -733,17 +662,15 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         }
         if (!done) {
             last = cur;
-            lexer->lexbuf[offset++] = cur;
-            NEXT_CHAR_NOERR(lexer, cur);
-        } else {
-            lexer->lexbuf[offset] = '\0';
+            sb_append_char(&lexer->lexbuf, cur);
+            cur = lex_getc_splice(stream);
         }
     }
 
-    bool is_float = has_e || (dot_loc != NULL) || has_f;
+    bool is_float = has_e || (dot_off != (size_t)-1) || has_f;
 
-    if ((is_float && (has_u || has_ll || (is_hex && p_loc == NULL))) ||
-        (!is_float && p_loc != NULL)) {
+    if ((is_float && (has_u || has_ll || (is_hex && p_off == (size_t)-1))) ||
+        (!is_float && p_off != (size_t)-1)) {
         err = true;
     }
 
@@ -755,40 +682,41 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         // Skip over junk at end (identifier characters)
         done = false;
         do {
-            NEXT_CHAR_NOERR(lexer, cur);
+            cur = lex_getc_splice(stream);
             switch (cur) {
-            case ASCII_DIGIT:
-            case ASCII_LOWER:
-            case ASCII_UPPER:
-            case '_':
+            case ID_CHARS:
                 break;
             default:
                 done = true;
             }
         } while(!done);
     }
+    ts_ungetc(cur, stream);
 
-    lexer->next_char = cur;
     if (err) {
         return status;
     }
 
+    char *buf = sb_buf(&lexer->lexbuf);
     char *end;
     errno = 0;
     if (is_float && is_hex) {
-        assert(p_loc != NULL && dot_loc != NULL);
+        assert(p_off != (size_t)-1 && dot_off != (size_t)-1);
+
+        char *dot_loc = buf + dot_off;
+        char *p_loc = buf + p_off;
         result->type = FLOATLIT;
         result->float_params.hasF = has_f;
         result->float_params.hasL = has_l;
         result->float_params.float_val = 0;
 
         long long head;
-        if (dot_loc == lexer->lexbuf + 2) {
+        if (dot_off == 2) {
             // Account for the case 0x.NNNpN
             head = 0;
             end = dot_loc;
         } else {
-            head = strtoll(lexer->lexbuf, &end, 16);
+            head = strtoll(buf, &end, 16);
         }
         if (errno == 0 && end == dot_loc) {
             long long frac;
@@ -822,18 +750,18 @@ static status_t lex_number(lexer_t *lexer, int cur, lexeme_t *result) {
         result->float_params.hasF = has_f;
         result->float_params.hasL = has_l;
         if (has_f) {
-            result->float_params.float_val = strtof(lexer->lexbuf, &end);
+            result->float_params.float_val = strtof(buf, &end);
         } else if (has_l) {
-            result->float_params.float_val = strtold(lexer->lexbuf, &end);
+            result->float_params.float_val = strtold(buf, &end);
         } else {
-            result->float_params.float_val = strtod(lexer->lexbuf, &end);
+            result->float_params.float_val = strtod(buf, &end);
         }
     } else {
         result->type = INTLIT;
         result->int_params.hasU = has_u;
         result->int_params.hasL = has_l;
         result->int_params.hasLL = has_ll;
-        result->int_params.int_val = strtoull(lexer->lexbuf, &end, 0);
+        result->int_params.int_val = strtoull(buf, &end, 0);
     }
     if (errno == ERANGE) {
         logger_log(&result->mark, LOG_ERR, "Overflow in numeric literal", cur);

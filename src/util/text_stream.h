@@ -27,7 +27,6 @@
 #define _TEXT_STREAM_H_
 
 #include <stdbool.h>
-#include <stdio.h>
 
 #include "util/file_directory.h"
 
@@ -36,143 +35,33 @@
  * its location in a file.
  */
 typedef struct tstream_t {
-    char *cur;    /**< Current location in the stream */
-    char *end;    /**< Character after the last character in the stream */
-    int last;     /**< Last character in the stream. 0 for none */
+    char *cur;
+    char *end;
     fmark_t mark; /**< Mark of current location in the stream */
+    int last;
 } tstream_t;
-
-/**
- * Text stream literal
- *
- * @param str String to create stream from
- * @param file Filename
- * @param line_start Pointer to start of current line
- * @param last Last file mark on stack
- * @param line Current line number
- * @param col Current column number
- */
-#define TSTREAM_LIT(word, last, file, line_start, line, col)    \
-    { word, word + (sizeof(word) - 1), 0,                       \
-            FMARK_LIT(last, file, line_start, line, col) }
 
 /**
  * Initializes a text stream
  *
  * @param ts Text stream to initalize
- * @param start Starting character of the stream
- * @param end Ending character of the stream
- * @param file Filename of the file the stream is processing
- * @param line_start Pointer to start of current line
- * @param last Last file mark on stack
- * @param line Current line number
- * @param col Current column number
  */
-void ts_init(tstream_t *ts, char *start, char *end,
-             char *file, char *line_start, fmark_t *last,
-             int line, int col);
+void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last);
 
 /**
- * Returns the a pointer to the current location in the text stream
+ * Retrieves a character from the text stream
  *
- * @param ts Text stream to use
- * @return the current character
+ * @param ts Text stream to fetch from
+ * @return the next character
  */
-inline char *ts_location(tstream_t *ts) {
-    return ts->cur;
-}
+int ts_getc(tstream_t *ts);
 
 /**
- * Returns the current character in the text stream
+ * Returns a character to the text stream
  *
- * @param ts Text stream to use
- * @return The current character
+ * @param ts Text stream to fetch from
+ * @return the next character
  */
-inline int ts_cur(tstream_t *ts) {
-    if (ts->cur == ts->end) {
-        return EOF;
-    }
-    return *ts->cur;
-}
-
-/**
- * Returns the next character in the text stream
- *
- * @param ts Text stream to use
- * @return The next character
- */
-inline int ts_next(tstream_t *ts) {
-    if (ts->cur == ts->end || ts->cur + 1 == ts->end) {
-        return EOF;
-    }
-    return *(ts->cur + 1);
-}
-
-/**
- * Returns the last character in the text stream
- *
- * @param ts Text stream to use
- * @return The last character
- */
-inline int ts_last(tstream_t *ts) {
-    return ts->last;
-}
-
-
-/**
- * Tells whether a text stream is at the end
- *
- * @param ts Text stream to use
- * @return true if text stream is at end, false otherwise
- */
-inline bool ts_end(tstream_t *ts) {
-    return ts->cur == ts->end;
-}
-
-/**
- * Advance an identifier forward one character.
- *
- * @param ts Text stream to use
- * @return the character in the LAST position
- */
-int ts_advance(tstream_t *ts);
-
-/**
- * Skip whitespace characters and block comments, or stop if the end is reached
- *
- * @param ts Text stream to use
- * @param skip_newlines if true, newlines are skipped too
- * @return The number of characters skipped
- */
-size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines);
-
-/**
- * Skip a "string" bounded by double or single quotes
- *
- * The starting character must be on the current location
- * Handles escape characters
- *
- * @param ts Text stream to use
- * @return The number of characters skipped
- */
-size_t ts_skip_string(tstream_t *ts);
-
-/**
- * Advance ts past an identifier
- *
- * @param ts Text stream to use
- * @return The length of the identifier
- */
-size_t ts_advance_identifier(tstream_t *ts);
-
-/**
- * Skip until the start of the next line. Does not skip the newline character
- *
- * @param ts Text stream to use
- * @param in_comment If not NULL, then is true if the line finished in a block
- *     comment.
- * @return The number of characters skipped
- */
-size_t ts_skip_line(tstream_t *ts, bool *in_comment);
+void ts_ungetc(int c, tstream_t *ts);
 
 #endif /* _TEXT_STREAM_H_ */

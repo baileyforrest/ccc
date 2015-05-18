@@ -47,6 +47,11 @@ void sb_compact(string_builder_t *sb) {
     sb->capacity = sb->len;
 }
 
+void sb_clear(string_builder_t *sb) {
+    sb->len = 0;
+    sb->buf[0] = '\0';
+}
+
 void sb_append_char(string_builder_t *sb, char val) {
     if (sb->len == sb->capacity) {
         sb->capacity = GROWTH_FUNC(sb->capacity);

@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <limits.h>
 
+#include "util/char_class.h"
 #include "util/logger.h"
 #include "util/string_store.h"
 

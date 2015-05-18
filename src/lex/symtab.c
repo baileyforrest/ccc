@@ -107,10 +107,10 @@ static symtab_entry_t s_reserved[] = {
 /**
  * Paramaters for newly constructed symbol tables
  */
-void st_init(symtab_t *table, bool is_sym) {
+void st_init(symtab_t *table, bool reserved) {
     assert(table != NULL);
 
-    size_t size = is_sym ? STATIC_ARRAY_LEN(s_reserved) * 2: 0;
+    size_t size = reserved ? STATIC_ARRAY_LEN(s_reserved) * 2: 0;
 
     ht_params_t params = {
         size,                           // Size estimate
@@ -121,10 +121,9 @@ void st_init(symtab_t *table, bool is_sym) {
     };
 
     ht_init(&table->hashtab, &params);
-    table->is_sym = is_sym;
 
     // Initalize symbol table with reserved keywords
-    if (is_sym) {
+    if (reserved) {
         for (size_t i = 0; i < STATIC_ARRAY_LEN(s_reserved); ++i) {
             status_t status = ht_insert(&table->hashtab, &s_reserved[i].link);
             assert(status == CCC_OK);
@@ -147,14 +146,12 @@ void st_destroy(symtab_t *table) {
     HT_DESTROY_FUNC(&table->hashtab, st_entry_destroy);
 }
 
-status_t st_lookup(symtab_t *table, char *str, token_t type,
-                   symtab_entry_t **entry) {
+symtab_entry_t *st_lookup(symtab_t *table, char *str, token_t type) {
     status_t status = CCC_OK;
 
     symtab_entry_t *cur_entry = ht_lookup(&table->hashtab, &str);
     if (cur_entry != NULL) {
-        *entry = cur_entry;
-        return status;
+        return cur_entry;
     }
 
     // Doesn't exist. Need to allocate memory for the string and entry
@@ -165,12 +162,8 @@ status_t st_lookup(symtab_t *table, char *str, token_t type,
     cur_entry->type = type;
 
     if (CCC_OK != (status = ht_insert(&table->hashtab, &cur_entry->link))) {
-        goto fail;
+        assert(false);
     }
 
-    *entry = cur_entry;
-    return status;
-fail:
-    free(cur_entry);
-    return status;
+    return cur_entry;
 }

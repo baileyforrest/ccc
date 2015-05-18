@@ -25,7 +25,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "parse/symtab.h"
+#include "lex/symtab.h"
 
 #define CASE_BASIC_PRINT(token) \
     case token: printf(#token "\n"); break
@@ -69,7 +69,12 @@ void token_print(lexeme_t *token) {
 
 const char *token_str(token_t token) {
     switch (token) {
-    case TOKEN_EOF:     return "EOF";
+    case HASH:          return "#";
+    case HASHHASH:      return "##";
+    case SPACE:         return " ";
+    case NEWLINE:       return "\n";
+    case BACKSLASH:     return "\\";
+
     case LBRACE:        return "{";
     case RBRACE:        return "}";
     case LPAREN:        return "(";

@@ -23,30 +23,26 @@
 #include "text_stream.h"
 
 #include <assert.h>
-#include <ctype.h>
-#include <stdio.h>
 
-extern inline char *ts_location(tstream_t *ts);
-extern inline int ts_cur(tstream_t *ts);
-extern inline bool ts_end(tstream_t *ts);
-extern inline int ts_next(tstream_t *ts);
-extern inline int ts_last(tstream_t *ts);
-
-void ts_init(tstream_t *ts, char *start, char *end, char *file,
-             char *line_start, fmark_t *last, int line, int col) {
+void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last) {
     assert(ts != NULL);
     ts->cur = start;
     ts->end = end;
-    ts->last = 0;
     ts->mark.filename = file;
-    ts->mark.line_start = line_start;
+    ts->mark.line_start = start;
     ts->mark.last = last;
-    ts->mark.line = line;
-    ts->mark.col = col;
+    ts->mark.line = 1;
+    ts->mark.col = 1;
+    ts->last = EOF;
 }
 
-int ts_advance(tstream_t *ts) {
-    ts->last = ts_cur(ts);
+int ts_getc(tstream_t *ts) {
+    if (ts->last != EOF) {
+        int retval = ts->last;
+        ts->last = EOF;
+        return retval;
+    }
+
     if (ts->cur == ts->end) {
         return EOF;
     }
@@ -62,141 +58,6 @@ int ts_advance(tstream_t *ts) {
     return *(ts->cur++);
 }
 
-size_t ts_skip_ws_and_comment(tstream_t *ts, bool skip_newlines) {
-    size_t num_chars = 0;
-    bool done = false;
-    bool comment = false;
-    for (;!done && !ts_end(ts); ++num_chars) {
-        if (comment) {
-            if (ts_last(ts) == '*' && ts_cur(ts) == '/') {
-                comment = false;
-            }
-            ts_advance(ts);
-            continue;
-        }
-        int cur = ts_cur(ts);
-        if (isspace(cur)) {
-            if (cur == '\n') {
-                if (skip_newlines) {
-                    ts_advance(ts);
-                } else {
-                    done = true;
-                }
-            } else {
-                ts_advance(ts);
-            }
-            continue;
-        }
-        switch (cur) {
-        case '/':
-            if (ts_next(ts) == '*') {
-                comment = true;
-                ts_advance(ts);
-
-                ++num_chars;
-                ts_advance(ts);
-                continue;
-            }
-            done = true;
-            break;
-        case '\\':
-            ts_advance(ts);
-            if (ts_end(ts)) {
-                break;
-            }
-
-            /* Skip escaped newlines */
-            if (ts_cur(ts) == '\n') {
-                ts_advance(ts);
-            }
-            break;
-        default:
-            done = true;
-        }
-    }
-
-    // Subtract one because terminator was counted
-    return num_chars - 1;
-}
-
-size_t ts_skip_string(tstream_t *ts) {
-    int terminator;
-    size_t num_chars = 0;
-    switch (ts_cur(ts)) {
-    case '"':
-    case '\'':
-        terminator = ts_cur(ts);
-        break;
-    default:
-        return num_chars;
-    }
-    ts_advance(ts);
-    ++num_chars;
-
-    bool ignore_escape = false;
-    while (!ts_end(ts)) {
-        ++num_chars;
-        if (ts_cur(ts) == terminator &&
-            (ts_last(ts) != '\\' && !ignore_escape)) {
-            ts_advance(ts);
-            break;
-        }
-        if (ts_cur(ts) == '\\' && ts_last(ts) == '\\') {
-            ignore_escape = true;
-        } else {
-            ignore_escape = false;
-        }
-        ts_advance(ts);
-    }
-    return num_chars;
-}
-
-size_t ts_advance_identifier(tstream_t *ts) {
-    size_t num_chars = 0;
-    bool done = false;
-    bool first = true;
-    while (!done && !ts_end(ts)) {
-
-        /* Charaters allowed to be in idenitifer */
-        switch (ts_cur(ts)) {
-        case ASCII_DIGIT:
-            if (first) {
-                done = true;
-                break;
-            }
-        case ASCII_LOWER:
-        case ASCII_UPPER:
-        case '_':
-            num_chars++;
-            ts_advance(ts);
-            break;
-        default: /* Found ts->end */
-            done = true;
-        }
-        first = false;
-    }
-
-    return num_chars;
-}
-
-size_t ts_skip_line(tstream_t *ts, bool *in_comment) {
-    size_t num_chars = 0;
-    int last = -1;
-    bool comment = in_comment == NULL ? false : *in_comment;
-    while (!ts_end(ts)) {
-        if (ts_cur(ts) == '/' && ts_next(ts) == '*') {
-            comment = true;
-        } else if (last == '*' && ts_cur(ts) == '/') {
-            comment = false;
-        } else if (ts_cur(ts) == '\n' && last != '\\') {
-            break;
-        }
-        num_chars++;
-        last = ts_advance(ts);
-    }
-
-    if (in_comment != NULL) {
-        *in_comment = comment;
-    }
-    return num_chars;
+void ts_ungetc(int c, tstream_t *ts) {
+    ts->last = c;
 }
