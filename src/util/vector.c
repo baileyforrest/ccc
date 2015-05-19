@@ -35,6 +35,10 @@ extern size_t vec_size(vec_t *vec);
 extern void *vec_front(vec_t *vec);
 extern void *vec_back(vec_t *vec);
 extern void *vec_pop_back(vec_t *vec);
+extern bool vec_iter_has_next(vec_iter_t *iter);
+extern void *vec_iter_get(vec_iter_t *iter);
+extern void *vec_iter_advance(vec_iter_t *iter);
+extern void *vec_iter_reverse(vec_iter_t *iter);
 
 void vec_init(vec_t *vec, size_t capacity) {
     vec->elems = emalloc(capacity * sizeof(vec->elems[0]));
@@ -55,4 +59,15 @@ void vec_push_back(vec_t *vec, void *elem) {
             erealloc(vec->elems, vec->capacity * sizeof(vec->elems[0]));
     }
     vec->elems[vec->size++] = elem;
+}
+
+void vec_append(vec_t *dest, vec_t *vec2) {
+    VEC_FOREACH(cur, vec2) {
+        vec_append(dest, vec_get(vec2, cur));
+    }
+}
+
+void vec_iter_init(vec_iter_t *iter, vec_t *vec) {
+    iter->vec = vec;
+    iter->off = 0;
 }

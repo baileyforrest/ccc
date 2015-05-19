@@ -43,6 +43,7 @@ void token_man_destroy(token_man_t *tm) {
 lexeme_t *token_create(token_man_t *tm) {
     lexeme_node_t *result = emalloc(sizeof(lexeme_node_t));
     sl_append(&tm->tokens, &result->link);
+    str_set_init(&result->lexeme.hideset);
 
     return &result->lexeme;
 }
@@ -53,10 +54,10 @@ void token_print(lexeme_t *token) {
     switch (token->type) {
         // Other
     case ID:
-        printf("%s", token->tab_entry->key);
+        printf("%s", token->id_name);
         break;
     case STRING:
-        printf("\"%s\"", token->tab_entry->key);
+        printf("\"%s\"", token->id_name);
         break;
     case INTLIT:
         printf("%lld", token->int_params.int_val);
@@ -89,7 +90,6 @@ const char *token_str(token_t token) {
     case TOKEN_EOF:     return "";
     case HASH:          return "#";
     case HASHHASH:      return "##";
-    case SPACE:         return " ";
     case NEWLINE:       return "\n";
     case BACKSLASH:     return "\\";
 

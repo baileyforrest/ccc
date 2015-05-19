@@ -25,13 +25,20 @@
 #ifndef _VECTOR_H_
 #define _VECTOR_H_
 
+#include <assert.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef struct vec_t {
     void **elems;
     size_t size;
     size_t capacity;
 } vec_t;
+
+typedef struct vec_iter_t {
+    vec_t *vec;
+    size_t off;
+} vec_iter_t;
 
 void vec_init(vec_t *vec, size_t capacity);
 
@@ -73,5 +80,28 @@ inline void *vec_pop_back(vec_t *vec) {
 
 #define VEC_FOREACH(cur_idx, vec) \
     for (size_t cur_idx = 0; cur_idx < (vec)->size; ++cur_idx)   \
+
+void vec_iter_init(vec_iter_t *iter, vec_t *vec);
+
+inline bool vec_iter_has_next(vec_iter_t *iter) {
+    return iter->off < vec_size(iter->vec);
+}
+
+inline void *vec_iter_get(vec_iter_t *iter) {
+    assert(vec_iter_has_next(iter));
+    return vec_get(iter->vec, iter->off);
+}
+
+inline void *vec_iter_advance(vec_iter_t *iter) {
+    assert(vec_iter_has_next(iter));
+    return vec_get(iter->vec, iter->off++);
+}
+
+inline void *vec_iter_reverse(vec_iter_t *iter) {
+    assert(vec_iter_has_next(iter));
+    return vec_get(iter->vec, iter->off--);
+}
+
+void vec_append(vec_t *dest, vec_t *vec2);
 
 #endif /* _VECTOR_H_ */

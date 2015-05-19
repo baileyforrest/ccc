@@ -24,13 +24,13 @@
 #define _TOKEN_H_
 
 #include "util/file_directory.h"
+#include "util/string_set.h"
 
 typedef enum token_t {
     TOKEN_EOF,
     HASH,          // #
     HASHHASH,      // ##
 
-    SPACE,         // ' '
     NEWLINE,       // '\n'
     BACKSLASH,     // '\\'
 
@@ -161,19 +161,18 @@ typedef enum token_t {
     FUNC,          // __func__
 } token_t;
 
-typedef struct symtab_entry_t symtab_entry_t; // Forward definition
-
 /**
  * Structure representing a single lexeme
  *
  * Acts as a tagged union
  */
 typedef struct lexeme_t {
-    token_t type;                  /**< Type of lememe */
+    str_set_t hideset;
     fmark_t mark;                  /**< Location of lexeme */
+    token_t type;                  /**< Type of lememe */
 
     union {
-        symtab_entry_t *tab_entry; /**< For id types */
+        char *id_name;
         char *str_val;
         struct {
             bool hasU;             /**< Has U suffix */

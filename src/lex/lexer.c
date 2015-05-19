@@ -109,16 +109,13 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
     memcpy(&result->mark, &stream->mark, sizeof(fmark_t));
     int cur = lex_getc_splice(stream);
 
-    // Combine spaces
+    // Ignore spaces
     if (isspace(cur) && cur != '\n') {
         while (isspace(cur) && cur != '\n') {
             cur = lex_getc_splice(stream);
         }
 
         ts_ungetc(cur, stream);
-        result->type = SPACE;
-
-        return status;
     }
 
     int next;
@@ -149,8 +146,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
         case '/':
             while ((next = lex_getc_splice(stream)) != '\n')
                 continue;
-            result->type = SPACE;
-            break;
+            return lex_next_token(lexer, stream, result);
 
             // Multi line comment
         case '*': {
@@ -160,8 +156,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
                     break;
                 }
             }
-            result->type = SPACE;
-            break;
+            return lex_next_token(lexer, stream, result);
         }
 
         case '=': result->type = DIVEQ; break;
@@ -382,8 +377,10 @@ status_t lex_id(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
         }
     }
 
-    result->tab_entry = st_lookup(lexer->symtab, sb_buf(&lexer->lexbuf), ID);
-    result->type = result->tab_entry->type;
+    symtab_entry_t *entry =
+        st_lookup(lexer->symtab, sb_buf(&lexer->lexbuf), ID);
+    result->id_name = entry->key;
+    result->type = entry->type;
 
     return status;
 }

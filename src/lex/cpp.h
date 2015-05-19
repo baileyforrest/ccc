@@ -26,6 +26,7 @@
 #include "lex/token.h"
 #include "util/vector.h"
 
-vec_t *cpp_process(vec_t *tokens);
+status_t cpp_process(token_man_t *token_man, char *filename, vec_t *tokens,
+                     vec_t *output);
 
 #endif /* _CPP_H_ */

@@ -52,8 +52,7 @@ status_t parser_parse(vec_t *tokens, trans_unit_t **result) {
     assert(result != NULL);
 
     lex_wrap_t lex;
-    lex.tokens = tokens;
-    lex.offset = 0;
+    vec_iter_init(&lex.tokens, tokens);
 
     return par_translation_unit(&lex, result);
 }
@@ -66,8 +65,7 @@ status_t parser_parse_expr(vec_t *tokens, trans_unit_t *tunit,
 
     lex_wrap_t lex;
     lex.tunit = tunit;
-    lex.tokens = tokens;
-    lex.offset = 0;
+    vec_iter_init(&lex.tokens, tokens);
 
     return par_expression(&lex, result);
 }
@@ -248,7 +246,7 @@ status_t par_declaration_specifiers(lex_wrap_t *lex, type_t **type) {
         case ID: {
             // Type specifier only if its a typedef name
             typetab_entry_t *entry =
-                tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key);
+                tt_lookup(lex->typetab, LEX_CUR(lex)->id_name);
             if (entry == NULL) {
                 return CCC_BACKTRACK;
             }
@@ -475,11 +473,11 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     case ID: { // typedef name
         // Type specifier only if its a typedef name
         typetab_entry_t *entry =
-            tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key);
+            tt_lookup(lex->typetab, LEX_CUR(lex)->id_name);
         assert(entry != NULL); // Must be checked before calling
         new_node = ast_type_create(lex->tunit, &LEX_CUR(lex)->mark,
                                    TYPE_TYPEDEF);
-        new_node->typedef_params.name = LEX_CUR(lex)->tab_entry->key;
+        new_node->typedef_params.name = LEX_CUR(lex)->id_name;
         new_node->typedef_params.base = entry->type;
         new_node->typedef_params.type = TYPE_VOID;
         *end_node = new_node;
@@ -585,7 +583,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
     typetab_entry_t *entry = NULL;
     type_t *entry_type;
     if (LEX_CUR(lex)->type == ID) {
-        name = LEX_CUR(lex)->tab_entry->key;
+        name = LEX_CUR(lex)->id_name;
         entry = tt_lookup_compound(lex->typetab, name);
 
         LEX_ADVANCE(lex);
@@ -721,7 +719,7 @@ status_t par_specifier_qualifiers(lex_wrap_t *lex, bool compound,
             // Type specifiers:
         case ID:
             // Type specifier only if its a typedef name
-            if (tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key) == NULL) {
+            if (tt_lookup(lex->typetab, LEX_CUR(lex)->id_name) == NULL) {
                 goto done;
             }
 
@@ -983,7 +981,7 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
     }
 
     case ID:
-        node->id = LEX_CUR(lex)->tab_entry->key;
+        node->id = LEX_CUR(lex)->id_name;
         LEX_ADVANCE(lex);
         break;
 
@@ -1289,7 +1287,7 @@ status_t par_mem_acc_list(lex_wrap_t *lex, mem_acc_list_t *list, bool nodot) {
             access = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                      EXPR_MEM_ACC);
             access->mem_acc.base = NULL;
-            access->mem_acc.name = LEX_CUR(lex)->tab_entry->key;
+            access->mem_acc.name = LEX_CUR(lex)->id_name;
             access->mem_acc.op = OP_DOT;
             LEX_ADVANCE(lex);
         } else if (LEX_CUR(lex)->type == LBRACK) {
@@ -1560,7 +1558,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
             expr = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                    EXPR_MEM_ACC);
             expr->mem_acc.base = base;
-            expr->mem_acc.name = LEX_CUR(lex)->tab_entry->key;
+            expr->mem_acc.name = LEX_CUR(lex)->id_name;
             expr->mem_acc.op = op;
             LEX_ADVANCE(lex);
             base = expr;
@@ -1613,7 +1611,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         break;
     case ID:
         base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_VAR);
-        base->var_id = LEX_CUR(lex)->tab_entry->key;
+        base->var_id = LEX_CUR(lex)->id_name;
         LEX_ADVANCE(lex);
         break;
 
@@ -1823,7 +1821,7 @@ status_t par_type_name(lex_wrap_t *lex, bool match_parens, decl_t **result) {
     if (match_parens) {
         switch (LEX_NEXT(lex)->type) {
         case ID: {
-            if (tt_lookup(lex->typetab, LEX_NEXT(lex)->tab_entry->key)
+            if (tt_lookup(lex->typetab, LEX_NEXT(lex)->id_name)
                 == NULL) {
                 return CCC_BACKTRACK;
             }
@@ -1964,7 +1962,7 @@ status_t par_enumerator(lex_wrap_t *lex, type_t *type) {
     }
     decl_node_t *node = ast_decl_node_create(lex->tunit, &LEX_CUR(lex)->mark);
     node->type = type->enum_params.type;
-    node->id = LEX_CUR(lex)->tab_entry->key;
+    node->id = LEX_CUR(lex)->id_name;
     LEX_ADVANCE(lex);
 
     // Parse enum value if there is one
@@ -2079,7 +2077,7 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
             }
             cur = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                   EXPR_DESIG_INIT);
-            cur->desig_init.name = LEX_CUR(lex)->tab_entry->key;
+            cur->desig_init.name = LEX_CUR(lex)->id_name;
             LEX_ADVANCE(lex); // Skip the ID
             LEX_ADVANCE(lex); // Skip the =
             if (CCC_OK != (status = par_initializer(lex,
@@ -2142,7 +2140,7 @@ status_t par_labeled_statement(lex_wrap_t *lex, stmt_t **result) {
     switch (LEX_CUR(lex)->type) {
     case ID:
         stmt = ast_stmt_create(lex->tunit, &LEX_CUR(lex)->mark, STMT_LABEL);
-        stmt->label.label = LEX_CUR(lex)->tab_entry->key;
+        stmt->label.label = LEX_CUR(lex)->id_name;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, COLON);
         if (CCC_OK != (status = par_statement(lex, &stmt->label.stmt))) {
@@ -2292,7 +2290,7 @@ status_t par_iteration_statement(lex_wrap_t *lex, stmt_t **result) {
             bool expr = false;
             switch (LEX_CUR(lex)->type) {
             case ID:
-                if (tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key) ==
+                if (tt_lookup(lex->typetab, LEX_CUR(lex)->id_name) ==
                     NULL) {
                     expr = true;
                     break;
@@ -2373,7 +2371,7 @@ status_t par_jump_statement(lex_wrap_t *lex, stmt_t **result) {
             status = CCC_ESYNTAX;
             goto fail;
         }
-        stmt->goto_params.label = LEX_CUR(lex)->tab_entry->key;
+        stmt->goto_params.label = LEX_CUR(lex)->id_name;
         LEX_ADVANCE(lex);
         LEX_MATCH(lex, SEMI);
         break;
@@ -2438,7 +2436,7 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result) {
                 break;
             }
             // Type specifier only if its a typedef name
-            if (tt_lookup(lex->typetab, LEX_CUR(lex)->tab_entry->key) != NULL) {
+            if (tt_lookup(lex->typetab, LEX_CUR(lex)->id_name) != NULL) {
                 is_decl = true;
             }
             break;

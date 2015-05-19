@@ -39,8 +39,7 @@
 typedef struct lex_wrap_t {
     trans_unit_t *tunit; /**< Current tranlation unit */
     typetab_t *typetab;  /**< Type table on top of stack */
-    vec_t *tokens;       /**< Token stream */
-    size_t offset;       /**< Offset into tokens */
+    vec_iter_t tokens;   /**< Token stream */
     char *function;      /**< Current function. NULL if none */
 } lex_wrap_t;
 
@@ -49,7 +48,7 @@ typedef struct lex_wrap_t {
  *
  * @param Lexer wrapper to get lexeme from
  */
-#define LEX_CUR(wrap) ((lexeme_t *)vec_get((wrap)->tokens, (wrap)->offset))
+#define LEX_CUR(wrap) ((lexeme_t *)vec_iter_get(&(wrap)->tokens))
 
 /**
  * Get the next lexeme
@@ -57,19 +56,14 @@ typedef struct lex_wrap_t {
  * @param Lexer wrapper to get lexeme from
  */
 #define LEX_NEXT(wrap) \
-    ((lexeme_t *)vec_get((wrap)->tokens, (wrap)->offset + 1))
+    ((lexeme_t *)vec_get((wrap)->tokens.vec, (wrap)->tokens.off + 1))
 
 /**
  * Advance lexer wrapper to next token
  *
  * @param wrap Wrapper to advance
  */
-#define LEX_ADVANCE(wrap)                                       \
-    do {                                                        \
-        if ((wrap)->offset < vec_size((wrap)->tokens) - 1) {    \
-            ++(wrap)->offset;                                   \
-        }                                                       \
-    } while (0)
+#define LEX_ADVANCE(wrap) vec_iter_advance(&(wrap)->tokens)
 
 /**
  * Match lexer wrapper with specified token, then advance to next token
