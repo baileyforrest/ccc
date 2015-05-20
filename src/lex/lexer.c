@@ -59,15 +59,15 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     status_t status = CCC_OK;
 
     while (true) {
-        lexeme_t *lexeme = token_create(lexer->token_man);
+        token_t *token = token_create(lexer->token_man);
 
-        if (CCC_OK != (status = lex_next_token(lexer, stream, lexeme))) {
-            free(lexeme);
+        if (CCC_OK != (status = lex_next_token(lexer, stream, token))) {
+            free(token);
             return status;
         }
 
-        vec_push_back(result, lexeme);
-        if (lexeme->type == TOKEN_EOF) {
+        vec_push_back(result, token);
+        if (token->type == TOKEN_EOF) {
             break;
         }
     }
@@ -75,7 +75,7 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     return status;
 }
 
-int lex_if_next_eq(tstream_t *stream, int test, token_t noeq, token_t iseq) {
+int lex_if_next_eq(tstream_t *stream, int test, token_type_t noeq, token_type_t iseq) {
     int next = lex_getc_splice(stream);
     if (next == test) {
         return iseq;
@@ -99,7 +99,7 @@ int lex_getc_splice(tstream_t *stream) {
     }
 }
 
-status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
+status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
     assert(lexer != NULL);
     assert(stream != NULL);
     assert(result != NULL);
@@ -363,7 +363,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
     return status;
 }
 
-status_t lex_id(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
+status_t lex_id(lexer_t *lexer, tstream_t *stream, token_t *result) {
     status_t status = CCC_OK;
     result->type = ID;
     sb_clear(&lexer->lexbuf);
@@ -495,7 +495,7 @@ char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
     }
 }
 
-status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
+status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
                       lex_str_type_t type) {
     status_t status = CCC_OK;
     result->type = INTLIT;
@@ -520,7 +520,7 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
     return status;
 }
 
-status_t lex_string(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
+status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
                     lex_str_type_t type) {
     // TODO2: Make sure wide character literals take up more space
     (void)type;
@@ -562,7 +562,7 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
 }
 
 status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
-                    lexeme_t *result) {
+                    token_t *result) {
     status_t status = CCC_OK;
 
     bool has_e = false;

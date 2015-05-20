@@ -146,7 +146,7 @@ void st_destroy(symtab_t *table) {
     HT_DESTROY_FUNC(&table->hashtab, st_entry_destroy);
 }
 
-symtab_entry_t *st_lookup(symtab_t *table, char *str, token_t type) {
+symtab_entry_t *st_lookup(symtab_t *table, char *str, token_type_t type) {
     status_t status = CCC_OK;
 
     symtab_entry_t *cur_entry = ht_lookup(&table->hashtab, &str);

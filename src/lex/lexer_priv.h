@@ -35,21 +35,22 @@ typedef enum lex_str_type_t {
     LEX_STR_U32,
 } lex_str_type_t;
 
-int lex_if_next_eq(tstream_t *stream, int test, token_t noeq, token_t iseq);
+int lex_if_next_eq(tstream_t *stream, int test, token_type_t noeq,
+                   token_type_t iseq);
 
 int lex_getc_splice(tstream_t *stream);
 
-status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result);
+status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result);
 
-status_t lex_id(lexer_t *lexer, tstream_t *stream, lexeme_t *result);
+status_t lex_id(lexer_t *lexer, tstream_t *stream, token_t *result);
 
 char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
                          lex_str_type_t type);
 
-status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
+status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
                       lex_str_type_t type);
 
-status_t lex_string(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
+status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
                     lex_str_type_t type);
 
 
@@ -60,7 +61,7 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, lexeme_t *result,
  * @param result Location to store the result
  */
 status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
-                    lexeme_t *result);
+                    token_t *result);
 
 
 #endif /* _LEXER_PRIV_H_ */

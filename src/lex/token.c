@@ -29,36 +29,36 @@
 
 #include "util/string_builder.h"
 
-typedef struct lexeme_node_t {
+typedef struct token_node_t {
     sl_link_t link;
-    lexeme_t lexeme;
-} lexeme_node_t;
+    token_t token;
+} token_node_t;
 
 void token_man_init(token_man_t *tm) {
-    sl_init(&tm->tokens, offsetof(lexeme_node_t, link));
+    sl_init(&tm->tokens, offsetof(token_node_t, link));
 }
 
 void token_man_destroy(token_man_t *tm) {
     SL_DESTROY_FUNC(&tm->tokens, free);
 }
 
-lexeme_t *token_create(token_man_t *tm) {
-    lexeme_node_t *result = emalloc(sizeof(lexeme_node_t));
+token_t *token_create(token_man_t *tm) {
+    token_node_t *result = emalloc(sizeof(token_node_t));
     sl_append(&tm->tokens, &result->link);
-    str_set_init(&result->lexeme.hideset);
+    str_set_init(&result->token.hideset);
 
-    return &result->lexeme;
+    return &result->token;
 }
 
-lexeme_t *token_copy(token_man_t *tm, lexeme_t *token) {
-    lexeme_t *result = token_create(tm);
-    memcpy(result, token, sizeof(lexeme_t));
+token_t *token_copy(token_man_t *tm, token_t *token) {
+    token_t *result = token_create(tm);
+    memcpy(result, token, sizeof(token_t));
     str_set_copy(&result->hideset, &token->hideset);
 
     return result;
 }
 
-void token_print_helper(lexeme_t *token, string_builder_t *sb, FILE *file) {
+void token_print_helper(token_t *token, string_builder_t *sb, FILE *file) {
     assert(token != NULL);
 
     switch (token->type) {
@@ -94,11 +94,11 @@ void token_print_helper(lexeme_t *token, string_builder_t *sb, FILE *file) {
     }
 }
 
-void token_print(FILE *file, lexeme_t *token) {
+void token_print(FILE *file, token_t *token) {
     token_print_helper(token, NULL, file);
 }
 
-char *token_str(lexeme_t *token) {
+char *token_str(token_t *token) {
     string_builder_t sb;
     sb_init(&sb, 0);
 
@@ -107,14 +107,14 @@ char *token_str(lexeme_t *token) {
     return sb_buf(&sb);
 }
 
-void token_str_append_sb(string_builder_t *sb, lexeme_t *token) {
+void token_str_append_sb(string_builder_t *sb, token_t *token) {
     token_print_helper(token, sb, NULL);
 }
 
 #define CASE_TOK_STR(tok, str) \
     case tok: str
 
-const char *token_type_str(token_t token) {
+const char *token_type_str(token_type_t token) {
     switch (token) {
     case TOKEN_EOF:     return "";
     case HASH:          return "#";

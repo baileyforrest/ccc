@@ -56,7 +56,7 @@ void lexer_destroy(lexer_t *lexer);
  *
  * @param lexer The lexer to fetch from
  * @param stream text stream
- * @param result (lexeme_t) Location to store lexemes
+ * @param result Location to store tokens
  * @return CCC_OK on success, error code on error
  */
 status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result);

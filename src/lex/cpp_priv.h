@@ -68,7 +68,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts);
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst);
 
-lexeme_t *cpp_stringify(cpp_state_t *cs, vec_t *ts);
+token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts);
 
 vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name);
 

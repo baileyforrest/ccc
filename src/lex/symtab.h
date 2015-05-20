@@ -35,12 +35,12 @@ typedef struct symtab_t {
 } symtab_t;
 
 /**
- * Type and value of a string lexeme
+ * Type and value of a string token
  */
 typedef struct symtab_entry_t {
     sl_link_t link; /**< Hashtable link */
     char *key;      /**< Hashtable key value */
-    token_t type;   /**< Denotes the type of the symbol table entry */
+    token_type_t type;   /**< Denotes the type of the symbol table entry */
 } symtab_entry_t;
 
 /**
@@ -69,6 +69,6 @@ void st_destroy(symtab_t *table);
  * @param Pointer to an entry pointer if success, otherwise unchanged
  * @return CCC_OK on success, error code on failure
  */
-symtab_entry_t *st_lookup(symtab_t *table, char *str, token_t type);
+symtab_entry_t *st_lookup(symtab_t *table, char *str, token_type_t type);
 
 #endif /* _SYMTAB_H_ */

@@ -98,9 +98,9 @@ void cpp_state_destroy(cpp_state_t *cs) {
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
 
-    lexeme_t *new_last = NULL, *last = NULL;
+    token_t *new_last = NULL, *last = NULL;
     for (; vec_iter_has_next(ts); vec_iter_advance(ts), last = new_last) {
-        lexeme_t *token = vec_iter_get(ts);
+        token_t *token = vec_iter_get(ts);
         new_last = token;
 
         switch (token->type) {
@@ -135,7 +135,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
 
         vec_iter_advance(ts);
-        lexeme_t *next = vec_iter_get(ts);
+        token_t *next = vec_iter_get(ts);
         vec_iter_reverse(ts);
 
         cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
@@ -166,7 +166,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 (status = cpp_fetch_macro_params(cs, ts, &macro_inst))) {
                 goto fail;
             }
-            lexeme_t *rparen = vec_iter_get(ts);
+            token_t *rparen = vec_iter_get(ts);
             assert(rparen->type == RPAREN);
             str_set_intersect(&token->hideset, &rparen->hideset, &hideset);
             str_set_add(&hideset, token->id_name);
@@ -177,7 +177,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
 
         VEC_FOREACH(cur, &subbed) {
-            lexeme_t *token = vec_get(&subbed, cur);
+            token_t *token = vec_get(&subbed, cur);
             vec_push_back(output, token);
         }
 
@@ -201,12 +201,12 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
     status_t status = CCC_OK;
 
     for (; vec_iter_has_next(&iter); vec_iter_advance(&iter)) {
-        lexeme_t *token = vec_iter_get(&iter);
+        token_t *token = vec_iter_get(&iter);
         vec_t *param_vec;
 
         if (token->type == HASH) {
             vec_iter_advance(&iter);
-            lexeme_t *param = vec_iter_get(&iter);
+            token_t *param = vec_iter_get(&iter);
             if (param->type != ID ||
                 NULL == (param_vec =
                          cpp_macro_inst_lookup(macro_inst, param->id_name))) {
@@ -215,11 +215,11 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                 goto fail;
             }
 
-            lexeme_t *stringified = cpp_stringify(cs, param_vec);
+            token_t *stringified = cpp_stringify(cs, param_vec);
             vec_push_back(output, stringified);
         } else if (token->type == HASHHASH) {
             vec_iter_advance(&iter);
-            lexeme_t *next = vec_iter_get(&iter);
+            token_t *next = vec_iter_get(&iter);
             if (next->type == ID &&
                 NULL != (param_vec =
                          cpp_macro_inst_lookup(macro_inst, next->id_name))) {
@@ -237,11 +237,11 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                    (param_vec = cpp_macro_inst_lookup(macro_inst,
                                                        token->id_name))) {
             vec_iter_advance(&iter);
-            lexeme_t *next = vec_iter_get(&iter);
+            token_t *next = vec_iter_get(&iter);
             if (next->type == HASHHASH) {
                 if (vec_size(param_vec) == 0) {
                     vec_iter_advance(&iter);
-                    lexeme_t *next = vec_iter_get(&iter);
+                    token_t *next = vec_iter_get(&iter);
                     if (next->type == ID &&
                         NULL != (param_vec =
                                  cpp_macro_inst_lookup(macro_inst,
@@ -262,7 +262,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
     }
 
     VEC_FOREACH(cur, output) {
-        lexeme_t *token = vec_get(output, cur);
+        token_t *token = vec_get(output, cur);
         str_set_union_inplace(&token->hideset, hideset);
     }
 
@@ -278,7 +278,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts) {
 
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst) {
-    lexeme_t *lparen = vec_iter_get(ts);
+    token_t *lparen = vec_iter_get(ts);
     assert(lparen->type == LPAREN);
     vec_iter_advance(ts);
 
@@ -310,14 +310,14 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                 param->name = arg->str;
             }
         }
-        lexeme_t *token = vec_iter_get(ts);
+        token_t *token = vec_iter_get(ts);
         if (token->type != RPAREN) {
             ++num_params;
         }
 
         int parens = 0;
         for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
-            lexeme_t *token = vec_iter_get(ts);
+            token_t *token = vec_iter_get(ts);
             if (token->type == LPAREN) {
                 ++parens;
             } else if (parens > 0 && token->type == RPAREN) {
@@ -333,7 +333,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             }
 
             if (cur != NULL) {
-                lexeme_t *copy = token_copy(cs->token_man, token);
+                token_t *copy = token_copy(cs->token_man, token);
                 copy->mark.last = &lparen->mark;
 
                 vec_push_back(&param->stream, copy);
@@ -355,19 +355,19 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
     return CCC_OK;
 }
 
-lexeme_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
+token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
     string_builder_t sb;
     sb_init(&sb, 0);
 
-    lexeme_t *token = token_create(cs->token_man);
+    token_t *token = token_create(cs->token_man);
     token->type = STRING;
-    lexeme_t *first = vec_get(ts, 0);
+    token_t *first = vec_get(ts, 0);
     memcpy(&token->mark, &first->mark, sizeof(fmark_t));
 
     bool last_space = false;
 
     VEC_FOREACH(cur, ts) {
-        lexeme_t *token = vec_get(ts, cur);
+        token_t *token = vec_get(ts, cur);
 
         if (token->type == SPACE) {
             if (!last_space) {
@@ -404,12 +404,12 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
 
     size_t lsize = vec_size(left);
 
-    lexeme_t *rhead = vec_iter_advance(right);
+    token_t *rhead = vec_iter_advance(right);
 
     if (lsize == 0) {
         vec_push_back(left, rhead);
     } else {
-        lexeme_t *ltail = vec_get(left, lsize - 1);
+        token_t *ltail = vec_get(left, lsize - 1);
 
         // Remove the left token
         vec_pop_back(left);

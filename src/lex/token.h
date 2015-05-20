@@ -26,7 +26,7 @@
 #include "util/file_directory.h"
 #include "util/string_set.h"
 
-typedef enum token_t {
+typedef enum token_type_t {
     TOKEN_EOF,
     HASH,          // #
     HASHHASH,      // ##
@@ -160,17 +160,15 @@ typedef enum token_t {
     FLOATLIT,      // Float literal
 
     FUNC,          // __func__
-} token_t;
+} token_type_t;
 
 /**
- * Structure representing a single lexeme
- *
- * Acts as a tagged union
+ * Token structure
  */
-typedef struct lexeme_t {
+typedef struct token_t {
     str_set_t hideset;
-    fmark_t mark;                  /**< Location of lexeme */
-    token_t type;                  /**< Type of lememe */
+    fmark_t mark;                  /**< Location of token */
+    token_type_t type;             /**< Type of token */
 
     union {
         char *id_name;
@@ -187,7 +185,7 @@ typedef struct lexeme_t {
             long double float_val; /**< For floating point types */
         } float_params;
     };
-} lexeme_t;
+} token_t;
 
 typedef struct token_man_t {
     slist_t tokens;
@@ -196,24 +194,24 @@ typedef struct token_man_t {
 void token_man_init(token_man_t *tm);
 void token_man_destroy(token_man_t *tm);
 
-lexeme_t *token_create(token_man_t *tm);
-lexeme_t *token_copy(token_man_t *tm, lexeme_t *token);
+token_t *token_create(token_man_t *tm);
+token_t *token_copy(token_man_t *tm, token_t *token);
 
 /**
  * Prints a token
  *
  * @param token The token to print
  */
-void token_print(FILE *file, lexeme_t *token);
+void token_print(FILE *file, token_t *token);
 
-char *token_str(lexeme_t *token);
+char *token_str(token_t *token);
 
-void token_str_append_sb(string_builder_t *sb, lexeme_t *token);
+void token_str_append_sb(string_builder_t *sb, token_t *token);
 
 /**
  * Returns a pointer to a token's string representation
  */
-const char *token_type_str(token_t token);
+const char *token_type_str(token_type_t token);
 
 
 #endif /* _TOKEN_H_ */

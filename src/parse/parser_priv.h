@@ -44,19 +44,19 @@ typedef struct lex_wrap_t {
 } lex_wrap_t;
 
 /**
- * Get the current lexeme
+ * Get the current token
  *
- * @param Lexer wrapper to get lexeme from
+ * @param Lexer wrapper to get token from
  */
-#define LEX_CUR(wrap) ((lexeme_t *)vec_iter_get(&(wrap)->tokens))
+#define LEX_CUR(wrap) ((token_t *)vec_iter_get(&(wrap)->tokens))
 
 /**
- * Get the next lexeme
+ * Get the next token
  *
- * @param Lexer wrapper to get lexeme from
+ * @param Lexer wrapper to get token from
  */
 #define LEX_NEXT(wrap) \
-    ((lexeme_t *)vec_get((wrap)->tokens.vec, (wrap)->tokens.off + 1))
+    ((token_t *)vec_get((wrap)->tokens.vec, (wrap)->tokens.off + 1))
 
 /**
  * Advance lexer wrapper to next token
@@ -73,7 +73,7 @@ typedef struct lex_wrap_t {
  */
 #define LEX_MATCH(wrap, token)                                          \
     do {                                                                \
-        token_t cur = LEX_CUR(wrap)->type;                              \
+        token_type_t cur = LEX_CUR(wrap)->type;                         \
         if (cur != (token)) {                                           \
             logger_log(&LEX_CUR(wrap)->mark, LOG_ERR,                   \
                        "expected '%s' before '%s' token",               \
@@ -94,7 +94,7 @@ typedef struct lex_wrap_t {
 // TODO1: Replace some parser code with this
 #define LEX_CHECK(wrap, token)                                          \
     do {                                                                \
-        token_t cur = LEX_CUR(wrap)->type;                              \
+        token_type_t cur = LEX_CUR(wrap)->type;                         \
         if (cur != (token)) {                                           \
             logger_log(&LEX_CUR(wrap)->mark, LOG_ERR,                   \
                        "expected '%s' before '%s' token",               \
