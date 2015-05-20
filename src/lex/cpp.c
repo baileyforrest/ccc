@@ -24,6 +24,7 @@
 
 #include "cpp.h"
 #include "cpp_priv.h"
+#include "cpp_directives.h"
 
 #include "util/logger.h"
 #include "util/string_store.h"
@@ -271,9 +272,65 @@ fail:
 }
 
 status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts) {
-    (void)ts;
-    (void)cs;
-    return CCC_OK;
+    status_t status = CCC_OK;
+
+    token_t *token = vec_iter_get(ts);
+    while (token->type == SPACE && vec_iter_has_next(ts)) {
+        vec_iter_advance(ts);
+        token = vec_iter_get(ts);
+    }
+
+    // Single # on a line allowed
+    if (token->type == NEWLINE || token->type == TOKEN_EOF ||
+        !vec_iter_has_next(ts)) {
+        return CCC_OK;
+    }
+
+    token_t *name_token = token;
+
+    cpp_directive_t *dir = NULL;
+
+    if (token->type == ID) {
+        for (dir = directives; ; ++dir) {
+            if (dir->name == NULL) {
+                dir = NULL;
+                break;
+            }
+
+            if (strcmp(dir->name, token->id_name) == 0) {
+                break;
+            }
+        }
+    }
+
+    if (dir == NULL) {
+        char *tok_str = token_str(token);
+        logger_log(&token->mark, LOG_ERR, "invalid preprocessing directive #%s",
+                   token_str);
+        free(tok_str);
+        status = CCC_ESYNTAX;
+    } else {
+        status = dir->func(cs, ts);
+    }
+
+    if (vec_iter_has_next(ts)) {
+        token = vec_iter_get(ts);
+        if (token->type != NEWLINE || token->type != TOKEN_EOF) {
+            if (dir != NULL) {
+                logger_log(&name_token->mark, LOG_WARN,
+                           "extra tokens at end of #%s directive",
+                           dir->name);
+            }
+
+            while (vec_iter_has_next(ts) &&
+                   token->type != NEWLINE && token->type != TOKEN_EOF) {
+                vec_iter_advance(ts);
+                token = vec_iter_get(ts);
+            }
+        }
+    }
+
+    return status;
 }
 
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,

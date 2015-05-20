@@ -103,6 +103,7 @@ char *token_str(token_t *token) {
     sb_init(&sb, 0);
 
     token_print_helper(token, &sb, NULL);
+    sb_compact(&sb);
 
     return sb_buf(&sb);
 }
