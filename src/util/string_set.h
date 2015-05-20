@@ -17,18 +17,32 @@
  * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
  */
 /**
- * C preprocessor interface
+ * String set interface
  */
 
-#ifndef _CPP_H_
-#define _CPP_H_
+#ifndef _STRING_SET_H_
+#define _STRING_SET_H_
 
-#include "lex/lexer.h"
-#include "lex/token.h"
+#include "util/slist.h"
 
-#include "util/vector.h"
+typedef struct str_set_t {
+    sl_link_t *head; /**< str_node_t */
+} str_set_t;
 
-status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filename,
-                     vec_t *output);
+void str_set_init(str_set_t *set);
 
-#endif /* _CPP_H_ */
+void str_set_destroy(str_set_t *set);
+
+void str_set_copy(str_set_t *dest, str_set_t *set);
+
+bool str_set_mem(str_set_t *set, char *str);
+
+void str_set_add(str_set_t *set, char *str);
+
+void str_set_union(str_set_t *set1, str_set_t *set2, str_set_t *dest);
+
+void str_set_union_inplace(str_set_t *dest, str_set_t *other);
+
+void str_set_intersect(str_set_t *set1, str_set_t *set2, str_set_t *dest);
+
+#endif /* _STRING_SET_H_ */

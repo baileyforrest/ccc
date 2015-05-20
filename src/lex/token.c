@@ -27,6 +27,8 @@
 
 #include "lex/symtab.h"
 
+#include "util/string_builder.h"
+
 typedef struct lexeme_node_t {
     sl_link_t link;
     lexeme_t lexeme;
@@ -48,48 +50,76 @@ lexeme_t *token_create(token_man_t *tm) {
     return &result->lexeme;
 }
 
-void token_print(lexeme_t *token) {
+lexeme_t *token_copy(token_man_t *tm, lexeme_t *token) {
+    lexeme_t *result = token_create(tm);
+    memcpy(result, token, sizeof(lexeme_t));
+    str_set_copy(&result->hideset, &token->hideset);
+
+    return result;
+}
+
+void token_print_helper(lexeme_t *token, string_builder_t *sb, FILE *file) {
     assert(token != NULL);
 
     switch (token->type) {
         // Other
     case ID:
-        printf("%s", token->id_name);
+        directed_print(sb, file, "%s", token->id_name);
         break;
     case STRING:
-        printf("\"%s\"", token->id_name);
+        directed_print(sb, file, "\"%s\"", token->str_val);
         break;
     case INTLIT:
-        printf("%lld", token->int_params.int_val);
+        directed_print(sb, file, "%lld", token->int_params.int_val);
         if (token->int_params.hasU) {
-            printf("U");
+            directed_print(sb, file, "U");
         }
         if (token->int_params.hasL) {
-            printf("L");
+            directed_print(sb, file, "L");
         } else if (token->int_params.hasLL) {
-            printf("LL");
+            directed_print(sb, file, "LL");
         }
         break;
     case FLOATLIT:
-        printf("%Lf", token->float_params.float_val);
+        directed_print(sb, file, "%Lf", token->float_params.float_val);
+        if (token->float_params.hasL) {
+            directed_print(sb, file, "L");
+        }
         if (token->float_params.hasF) {
-            printf("F");
+            directed_print(sb, file, "F");
         }
         break;
     default:
-        printf("%s", token_str(token->type));
+        directed_print(sb, file, "%s", token_type_str(token->type));
     }
-    printf("\n");
+}
+
+void token_print(FILE *file, lexeme_t *token) {
+    token_print_helper(token, NULL, file);
+}
+
+char *token_str(lexeme_t *token) {
+    string_builder_t sb;
+    sb_init(&sb, 0);
+
+    token_print_helper(token, &sb, NULL);
+
+    return sb_buf(&sb);
+}
+
+void token_str_append_sb(string_builder_t *sb, lexeme_t *token) {
+    token_print_helper(token, sb, NULL);
 }
 
 #define CASE_TOK_STR(tok, str) \
     case tok: str
 
-const char *token_str(token_t token) {
+const char *token_type_str(token_t token) {
     switch (token) {
     case TOKEN_EOF:     return "";
     case HASH:          return "#";
     case HASHHASH:      return "##";
+    case SPACE:         return " ";
     case NEWLINE:       return "\n";
     case BACKSLASH:     return "\\";
 

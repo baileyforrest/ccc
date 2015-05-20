@@ -77,7 +77,7 @@ typedef struct lex_wrap_t {
         if (cur != (token)) {                                           \
             logger_log(&LEX_CUR(wrap)->mark, LOG_ERR,                   \
                        "expected '%s' before '%s' token",               \
-                       token_str(token), token_str(cur));               \
+                       token_type_str(token), token_type_str(cur));     \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \
@@ -98,7 +98,7 @@ typedef struct lex_wrap_t {
         if (cur != (token)) {                                           \
             logger_log(&LEX_CUR(wrap)->mark, LOG_ERR,                   \
                        "expected '%s' before '%s' token",               \
-                       token_str(token), token_str(cur));               \
+                       token_type_str(token), token_type_str(cur));     \
             status = CCC_ESYNTAX;                                       \
             goto fail;                                                  \
         }                                                               \

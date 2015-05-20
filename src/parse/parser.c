@@ -335,7 +335,8 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     if (LEX_CUR(lex)->type == STATIC_ASSERT) {
         if (*type != NULL) {
             logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
-                       "Unexpected token %s", token_str(LEX_CUR(lex)->type));
+                       "Unexpected token %s",
+                       token_type_str(LEX_CUR(lex)->type));
             return CCC_ESYNTAX;
         }
         LEX_ADVANCE(lex);
@@ -1279,7 +1280,7 @@ status_t par_mem_acc_list(lex_wrap_t *lex, mem_acc_list_t *list, bool nodot) {
             if (LEX_CUR(lex)->type != ID) { // Not a name
                 logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                            "Parse Error: Expected <identifer>, Found: %s.",
-                           token_str(LEX_CUR(lex)->type));
+                           token_type_str(LEX_CUR(lex)->type));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -1551,7 +1552,7 @@ status_t par_postfix_expression(lex_wrap_t *lex, expr_t **result) {
             if (LEX_CUR(lex)->type != ID) { // Not a name
                 logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                            "Parse Error: Expected <identifer>, Found: %s.",
-                           token_str(LEX_CUR(lex)->type));
+                           token_type_str(LEX_CUR(lex)->type));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
@@ -1624,7 +1625,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             if (lex->function == NULL) {
                 logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                            "'%s' is not defined outside of function scope",
-                           token_str(LEX_CUR(lex)->type));
+                           token_type_str(LEX_CUR(lex)->type));
                 base->const_val.str_val = "";
             } else {
                 base->const_val.str_val = lex->function;
@@ -1722,7 +1723,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     default:
         logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
                    "Unexpected token %s. Expected primary expression.",
-                   token_str(LEX_CUR(lex)->type));
+                   token_type_str(LEX_CUR(lex)->type));
         status = CCC_ESYNTAX;
         goto fail;
     }
@@ -1888,7 +1889,7 @@ status_t par_parameter_list(lex_wrap_t *lex, type_t *func) {
             LEX_MATCH(lex, COMMA);
             if (LEX_CUR(lex)->type == RPAREN) {
                 logger_log(&LEX_CUR(lex)->mark, LOG_ERR,
-                           "Unexpected token %s", token_str(COMMA));
+                           "Unexpected token %s", token_type_str(COMMA));
                 status = CCC_ESYNTAX;
                 goto fail;
             }

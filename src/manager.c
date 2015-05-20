@@ -101,7 +101,7 @@ status_t man_dump_tokens(manager_t *manager) {
     status_t status = CCC_OK;
 
     VEC_FOREACH(cur, &manager->tokens) {
-        token_print(vec_get(&manager->tokens, cur));
+        token_print(stdout, vec_get(&manager->tokens, cur));
     }
 
     return status;

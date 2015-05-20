@@ -109,13 +109,16 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
     memcpy(&result->mark, &stream->mark, sizeof(fmark_t));
     int cur = lex_getc_splice(stream);
 
-    // Ignore spaces
+    // Combine spaces
     if (isspace(cur) && cur != '\n') {
         while (isspace(cur) && cur != '\n') {
             cur = lex_getc_splice(stream);
         }
 
         ts_ungetc(cur, stream);
+
+        result->type = SPACE;
+        return status;
     }
 
     int next;
@@ -146,7 +149,8 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
         case '/':
             while ((next = lex_getc_splice(stream)) != '\n')
                 continue;
-            return lex_next_token(lexer, stream, result);
+            result->type = SPACE;
+            break;
 
             // Multi line comment
         case '*': {
@@ -156,7 +160,8 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, lexeme_t *result) {
                     break;
                 }
             }
-            return lex_next_token(lexer, stream, result);
+            result->type = SPACE;
+            break;
         }
 
         case '=': result->type = DIVEQ; break;

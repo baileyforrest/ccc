@@ -31,6 +31,7 @@ typedef enum token_t {
     HASH,          // #
     HASHHASH,      // ##
 
+    SPACE,         // ' '
     NEWLINE,       // '\n'
     BACKSLASH,     // '\\'
 
@@ -194,19 +195,25 @@ typedef struct token_man_t {
 
 void token_man_init(token_man_t *tm);
 void token_man_destroy(token_man_t *tm);
+
 lexeme_t *token_create(token_man_t *tm);
+lexeme_t *token_copy(token_man_t *tm, lexeme_t *token);
 
 /**
  * Prints a token
  *
  * @param token The token to print
  */
-void token_print(lexeme_t *token);
+void token_print(FILE *file, lexeme_t *token);
+
+char *token_str(lexeme_t *token);
+
+void token_str_append_sb(string_builder_t *sb, lexeme_t *token);
 
 /**
  * Returns a pointer to a token's string representation
  */
-const char *token_str(token_t token);
+const char *token_type_str(token_t token);
 
 
 #endif /* _TOKEN_H_ */

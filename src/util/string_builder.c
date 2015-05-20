@@ -22,6 +22,8 @@
 
 #include "string_builder.h"
 
+#include <stdarg.h>
+
 #include "util/util.h"
 
 #define GROWTH_FUNC(size) ((size) < 16 ? 16 : (((size) >> 1) + (size)))
@@ -47,6 +49,15 @@ void sb_compact(string_builder_t *sb) {
     sb->capacity = sb->len;
 }
 
+void sb_reserve(string_builder_t *sb, size_t capacity) {
+    if (capacity < sb->capacity) {
+        return;
+    }
+
+    sb->buf = erealloc(sb->buf, capacity + 1);
+    sb->capacity = capacity;
+}
+
 void sb_clear(string_builder_t *sb) {
     sb->len = 0;
     sb->buf[0] = '\0';
@@ -59,5 +70,23 @@ void sb_append_char(string_builder_t *sb, char val) {
     }
 
     sb->buf[sb->len++] = val;
+    sb->buf[sb->len] = '\0';
+}
+
+void sb_append_printf(string_builder_t *sb, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    sb_append_vprintf(sb, fmt, ap);
+}
+
+void sb_append_vprintf(string_builder_t *sb, char *fmt, va_list ap) {
+    int size = vsnprintf(NULL, 0, fmt, ap) + 1;
+
+    sb_reserve(sb, sb_len(sb) + size);
+
+    vsnprintf(sb_buf(sb) + sb_len(sb), size, fmt, ap);
+
+    sb->len = sb->len + size;
     sb->buf[sb->len] = '\0';
 }

@@ -31,8 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #include "util/slist.h"
+#include "util/string_builder.h"
 
 #define PTR_SIZE (sizeof(void *));
 #define PTR_ALIGN (alignof(void *));
@@ -126,6 +126,8 @@ void *ecalloc(size_t nmemb, size_t size);
  * @return Heap memory returned from realloc
  */
 void *erealloc(void *ptr, size_t size);
+
+void directed_print(string_builder_t *sb, FILE *file, char *fmt, ...);
 
 /**
  * djb2 String hash function for len_str_t.

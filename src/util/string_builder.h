@@ -23,6 +23,7 @@
 #ifndef _STRING_BUILDER_H_
 #define _STRING_BUILDER_H_
 
+#include <stdarg.h>
 #include <stddef.h>
 
 typedef struct string_builder_t {
@@ -45,8 +46,14 @@ void sb_destroy(string_builder_t *sb);
 
 void sb_compact(string_builder_t *sb);
 
+void sb_reserve(string_builder_t *sb, size_t capacity);
+
 void sb_clear(string_builder_t *sb);
 
 void sb_append_char(string_builder_t *sb, char val);
+
+void sb_append_printf(string_builder_t *sb, char *fmt, ...);
+
+void sb_append_vprintf(string_builder_t *sb, char *fmt, va_list ap);
 
 #endif /* _STRING_BUILDER_H_ */

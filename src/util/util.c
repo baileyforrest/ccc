@@ -76,6 +76,19 @@ void *erealloc(void *ptr, size_t size) {
     return result;
 }
 
+// TODO1 Replace ast printing with this
+void directed_print(string_builder_t *sb, FILE *file, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    if (sb == NULL) {
+        assert(file != NULL);
+        vfprintf(file, fmt, ap);
+    } else {
+        sb_append_vprintf(sb, fmt, ap);
+    }
+}
+
 char *unescape_str(char *str) {
     // No forward slashes, just return input string
     if (strchr(str, '\\') == NULL) {
