@@ -85,7 +85,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
     // If its an identifier, then try to expand it
     if (token->type == ID) {
-        vec_iter_advance(ts);
+        cpp_iter_advance(ts);
 
         vec_t input;
         vec_init(&input, 1);
@@ -104,7 +104,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
     switch (token->type) {
     case STRING: // "filename
-        vec_iter_advance(ts);
+        cpp_iter_advance(ts);
         filename = token->str_val;
         status = cpp_include_helper(cs, mark, filename, false, output);
         break;
@@ -112,6 +112,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         string_builder_t sb;
         sb_init(&sb, 0);
 
+        // Don't use cpp_iter_advance, we want to preserve whitespace
         bool done = false;
         vec_iter_advance(ts);
         for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
@@ -210,15 +211,15 @@ status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     vec_init(&macro->params, 0);
     macro->num_params = -1;
 
-    vec_iter_advance(ts);
+    cpp_iter_advance(ts);
 
     if (vec_iter_has_next(ts) && (token = vec_iter_get(ts))->type == LPAREN) {
-        vec_iter_advance(ts);
+        cpp_iter_advance(ts);
         macro->num_params = 0;
 
         bool done = false;
         bool first = true;
-        for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+        for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
             token = vec_iter_get(ts);
             if (token->type == NEWLINE) {
                 break;
@@ -253,6 +254,7 @@ status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
     }
 
+    // Don't use cpp_iter_advance, we want to preserve whitespace
     for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
         token = vec_iter_get(ts);
         if (token->type == NEWLINE) {

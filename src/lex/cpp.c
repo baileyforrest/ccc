@@ -116,11 +116,11 @@ void cpp_state_destroy(cpp_state_t *cs) {
 size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
     size_t skipped = 0;
 
-    for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
         token_t *token = vec_iter_get(ts);
         if (token->type == NEWLINE) {
             if (skip_newline) {
-                vec_iter_advance(ts);
+                cpp_iter_advance(ts);
             }
             break;
         }
@@ -187,7 +187,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
 
     token_t *new_last = NULL, *last = NULL;
-    for (; vec_iter_has_next(ts); vec_iter_advance(ts), last = new_last) {
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts), last = new_last) {
         token_t *token = vec_iter_get(ts);
         new_last = token;
 
@@ -222,7 +222,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             continue;
         }
 
-        vec_iter_advance(ts);
+        cpp_iter_advance(ts);
         token_t *next = vec_iter_get(ts);
         vec_iter_reverse(ts);
 
@@ -288,12 +288,12 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
     vec_iter_t iter = { &macro_inst->macro->stream, 0 };
     status_t status = CCC_OK;
 
-    for (; vec_iter_has_next(&iter); vec_iter_advance(&iter)) {
+    for (; vec_iter_has_next(&iter); cpp_iter_advance(&iter)) {
         token_t *token = vec_iter_get(&iter);
         vec_t *param_vec;
 
         if (token->type == HASH) {
-            vec_iter_advance(&iter);
+            cpp_iter_advance(&iter);
             token_t *param = vec_iter_get(&iter);
             if (param->type != ID ||
                 NULL == (param_vec =
@@ -306,7 +306,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             token_t *stringified = cpp_stringify(cs, param_vec);
             vec_push_back(output, stringified);
         } else if (token->type == HASHHASH) {
-            vec_iter_advance(&iter);
+            cpp_iter_advance(&iter);
             token_t *next = vec_iter_get(&iter);
             if (next->type == ID &&
                 NULL != (param_vec =
@@ -324,11 +324,11 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                    NULL !=
                    (param_vec = cpp_macro_inst_lookup(macro_inst,
                                                        token->id_name))) {
-            vec_iter_advance(&iter);
+            cpp_iter_advance(&iter);
             token_t *next = vec_iter_get(&iter);
             if (next->type == HASHHASH) {
                 if (vec_size(param_vec) == 0) {
-                    vec_iter_advance(&iter);
+                    cpp_iter_advance(&iter);
                     token_t *next = vec_iter_get(&iter);
                     if (next->type == ID &&
                         NULL != (param_vec =
@@ -362,10 +362,6 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
 
     token_t *token = vec_iter_get(ts);
-    while (token->type == SPACE && vec_iter_has_next(ts)) {
-        vec_iter_advance(ts);
-        token = vec_iter_get(ts);
-    }
 
     // Single # on a line allowed
     if (token->type == NEWLINE || token->type == TOKEN_EOF ||
@@ -397,7 +393,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         free(tok_str);
         status = CCC_ESYNTAX;
     } else {
-        vec_iter_advance(ts); // Skip the directive name
+        cpp_iter_advance(ts); // Skip the directive name
         status = dir->func(cs, ts, output);
     }
 
@@ -416,7 +412,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst) {
     token_t *lparen = vec_iter_get(ts);
     assert(lparen->type == LPAREN);
-    vec_iter_advance(ts);
+    cpp_iter_advance(ts);
 
     cpp_macro_t *macro = macro_inst->macro;
     assert(macro->num_params >= 0);
@@ -452,7 +448,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
         }
 
         int parens = 0;
-        for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+        for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
             token_t *token = vec_iter_get(ts);
             if (token->type == LPAREN) {
                 ++parens;
@@ -540,7 +536,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
 
     size_t lsize = vec_size(left);
 
-    token_t *rhead = vec_iter_advance(right);
+    token_t *rhead = cpp_iter_advance(right);
 
     if (lsize == 0) {
         vec_push_back(left, rhead);
@@ -581,8 +577,8 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
     // 0 wraps around to SIZE_MAX
     --nelems;
 
-    while (vec_iter_has_next(right) && nelems > 0) {
-        vec_append(left, vec_iter_advance(right));
+    while (vec_iter_has_next(right) && nelems-- > 0) {
+        vec_push_back(left, cpp_iter_advance(right));
     }
 
     return CCC_OK;
