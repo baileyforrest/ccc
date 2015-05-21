@@ -20,7 +20,6 @@
  * Implementations of misc utilities
  */
 
-#define _DEFAULT_SOURCE 1
 #include "util.h"
 
 #include <assert.h>
@@ -50,6 +49,16 @@ char *ccc_basename(char *path) {
     }
 
     return path + path_len;
+}
+
+char *ccc_dirname(char *path) {
+    size_t path_len = strlen(path);
+    while (path_len > 0 && path[path_len - 1] != '/') {
+        --path_len;
+    }
+    path[path_len] = '\0';
+
+    return path;
 }
 
 void *emalloc(size_t size) {

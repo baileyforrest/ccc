@@ -21,8 +21,6 @@
  */
 // TODO1: exit program on error
 
-#define _DEFAULT_SOURCE 1
-
 #include "tempfile.h"
 
 #include <errno.h>

@@ -32,6 +32,7 @@ typedef struct cpp_state_t {
     token_man_t *token_man;
     lexer_t *lexer;
     htable_t macros; /**< char * -> cpp_macro_t */
+    vec_t search_path; /**< (char *) */
 } cpp_state_t;
 
 typedef struct cpp_macro_t {
@@ -63,7 +64,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                         str_set_t *hideset, vec_t *output);
 
-status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts);
+status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst);

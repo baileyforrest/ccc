@@ -100,6 +100,7 @@ typedef struct len_str_node_node_t {
 void exit_err(char *msg);
 
 char *ccc_basename(char *path);
+char *ccc_dirname(char *path);
 
 /**
  * Malloc that reports error and exits if memory cannot be obtained

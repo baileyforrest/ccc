@@ -26,7 +26,8 @@
 #include "cpp.h"
 #include "cpp_priv.h"
 
-typedef status_t (*cpp_directive_func_t)(cpp_state_t *cs, vec_iter_t *ts);
+typedef status_t (*cpp_directive_func_t)(cpp_state_t *cs, vec_iter_t *ts,
+                                         vec_t *output);
 
 typedef struct cpp_directive_t {
     const char *name;

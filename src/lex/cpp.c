@@ -31,6 +31,17 @@
 
 #define VARARG_NAME "__VA_ARGS__"
 
+static char *search_path[] = {
+    "", // Denotes current directory
+    "/usr/local/include",
+
+    // TODO1: conditionally compile these
+    "/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include"
+
+    "/usr/include",
+
+};
+
 // TODO0: Need to copy in some places for expand/substitute
 
 
@@ -81,10 +92,15 @@ void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
         ind_str_eq,                  // void string compare
     };
 
-    ht_init(&cs->macros, &params);
     cs->filename = NULL;
     cs->token_man = token_man;
     cs->lexer = lexer;
+    ht_init(&cs->macros, &params);
+    vec_init(&cs->search_path, STATIC_ARRAY_LEN(search_path));
+
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(search_path); ++i) {
+        vec_push_back(&cs->search_path, &search_path[i]);
+    }
 }
 
 void cpp_macro_destroy(cpp_macro_t *macro) {
@@ -110,7 +126,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 logger_log(&token->mark, LOG_ERR, "stray '#' in program");
                 break;
             }
-            cpp_handle_directive(cs, ts);
+            cpp_handle_directive(cs, ts, output);
             continue;
         case ID:
             break;
@@ -271,7 +287,7 @@ fail:
     return status;
 }
 
-status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts) {
+status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
 
     token_t *token = vec_iter_get(ts);
@@ -310,7 +326,8 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts) {
         free(tok_str);
         status = CCC_ESYNTAX;
     } else {
-        status = dir->func(cs, ts);
+        vec_iter_advance(ts); // Skip the directive name
+        status = dir->func(cs, ts, output);
     }
 
     if (vec_iter_has_next(ts)) {
