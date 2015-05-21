@@ -20,6 +20,8 @@
  * C preprocessor implementation
  */
 
+// TODO0: Need to copy in some places for expand/substitute
+
 #include <assert.h>
 
 #include "cpp.h"
@@ -42,13 +44,11 @@ static char *search_path[] = {
 
 };
 
-// TODO0: Need to copy in some places for expand/substitute
-
-
 status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filename,
                      vec_t *output) {
     cpp_state_t cs;
     cpp_state_init(&cs, token_man, lexer);
+    cs.cur_filename = filename;
 
     status_t status = cpp_process_file(&cs, filename, output);
 
@@ -97,6 +97,9 @@ void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
     cs->lexer = lexer;
     ht_init(&cs->macros, &params);
     vec_init(&cs->search_path, STATIC_ARRAY_LEN(search_path));
+    cs->cur_filename = NULL;
+    cs->line_mod = 0;
+    cs->line_orig = 0;
 
     for (size_t i = 0; i < STATIC_ARRAY_LEN(search_path); ++i) {
         vec_push_back(&cs->search_path, &search_path[i]);
@@ -104,6 +107,9 @@ void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
 }
 
 void cpp_macro_destroy(cpp_macro_t *macro) {
+    if (macro == NULL) {
+        return;
+    }
     vec_destroy(&macro->stream);
     vec_destroy(&macro->params);
     free(macro);

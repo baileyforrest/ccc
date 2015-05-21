@@ -33,6 +33,9 @@ typedef struct cpp_state_t {
     lexer_t *lexer;
     htable_t macros; /**< char * -> cpp_macro_t */
     vec_t search_path; /**< (char *) */
+    char *cur_filename; /**< filename for __FILE__ */
+    int line_mod; /**< line number that was changed to 0, if unmodified */
+    int line_orig; /**< original line number, used to calulate __LINE__ */
 } cpp_state_t;
 
 typedef struct cpp_macro_t {
