@@ -36,11 +36,12 @@ typedef struct cpp_state_t {
 } cpp_state_t;
 
 typedef struct cpp_macro_t {
-    sl_link_t *link;
+    sl_link_t link;
     char *name;
-    vec_t stream;
-    slist_t params; /**< str_node_t, NULL if varargs */
-    int num_params;
+    fmark_t *mark;
+    vec_t stream; /**< (token_t) */
+    vec_t params; /**< (char *) name NULL if varargs */
+    int num_params; /**< -1 if object like macro */
 } cpp_macro_t;
 
 typedef struct cpp_macro_param_t {
@@ -57,7 +58,18 @@ typedef struct cpp_macro_inst_t {
 status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output);
 
 void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer);
+
+void cpp_macro_destroy(cpp_macro_t *macro);
+
 void cpp_state_destroy(cpp_state_t *cs);
+
+token_t *cpp_iter_advance(vec_iter_t *iter);
+
+void cpp_iter_skip_space(vec_iter_t *iter);
+
+size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline);
+
+bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2);
 
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 

@@ -60,7 +60,7 @@ inline void **vec_elems(vec_t *vec) {
     return vec->elems;
 }
 
-inline size_t vec_size(vec_t *vec) {
+inline size_t vec_size(const vec_t *vec) {
     return vec->size;
 }
 

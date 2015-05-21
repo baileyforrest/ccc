@@ -58,6 +58,31 @@ token_t *token_copy(token_man_t *tm, token_t *token) {
     return result;
 }
 
+bool token_equal(const token_t *t1, const token_t *t2) {
+    if (t1 == t2) {
+        return true;
+    }
+
+    if (t1->type != t2->type) {
+        return false;
+    }
+
+    switch (t1->type) {
+    case ID: return strcmp(t1->id_name, t2->id_name) == 0;
+    case STRING: return strcmp(t1->str_val, t2->str_val) == 0;
+    case INTLIT:
+        return memcmp(&t1->int_params, &t2->int_params, sizeof(t1->int_params))
+            == 0;
+    case FLOATLIT:
+        return memcmp(&t1->float_params, &t2->float_params,
+                      sizeof(t1->float_params)) == 0;
+    default:
+        break;
+    }
+    return true;
+}
+
+
 void token_print_helper(token_t *token, string_builder_t *sb, FILE *file) {
     assert(token != NULL);
 

@@ -194,10 +194,91 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
 }
 
 status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
     (void)output;
-    return CCC_ESYNTAX;
+
+    token_t *token = vec_iter_get(ts);
+    if (token->type != ID) {
+        logger_log(&token->mark, LOG_ERR, "macro names must be identifiers");
+        return CCC_ESYNTAX;
+    }
+    status_t status = CCC_OK;
+
+    cpp_macro_t *macro = emalloc(sizeof(*macro));
+    macro->name = token->id_name;
+    macro->mark = &token->mark;
+    vec_init(&macro->stream, 0);
+    vec_init(&macro->params, 0);
+    macro->num_params = -1;
+
+    vec_iter_advance(ts);
+
+    if (vec_iter_has_next(ts) && (token = vec_iter_get(ts))->type == LPAREN) {
+        vec_iter_advance(ts);
+        macro->num_params = 0;
+
+        bool done = false;
+        bool first = true;
+        for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+            token = vec_iter_get(ts);
+            if (token->type == NEWLINE) {
+                break;
+            }
+            if (token->type == RPAREN) {
+                done = true;
+                break;
+            }
+            if (!first && token->type != COMMA) {
+                logger_log(&token->mark, LOG_ERR,
+                           "macro parameters must be comma-separated");
+                status = CCC_ESYNTAX;
+                goto fail;
+            }
+            if (token->type != ID) {
+                logger_log(&token->mark, LOG_ERR,
+                           "\"%s\" may not appear in macro parameter list",
+                           token_type_str(token->type));
+                status = CCC_ESYNTAX;
+                goto fail;
+            }
+            vec_push_back(&macro->params, token->id_name);
+            ++macro->num_params;
+            first = false;
+        }
+
+        if (!done) {
+            logger_log(macro->mark, LOG_ERR,
+                       "missing ')' in macro parameter list");
+            status = CCC_ESYNTAX;
+            goto fail;
+        }
+    }
+
+    for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+        token = vec_iter_get(ts);
+        if (token->type == NEWLINE) {
+            break;
+        }
+
+        vec_push_back(&macro->stream, token);
+    }
+
+    cpp_macro_t *old_macro = ht_remove(&cs->macros, &macro->name);
+    if (old_macro != NULL) {
+        if (!cpp_macro_equal(macro, old_macro)) {
+            logger_log(macro->mark, LOG_WARN, "\"%s\" redefined", macro->name);
+            logger_log(old_macro->mark, LOG_NOTE,
+                       "this is the location of the previous definition");
+        }
+        cpp_macro_destroy(old_macro);
+    }
+    status = ht_insert(&cs->macros, &macro->link);
+    assert(status == CCC_OK);
+
+    return status;
+
+fail:
+    cpp_macro_destroy(macro);
+    return status;
 }
 
 status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {

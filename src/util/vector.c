@@ -31,7 +31,7 @@
 
 extern void *vec_get(vec_t *vec, size_t idx);
 extern void **vec_elems(vec_t *vec);
-extern size_t vec_size(vec_t *vec);
+extern size_t vec_size(const vec_t *vec);
 extern void *vec_front(vec_t *vec);
 extern void *vec_back(vec_t *vec);
 extern void *vec_pop_back(vec_t *vec);

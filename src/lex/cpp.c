@@ -105,11 +105,82 @@ void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
 
 void cpp_macro_destroy(cpp_macro_t *macro) {
     vec_destroy(&macro->stream);
+    vec_destroy(&macro->params);
     free(macro);
 }
 
 void cpp_state_destroy(cpp_state_t *cs) {
     HT_DESTROY_FUNC(&cs->macros, cpp_macro_destroy);
+}
+
+size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
+    size_t skipped = 0;
+
+    for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+        token_t *token = vec_iter_get(ts);
+        if (token->type == NEWLINE) {
+            if (skip_newline) {
+                vec_iter_advance(ts);
+            }
+            break;
+        }
+        ++skipped;
+    }
+
+    return skipped;
+}
+
+token_t *cpp_iter_advance(vec_iter_t *iter) {
+    cpp_iter_skip_space(iter);
+    return vec_iter_advance(iter);
+}
+
+void cpp_iter_skip_space(vec_iter_t *iter) {
+    for (; vec_iter_has_next(iter); vec_iter_advance(iter)) {
+        token_t *token = vec_iter_get(iter);
+        if (token->type != SPACE) {
+            break;
+        }
+    }
+}
+
+
+bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2) {
+    if (m1 == m2) {
+        return true;
+    }
+
+    if (m1->num_params != m2->num_params) {
+        return false;
+    }
+
+    if (strcmp(m1->name, m2->name) != 0) {
+        return false;
+    }
+    if (vec_size(&m1->params) != vec_size(&m2->params)) {
+        return false;
+    }
+    for (size_t i = 0; i < vec_size(&m1->params); ++i) {
+        if (strcmp(vec_get(&m1->params, i), vec_get(&m2->params, i)) != 0) {
+            return false;
+        }
+    }
+
+    vec_iter_t stream1 = { &m1->stream, 0 }, stream2 = { &m2->stream, 0 };
+    cpp_iter_skip_space(&stream1);
+    cpp_iter_skip_space(&stream2);
+    while (vec_iter_has_next(&stream1) && vec_iter_has_next(&stream2)) {
+        token_t *t1 = vec_iter_get(&stream1);
+        token_t *t2 = vec_iter_get(&stream2);
+        if (!token_equal(t1, t2)) {
+            return false;
+        }
+
+        cpp_iter_advance(&stream1);
+        cpp_iter_advance(&stream2);
+    }
+
+    return true;
 }
 
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
@@ -330,20 +401,11 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         status = dir->func(cs, ts, output);
     }
 
-    if (vec_iter_has_next(ts)) {
-        token = vec_iter_get(ts);
-        if (token->type != NEWLINE || token->type != TOKEN_EOF) {
-            if (dir != NULL) {
-                logger_log(&name_token->mark, LOG_WARN,
-                           "extra tokens at end of #%s directive",
-                           dir->name);
-            }
-
-            while (vec_iter_has_next(ts) &&
-                   token->type != NEWLINE && token->type != TOKEN_EOF) {
-                vec_iter_advance(ts);
-                token = vec_iter_get(ts);
-            }
+    if (cpp_skip_line(ts, true) > 1) {
+        if (dir != NULL && status == CCC_OK) {
+            logger_log(&name_token->mark, LOG_WARN,
+                       "extra tokens at end of #%s directive",
+                       dir->name);
         }
     }
 
@@ -362,22 +424,22 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
     int num_params = 0;
 
     bool done = false;
-    sl_link_t *cur = macro->params.head;
+    int cur = 0;
 
     while (!done) {
         bool vararg = false;
         str_node_t *arg = NULL;
         cpp_macro_param_t *param = NULL;
 
-        if (cur != NULL) {
-            arg = GET_ELEM(&macro->params, cur);
+        if (cur < macro->num_params) {
+            arg = vec_get(&macro->params, cur);
             param = emalloc(sizeof(cpp_macro_param_t));
 
             vec_init(&param->stream, 0);
 
             if (arg->str == NULL) {
                 // Must be last argument
-                assert(arg == sl_tail(&macro->params));
+                assert(cur = macro->num_params - 1);
                 vararg = true;
                 param->name = VARARG_NAME;
             } else {
@@ -406,7 +468,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                 }
             }
 
-            if (cur != NULL) {
+            if (cur < macro->num_params) {
                 token_t *copy = token_copy(cs->token_man, token);
                 copy->mark.last = &lparen->mark;
 
@@ -414,8 +476,8 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             }
         }
 
-        if (cur != NULL) {
-            cur = cur->next;
+        if (cur < macro->num_params) {
+            ++cur;
         }
     }
 

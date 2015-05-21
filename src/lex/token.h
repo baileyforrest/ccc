@@ -197,6 +197,8 @@ void token_man_destroy(token_man_t *tm);
 token_t *token_create(token_man_t *tm);
 token_t *token_copy(token_man_t *tm, token_t *token);
 
+bool token_equal(const token_t *t1, const token_t *t2);
+
 /**
  * Prints a token
  *
