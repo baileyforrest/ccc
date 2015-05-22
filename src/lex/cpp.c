@@ -28,6 +28,8 @@
 #include "cpp_priv.h"
 #include "cpp_directives.h"
 
+#include "optman.h"
+
 #include "util/logger.h"
 #include "util/string_store.h"
 
@@ -44,13 +46,59 @@ static char *search_path[] = {
 
 };
 
+static char *predef_macros[] = {
+    // Standard C required macros
+    "__STDC__ 1", // ISO C
+    "__STDC_VERSION__ 201112L", // C11
+    "__STDC_HOSTED__ 1", // stdlib available
+
+    "__STDC_UTF_16__ 1", // UTF16 supported
+    "__STDC_UTF_32__ 1", // UTF32 supported
+
+    // We don't support these C features
+    "__STDC_NO_ATOMICS__ 1",
+    "__STDC_NO_COMPLEX__ 1",
+    "__STDC_NO_THREADS__ 1",
+    "__STDC_NO_VLA__ 1",
+
+    // Required for compatability
+    "__alignof__ _Alignof",
+    "__FUNCTION__ __func__",
+
+#ifdef __x86_64__
+    "__amd64 1",
+    "__amd64__ 1",
+    "__x86_64 1",
+    "__x86_64__ 1",
+#endif
+
+#ifdef __linux
+    "__linux 1",
+    "__linux__ 1",
+    "__gnu_linux__ 1",
+    "__unix 1",
+    "__unix__ 1",
+    "_LP64 1",
+    "__LP64__ 1",
+    "__ELF__ 1",
+#endif
+
+    // TODO1: Conditionally compile or handle these better
+    "char16_t short",
+    "char32_t int"
+};
+
 status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
                      vec_t *output) {
+    status_t status = CCC_OK;
+
     cpp_state_t cs;
-    cpp_state_init(&cs, token_man, lexer);
+    if (CCC_OK != (status = cpp_state_init(&cs, token_man, lexer))) {
+        return status;
+    }
     cs.cur_filename = ccc_basename(filepath);
 
-    status_t status = cpp_process_file(&cs, filepath, output);
+    status = cpp_process_file(&cs, filepath, output);
 
     cpp_state_destroy(&cs);
 
@@ -83,7 +131,10 @@ fail:
     return status;
 }
 
-void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
+status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
+                        lexer_t *lexer) {
+    status_t status = CCC_OK;
+
     static const ht_params_t params = {
         0,                           // Size estimate
         offsetof(cpp_macro_t, name), // Offset of key
@@ -105,9 +156,32 @@ void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
     cs->ignore = true;
     cs->last_dir = CPP_DIR_NONE;
 
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(search_path); ++i) {
-        vec_push_back(&cs->search_path, &search_path[i]);
+    // Add search path from command line options
+    VEC_FOREACH(cur, &optman.include_paths) {
+        vec_push_back(&cs->search_path, vec_get(&optman.include_paths, cur));
     }
+
+    // Add default search path
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(search_path); ++i) {
+        vec_push_back(&cs->search_path, search_path[i]);
+    }
+
+    // Add default macros
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(predef_macros); ++i) {
+        if (CCC_OK !=
+            (status = cpp_macro_define(cs, predef_macros[i], false))) {
+            return status;
+        }
+    }
+
+    VEC_FOREACH(cur, &optman.macros) {
+        char *macro = vec_get(&optman.macros, cur);
+        if (CCC_OK != (status = cpp_macro_define(cs, macro, false))) {
+            return status;
+        }
+    }
+
+    return CCC_OK;
 }
 
 void cpp_macro_destroy(cpp_macro_t *macro) {
@@ -427,8 +501,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     return status;
 }
 
-status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq,
-                          cpp_macro_t **macro) {
+status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq) {
     status_t status = CCC_OK;
     tstream_t stream;
     ts_init(&stream, string, string + strlen(string), COMMAND_LINE_FILENAME,
@@ -441,7 +514,7 @@ status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq,
     }
 
     vec_iter_t tstream = { &tokens, 0 };
-    if (CCC_OK != (status = cpp_define_helper(&tstream, has_eq, macro))) {
+    if (CCC_OK != (status = cpp_define_helper(cs, &tstream, has_eq))) {
         goto fail;
     }
 

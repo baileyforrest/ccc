@@ -30,47 +30,6 @@
 #include "typecheck/typechecker.h"
 #include "util/logger.h"
 
-#define VERIFY_TOK_ID(token)                            \
-    do {                                                    \
-        if (token->type != ID) {                            \
-            logger_log(&token->mark, LOG_ERR,               \
-                       "macro names must be identifiers");  \
-            return CCC_ESYNTAX;                             \
-        }                                                   \
-    } while (0)
-
-#define DIR_DECL(directive) \
-    status_t cpp_dir_ ## directive(cpp_state_t *cs, vec_iter_t *ts, \
-                                   vec_t *output)
-
-DIR_DECL(include);
-
-DIR_DECL(define);
-DIR_DECL(undef);
-
-DIR_DECL(ifdef);
-DIR_DECL(ifndef);
-DIR_DECL(if);
-DIR_DECL(elif);
-DIR_DECL(else);
-DIR_DECL(endif);
-
-DIR_DECL(error);
-DIR_DECL(warning);
-
-DIR_DECL(pragma);
-DIR_DECL(line);
-
-status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
-                            bool bracket, vec_t *output);
-
-status_t cpp_dir_error_helper(vec_iter_t *ts, bool is_err);
-
-status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
-                       bool if_taken);
-
-status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val);
-
 #define DIR_ENTRY(directive, if_ignored) \
     { #directive, cpp_dir_ ## directive, CPP_DIR_ ## directive, if_ignored }
 
@@ -216,28 +175,10 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
 
 status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
-    status_t status = CCC_OK;
-    cpp_macro_t *macro;
-    if (CCC_OK != (status = cpp_define_helper(ts, false, &macro))) {
-        return status;
-    }
-
-    cpp_macro_t *old_macro = ht_remove(&cs->macros, &macro->name);
-    if (old_macro != NULL) {
-        if (!cpp_macro_equal(macro, old_macro)) {
-            logger_log(macro->mark, LOG_WARN, "\"%s\" redefined", macro->name);
-            logger_log(old_macro->mark, LOG_NOTE,
-                       "this is the location of the previous definition");
-        }
-        cpp_macro_destroy(old_macro);
-    }
-    status = ht_insert(&cs->macros, &macro->link);
-    assert(status == CCC_OK);
-
-    return status;
+    return cpp_define_helper(cs, ts, false);
 }
 
-status_t cpp_define_helper(vec_iter_t *ts, bool has_eq, cpp_macro_t **result) {
+status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
 
@@ -307,7 +248,18 @@ status_t cpp_define_helper(vec_iter_t *ts, bool has_eq, cpp_macro_t **result) {
         vec_push_back(&macro->stream, token);
     }
 
-    *result = macro;
+    cpp_macro_t *old_macro = ht_remove(&cs->macros, &macro->name);
+    if (old_macro != NULL) {
+        if (!cpp_macro_equal(macro, old_macro)) {
+            logger_log(macro->mark, LOG_WARN, "\"%s\" redefined", macro->name);
+            logger_log(old_macro->mark, LOG_NOTE,
+                       "this is the location of the previous definition");
+        }
+        cpp_macro_destroy(old_macro);
+    }
+    status = ht_insert(&cs->macros, &macro->link);
+    assert(status == CCC_OK);
+
     return status;
 
 fail:

@@ -83,9 +83,19 @@ typedef struct cpp_macro_inst_t {
     slist_t args;       /**< cpp_macro_param_t */
 } cpp_macro_inst_t;
 
+#define VERIFY_TOK_ID(token)                                \
+    do {                                                    \
+        if (token->type != ID) {                            \
+            logger_log(&token->mark, LOG_ERR,               \
+                       "macro names must be identifiers");  \
+            return CCC_ESYNTAX;                             \
+        }                                                   \
+    } while (0)
+
 status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output);
 
-void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer);
+status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
+                        lexer_t *lexer);
 
 void cpp_macro_destroy(cpp_macro_t *macro);
 
@@ -106,8 +116,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
 
 status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 
-status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq,
-                          cpp_macro_t **macro);
+status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq);
 
 
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,

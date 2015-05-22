@@ -38,6 +38,39 @@ typedef struct cpp_directive_t {
 
 extern cpp_directive_t directives[];
 
-status_t cpp_define_helper(vec_iter_t *ts, bool has_eq, cpp_macro_t **result);
+#define DIR_DECL(directive) \
+    status_t cpp_dir_ ## directive(cpp_state_t *cs, vec_iter_t *ts, \
+                                   vec_t *output)
+
+DIR_DECL(include);
+
+DIR_DECL(define);
+DIR_DECL(undef);
+
+DIR_DECL(ifdef);
+DIR_DECL(ifndef);
+DIR_DECL(if);
+DIR_DECL(elif);
+DIR_DECL(else);
+DIR_DECL(endif);
+
+DIR_DECL(error);
+DIR_DECL(warning);
+
+DIR_DECL(pragma);
+DIR_DECL(line);
+
+status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
+                            bool bracket, vec_t *output);
+
+status_t cpp_dir_error_helper(vec_iter_t *ts, bool is_err);
+
+status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
+                       bool if_taken);
+
+status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val);
+
+
+status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq);
 
 #endif /* _CPP_DIRECTIVES_H_ */
