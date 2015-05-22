@@ -25,26 +25,29 @@
 
 #include "util/slist.h"
 
-typedef struct str_set_t {
-    sl_link_t *head; /**< str_node_t */
-} str_set_t;
+typedef struct str_set_t str_set_t;
 
-#define STR_SET_LIT { NULL }
+struct str_set_t {
+    str_set_t *next;
+    char *str;
+};
 
-void str_set_init(str_set_t *set);
+#define STR_SET_LIT NULL
+
+str_set_t *str_set_empty(void);
 
 void str_set_destroy(str_set_t *set);
 
-void str_set_copy(str_set_t *dest, str_set_t *set);
+str_set_t *str_set_copy(str_set_t *set);
 
 bool str_set_mem(str_set_t *set, char *str);
 
-void str_set_add(str_set_t *set, char *str);
+str_set_t *str_set_add(str_set_t *set, char *str);
 
-void str_set_union(str_set_t *set1, str_set_t *set2, str_set_t *dest);
+str_set_t *str_set_union(str_set_t *set1, str_set_t *set2);
 
-void str_set_union_inplace(str_set_t *dest, str_set_t *other);
+str_set_t *str_set_union_inplace(str_set_t *dest, str_set_t *other);
 
-void str_set_intersect(str_set_t *set1, str_set_t *set2, str_set_t *dest);
+str_set_t *str_set_intersect(str_set_t *set1, str_set_t *set2);
 
 #endif /* _STRING_SET_H_ */

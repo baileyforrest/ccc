@@ -233,7 +233,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         assert(token->type == ID);
 
         // If the current token is a member of the hideset, just pass it
-        if (str_set_mem(&token->hideset, token->id_name)) {
+        if (str_set_mem(token->hideset, token->id_name)) {
             vec_push_back(output, token);
             continue;
         }
@@ -252,17 +252,17 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         cpp_macro_inst_t macro_inst =
             { macro, SLIST_LIT(offsetof(cpp_macro_param_t, link)) };
 
-        str_set_t hideset;
+        str_set_t *hideset;
 
         vec_t subbed;
         vec_init(&subbed, 0);
 
         // Object like macro
         if (macro->num_params == 0) {
-            str_set_copy(&hideset, &token->hideset);
-            str_set_add(&hideset, token->id_name);
+            hideset = str_set_copy(token->hideset);
+            str_set_add(hideset, token->id_name);
             if (CCC_OK !=
-                (status = cpp_substitute(cs, &macro_inst, &hideset, &subbed))) {
+                (status = cpp_substitute(cs, &macro_inst, hideset, &subbed))) {
                 goto fail;
             }
         } else {
@@ -272,10 +272,10 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             }
             token_t *rparen = vec_iter_get(ts);
             assert(rparen->type == RPAREN);
-            str_set_intersect(&token->hideset, &rparen->hideset, &hideset);
-            str_set_add(&hideset, token->id_name);
+            hideset = str_set_intersect(token->hideset, rparen->hideset);
+            str_set_add(hideset, token->id_name);
             if (CCC_OK !=
-                (status = cpp_substitute(cs, &macro_inst, &hideset, &subbed))) {
+                (status = cpp_substitute(cs, &macro_inst, hideset, &subbed))) {
                 goto fail;
             }
         }
@@ -285,12 +285,12 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             vec_push_back(output, token);
         }
 
-        str_set_destroy(&hideset);
+        str_set_destroy(hideset);
         vec_destroy(&subbed);
         continue;
 
     fail:
-        str_set_destroy(&hideset);
+        str_set_destroy(hideset);
         vec_destroy(&subbed);
         goto done;
     }
@@ -367,7 +367,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
 
     VEC_FOREACH(cur, output) {
         token_t *token = vec_get(output, cur);
-        str_set_union_inplace(&token->hideset, hideset);
+        str_set_union_inplace(token->hideset, hideset);
     }
 
 fail:
@@ -467,7 +467,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
 
     while (!done) {
         bool vararg = false;
-        str_node_t *arg = NULL;
+        char *arg = NULL;
         cpp_macro_param_t *param = NULL;
 
         if (cur < macro->num_params) {
@@ -476,13 +476,13 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
 
             vec_init(&param->stream, 0);
 
-            if (arg->str == NULL) {
+            if (arg == NULL) {
                 // Must be last argument
                 assert(cur = macro->num_params - 1);
                 vararg = true;
                 param->name = VARARG_NAME;
             } else {
-                param->name = arg->str;
+                param->name = arg;
             }
         }
         token_t *token = vec_iter_get(ts);

@@ -24,40 +24,36 @@
 
 #include "util/util.h"
 
-#define STR_SET_ELEM(list_link) \
-    (str_node_t *)((char *)(list_link) - offsetof(str_node_t, link));
-
-void str_set_init(str_set_t *set) {
-    set->head = NULL;
+str_set_t *str_set_empty(void) {
+    return NULL;
 }
 
 void str_set_destroy(str_set_t *set) {
-    for (sl_link_t *cur = set->head, *next; cur != NULL; cur = next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-        next = cur->next;
-        free(elem);
+    for (str_set_t *next; set != NULL; set = next) {
+        next = set->next;
+        free(set);
     }
 }
 
-void str_set_copy(str_set_t *dest, str_set_t *set) {
-    str_set_init(dest);
-    sl_link_t **ptail = &dest->head;
+str_set_t *str_set_copy(str_set_t *set) {
+    str_set_t *dest = NULL;
+    str_set_t **ptail = &dest;
 
-    for (sl_link_t *cur = set->head; cur != NULL; cur = cur->next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-
-        str_node_t *new_elem = emalloc(sizeof(str_node_t));
-        new_elem->str = elem->str;
-        *ptail = &new_elem->link;
-        ptail = &new_elem->link.next;
+    for (; set != NULL; set = set->next) {
+        str_set_t *new_node = emalloc(sizeof(str_set_t));
+        new_node->str = set->str;
+        *ptail = new_node;
+        ptail = &new_node->next;
     }
+
     *ptail = NULL;
+
+    return dest;
 }
 
 bool str_set_mem(str_set_t *set, char *str) {
-    for (sl_link_t *cur = set->head; cur != NULL; cur = cur->next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-        if (strcmp(str, elem->str) == 0) {
+    for (; set != NULL; set = set->next) {
+        if (strcmp(str, set->str) == 0) {
             return true;
         }
     }
@@ -65,49 +61,52 @@ bool str_set_mem(str_set_t *set, char *str) {
     return false;
 }
 
-void str_set_add(str_set_t *set, char *str) {
-    sl_link_t **pcur;
-    for (pcur = &set->head; *pcur != NULL; pcur = &(*pcur)->next) {
-        str_node_t *elem = STR_SET_ELEM(*pcur);
-        if (strcmp(str, elem->str) == 0) {
-            return;
+str_set_t *str_set_add(str_set_t *set, char *str) {
+    str_set_t **pset;
+    for (pset = &set; *pset != NULL; pset = &(*pset)->next) {
+        if (strcmp((*pset)->str, str) == 0) {
+            return set;
         }
     }
 
-    str_node_t *new_elem = emalloc(sizeof(str_node_t));
+    str_set_t *new_elem = emalloc(sizeof(str_set_t));
     new_elem->str = str;
-    *pcur = &new_elem->link;
-    new_elem->link.next = NULL;
+    new_elem->next = NULL;
+    *pset = new_elem;
+
+    return set;
 }
 
-void str_set_union(str_set_t *set1, str_set_t *set2, str_set_t *dest) {
-    str_set_init(dest);
+str_set_t *str_set_union(str_set_t *set1, str_set_t *set2) {
+    str_set_t *dest = str_set_empty();
 
-    for (sl_link_t *cur = set1->head; cur != NULL; cur = cur->next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-        str_set_add(dest, elem->str);
+    for (; set1 != NULL; set1 = set1->next) {
+        str_set_add(dest, set1->str);
     }
 
-    for (sl_link_t *cur = set2->head; cur != NULL; cur = cur->next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-        str_set_add(dest, elem->str);
+    for (; set2 != NULL; set2 = set2->next) {
+        str_set_add(dest, set2->str);
     }
+
+    return dest;
 }
 
-void str_set_union_inplace(str_set_t *dest, str_set_t *other) {
-    for (sl_link_t *cur = other->head; cur != NULL; cur = cur->next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-        str_set_add(dest, elem->str);
+str_set_t *str_set_union_inplace(str_set_t *dest, str_set_t *other) {
+    for (; other != NULL; other = other->next) {
+        str_set_add(dest, other->str);
     }
+
+    return dest;
 }
 
-void str_set_intersect(str_set_t *set1, str_set_t *set2, str_set_t *dest) {
-    str_set_init(dest);
+str_set_t *str_set_intersect(str_set_t *set1, str_set_t *set2) {
+    str_set_t *dest = str_set_empty();
 
-    for (sl_link_t *cur = set1->head; cur != NULL; cur = cur->next) {
-        str_node_t *elem = STR_SET_ELEM(cur);
-        if (str_set_mem(set2, elem->str)) {
-            str_set_add(dest, elem->str);
+    for (; set1 != NULL; set1 = set1->next) {
+        if (str_set_mem(set2, set1->str)) {
+            str_set_add(dest, set1->str);
         }
     }
+
+    return dest;
 }

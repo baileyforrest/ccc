@@ -166,7 +166,7 @@ typedef enum token_type_t {
  * Token structure
  */
 typedef struct token_t {
-    str_set_t hideset;
+    str_set_t *hideset;
     fmark_t mark;                  /**< Location of token */
     token_type_t type;             /**< Type of token */
 

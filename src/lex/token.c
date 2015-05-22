@@ -57,7 +57,7 @@ void token_man_destroy(token_man_t *tm) {
 token_t *token_create(token_man_t *tm) {
     token_node_t *result = emalloc(sizeof(token_node_t));
     sl_append(&tm->tokens, &result->link);
-    str_set_init(&result->token.hideset);
+    result->token.hideset = str_set_empty();
 
     return &result->token;
 }
@@ -65,7 +65,7 @@ token_t *token_create(token_man_t *tm) {
 token_t *token_copy(token_man_t *tm, token_t *token) {
     token_t *result = token_create(tm);
     memcpy(result, token, sizeof(token_t));
-    str_set_copy(&result->hideset, &token->hideset);
+    result->hideset = str_set_copy(token->hideset);
 
     return result;
 }

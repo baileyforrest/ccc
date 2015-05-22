@@ -58,29 +58,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif /* MIN */
 
-/**
- * String with length attached
- */
-typedef struct len_str_t {
-    char *str;  /**< String. Possibly non null terminated */
-    size_t len; /**< Length of the string (not including NULL) */
-} len_str_t;
-
-/**
- * Macro for creating a len_str_t literal from a literal string
- *
- * @param str The string to create the literal it with
- */
-#define LEN_STR_LIT(str) { str, sizeof(str) - 1 }
-
-/**
- * String slist node
- */
-typedef struct len_str_node_t {
-    sl_link_t link; /**< Singly linked list node */
-    len_str_t str;  /**< Stored string object */
-} len_str_node_t;
-
+// TODO0: Remove this in favor of string vectors to avoid many small allocations
 /**
  * String slist node
  */
@@ -88,14 +66,6 @@ typedef struct str_node_t {
     sl_link_t link; /**< Singly linked list node */
     char *str;      /**< Stored string object */
 } str_node_t;
-
-/**
- * Structure for storage of len_str_node_t
- */
-typedef struct len_str_node_node_t {
-    sl_link_t link;
-    len_str_node_t node;
-} len_str_node_node_t;
 
 void exit_err(char *msg);
 
@@ -131,7 +101,7 @@ void *erealloc(void *ptr, size_t size);
 void directed_print(string_builder_t *sb, FILE *file, char *fmt, ...);
 
 /**
- * djb2 String hash function for len_str_t.
+ * djb2 String hash function
  * Must be void * for hashtable interface
  *
  * Source: http://www.cse.yorku.ca/~oz/hash.html
@@ -162,46 +132,6 @@ inline bool ind_str_eq(const void *vstr1, const void *vstr2) {
     const char *str2 = *(const char **)vstr2;
 
     return strcmp(str1, str2) == 0;
-}
-
-/**
- * djb2 String hash function for len_str_t.
- * Must be void * for hashtable interface
- *
- * Source: http://www.cse.yorku.ca/~oz/hash.html
- *
- * @param vstr The len_str_t to hash
- */
-inline uint32_t len_str_hash(const void *vstr) {
-    const len_str_t *len_str = (const len_str_t *)vstr;
-    const char *str = len_str->str;
-    size_t len = len_str->len;
-    uint32_t hash = 5381;
-    int c;
-
-    while (len-- > 0 && (c = *str++)) {
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-    }
-
-    return hash;
-}
-
-/**
- * String compare with void pointers to be compatible with the hash table
- * interface
- *
- * @param vstr1 First string
- * @param vstr2 Second string
- */
-inline bool len_str_eq(const void *vstr1, const void *vstr2) {
-    const len_str_t *str1 = (const len_str_t *)vstr1;
-    const len_str_t *str2 = (const len_str_t *)vstr2;
-
-    if (str1->len != str2->len) {
-        return false;
-    }
-
-    return strncmp(str1->str, str2->str, str1->len) == 0;
 }
 
 char *unescape_str(char *str);
