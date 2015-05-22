@@ -88,49 +88,6 @@ static char *predef_macros[] = {
     "char32_t int"
 };
 
-status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
-                     vec_t *output) {
-    status_t status = CCC_OK;
-
-    cpp_state_t cs;
-    if (CCC_OK != (status = cpp_state_init(&cs, token_man, lexer))) {
-        return status;
-    }
-    cs.cur_filename = ccc_basename(filepath);
-
-    status = cpp_process_file(&cs, filepath, output);
-
-    cpp_state_destroy(&cs);
-
-    return status;
-}
-
-status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output) {
-    status_t status = CCC_OK;
-    vec_t file_tokens;
-    vec_init(&file_tokens, 0);
-
-    fdir_entry_t *entry;
-    if (CCC_OK != (status = fdir_insert(filename, &entry))) {
-        goto fail;
-    }
-
-    tstream_t stream;
-    ts_init(&stream, entry->buf, entry->end, entry->filename, NULL);
-
-    if (CCC_OK != (status = lexer_lex_stream(cs->lexer, &stream,
-                                             &file_tokens))) {
-        goto fail;
-    }
-
-    vec_iter_t iter = { &file_tokens, 0 };
-    status = cpp_expand(cs, &iter, output);
-
-fail:
-    vec_destroy(&file_tokens);
-    return status;
-}
-
 status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
                         lexer_t *lexer) {
     status_t status = CCC_OK;
@@ -153,7 +110,7 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
     cs->line_orig = 0;
     cs->if_count = 0;
     cs->if_taken = false;
-    cs->ignore = true;
+    cs->ignore = false;
     cs->last_dir = CPP_DIR_NONE;
 
     // Add search path from command line options
@@ -265,6 +222,81 @@ bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2) {
     }
 
     return true;
+}
+
+vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name) {
+    SL_FOREACH(cur, &inst->args) {
+        cpp_macro_param_t *param = GET_ELEM(&inst->args, cur);
+        if (strcmp(param->name, arg_name) == 0) {
+            return &param->stream;
+        }
+    }
+    return NULL;
+}
+
+status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq) {
+    status_t status = CCC_OK;
+    tstream_t stream;
+    ts_init(&stream, string, string + strlen(string), COMMAND_LINE_FILENAME,
+            NULL);
+    vec_t tokens;
+    vec_init(&tokens, 0);
+
+    if (CCC_OK != (status = lexer_lex_stream(cs->lexer, &stream, &tokens))) {
+        goto fail;
+    }
+
+    vec_iter_t tstream = { &tokens, 0 };
+    if (CCC_OK != (status = cpp_define_helper(cs, &tstream, has_eq))) {
+        goto fail;
+    }
+
+fail:
+    vec_destroy(&tokens);
+    return status;
+}
+
+status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
+                     vec_t *output) {
+    status_t status = CCC_OK;
+
+    cpp_state_t cs;
+    if (CCC_OK != (status = cpp_state_init(&cs, token_man, lexer))) {
+        return status;
+    }
+    cs.cur_filename = ccc_basename(filepath);
+
+    status = cpp_process_file(&cs, filepath, output);
+
+    cpp_state_destroy(&cs);
+
+    return status;
+}
+
+status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output) {
+    status_t status = CCC_OK;
+    vec_t file_tokens;
+    vec_init(&file_tokens, 0);
+
+    fdir_entry_t *entry;
+    if (CCC_OK != (status = fdir_insert(filename, &entry))) {
+        goto fail;
+    }
+
+    tstream_t stream;
+    ts_init(&stream, entry->buf, entry->end, entry->filename, NULL);
+
+    if (CCC_OK != (status = lexer_lex_stream(cs->lexer, &stream,
+                                             &file_tokens))) {
+        goto fail;
+    }
+
+    vec_iter_t iter = { &file_tokens, 0 };
+    status = cpp_expand(cs, &iter, output);
+
+fail:
+    vec_destroy(&file_tokens);
+    return status;
 }
 
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
@@ -501,29 +533,6 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     return status;
 }
 
-status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq) {
-    status_t status = CCC_OK;
-    tstream_t stream;
-    ts_init(&stream, string, string + strlen(string), COMMAND_LINE_FILENAME,
-            NULL);
-    vec_t tokens;
-    vec_init(&tokens, 0);
-
-    if (CCC_OK != (status = lexer_lex_stream(cs->lexer, &stream, &tokens))) {
-        goto fail;
-    }
-
-    vec_iter_t tstream = { &tokens, 0 };
-    if (CCC_OK != (status = cpp_define_helper(cs, &tstream, has_eq))) {
-        goto fail;
-    }
-
-fail:
-    vec_destroy(&tokens);
-    return status;
-}
-
-
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst) {
     token_t *lparen = vec_iter_get(ts);
@@ -634,16 +643,6 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
     sb_destroy(&sb);
 
     return token;
-}
-
-vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name) {
-    SL_FOREACH(cur, &inst->args) {
-        cpp_macro_param_t *param = GET_ELEM(&inst->args, cur);
-        if (strcmp(param->name, arg_name) == 0) {
-            return &param->stream;
-        }
-    }
-    return NULL;
 }
 
 status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
