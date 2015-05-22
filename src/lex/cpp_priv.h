@@ -27,15 +27,40 @@
 
 #include "util/htable.h"
 
+typedef enum cpp_dir_type_t {
+    CPP_DIR_NONE,
+    CPP_DIR_include,
+    CPP_DIR_define,
+    CPP_DIR_undef,
+    CPP_DIR_ifdef,
+    CPP_DIR_ifndef,
+    CPP_DIR_if,
+    CPP_DIR_elif,
+    CPP_DIR_else,
+    CPP_DIR_endif,
+    CPP_DIR_error,
+    CPP_DIR_warning,
+    CPP_DIR_pragma,
+    CPP_DIR_line,
+} cpp_dir_type_t;
+
+
 typedef struct cpp_state_t {
     char *filename;
     token_man_t *token_man;
     lexer_t *lexer;
     htable_t macros; /**< char * -> cpp_macro_t */
     vec_t search_path; /**< (char *) */
+
     char *cur_filename; /**< filename for __FILE__ */
     int line_mod; /**< line number that was changed to 0, if unmodified */
     int line_orig; /**< original line number, used to calulate __LINE__ */
+
+    cpp_dir_type_t last_dir;
+
+    int if_count;
+    bool if_taken;
+    bool ignore;
 } cpp_state_t;
 
 typedef struct cpp_macro_t {

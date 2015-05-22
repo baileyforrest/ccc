@@ -29,6 +29,18 @@
 
 #include "util/string_builder.h"
 
+#define INT_TOK_LIT(val) {                                              \
+        STR_SET_LIT,                                                    \
+        FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),    \
+        INTLIT,                                                         \
+        .int_params = { false, false, false, val }                      \
+    }
+
+token_t token_int_zero = INT_TOK_LIT(0);
+
+token_t token_int_one = INT_TOK_LIT(1);
+
+
 typedef struct token_node_t {
     sl_link_t link;
     token_t token;

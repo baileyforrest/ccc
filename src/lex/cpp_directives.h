@@ -32,6 +32,8 @@ typedef status_t (*cpp_directive_func_t)(cpp_state_t *cs, vec_iter_t *ts,
 typedef struct cpp_directive_t {
     const char *name;
     cpp_directive_func_t func;
+    cpp_dir_type_t type;
+    bool if_ignore;
 } cpp_directive_t;
 
 extern cpp_directive_t directives[];

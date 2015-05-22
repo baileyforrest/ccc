@@ -61,7 +61,7 @@ typedef struct fmark_node_t {
  * @param col Current column number
  */
 #define FMARK_LIT(last, file, line_start, line, col) \
-    { last, file, line, line, col }
+    { last, file, line_start, line, col }
 
 /**
  * File directory entry.

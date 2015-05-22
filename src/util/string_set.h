@@ -29,6 +29,8 @@ typedef struct str_set_t {
     sl_link_t *head; /**< str_node_t */
 } str_set_t;
 
+#define STR_SET_LIT { NULL }
+
 void str_set_init(str_set_t *set);
 
 void str_set_destroy(str_set_t *set);

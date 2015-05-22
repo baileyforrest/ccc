@@ -191,6 +191,9 @@ typedef struct token_man_t {
     slist_t tokens;
 } token_man_t;
 
+extern token_t token_int_zero;
+extern token_t token_int_one;
+
 void token_man_init(token_man_t *tm);
 void token_man_destroy(token_man_t *tm);
 

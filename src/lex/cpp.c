@@ -100,6 +100,10 @@ void cpp_state_init(cpp_state_t *cs, token_man_t *token_man, lexer_t *lexer) {
     cs->cur_filename = NULL;
     cs->line_mod = 0;
     cs->line_orig = 0;
+    cs->if_count = 0;
+    cs->if_taken = false;
+    cs->ignore = true;
+    cs->last_dir = CPP_DIR_NONE;
 
     for (size_t i = 0; i < STATIC_ARRAY_LEN(search_path); ++i) {
         vec_push_back(&cs->search_path, &search_path[i]);
@@ -197,13 +201,19 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         token_t *token = vec_iter_get(ts);
         new_last = token;
 
+        if (cs->ignore && token->type != HASHHASH) {
+            continue;
+        }
+
         switch (token->type) {
         case HASH:
             if (last->type != NEWLINE) {
                 logger_log(&token->mark, LOG_ERR, "stray '#' in program");
                 break;
             }
-            cpp_handle_directive(cs, ts, output);
+            if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
+                return status;
+            }
             continue;
         case ID:
             break;
@@ -400,7 +410,10 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         status = CCC_ESYNTAX;
     } else {
         cpp_iter_advance(ts); // Skip the directive name
-        status = dir->func(cs, ts, output);
+        if (!cs->ignore || !dir->if_ignore) {
+            status = dir->func(cs, ts, output);
+            cs->last_dir = dir->type;
+        }
     }
 
     if (cpp_skip_line(ts, true) > 1) {

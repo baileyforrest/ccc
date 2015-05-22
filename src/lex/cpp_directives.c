@@ -25,7 +25,19 @@
 #include <limits.h>
 #include <unistd.h>
 
+#include "parse/ast.h"
+#include "parse/parser.h"
+#include "typecheck/typechecker.h"
 #include "util/logger.h"
+
+#define VERIFY_TOK_ID(token)                            \
+    do {                                                    \
+        if (token->type != ID) {                            \
+            logger_log(&token->mark, LOG_ERR,               \
+                       "macro names must be identifiers");  \
+            return CCC_ESYNTAX;                             \
+        }                                                   \
+    } while (0)
 
 #define DIR_DECL(directive) \
     status_t cpp_dir_ ## directive(cpp_state_t *cs, vec_iter_t *ts, \
@@ -54,27 +66,33 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
 
 status_t cpp_dir_error_helper(vec_iter_t *ts, bool is_err);
 
-#define DIR_ENTRY(directive) { #directive, cpp_dir_ ## directive }
+status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
+                       bool if_taken);
+
+status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val);
+
+#define DIR_ENTRY(directive, if_ignored) \
+    { #directive, cpp_dir_ ## directive, CPP_DIR_ ## directive, if_ignored }
 
 cpp_directive_t directives[] = {
-    DIR_ENTRY(include),
+    DIR_ENTRY(include, true),
 
-    DIR_ENTRY(define),
-    DIR_ENTRY(undef),
+    DIR_ENTRY(define, true),
+    DIR_ENTRY(undef, true),
 
-    DIR_ENTRY(ifdef),
-    DIR_ENTRY(ifndef),
-    DIR_ENTRY(if),
-    DIR_ENTRY(elif),
-    DIR_ENTRY(else),
-    DIR_ENTRY(endif),
+    DIR_ENTRY(ifdef, false),
+    DIR_ENTRY(ifndef, false),
+    DIR_ENTRY(if, false),
+    DIR_ENTRY(elif, false),
+    DIR_ENTRY(else, false),
+    DIR_ENTRY(endif, false),
 
-    DIR_ENTRY(error),
-    DIR_ENTRY(warning),
+    DIR_ENTRY(error, true),
+    DIR_ENTRY(warning, true),
 
-    DIR_ENTRY(pragma),
-    DIR_ENTRY(line),
-    { NULL, NULL }
+    DIR_ENTRY(pragma, true),
+    DIR_ENTRY(line, true),
+    { NULL, NULL, CPP_DIR_NONE, false }
 };
 
 status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
@@ -200,10 +218,8 @@ status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
 
     token_t *token = vec_iter_get(ts);
-    if (token->type != ID) {
-        logger_log(&token->mark, LOG_ERR, "macro names must be identifiers");
-        return CCC_ESYNTAX;
-    }
+    VERIFY_TOK_ID(token);
+
     status_t status = CCC_OK;
 
     cpp_macro_t *macro = emalloc(sizeof(*macro));
@@ -288,10 +304,8 @@ fail:
 status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
     token_t *token = vec_iter_get(ts);
-    if (token->type != ID) {
-        logger_log(&token->mark, LOG_ERR, "macro names must be identifiers");
-        return CCC_ESYNTAX;
-    }
+    VERIFY_TOK_ID(token);
+
     cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
     cpp_macro_destroy(macro);
 
@@ -299,45 +313,186 @@ status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 }
 
 status_t cpp_dir_ifdef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
-    (void)output;
-    return CCC_ESYNTAX;
+    token_t *token = vec_iter_get(ts);
+    VERIFY_TOK_ID(token);
+
+    cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+    return cpp_if_helper(cs, ts, output, macro != NULL);
 }
 
 status_t cpp_dir_ifndef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
-    (void)output;
-    return CCC_ESYNTAX;
+    token_t *token = vec_iter_get(ts);
+    VERIFY_TOK_ID(token);
+
+    cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+    return cpp_if_helper(cs, ts, output, macro == NULL);
 }
 
 status_t cpp_dir_if(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
-    (void)output;
-    return CCC_ESYNTAX;
+    status_t status = CCC_OK;
+    long long val;
+    if (CCC_OK != (status = cpp_evaluate_line(cs, ts, &val))) {
+        return status;
+    }
+
+    return cpp_if_helper(cs, ts, output, val != 0);
+}
+
+status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val) {
+    status_t status = CCC_OK;
+    trans_unit_t *ast = NULL;
+    *val = 0;
+
+    vec_t input;
+    vec_t output;
+    vec_init(&input, 0);
+    vec_init(&output, 0);
+
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
+        token_t *token = vec_iter_get(ts);
+        if (token->type == NEWLINE) {
+            break;
+        }
+
+        if (token->type == ID) {
+            // Handle defined operator
+            if (strcmp(token->id_name, "defined") == 0) {
+                cpp_iter_advance(ts);
+                bool has_paren = false;
+                if (token->type == LPAREN) {
+                    has_paren = true;
+                    cpp_iter_advance(ts);
+                }
+
+                if (token->type != ID) {
+                    logger_log(&token->mark, LOG_ERR,
+                               "operator \"defined\" requires an identifier");
+                    status = CCC_ESYNTAX;
+                    goto fail;
+                }
+
+                cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+                token = macro == NULL ? &token_int_zero : &token_int_one;
+
+                cpp_iter_advance(ts);
+                if (has_paren) {
+                    if (token->type != RPAREN) {
+                        logger_log(&token->mark, LOG_ERR,
+                                   "missing ')' after \"defined\"");
+                        status = CCC_ESYNTAX;
+                        goto fail;
+                    }
+                    cpp_iter_advance(ts);
+                }
+            }
+        }
+
+        vec_push_back(&input, token);
+    }
+    vec_iter_t input_iter = { &input, 0 };
+
+    if (CCC_OK != (status = cpp_expand(cs, &input_iter, &output))) {
+        goto fail;
+    }
+
+    expr_t *expr = NULL;
+    if (CCC_OK != (status = parser_parse_expr(&output, ast, &expr))) {
+        goto fail;
+    }
+
+    if (!typecheck_const_expr(expr, val, true)) {
+        goto fail;
+    }
+
+fail:
+    ast_destroy(ast);
+    cpp_skip_line(ts, false);
+    vec_destroy(&input);
+    vec_destroy(&output);
+    return status;
+}
+
+status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
+                       bool if_taken) {
+    status_t status = CCC_OK;
+    token_t *start_token = vec_iter_get(ts);
+
+    bool ignore_save = cs->ignore;
+    cs->if_taken = if_taken; // Mark if_taken for last directive
+
+    // We ignore first if, if we were already ignoring, or if wasn't taken
+    cs->ignore = ignore_save || !if_taken;
+    ++cs->if_count;
+
+    do {
+        // If last directive was a taken branch, then mark if_taken as true
+        if (cs->if_taken) {
+            if_taken = true;
+        }
+        if (CCC_BACKTRACK != (status = cpp_expand(cs, ts, output))) {
+            if (status == CCC_OK) {
+                logger_log(&start_token->mark, LOG_ERR, "Unterminted #if");
+            }
+            goto fail;
+        }
+        // If we were ignoring before, or already took an if branch then ignore
+        if (ignore_save || if_taken) {
+            cs->ignore = true;
+        }
+        cs->if_taken = false;
+    } while (cs->last_dir != CPP_DIR_endif);
+
+    // Restore state
+    --cs->if_count;
+    cs->ignore = ignore_save;
+
+fail:
+    return status;
 }
 
 status_t cpp_dir_elif(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
     (void)output;
-    return CCC_ESYNTAX;
+    status_t status = CCC_OK;
+
+    token_t *token = vec_iter_get(ts);
+    if (cs->if_count == 0) {
+        logger_log(&token->mark, LOG_ERR, "#else without #if");
+        return CCC_ESYNTAX;
+    }
+
+    long long val;
+    if (CCC_OK != (status = cpp_evaluate_line(cs, ts, &val))) {
+        return status;
+    }
+
+    // This if is taken if it's value evaluated to non zero
+    cs->if_taken = val != 0;
+
+    return CCC_BACKTRACK; // Return to calling if
 }
 
 status_t cpp_dir_else(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
     (void)output;
-    return CCC_ESYNTAX;
+    token_t *token = vec_iter_get(ts);
+    if (cs->if_count == 0) {
+        logger_log(&token->mark, LOG_ERR, "#else without #if");
+        return CCC_ESYNTAX;
+    }
+
+    // Mark this branch as always taken
+    cs->if_taken = true;
+    return CCC_BACKTRACK; // Return to calling if
 }
 
 status_t cpp_dir_endif(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    (void)cs;
-    (void)ts;
     (void)output;
-    return CCC_ESYNTAX;
+    token_t *token = vec_iter_get(ts);
+    if (cs->if_count == 0) {
+        logger_log(&token->mark, LOG_ERR, "#else without #if");
+        return CCC_ESYNTAX;
+    }
+
+    return CCC_BACKTRACK; // Return to calling if
 }
 
 status_t cpp_dir_error(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
