@@ -216,7 +216,28 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
 
 status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
+    status_t status = CCC_OK;
+    cpp_macro_t *macro;
+    if (CCC_OK != (status = cpp_define_helper(ts, false, &macro))) {
+        return status;
+    }
 
+    cpp_macro_t *old_macro = ht_remove(&cs->macros, &macro->name);
+    if (old_macro != NULL) {
+        if (!cpp_macro_equal(macro, old_macro)) {
+            logger_log(macro->mark, LOG_WARN, "\"%s\" redefined", macro->name);
+            logger_log(old_macro->mark, LOG_NOTE,
+                       "this is the location of the previous definition");
+        }
+        cpp_macro_destroy(old_macro);
+    }
+    status = ht_insert(&cs->macros, &macro->link);
+    assert(status == CCC_OK);
+
+    return status;
+}
+
+status_t cpp_define_helper(vec_iter_t *ts, bool has_eq, cpp_macro_t **result) {
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
 
@@ -230,6 +251,10 @@ status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     macro->num_params = -1;
 
     cpp_iter_advance(ts);
+
+    if (has_eq && (token = vec_iter_get(ts))->type == EQ) {
+        cpp_iter_advance(ts);
+    }
 
     if (vec_iter_has_next(ts) && (token = vec_iter_get(ts))->type == LPAREN) {
         cpp_iter_advance(ts);
@@ -282,18 +307,7 @@ status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         vec_push_back(&macro->stream, token);
     }
 
-    cpp_macro_t *old_macro = ht_remove(&cs->macros, &macro->name);
-    if (old_macro != NULL) {
-        if (!cpp_macro_equal(macro, old_macro)) {
-            logger_log(macro->mark, LOG_WARN, "\"%s\" redefined", macro->name);
-            logger_log(old_macro->mark, LOG_NOTE,
-                       "this is the location of the previous definition");
-        }
-        cpp_macro_destroy(old_macro);
-    }
-    status = ht_insert(&cs->macros, &macro->link);
-    assert(status == CCC_OK);
-
+    *result = macro;
     return status;
 
 fail:

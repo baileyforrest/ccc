@@ -49,11 +49,11 @@ static status_t optman_parse(int argc, char **argv);
 status_t optman_init(int argc, char **argv) {
     optman.exec_name = NULL;
     optman.output = NULL;
-    sl_init(&optman.include_paths, offsetof(len_str_node_node_t, link));
-    sl_init(&optman.link_opts, offsetof(str_node_t, link));
-    sl_init(&optman.src_files, offsetof(str_node_t, link));
-    sl_init(&optman.obj_files, offsetof(str_node_t, link));
-    sl_init(&optman.macros, offsetof(macro_node_t, link));
+    vec_init(&optman.include_paths, 0);
+    vec_init(&optman.link_opts, 0);
+    vec_init(&optman.src_files, 0);
+    vec_init(&optman.obj_files, 0);
+    vec_init(&optman.macros, 0);
     optman.dump_opts = 0;
     optman.warn_opts = 0;
     optman.olevel = 0;
@@ -65,18 +65,13 @@ status_t optman_init(int argc, char **argv) {
     return optman_parse(argc, argv);
 }
 
-static void optman_macro_node_destroy(macro_node_t *node) {
-    // TODO0: This
-    free(node);
-}
-
 void optman_destroy(void) {
-    SL_DESTROY_FUNC(&optman.include_paths, free);
-    SL_DESTROY_FUNC(&optman.link_opts, free);
-    SL_DESTROY_FUNC(&optman.src_files, free);
-    SL_DESTROY_FUNC(&optman.asm_files, free);
-    SL_DESTROY_FUNC(&optman.obj_files, free);
-    SL_DESTROY_FUNC(&optman.macros, optman_macro_node_destroy);
+    vec_destroy(&optman.include_paths);
+    vec_destroy(&optman.link_opts);
+    vec_destroy(&optman.src_files);
+    vec_destroy(&optman.asm_files);
+    vec_destroy(&optman.obj_files);
+    vec_destroy(&optman.macros);
 }
 
 static status_t optman_parse(int argc, char **argv) {
@@ -164,17 +159,12 @@ static status_t optman_parse(int argc, char **argv) {
             break;
 
         case 'l': { // Link options
-            str_node_t *node = emalloc(sizeof(str_node_t));
-            node->str = optarg;
-            sl_append(&optman.link_opts, &node->link);
+            vec_push_back(&optman.link_opts, optarg);
             break;
         }
 
         case 'I': { // Search path additions
-            len_str_node_node_t *node = emalloc(sizeof(len_str_node_node_t));
-            node->node.str.str = optarg;
-            node->node.str.len = strlen(optarg);
-            sl_append(&optman.include_paths, &node->link);
+            vec_push_back(&optman.include_paths, optarg);
             break;
         }
 
@@ -193,13 +183,7 @@ static status_t optman_parse(int argc, char **argv) {
             break;
 
         case 'D': { // Define macros
-            // TODO0: This
-            macro_node_t *node = emalloc(sizeof(macro_node_t));
-            tstream_t stream;
-            ts_init(&stream, optarg, optarg + strlen(optarg),
-                    COMMAND_LINE_FILENAME, NULL);
-
-            sl_append(&optman.macros, &node->link);
+            vec_push_back(&optman.macros, optarg);
             break;
         }
 
@@ -232,21 +216,17 @@ static status_t optman_parse(int argc, char **argv) {
     for (int i = optind; i < argc; ++i) {
         char *param = argv[i];
         size_t len = strlen(param);
-
-        str_node_t *node = emalloc(sizeof(str_node_t));
-        node->str = param;
-
         switch (param[len - 1]) {
         case 'c':
         case 'C':
-            sl_append(&optman.src_files, &node->link);
+            vec_push_back(&optman.src_files, param);
             break;
         case 's':
         case 'S':
-            sl_append(&optman.asm_files, &node->link);
+            vec_push_back(&optman.asm_files, param);
             break;
         default:
-            sl_append(&optman.obj_files, &node->link);
+            vec_push_back(&optman.obj_files, param);
         }
     }
 

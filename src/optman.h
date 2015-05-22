@@ -26,11 +26,11 @@
 #ifndef _OPTMAN_H_
 #define _OPTMAN_H_
 
-#include "util/slist.h"
+#include "lex/cpp.h"
+
+#include "util/vector.h"
 #include "util/util.h"
 #include "util/status.h"
-
-#include "lex/cpp.h"
 
 /**
  * Options for dumping at various stages of the compilation
@@ -89,23 +89,18 @@ typedef enum output_opts_t {
     OUTPUT_DBG_SYM   = 1 << 3, // -g Generate debug symbols
 } output_opts_t;
 
-typedef struct macro_node_t {
-    sl_link_t link;
-    // TODO0: This
-} macro_node_t;
-
 /**
  * The Option manager. Contains flags/lists from the command line parameters.
  */
 typedef struct optman_t {
     char *exec_name;           /**< Name of the executable */
     char *output;              /**< Name of the output file */
-    slist_t include_paths;     /**< Search path additions with -I flag */
-    slist_t link_opts;         /**< Linker libraries */
-    slist_t src_files;         /**< C files */
-    slist_t asm_files;         /**< Assember files */
-    slist_t obj_files;         /**< All other files assumed for linker */
-    slist_t macros;            /**< Parameter defined macros */
+    vec_t include_paths;       /**< Search path additions with -I flag */
+    vec_t link_opts;           /**< Linker libraries */
+    vec_t src_files;           /**< C files */
+    vec_t asm_files;           /**< Assember files */
+    vec_t obj_files;           /**< All other files assumed for linker */
+    vec_t macros;              /**< Parameter defined macros */
     dump_opts_t dump_opts;     /**< Dump options */
     warn_opts_t warn_opts;     /**< Warn options */
     olevel_t olevel;           /**< Optimization level */

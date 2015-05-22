@@ -38,4 +38,6 @@ typedef struct cpp_directive_t {
 
 extern cpp_directive_t directives[];
 
+status_t cpp_define_helper(vec_iter_t *ts, bool has_eq, cpp_macro_t **result);
+
 #endif /* _CPP_DIRECTIVES_H_ */

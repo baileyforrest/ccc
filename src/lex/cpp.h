@@ -28,7 +28,9 @@
 
 #include "util/vector.h"
 
-status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filename,
+typedef struct cpp_macro_t cpp_macro_t;
+
+status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
                      vec_t *output);
 
 #endif /* _CPP_H_ */

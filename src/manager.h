@@ -82,12 +82,15 @@ void man_destroy_parse(manager_t *manager);
  */
 void man_destroy_ir(manager_t *manager);
 
+status_t man_lex(manager_t *manager, char *filepath);
+
 /**
  * Parse a translation unit from a compilation manager.
  *
  * The manager's preprocessor must be set up first
  *
  * @param manager The compilation mananger to parse
+ * @param filepath Path to file to parse
  * @param ast The parsed ast
  * @return CCC_OK on success, error code on error.
  */

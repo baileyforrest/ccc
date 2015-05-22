@@ -26,6 +26,7 @@
 
 #include "ir/translator.h"
 
+#include "lex/cpp.h"
 #include "lex/lexer.h"
 #include "lex/symtab.h"
 
@@ -75,9 +76,15 @@ void man_destroy_ir(manager_t *manager) {
     manager->ir = NULL;
 }
 
+status_t man_lex(manager_t *manager, char *filepath) {
+    return cpp_process(&manager->token_man, &manager->lexer, filepath,
+                       &manager->tokens);
+}
+
 status_t man_parse(manager_t *manager, trans_unit_t **ast) {
     assert(manager != NULL);
     assert(ast != NULL);
+
     status_t status = parser_parse(&manager->tokens, &manager->ast);
     *ast = manager->ast;
     return status;

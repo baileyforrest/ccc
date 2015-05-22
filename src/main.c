@@ -71,13 +71,16 @@ int main(int argc, char **argv) {
 
     bool link = false; // If true, linker will be invoked
 
-    SL_FOREACH(cur, &optman.src_files) {
+    VEC_FOREACH(cur, &optman.src_files) {
         bool done = false;
-        str_node_t *node = GET_ELEM(&optman.src_files, cur);
-        char *filename = node->str;
+        char *filename = vec_get(&optman.src_files, cur);
 
         manager_t manager;
         man_init(&manager, NULL);
+
+        if (CCC_OK != (status = man_lex(&manager, filename))) {
+            goto next;
+        }
 
         if (optman.dump_opts & DUMP_TOKENS) {
             printf("//@ Tokens %s\n", filename);
@@ -269,9 +272,7 @@ void main_assemble(char *filename, char *asm_path, char *obj_path) {
     waitpid(pid, &child_status, 0);
     assert(child_status == 0);
 
-    str_node_t *obj_node = emalloc(sizeof(str_node_t));
-    obj_node->str = objpath;
-    sl_append(&optman.obj_files, &obj_node->link);
+    vec_push_back(&optman.obj_files, objpath);
 }
 
 void main_link(void) {
@@ -297,9 +298,8 @@ void main_link(void) {
 
 
         // Add the object files
-        SL_FOREACH(cur, &optman.obj_files) {
-            str_node_t *str = GET_ELEM(&optman.obj_files, cur);
-            vec_push_back(&argv, str->str);
+        VEC_FOREACH(cur, &optman.obj_files) {
+            vec_push_back(&argv, vec_get(&optman.obj_files, cur));
         }
 
         // Add NULL terminator

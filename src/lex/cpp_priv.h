@@ -106,6 +106,10 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
 
 status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 
+status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq,
+                          cpp_macro_t **macro);
+
+
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst);
 
