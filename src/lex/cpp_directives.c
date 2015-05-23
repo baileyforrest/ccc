@@ -241,11 +241,15 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
     vec_init(&macro->params, 0);
     macro->num_params = -1;
 
-    cpp_iter_advance(ts);
-
-    if (has_eq && (token = vec_iter_get(ts))->type == EQ) {
+    if (has_eq) {
         cpp_iter_advance(ts);
+        if ((token = vec_iter_get(ts))->type == EQ) {
+            vec_iter_advance(ts);
+        }
     }
+
+    // Don't want to skip spaces, because lparen must be right after macro name
+    vec_iter_advance(ts);
 
     if (vec_iter_has_next(ts) && (token = vec_iter_get(ts))->type == LPAREN) {
         cpp_iter_advance(ts);
@@ -292,6 +296,8 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
             goto fail;
         }
     }
+
+    cpp_iter_skip_space(ts); // Skip space between header and body
 
     // Don't use cpp_iter_advance, we want to preserve whitespace
     for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {

@@ -88,11 +88,14 @@ bool token_equal(const token_t *t1, const token_t *t2) {
     case ID: return strcmp(t1->id_name, t2->id_name) == 0;
     case STRING: return strcmp(t1->str_val, t2->str_val) == 0;
     case INTLIT:
-        return memcmp(&t1->int_params, &t2->int_params, sizeof(t1->int_params))
-            == 0;
+        return t1->int_params.int_val == t2->int_params.int_val &&
+            t1->int_params.hasU == t2->int_params.hasU &&
+            t1->int_params.hasL == t2->int_params.hasL &&
+            t1->int_params.hasLL == t2->int_params.hasLL;
     case FLOATLIT:
-        return memcmp(&t1->float_params, &t2->float_params,
-                      sizeof(t1->float_params)) == 0;
+        return t1->float_params.float_val == t2->float_params.float_val &&
+            t1->float_params.hasF == t2->float_params.hasF &&
+            t1->float_params.hasL == t2->float_params.hasL;
     default:
         break;
     }

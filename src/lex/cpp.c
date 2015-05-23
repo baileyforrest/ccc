@@ -241,7 +241,7 @@ bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2) {
         cpp_iter_advance(&stream2);
     }
 
-    if (!vec_iter_has_next(&stream1) || !vec_iter_has_next(&stream2)) {
+    if (vec_iter_has_next(&stream1) || vec_iter_has_next(&stream2)) {
         return false;
     }
 
