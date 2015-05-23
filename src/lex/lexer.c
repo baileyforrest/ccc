@@ -537,8 +537,11 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
     sb_clear(&lexer->lexbuf);
 
     bool done = false;
-    do {
+    while (!done) {
         int cur = lex_getc_splice(stream);
+        if (cur == EOF) {
+            break;
+        }
 
         // Reached the end, an unescaped quote
         if (cur == '"' &&
@@ -549,7 +552,7 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
             // then if we find another quote, skip that quote
             do {
                 cur = lex_getc_splice(stream);
-                if (!isspace(cur)) {
+                if (!isspace(cur) || cur == '\n') {
                     done = true;
                 }
             } while(!done);
@@ -559,9 +562,9 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
                 ts_ungetc(cur, stream);
             }
         } else {
-            cur = lex_getc_splice(stream);
+            sb_append_char(&lexer->lexbuf, cur);
         }
-    } while (!done);
+    }
 
     result->str_val = sstore_lookup(sb_buf(&lexer->lexbuf));
 

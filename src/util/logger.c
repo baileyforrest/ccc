@@ -57,7 +57,7 @@ void logger_log_line(fmark_t *mark) {
     fputc('\n', stderr);
 
     // Print the error marker
-    for (int i = 0; i < mark->col - 1; ++i) {
+    for (int i = 1; i < mark->col - 1; ++i) {
         fputc(' ', stderr);
     }
     fputc('^', stderr);

@@ -567,7 +567,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
     }
 
-    if (cpp_skip_line(ts, true) > 1) {
+    if (cpp_skip_line(ts, false) > 1) {
         if (dir != NULL && status == CCC_OK) {
             logger_log(&name_token->mark, LOG_WARN,
                        "extra tokens at end of #%s directive",
