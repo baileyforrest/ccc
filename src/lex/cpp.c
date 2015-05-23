@@ -347,7 +347,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
         switch (token->type) {
         case HASH:
-            if (last->type != NEWLINE) {
+            if (last != NULL && last->type != NEWLINE) {
                 logger_log(&token->mark, LOG_ERR, "stray '#' in program");
                 break;
             }
@@ -355,6 +355,9 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
                 return status;
             }
+
+            // Set last as NULL to allow another directive following this one
+            token = NULL;
             continue;
         case ID:
             break;
@@ -394,13 +397,15 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             { macro, SLIST_LIT(offsetof(cpp_macro_param_t, link)) };
 
         str_set_t *hideset; // Macro's hideset
+        vec_t subbed;
+        vec_init(&subbed, 0);
 
         // Object like macro
         if (macro->num_params == -1) {
             hideset = str_set_copy(token->hideset);
             hideset = str_set_add(hideset, token->id_name);
             if (CCC_OK !=
-                (status = cpp_substitute(cs, &macro_inst, hideset, output))) {
+                (status = cpp_substitute(cs, &macro_inst, hideset, &subbed))) {
                 goto fail;
             }
         } else {
@@ -415,18 +420,24 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             hideset = str_set_intersect(token->hideset, rparen->hideset);
             hideset = str_set_add(hideset, token->id_name);
             if (CCC_OK !=
-                (status = cpp_substitute(cs, &macro_inst, hideset, output))) {
+                (status = cpp_substitute(cs, &macro_inst, hideset, &subbed))) {
                 goto fail;
             }
         }
 
+        // Expand the result of the substitution
+        vec_iter_t sub_iter = { &subbed, 0 };
+        cpp_expand(cs, &sub_iter, output);
+
         cpp_macro_inst_destroy(&macro_inst);
         str_set_destroy(hideset);
+        vec_destroy(&subbed);
         continue;
 
     fail:
         cpp_macro_inst_destroy(&macro_inst);
         str_set_destroy(hideset);
+        vec_destroy(&subbed);
         goto done;
     }
 
@@ -708,8 +719,8 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
         token_str_append_sb(&sb, rhead);
 
         tstream_t stream;
-        ts_init(&stream, sb_buf(&sb), sb_buf(&sb) + sb_len(&sb),
-                ltail->mark.filename, NULL);
+        char *buf = sstore_lookup(sb_buf(&sb));
+        ts_init(&stream, buf, buf + sb_len(&sb), ltail->mark.filename, NULL);
 
         size_t init_size = vec_size(left);
 
