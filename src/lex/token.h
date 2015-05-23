@@ -23,8 +23,11 @@
 #ifndef _TOKEN_H_
 #define _TOKEN_H_
 
-#include "util/file_directory.h"
+#include <stdio.h>
+
+#include "util/file_mark.h"
 #include "util/string_set.h"
+#include "util/string_builder.h"
 
 typedef enum token_type_t {
     HASH,          // #

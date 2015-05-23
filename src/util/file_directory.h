@@ -26,44 +26,6 @@
 #include "util/util.h"
 
 /**
- * Structure for representing a location in a file
- */
-typedef struct fmark_t {
-    struct fmark_t *last;   /**< Last mark in stack */
-    char *filename;         /**< Filename */
-    const char *line_start; /**< Start of current line */
-    int line;               /**< Line number */
-    int col;                /**< Column number */
-} fmark_t;
-
-typedef struct fmark_node_t {
-    sl_link_t link;
-    fmark_t mark;
-} fmark_node_t;
-
-/**
- * Name of "file" for built in objects
- */
-#define BUILT_IN_FILENAME "<built in>"
-
-/**
- * Name of "file" for command line
- */
-#define COMMAND_LINE_FILENAME "<command-line>"
-
-/**
- * File mark literal
- *
- * @param file Filename
- * @param line_start Pointer to start of current line
- * @param last Last file mark on stack
- * @param line Current line number
- * @param col Current column number
- */
-#define FMARK_LIT(last, file, line_start, line, col) \
-    { last, file, line_start, line, col }
-
-/**
  * File directory entry.
  *
  * Contains a filename and buffer of file contents

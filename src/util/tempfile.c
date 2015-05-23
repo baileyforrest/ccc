@@ -28,6 +28,7 @@
 #include <fcntl.h>
 
 #include "util/logger.h"
+#include "util/util.h"
 
 #define TMP_SUFFIX "-XXXXXX"
 #define TMP_DIR "/tmp/"

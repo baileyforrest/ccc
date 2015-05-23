@@ -32,6 +32,7 @@
 
 #include "util/logger.h"
 #include "util/string_store.h"
+#include "util/file_directory.h"
 
 #define VARARG_NAME "__VA_ARGS__"
 

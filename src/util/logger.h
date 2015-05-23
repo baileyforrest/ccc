@@ -25,8 +25,10 @@
 #ifndef _LOGGER_H_
 #define _LOGGER_H_
 
+#include <stdbool.h>
+
+#include "util/file_mark.h"
 #include "util/status.h"
-#include "util/file_directory.h"
 
 typedef enum log_type_t {
     LOG_ERR,  /**< Error */

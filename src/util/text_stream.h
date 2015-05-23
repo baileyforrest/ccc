@@ -27,8 +27,9 @@
 #define _TEXT_STREAM_H_
 
 #include <stdbool.h>
+#include <stdio.h>
 
-#include "util/file_directory.h"
+#include "util/file_mark.h"
 
 /**
  * Text stream. Represents a string of characters which automatically updates
