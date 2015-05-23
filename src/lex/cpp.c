@@ -339,6 +339,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 logger_log(&token->mark, LOG_ERR, "stray '#' in program");
                 break;
             }
+            cpp_iter_advance(ts);
             if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
                 return status;
             }
@@ -385,7 +386,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         // Object like macro
         if (macro->num_params == -1) {
             hideset = str_set_copy(token->hideset);
-            str_set_add(hideset, token->id_name);
+            hideset = str_set_add(hideset, token->id_name);
             if (CCC_OK !=
                 (status = cpp_substitute(cs, &macro_inst, hideset, output))) {
                 goto fail;
@@ -398,7 +399,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             token_t *rparen = vec_iter_get(ts);
             assert(rparen->type == RPAREN);
             hideset = str_set_intersect(token->hideset, rparen->hideset);
-            str_set_add(hideset, token->id_name);
+            hideset = str_set_add(hideset, token->id_name);
             if (CCC_OK !=
                 (status = cpp_substitute(cs, &macro_inst, hideset, output))) {
                 goto fail;
@@ -500,7 +501,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
 
         // Make a copy and add it to output
         token_t *copy = token_copy(cs->token_man, token);
-        str_set_union_inplace(copy->hideset, hideset);
+        copy->hideset = str_set_union_inplace(copy->hideset, hideset);
         vec_push_back(output, copy);
     }
 
@@ -539,7 +540,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     if (dir == NULL) {
         char *tok_str = token_str(token);
         logger_log(&token->mark, LOG_ERR, "invalid preprocessing directive #%s",
-                   token_str);
+                   tok_str);
         free(tok_str);
         status = CCC_ESYNTAX;
     } else {

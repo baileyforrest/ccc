@@ -50,8 +50,13 @@ void token_man_init(token_man_t *tm) {
     sl_init(&tm->tokens, offsetof(token_node_t, link));
 }
 
+void token_node_destroy(token_node_t *token_node) {
+    str_set_destroy(token_node->token.hideset);
+    free(token_node);
+}
+
 void token_man_destroy(token_man_t *tm) {
-    SL_DESTROY_FUNC(&tm->tokens, free);
+    SL_DESTROY_FUNC(&tm->tokens, token_node_destroy);
 }
 
 token_t *token_create(token_man_t *tm) {

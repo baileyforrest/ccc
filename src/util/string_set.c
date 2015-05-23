@@ -81,11 +81,11 @@ str_set_t *str_set_union(str_set_t *set1, str_set_t *set2) {
     str_set_t *dest = str_set_empty();
 
     for (; set1 != NULL; set1 = set1->next) {
-        str_set_add(dest, set1->str);
+        dest = str_set_add(dest, set1->str);
     }
 
     for (; set2 != NULL; set2 = set2->next) {
-        str_set_add(dest, set2->str);
+        dest = str_set_add(dest, set2->str);
     }
 
     return dest;
@@ -93,7 +93,7 @@ str_set_t *str_set_union(str_set_t *set1, str_set_t *set2) {
 
 str_set_t *str_set_union_inplace(str_set_t *dest, str_set_t *other) {
     for (; other != NULL; other = other->next) {
-        str_set_add(dest, other->str);
+        dest = str_set_add(dest, other->str);
     }
 
     return dest;
@@ -104,7 +104,7 @@ str_set_t *str_set_intersect(str_set_t *set1, str_set_t *set2) {
 
     for (; set1 != NULL; set1 = set1->next) {
         if (str_set_mem(set2, set1->str)) {
-            str_set_add(dest, set1->str);
+            dest = str_set_add(dest, set1->str);
         }
     }
 

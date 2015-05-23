@@ -81,7 +81,7 @@ void sb_append_printf(string_builder_t *sb, char *fmt, ...) {
 }
 
 void sb_append_vprintf(string_builder_t *sb, char *fmt, va_list ap) {
-    int size = vsnprintf(NULL, 0, fmt, ap) + 1;
+    int size = vsnprintf(NULL, 0, fmt, ap);
 
     sb_reserve(sb, sb_len(sb) + size);
 
