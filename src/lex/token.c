@@ -29,16 +29,20 @@
 
 #include "util/string_builder.h"
 
-#define INT_TOK_LIT(val) {                                              \
-        STR_SET_LIT,                                                    \
-        FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),    \
+#define INT_PARAM_LIT(val) { false, false, false, val }
+
+#define INT_TOK_LIT(param) {                                            \
         INTLIT,                                                         \
-        .int_params = { false, false, false, val }                      \
+        FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),    \
+        STR_SET_LIT,                                                    \
+        .int_params = &param                                            \
     }
 
-token_t token_int_zero = INT_TOK_LIT(0);
+static token_int_params_t zero_params = INT_PARAM_LIT(0);
+token_t token_int_zero = INT_TOK_LIT(zero_params);
 
-token_t token_int_one = INT_TOK_LIT(1);
+static token_int_params_t one_params = INT_PARAM_LIT(1);
+token_t token_int_one = INT_TOK_LIT(one_params);
 
 
 typedef struct token_node_t {
@@ -52,6 +56,12 @@ void token_man_init(token_man_t *tm) {
 
 void token_node_destroy(token_node_t *token_node) {
     str_set_destroy(token_node->token.hideset);
+    switch (token_node->token.type) {
+    case INTLIT: free(token_node->token.int_params); break;
+    case FLOATLIT: free(token_node->token.float_params); break;
+    default:
+        break;
+    }
     free(token_node);
 }
 
@@ -70,6 +80,20 @@ token_t *token_create(token_man_t *tm) {
 token_t *token_copy(token_man_t *tm, token_t *token) {
     token_t *result = token_create(tm);
     memcpy(result, token, sizeof(token_t));
+    switch (token->type) {
+    case INTLIT:
+        result->int_params = emalloc(sizeof(token_int_params_t));
+        memcpy(result->int_params, token->int_params,
+               sizeof(token_int_params_t));
+        break;
+    case FLOATLIT:
+        result->float_params = emalloc(sizeof(token_float_params_t));
+        memcpy(result->float_params, token->float_params,
+               sizeof(token_float_params_t));
+        break;
+    default:
+        break;
+    }
     result->hideset = str_set_copy(token->hideset);
 
     return result;
@@ -88,14 +112,14 @@ bool token_equal(const token_t *t1, const token_t *t2) {
     case ID: return strcmp(t1->id_name, t2->id_name) == 0;
     case STRING: return strcmp(t1->str_val, t2->str_val) == 0;
     case INTLIT:
-        return t1->int_params.int_val == t2->int_params.int_val &&
-            t1->int_params.hasU == t2->int_params.hasU &&
-            t1->int_params.hasL == t2->int_params.hasL &&
-            t1->int_params.hasLL == t2->int_params.hasLL;
+        return t1->int_params->int_val == t2->int_params->int_val &&
+            t1->int_params->hasU == t2->int_params->hasU &&
+            t1->int_params->hasL == t2->int_params->hasL &&
+            t1->int_params->hasLL == t2->int_params->hasLL;
     case FLOATLIT:
-        return t1->float_params.float_val == t2->float_params.float_val &&
-            t1->float_params.hasF == t2->float_params.hasF &&
-            t1->float_params.hasL == t2->float_params.hasL;
+        return t1->float_params->float_val == t2->float_params->float_val &&
+            t1->float_params->hasF == t2->float_params->hasF &&
+            t1->float_params->hasL == t2->float_params->hasL;
     default:
         break;
     }
@@ -115,22 +139,22 @@ void token_print_helper(token_t *token, string_builder_t *sb, FILE *file) {
         directed_print(sb, file, "\"%s\"", token->str_val);
         break;
     case INTLIT:
-        directed_print(sb, file, "%lld", token->int_params.int_val);
-        if (token->int_params.hasU) {
+        directed_print(sb, file, "%lld", token->int_params->int_val);
+        if (token->int_params->hasU) {
             directed_print(sb, file, "U");
         }
-        if (token->int_params.hasL) {
+        if (token->int_params->hasL) {
             directed_print(sb, file, "L");
-        } else if (token->int_params.hasLL) {
+        } else if (token->int_params->hasLL) {
             directed_print(sb, file, "LL");
         }
         break;
     case FLOATLIT:
-        directed_print(sb, file, "%Lf", token->float_params.float_val);
-        if (token->float_params.hasL) {
+        directed_print(sb, file, "%Lf", token->float_params->float_val);
+        if (token->float_params->hasL) {
             directed_print(sb, file, "L");
         }
-        if (token->float_params.hasF) {
+        if (token->float_params->hasF) {
             directed_print(sb, file, "F");
         }
         break;

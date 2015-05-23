@@ -161,28 +161,32 @@ typedef enum token_type_t {
     FUNC,          // __func__
 } token_type_t;
 
+typedef struct token_int_params_t {
+    bool hasU;             /**< Has U suffix */
+    bool hasL;             /**< Has L suffix */
+    bool hasLL;            /**< Has LL suffix */
+    long long int_val;     /**< For integral types */
+} token_int_params_t;
+
+typedef struct token_float_params_t {
+    bool hasF;             /**< Has F suffix */
+    bool hasL;             /**< Has L suffix */
+    long double float_val; /**< For floating point types */
+} token_float_params_t;
+
 /**
  * Token structure
  */
 typedef struct token_t {
-    str_set_t *hideset;
-    fmark_t mark;                  /**< Location of token */
     token_type_t type;             /**< Type of token */
+    fmark_t mark;                  /**< Location of token */
+    str_set_t *hideset;
 
     union {
         char *id_name;
         char *str_val;
-        struct {
-            bool hasU;             /**< Has U suffix */
-            bool hasL;             /**< Has L suffix */
-            bool hasLL;            /**< Has LL suffix */
-            long long int_val;     /**< For integral types */
-        } int_params;
-        struct {
-            bool hasF;             /**< Has F suffix */
-            bool hasL;             /**< Has L suffix */
-            long double float_val; /**< For floating point types */
-        } float_params;
+        token_int_params_t *int_params;
+        token_float_params_t *float_params;
     };
 } token_t;
 

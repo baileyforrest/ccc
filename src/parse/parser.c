@@ -1644,7 +1644,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     }
     case INTLIT: {
         base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark, EXPR_CONST_INT);
-        unsigned long long intval = LEX_CUR(lex)->int_params.int_val;
+        unsigned long long intval = LEX_CUR(lex)->int_params->int_val;
         base->const_val.int_val = intval;
 
         type_t *type;
@@ -1665,9 +1665,9 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
         }
 
         type_t *explicit;
-        if (LEX_CUR(lex)->int_params.hasLL) {
+        if (LEX_CUR(lex)->int_params->hasLL) {
             explicit = tt_long_long;
-        } else if (LEX_CUR(lex)->int_params.hasL) {
+        } else if (LEX_CUR(lex)->int_params->hasL) {
             explicit = tt_long;
         } else {
             explicit = tt_int;
@@ -1679,7 +1679,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             type = tt_long_long;
             need_u = true;
 
-            if (!LEX_CUR(lex)->int_params.hasU && explicit_size < ll_size) {
+            if (!LEX_CUR(lex)->int_params->hasU && explicit_size < ll_size) {
                 logger_log(&LEX_CUR(lex)->mark, LOG_WARN,
                            "integer constant is so large that it is unsigned");
             }
@@ -1691,7 +1691,7 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
             type = explicit;
         }
 
-        if (LEX_CUR(lex)->int_params.hasU) {
+        if (LEX_CUR(lex)->int_params->hasU) {
             need_u = true;
         }
 
@@ -1709,10 +1709,10 @@ status_t par_primary_expression(lex_wrap_t *lex, expr_t **result) {
     case FLOATLIT: {
         base = ast_expr_create(lex->tunit, &LEX_CUR(lex)->mark,
                                EXPR_CONST_FLOAT);
-        base->const_val.float_val = LEX_CUR(lex)->float_params.float_val;
-        if (LEX_CUR(lex)->float_params.hasF) {
+        base->const_val.float_val = LEX_CUR(lex)->float_params->float_val;
+        if (LEX_CUR(lex)->float_params->hasF) {
             base->const_val.type = tt_float;
-        } else if (LEX_CUR(lex)->float_params.hasL) {
+        } else if (LEX_CUR(lex)->float_params->hasL) {
             base->const_val.type = tt_long_double;
         } else {
             base->const_val.type = tt_double;

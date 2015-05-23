@@ -533,7 +533,7 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 status = CCC_ESYNTAX;
                 goto fail;
             }
-            cs->line_mod = token->int_params.int_val;
+            cs->line_mod = token->int_params->int_val;
             cs->line_orig = token->mark.line;
             break;
         case 1:

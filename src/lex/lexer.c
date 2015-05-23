@@ -506,11 +506,12 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
                       lex_str_type_t type) {
     status_t status = CCC_OK;
     result->type = INTLIT;
-    result->int_params.hasU = false;
-    result->int_params.hasL = false;
-    result->int_params.hasLL = false;
+    result->int_params = emalloc(sizeof(token_int_params_t));
+    result->int_params->hasU = false;
+    result->int_params->hasL = false;
+    result->int_params->hasLL = false;
 
-    result->int_params.int_val = lex_single_char(lexer, stream, type);
+    result->int_params->int_val = lex_single_char(lexer, stream, type);
 
     int cur = lex_getc_splice(stream);
     if (cur != '\'') {
@@ -720,9 +721,10 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
         char *dot_loc = buf + dot_off;
         char *p_loc = buf + p_off;
         result->type = FLOATLIT;
-        result->float_params.hasF = has_f;
-        result->float_params.hasL = has_l;
-        result->float_params.float_val = 0;
+        result->float_params = emalloc(sizeof(token_float_params_t));
+        result->float_params->hasF = has_f;
+        result->float_params->hasL = has_l;
+        result->float_params->float_val = 0;
 
         long long head;
         if (dot_off == 2) {
@@ -755,27 +757,28 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
                     long double val = (long double)head + dfrac;
 
                     val *= powl(2.0, exp);
-                    result->float_params.float_val = val;
+                    result->float_params->float_val = val;
                 }
             }
         }
     } else if (is_float) {
         result->type = FLOATLIT;
-        result->float_params.hasF = has_f;
-        result->float_params.hasL = has_l;
+        result->float_params->hasF = has_f;
+        result->float_params->hasL = has_l;
         if (has_f) {
-            result->float_params.float_val = strtof(buf, &end);
+            result->float_params->float_val = strtof(buf, &end);
         } else if (has_l) {
-            result->float_params.float_val = strtold(buf, &end);
+            result->float_params->float_val = strtold(buf, &end);
         } else {
-            result->float_params.float_val = strtod(buf, &end);
+            result->float_params->float_val = strtod(buf, &end);
         }
     } else {
         result->type = INTLIT;
-        result->int_params.hasU = has_u;
-        result->int_params.hasL = has_l;
-        result->int_params.hasLL = has_ll;
-        result->int_params.int_val = strtoull(buf, &end, 0);
+        result->int_params = emalloc(sizeof(token_int_params_t));
+        result->int_params->hasU = has_u;
+        result->int_params->hasL = has_l;
+        result->int_params->hasLL = has_ll;
+        result->int_params->int_val = strtoull(buf, &end, 0);
     }
     if (errno == ERANGE) {
         logger_log(&result->mark, LOG_ERR, "Overflow in numeric literal", cur);
