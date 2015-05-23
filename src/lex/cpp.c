@@ -35,7 +35,7 @@
 
 #define VARARG_NAME "__VA_ARGS__"
 
-static char *search_path[] = {
+static char *s_search_path[] = {
     "", // Denotes current directory
     "/usr/local/include",
 
@@ -46,7 +46,7 @@ static char *search_path[] = {
 
 };
 
-static char *predef_macros[] = {
+static char *s_predef_macros[] = {
     // Standard C required macros
     "__STDC__ 1", // ISO C
     "__STDC_VERSION__ 201112L", // C11
@@ -95,18 +95,19 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
     status_t status = CCC_OK;
 
     static const ht_params_t params = {
-        0,                           // Size estimate
-        offsetof(cpp_macro_t, name), // Offset of key
-        offsetof(cpp_macro_t, link), // Offset of ht link
-        ind_str_hash,                // Hash function
-        ind_str_eq,                  // void string compare
+        STATIC_ARRAY_LEN(s_predef_macros), // Size estimate
+        offsetof(cpp_macro_t, name),         // Offset of key
+        offsetof(cpp_macro_t, link),         // Offset of ht link
+        ind_str_hash,                        // Hash function
+        ind_str_eq,                          // void string compare
     };
+
+    ht_init(&cs->macros, &params);
+    vec_init(&cs->search_path, STATIC_ARRAY_LEN(s_search_path));
 
     cs->filename = NULL;
     cs->token_man = token_man;
     cs->lexer = lexer;
-    ht_init(&cs->macros, &params);
-    vec_init(&cs->search_path, STATIC_ARRAY_LEN(search_path));
     cs->cur_filename = NULL;
     cs->line_mod = 0;
     cs->line_orig = 0;
@@ -121,14 +122,14 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
     }
 
     // Add default search path
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(search_path); ++i) {
-        vec_push_back(&cs->search_path, search_path[i]);
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_search_path); ++i) {
+        vec_push_back(&cs->search_path, s_search_path[i]);
     }
 
     // Add default macros
-    for (size_t i = 0; i < STATIC_ARRAY_LEN(predef_macros); ++i) {
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
         if (CCC_OK !=
-            (status = cpp_macro_define(cs, predef_macros[i], false))) {
+            (status = cpp_macro_define(cs, s_predef_macros[i], false))) {
             return status;
         }
     }
@@ -155,6 +156,7 @@ void cpp_macro_destroy(cpp_macro_t *macro) {
 
 void cpp_state_destroy(cpp_state_t *cs) {
     HT_DESTROY_FUNC(&cs->macros, cpp_macro_destroy);
+    vec_destroy(&cs->search_path);
 }
 
 token_t *cpp_iter_advance(vec_iter_t *iter) {
@@ -273,14 +275,16 @@ status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
 
     cpp_state_t cs;
     if (CCC_OK != (status = cpp_state_init(&cs, token_man, lexer))) {
-        return status;
+        goto fail;
     }
     cs.cur_filename = ccc_basename(filepath);
 
-    status = cpp_process_file(&cs, filepath, output);
+    if (CCC_OK != (status = cpp_process_file(&cs, filepath, output))) {
+        goto fail;
+    }
 
+fail:
     cpp_state_destroy(&cs);
-
     return status;
 }
 
@@ -511,8 +515,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     token_t *token = vec_iter_get(ts);
 
     // Single # on a line allowed
-    if (token->type == NEWLINE || token->type == TOKEN_EOF ||
-        !vec_iter_has_next(ts)) {
+    if (token->type == NEWLINE || !vec_iter_has_next(ts)) {
         return CCC_OK;
     }
 

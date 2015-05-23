@@ -48,6 +48,14 @@ typedef struct tstream_t {
  */
 void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last);
 
+inline int ts_peek(tstream_t *ts) {
+    if (ts->cur == ts->end) {
+        return EOF;
+    }
+
+    return *ts->cur;
+}
+
 /**
  * Retrieves a character from the text stream
  *

@@ -24,6 +24,8 @@
 
 #include <assert.h>
 
+extern int ts_peek(tstream_t *ts);
+
 void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last) {
     assert(ts != NULL);
     ts->cur = start;

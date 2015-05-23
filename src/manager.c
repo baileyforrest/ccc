@@ -55,11 +55,9 @@ void man_destroy(manager_t *manager) {
     }
 
     if (!manager->parse_destroyed) {
-        lexer_destroy(&manager->lexer);
-        ast_destroy(manager->ast);
+        man_destroy_parse(manager);
     }
 
-    st_destroy(&manager->symtab);
     man_destroy_ir(manager);
 }
 
@@ -67,7 +65,10 @@ void man_destroy_parse(manager_t *manager) {
     assert(!manager->parse_destroyed);
     manager->parse_destroyed = true;
 
+    vec_destroy(&manager->tokens);
+    st_destroy(&manager->symtab);
     lexer_destroy(&manager->lexer);
+    token_man_destroy(&manager->token_man);
     ast_destroy(manager->ast);
 }
 

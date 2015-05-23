@@ -154,7 +154,6 @@ void token_str_append_sb(string_builder_t *sb, token_t *token) {
 
 const char *token_type_str(token_type_t token) {
     switch (token) {
-    case TOKEN_EOF:     return "";
     case HASH:          return "#";
     case HASHHASH:      return "##";
     case SPACE:         return " ";

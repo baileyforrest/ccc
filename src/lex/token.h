@@ -27,7 +27,6 @@
 #include "util/string_set.h"
 
 typedef enum token_type_t {
-    TOKEN_EOF,
     HASH,          // #
     HASHHASH,      // ##
 

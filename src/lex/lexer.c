@@ -58,24 +58,30 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     assert(result != NULL);
     status_t status = CCC_OK;
 
-    while (true) {
+    token_t *last = NULL;
+    while (ts_peek(stream) != EOF) {
         token_t *token = token_create(lexer->token_man);
 
         if (CCC_OK != (status = lex_next_token(lexer, stream, token))) {
-            free(token);
             return status;
         }
 
-        vec_push_back(result, token);
-        if (token->type == TOKEN_EOF) {
-            break;
+        // If we encounter two # in a row, combine them. This is necessary
+        // to lex the %:%: digraph with only getc and ungetc operations
+        if (token->type == HASH && last != NULL && last->type == HASH) {
+            last->type = HASHHASH;
+            continue;
         }
+
+        vec_push_back(result, token);
+        last = token;
     }
 
     return status;
 }
 
-int lex_if_next_eq(tstream_t *stream, int test, token_type_t noeq, token_type_t iseq) {
+int lex_if_next_eq(tstream_t *stream, int test, token_type_t noeq,
+                   token_type_t iseq) {
     int next = lex_getc_splice(stream);
     if (next == test) {
         return iseq;
@@ -123,6 +129,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
 
     int next;
     switch (cur) {
+    case '\n': result->type = NEWLINE; break;
     case '{': result->type = LBRACE; break;
     case '}': result->type = RBRACE; break;
     case '(': result->type = LPAREN; break;
@@ -204,6 +211,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
         switch (next) {
         case '=': result->type = MODEQ; break;
         case '>': result->type = RBRACE; break; // digraph %> = }
+        case ':': result->type = HASH; break; // digraph %: = #
         default:
             ts_ungetc(next, stream);
             result->type = MOD;

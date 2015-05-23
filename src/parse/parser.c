@@ -111,7 +111,7 @@ status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result) {
     lex->typetab = &tunit->typetab; // Set top type table to translation units
     lex->tunit = tunit;
 
-    while (LEX_CUR(lex)->type != TOKEN_EOF) {
+    while (vec_iter_has_next(&lex->tokens)) {
         gdecl_t *gdecl;
         if (CCC_OK != (status = par_external_declaration(lex, &gdecl))) {
             goto fail;
