@@ -492,7 +492,8 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             // Found a macro paramater
             token_t *next = cpp_iter_lookahead(&iter, 1);
 
-            if (next->type == HASHHASH) { // Next token is a paste
+            if (next != NULL && next->type == HASHHASH) {
+                // Next token is a paste
                 if (vec_size(param_vec) == 0) {
                     // Empty parameter vector
                     token_t *after_paste = cpp_iter_lookahead(&iter, 2);
@@ -702,7 +703,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
         return status;
     }
 
-    token_t *rhead = cpp_iter_advance(right);
+    token_t *rhead = vec_iter_get(right);
 
     if (vec_size(left) == 0) {
         vec_push_back(left, rhead);
@@ -743,8 +744,12 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
     // 0 wraps around to SIZE_MAX
     --nelems;
 
-    while (vec_iter_has_next(right) && nelems-- > 0) {
-        vec_push_back(left, cpp_iter_advance(right));
+    while (nelems-- > 0) {
+        cpp_iter_advance(right);
+        if (!vec_iter_has_next(right)) {
+            break;
+        }
+        vec_push_back(left, vec_iter_get(right));
     }
 
     return CCC_OK;
