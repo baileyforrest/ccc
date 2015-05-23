@@ -90,7 +90,7 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
         fprintf(stderr, "%s: %s ", optman.exec_name, header);
         vfprintf(stderr, fmt, ap);
         fprintf(stderr, "\n");
-        return;
+        goto done;
     }
 
     static char *last_func = NULL;
@@ -111,6 +111,10 @@ void logger_log(fmark_t *mark, log_type_t type, const char *fmt, ...) {
                 cur->col, "In expansion of macro");
         logger_log_line(cur);
     }
+
+done:
+    va_end(ap);
+    return;
 }
 
 bool logger_has_error(void) {

@@ -61,9 +61,9 @@ void vec_push_back(vec_t *vec, void *elem) {
     vec->elems[vec->size++] = elem;
 }
 
-void vec_append(vec_t *dest, vec_t *vec2) {
+void vec_append_vec(vec_t *dest, vec_t *vec2) {
     VEC_FOREACH(cur, vec2) {
-        vec_append(dest, vec_get(vec2, cur));
+        vec_push_back(dest, vec_get(vec2, cur));
     }
 }
 

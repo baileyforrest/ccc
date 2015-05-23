@@ -169,6 +169,9 @@ void cpp_state_destroy(cpp_state_t *cs) {
 }
 
 token_t *cpp_iter_advance(vec_iter_t *iter) {
+    if (!vec_iter_has_next(iter)) {
+        return NULL;
+    }
     token_t *cur = vec_iter_advance(iter);
     cpp_iter_skip_space(iter);
 
@@ -491,11 +494,11 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                                                        after_paste->id_name))) {
                         cpp_iter_advance(&iter); // skip empty param
                         cpp_iter_advance(&iter); // skip ##
-                        vec_append(&temp, param_vec);
+                        vec_append_vec(&temp, param_vec);
                     }
                 } else {
                     // Just append all the tokens onto the output if pasting
-                    vec_append(&temp, param_vec);
+                    vec_append_vec(&temp, param_vec);
                 }
             } else {
                 // Macro param not followed by ##, expand it onto the output

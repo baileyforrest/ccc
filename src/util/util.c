@@ -96,6 +96,7 @@ void directed_print(string_builder_t *sb, FILE *file, char *fmt, ...) {
     } else {
         sb_append_vprintf(sb, fmt, ap);
     }
+    va_end(ap);
 }
 
 char *unescape_str(char *str) {

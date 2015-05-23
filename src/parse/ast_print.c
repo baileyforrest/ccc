@@ -54,6 +54,7 @@ void ast_directed_print(char **buf, size_t *remain, const char *fmt, ...) {
         *remain -= printed;
         *buf += printed;
     }
+    va_end(ap);
 }
 
 void ast_trans_unit_print(trans_unit_t *tras_unit) {

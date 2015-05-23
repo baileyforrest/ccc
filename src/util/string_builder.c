@@ -78,15 +78,19 @@ void sb_append_printf(string_builder_t *sb, char *fmt, ...) {
     va_start(ap, fmt);
 
     sb_append_vprintf(sb, fmt, ap);
+    va_end(ap);
 }
 
 void sb_append_vprintf(string_builder_t *sb, char *fmt, va_list ap) {
+    va_list copy;
+    va_copy(copy, ap);
     int size = vsnprintf(NULL, 0, fmt, ap);
 
     sb_reserve(sb, sb_len(sb) + size);
 
-    vsnprintf(sb_buf(sb) + sb_len(sb), size, fmt, ap);
+    vsnprintf(sb_buf(sb) + sb_len(sb), size + 1, fmt, copy);
 
     sb->len = sb->len + size;
     sb->buf[sb->len] = '\0';
+    va_end(copy);
 }

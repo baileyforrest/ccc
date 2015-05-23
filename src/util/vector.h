@@ -102,6 +102,6 @@ inline void *vec_iter_reverse(vec_iter_t *iter) {
     return vec_get(iter->vec, iter->off--);
 }
 
-void vec_append(vec_t *dest, vec_t *vec2);
+void vec_append_vec(vec_t *dest, vec_t *vec2);
 
 #endif /* _VECTOR_H_ */
