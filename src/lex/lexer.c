@@ -373,7 +373,6 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
 
 status_t lex_id(lexer_t *lexer, tstream_t *stream, token_t *result) {
     status_t status = CCC_OK;
-    result->type = ID;
     sb_clear(&lexer->lexbuf);
 
     bool done = false;

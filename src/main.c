@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
         char *filename = vec_get(&optman.src_files, cur);
 
         manager_t manager;
-        man_init(&manager, NULL);
+        man_init(&manager);
 
         if (CCC_OK != (status = man_lex(&manager, filename))) {
             goto next;

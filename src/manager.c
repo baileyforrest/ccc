@@ -33,13 +33,12 @@
 #include "parse/ast.h"
 #include "parse/parser.h"
 
-void man_init(manager_t *manager, htable_t *macros) {
+void man_init(manager_t *manager) {
     assert(manager != NULL);
 
     vec_init(&manager->tokens, 0);
 
-    bool preload = macros != NULL;
-    st_init(&manager->symtab, preload);
+    st_init(&manager->symtab, true);
 
     token_man_init(&manager->token_man);
     lexer_init(&manager->lexer, &manager->token_man, &manager->symtab);
@@ -110,6 +109,7 @@ status_t man_dump_tokens(manager_t *manager) {
 
     VEC_FOREACH(cur, &manager->tokens) {
         token_print(stdout, vec_get(&manager->tokens, cur));
+        printf("\n");
     }
 
     return status;

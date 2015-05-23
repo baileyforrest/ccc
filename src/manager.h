@@ -49,11 +49,8 @@ typedef struct manager_t {
  * Initialize a compilation mananger
  *
  * @param manager The compilation mananger to initialize
- * @param macros If non NULL, manager's preprocessor is initialized with
- *     given macros. It is then used under the assumption that macros will not
- *     change during use, and that manager will not change macros
  */
-void man_init(manager_t *manager, htable_t *macros);
+void man_init(manager_t *manager);
 
 /**
  * Destroy a compilation mananger
