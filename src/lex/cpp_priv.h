@@ -92,7 +92,14 @@ typedef struct cpp_macro_inst_t {
         }                                                   \
     } while (0)
 
-status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output);
+inline void cpp_iter_skip_space(vec_iter_t *iter) {
+    for (; vec_iter_has_next(iter); vec_iter_advance(iter)) {
+        token_t *token = vec_iter_get(iter);
+        if (token->type != SPACE) {
+            break;
+        }
+    }
+}
 
 status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
                         lexer_t *lexer);
@@ -103,11 +110,17 @@ void cpp_state_destroy(cpp_state_t *cs);
 
 token_t *cpp_iter_advance(vec_iter_t *iter);
 
-void cpp_iter_skip_space(vec_iter_t *iter);
+token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead);
+
+status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output);
 
 size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline);
 
 bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2);
+
+vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name);
+
+status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq);
 
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 
@@ -116,18 +129,12 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
 
 status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 
-status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq);
-
-
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst);
 
 token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts);
 
-vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name);
-
 status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
                   size_t nelems);
-
 
 #endif /* _CPP_PRIV_ */

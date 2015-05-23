@@ -88,6 +88,8 @@ static char *predef_macros[] = {
     "char32_t int"
 };
 
+extern void cpp_iter_skip_space(vec_iter_t *iter);
+
 status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
                         lexer_t *lexer) {
     status_t status = CCC_OK;
@@ -145,6 +147,7 @@ void cpp_macro_destroy(cpp_macro_t *macro) {
     if (macro == NULL) {
         return;
     }
+
     vec_destroy(&macro->stream);
     vec_destroy(&macro->params);
     free(macro);
@@ -152,6 +155,24 @@ void cpp_macro_destroy(cpp_macro_t *macro) {
 
 void cpp_state_destroy(cpp_state_t *cs) {
     HT_DESTROY_FUNC(&cs->macros, cpp_macro_destroy);
+}
+
+token_t *cpp_iter_advance(vec_iter_t *iter) {
+    token_t *cur = vec_iter_advance(iter);
+    cpp_iter_skip_space(iter);
+
+    return cur;
+}
+
+token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead) {
+    vec_iter_t temp;
+    memcpy(&temp, iter, sizeof(temp));
+
+    while (lookahead--) {
+        cpp_iter_advance(&temp);
+    }
+
+    return vec_iter_get(&temp);
 }
 
 size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
@@ -170,21 +191,6 @@ size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
 
     return skipped;
 }
-
-token_t *cpp_iter_advance(vec_iter_t *iter) {
-    cpp_iter_skip_space(iter);
-    return vec_iter_advance(iter);
-}
-
-void cpp_iter_skip_space(vec_iter_t *iter) {
-    for (; vec_iter_has_next(iter); vec_iter_advance(iter)) {
-        token_t *token = vec_iter_get(iter);
-        if (token->type != SPACE) {
-            break;
-        }
-    }
-}
-
 
 bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2) {
     if (m1 == m2) {
@@ -221,6 +227,10 @@ bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2) {
         cpp_iter_advance(&stream2);
     }
 
+    if (!vec_iter_has_next(&stream1) || !vec_iter_has_next(&stream2)) {
+        return false;
+    }
+
     return true;
 }
 
@@ -231,6 +241,7 @@ vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name) {
             return &param->stream;
         }
     }
+
     return NULL;
 }
 
@@ -292,7 +303,10 @@ status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output) {
     }
 
     vec_iter_t iter = { &file_tokens, 0 };
-    status = cpp_expand(cs, &iter, output);
+    cpp_iter_skip_space(&iter);
+    if (CCC_OK != (status = cpp_expand(cs, &iter, output))) {
+        goto fail;
+    }
 
 fail:
     vec_destroy(&file_tokens);
@@ -302,12 +316,12 @@ fail:
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
 
-    token_t *new_last = NULL, *last = NULL;
-    for (; vec_iter_has_next(ts); cpp_iter_advance(ts), last = new_last) {
-        token_t *token = vec_iter_get(ts);
-        new_last = token;
+    token_t *token = NULL, *last = NULL;
+    for (; vec_iter_has_next(ts); last = token, cpp_iter_advance(ts)) {
+        token = vec_iter_get(ts);
 
-        if (cs->ignore && token->type != HASHHASH) {
+        // If we're ignoring and, we only want to check # directives
+        if (cs->ignore && token->type != HASH) {
             continue;
         }
 
@@ -327,7 +341,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         case HASHHASH:
             logger_log(&token->mark, LOG_ERR, "stray '##' in program");
         case NEWLINE:
-            // ignore spaces these
+            // ignore these
             continue;
 
         default:
@@ -338,19 +352,19 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
         assert(token->type == ID);
 
-        // If the current token is a member of the hideset, just pass it
+        // If the current token is a member of its hideset, just pass it
         if (str_set_mem(token->hideset, token->id_name)) {
             vec_push_back(output, token);
             continue;
         }
 
-        cpp_iter_advance(ts);
-        token_t *next = vec_iter_get(ts);
-        vec_iter_reverse(ts);
+        token_t *next = cpp_iter_lookahead(ts, 1);
 
         cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
         if (macro == NULL ||
             (macro->num_params != -1 && next->type != LPAREN)) {
+            // Just continue if this isn't a macro, or a function like macro
+            // without a paren next
             vec_push_back(output, token);
             continue;
         }
@@ -358,17 +372,14 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         cpp_macro_inst_t macro_inst =
             { macro, SLIST_LIT(offsetof(cpp_macro_param_t, link)) };
 
-        str_set_t *hideset;
-
-        vec_t subbed;
-        vec_init(&subbed, 0);
+        str_set_t *hideset; // Macro's hideset
 
         // Object like macro
-        if (macro->num_params == 0) {
+        if (macro->num_params == -1) {
             hideset = str_set_copy(token->hideset);
             str_set_add(hideset, token->id_name);
             if (CCC_OK !=
-                (status = cpp_substitute(cs, &macro_inst, hideset, &subbed))) {
+                (status = cpp_substitute(cs, &macro_inst, hideset, output))) {
                 goto fail;
             }
         } else {
@@ -381,23 +392,16 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             hideset = str_set_intersect(token->hideset, rparen->hideset);
             str_set_add(hideset, token->id_name);
             if (CCC_OK !=
-                (status = cpp_substitute(cs, &macro_inst, hideset, &subbed))) {
+                (status = cpp_substitute(cs, &macro_inst, hideset, output))) {
                 goto fail;
             }
         }
 
-        VEC_FOREACH(cur, &subbed) {
-            token_t *token = vec_get(&subbed, cur);
-            vec_push_back(output, token);
-        }
-
         str_set_destroy(hideset);
-        vec_destroy(&subbed);
         continue;
 
     fail:
         str_set_destroy(hideset);
-        vec_destroy(&subbed);
         goto done;
     }
 
@@ -407,14 +411,16 @@ done:
 
 status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                         str_set_t *hideset, vec_t *output) {
-    vec_iter_t iter = { &macro_inst->macro->stream, 0 };
     status_t status = CCC_OK;
+    vec_iter_t iter = { &macro_inst->macro->stream, 0 };
+    vec_t temp;
+    vec_init(&temp, 0);
 
     for (; vec_iter_has_next(&iter); cpp_iter_advance(&iter)) {
         token_t *token = vec_iter_get(&iter);
         vec_t *param_vec;
 
-        if (token->type == HASH) {
+        if (token->type == HASH) { // Handle stringification
             cpp_iter_advance(&iter);
             token_t *param = vec_iter_get(&iter);
             if (param->type != ID ||
@@ -426,57 +432,72 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             }
 
             token_t *stringified = cpp_stringify(cs, param_vec);
-            vec_push_back(output, stringified);
-        } else if (token->type == HASHHASH) {
+            vec_push_back(&temp, stringified);
+        } else if (token->type == HASHHASH) { // Concatenation
             cpp_iter_advance(&iter);
             token_t *next = vec_iter_get(&iter);
+
             if (next->type == ID &&
                 NULL != (param_vec =
                          cpp_macro_inst_lookup(macro_inst, next->id_name))) {
+                // Macro parameter: glue tho whole parameter
                 vec_iter_t param_iter = { param_vec, 0 };
-                if (CCC_OK != (status = cpp_glue(cs, output, &param_iter, 0))) {
+                if (CCC_OK != (status = cpp_glue(cs, &temp, &param_iter, 0))) {
                     goto fail;
                 }
-            } else {
-                if (CCC_OK != (status = cpp_glue(cs, output, &iter, 1))) {
+            } else { // Not macro param, just glue the next token
+                if (CCC_OK != (status = cpp_glue(cs, &temp, &iter, 1))) {
                     goto fail;
                 }
             }
-        } else if (token->type == ID &&
-                   NULL !=
+        } else if (token->type == ID && NULL !=
                    (param_vec = cpp_macro_inst_lookup(macro_inst,
                                                        token->id_name))) {
-            cpp_iter_advance(&iter);
-            token_t *next = vec_iter_get(&iter);
-            if (next->type == HASHHASH) {
+            // Found a macro paramater
+            token_t *next = cpp_iter_lookahead(&iter, 1);
+
+            if (next->type == HASHHASH) { // Next token is a paste
                 if (vec_size(param_vec) == 0) {
-                    cpp_iter_advance(&iter);
-                    token_t *next = vec_iter_get(&iter);
-                    if (next->type == ID &&
+                    // Empty parameter vector
+                    token_t *after_paste = cpp_iter_lookahead(&iter, 2);
+
+                    // If next token is a macro parameter, then skip the
+                    // next two tokens and output that param's tokens
+                    if (after_paste->type == ID &&
                         NULL != (param_vec =
                                  cpp_macro_inst_lookup(macro_inst,
-                                                       next->id_name))) {
-                        vec_append(output, param_vec);
+                                                       after_paste->id_name))) {
+                        cpp_iter_advance(&iter); // skip empty param
+                        cpp_iter_advance(&iter); // skip ##
+                        vec_append(&temp, param_vec);
                     }
                 } else {
-                    vec_iter_reverse(&iter);
-                    vec_append(output, param_vec);
+                    // Just append all the tokens onto the output if pasting
+                    vec_append(&temp, param_vec);
                 }
             } else {
+                // Macro param not followed by ##, expand it onto the output
                 vec_iter_t iter = { param_vec, 0 };
-                cpp_expand(cs, &iter, output);
+                cpp_expand(cs, &iter, &temp);
             }
         } else {
-            vec_push_back(output, token);
+            // Regular token, just put it on the output
+            vec_push_back(&temp, token);
         }
     }
 
-    VEC_FOREACH(cur, output) {
-        token_t *token = vec_get(output, cur);
-        str_set_union_inplace(token->hideset, hideset);
+    // Add the hideset passed into this function to all output tokens
+    VEC_FOREACH(cur, &temp) {
+        token_t *token = vec_get(&temp, cur);
+
+        // Make a copy and add it to output
+        token_t *copy = token_copy(cs->token_man, token);
+        str_set_union_inplace(copy->hideset, hideset);
+        vec_push_back(output, copy);
     }
 
 fail:
+    vec_destroy(&temp);
     return status;
 }
 
@@ -535,6 +556,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
 status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                                 cpp_macro_inst_t *macro_inst) {
+    (void)cs;
     token_t *lparen = vec_iter_get(ts);
     assert(lparen->type == LPAREN);
     cpp_iter_advance(ts);
@@ -555,12 +577,10 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
         if (cur < macro->num_params) {
             arg = vec_get(&macro->params, cur);
             param = emalloc(sizeof(cpp_macro_param_t));
-
             vec_init(&param->stream, 0);
 
-            if (arg == NULL) {
-                // Must be last argument
-                assert(cur = macro->num_params - 1);
+            if (arg == NULL) { // NULL arg denotes vararg
+                assert(cur == macro->num_params - 1); // Must be last argument
                 vararg = true;
                 param->name = VARARG_NAME;
             } else {
@@ -590,10 +610,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             }
 
             if (cur < macro->num_params) {
-                token_t *copy = token_copy(cs->token_man, token);
-                copy->mark.last = &lparen->mark;
-
-                vec_push_back(&param->stream, copy);
+                vec_push_back(&param->stream, token);
             }
         }
 
@@ -621,22 +638,17 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
     token_t *first = vec_get(ts, 0);
     memcpy(&token->mark, &first->mark, sizeof(fmark_t));
 
-    bool last_space = false;
-
+    token_t *last = NULL;
     VEC_FOREACH(cur, ts) {
         token_t *token = vec_get(ts, cur);
 
-        if (token->type == SPACE) {
-            if (!last_space) {
-                last_space = true;
-            } else {
-                continue;
-            }
-        } else {
-            last_space = false;
+        // Combine multiple spaces into one
+        if (token->type == SPACE && last != NULL && last->type == SPACE) {
+            continue;
         }
 
         token_str_append_sb(&sb, token);
+        last = token;
     }
 
     token->str_val = sstore_lookup(sb_buf(&sb));
@@ -649,19 +661,20 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
                   size_t nelems) {
     status_t status = CCC_OK;
 
-    size_t lsize = vec_size(left);
+    if (!vec_iter_has_next(right)) { // Do nothing if right is empty
+        return status;
+    }
 
     token_t *rhead = cpp_iter_advance(right);
 
-    if (lsize == 0) {
+    if (vec_size(left) == 0) {
         vec_push_back(left, rhead);
     } else {
-        token_t *ltail = vec_get(left, lsize - 1);
+        // Remove the last token of the left
+        token_t *ltail = vec_pop_back(left);
 
-        // Remove the left token
-        vec_pop_back(left);
-
-        // Combine the two tokens
+        // Combine right most left token and left most right token
+        // Just print them and lex it into new tokens
         string_builder_t sb;
         sb_init(&sb, 0);
 
@@ -670,11 +683,12 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
 
         tstream_t stream;
         ts_init(&stream, sb_buf(&sb), sb_buf(&sb) + sb_len(&sb),
-                "builtin", NULL);
+                ltail->mark.filename, NULL);
 
         size_t init_size = vec_size(left);
 
         status = lexer_lex_stream(cs->lexer, &stream, left);
+        // Must be valid if this already broke into tokens
         assert(status == CCC_OK);
 
         size_t post_size = vec_size(left);
