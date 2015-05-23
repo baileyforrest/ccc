@@ -286,6 +286,9 @@ status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
 
 status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output) {
     status_t status = CCC_OK;
+    char *filename_save = cs->filename;
+    cs->filename = filename;
+
     vec_t file_tokens;
     vec_init(&file_tokens, 0);
 
@@ -310,6 +313,7 @@ status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output) {
 
 fail:
     vec_destroy(&file_tokens);
+    cs->filename = filename_save;
     return status;
 }
 

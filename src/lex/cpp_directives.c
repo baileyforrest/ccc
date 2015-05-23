@@ -54,36 +54,85 @@ cpp_directive_t directives[] = {
     { NULL, NULL, CPP_DIR_NONE, false }
 };
 
+status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
+                         bool pp_if) {
+    status_t status = CCC_OK;
+
+    vec_t input;
+    vec_init(&input, 0);
+
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
+        token_t *token = vec_iter_get(ts);
+        if (token->type == NEWLINE) {
+            break;
+        }
+
+        if (pp_if && token->type == ID) {
+            // Handle defined operator
+            if (strcmp(token->id_name, "defined") == 0) {
+                cpp_iter_advance(ts);
+                bool has_paren = false;
+                if (token->type == LPAREN) {
+                    has_paren = true;
+                    cpp_iter_advance(ts);
+                }
+
+                if (token->type != ID) {
+                    logger_log(&token->mark, LOG_ERR,
+                               "operator \"defined\" requires an identifier");
+                    status = CCC_ESYNTAX;
+                    goto fail;
+                }
+
+                cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+                token = macro == NULL ? &token_int_zero : &token_int_one;
+
+                cpp_iter_advance(ts);
+                if (has_paren) {
+                    if (token->type != RPAREN) {
+                        logger_log(&token->mark, LOG_ERR,
+                                   "missing ')' after \"defined\"");
+                        status = CCC_ESYNTAX;
+                        goto fail;
+                    }
+                    cpp_iter_advance(ts);
+                }
+            }
+        }
+
+        vec_push_back(&input, token);
+    }
+
+    vec_iter_t input_iter = { &input, 0 };
+
+    if (CCC_OK != (status = cpp_expand(cs, &input_iter, output))) {
+        goto fail;
+    }
+
+fail:
+    vec_destroy(&input);
+    return status;
+}
+
 status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
     token_t *token = vec_iter_get(ts);
     fmark_t *mark = &token->mark;
     char *filename = NULL;
-    vec_t macro_output;
-    vec_init(&macro_output, 0);
 
-    // If its an identifier, then try to expand it
-    if (token->type == ID) {
-        cpp_iter_advance(ts);
+    vec_t line;
+    vec_init(&line, 0);
 
-        vec_t input;
-        vec_init(&input, 1);
-
-        vec_push_back(&input, token);
-
-        vec_iter_t input_iter = { &input, 0 };
-        status = cpp_expand(cs, &input_iter, &macro_output);
-        assert(status == CCC_OK);
-
-        // Set token stream to expanded macro
-        ts = &(vec_iter_t){ &macro_output, 0 };
-        vec_destroy(&input);
-        token = vec_iter_get(ts);
+    if (CCC_OK != (status = cpp_expand_line(cs, ts, &line, false))) {
+        goto fail;
     }
 
+    vec_iter_t line_iter = { &line, 0 };
+    token = vec_iter_get(&line_iter);
+
     switch (token->type) {
-    case STRING: // "filename
-        cpp_iter_advance(ts);
+    case STRING: // "filename"
+        cpp_iter_advance(&line_iter);
         filename = token->str_val;
         status = cpp_include_helper(cs, mark, filename, false, output);
         break;
@@ -93,16 +142,16 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
         // Don't use cpp_iter_advance, we want to preserve whitespace
         bool done = false;
-        vec_iter_advance(ts);
-        for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
-            token_t *token = vec_iter_get(ts);
+        vec_iter_advance(&line_iter);
+        for (; vec_iter_has_next(&line_iter); vec_iter_advance(&line_iter)) {
+            token_t *token = vec_iter_get(&line_iter);
 
             if (token->type == NEWLINE) {
                 break;
             }
             if (token->type == GT) {
                 done = true;
-                vec_iter_advance(ts);
+                vec_iter_advance(&line_iter);
                 break;
             }
 
@@ -124,7 +173,8 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         status = CCC_ESYNTAX;
     }
 
-    vec_destroy(&macro_output);
+fail:
+    vec_destroy(&line);
     return status;
 }
 
@@ -272,7 +322,7 @@ status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
 
-    cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+    cpp_macro_t *macro = ht_remove(&cs->macros, &token->id_name);
     cpp_macro_destroy(macro);
 
     return CCC_OK;
@@ -309,72 +359,27 @@ status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val) {
     trans_unit_t *ast = NULL;
     *val = 0;
 
-    vec_t input;
-    vec_t output;
-    vec_init(&input, 0);
-    vec_init(&output, 0);
+    vec_t line;
+    vec_init(&line, 0);
 
-    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
-        token_t *token = vec_iter_get(ts);
-        if (token->type == NEWLINE) {
-            break;
-        }
-
-        if (token->type == ID) {
-            // Handle defined operator
-            if (strcmp(token->id_name, "defined") == 0) {
-                cpp_iter_advance(ts);
-                bool has_paren = false;
-                if (token->type == LPAREN) {
-                    has_paren = true;
-                    cpp_iter_advance(ts);
-                }
-
-                if (token->type != ID) {
-                    logger_log(&token->mark, LOG_ERR,
-                               "operator \"defined\" requires an identifier");
-                    status = CCC_ESYNTAX;
-                    goto fail;
-                }
-
-                cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
-                token = macro == NULL ? &token_int_zero : &token_int_one;
-
-                cpp_iter_advance(ts);
-                if (has_paren) {
-                    if (token->type != RPAREN) {
-                        logger_log(&token->mark, LOG_ERR,
-                                   "missing ')' after \"defined\"");
-                        status = CCC_ESYNTAX;
-                        goto fail;
-                    }
-                    cpp_iter_advance(ts);
-                }
-            }
-        }
-
-        vec_push_back(&input, token);
-    }
-    vec_iter_t input_iter = { &input, 0 };
-
-    if (CCC_OK != (status = cpp_expand(cs, &input_iter, &output))) {
+    if (CCC_OK != (status = cpp_expand_line(cs, ts, &line, true))) {
         goto fail;
     }
 
     expr_t *expr = NULL;
-    if (CCC_OK != (status = parser_parse_expr(&output, ast, &expr))) {
+    if (CCC_OK != (status = parser_parse_expr(&line, ast, &expr))) {
         goto fail;
     }
 
     if (!typecheck_const_expr(expr, val, true)) {
+        status = CCC_ESYNTAX;
         goto fail;
     }
 
 fail:
     ast_destroy(ast);
     cpp_skip_line(ts, false);
-    vec_destroy(&input);
-    vec_destroy(&output);
+    vec_destroy(&line);
     return status;
 }
 
@@ -395,7 +400,8 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
         if (cs->if_taken) {
             if_taken = true;
         }
-        if (CCC_BACKTRACK != (status = cpp_expand(cs, ts, output))) {
+        if (CCC_BACKTRACK != (status = cpp_expand(cs, ts, output)) &&
+            cs->last_dir != CPP_DIR_endif) {
             if (status == CCC_OK) {
                 logger_log(&start_token->mark, LOG_ERR, "Unterminted #if");
             }
@@ -494,31 +500,19 @@ status_t cpp_dir_pragma(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     return CCC_OK;
 }
 
-status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *out) {
-    (void)out;
+status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
+    (void)output;
     status_t status = CCC_OK;
 
-    vec_t input;
-    vec_t output;
-    vec_init(&input, 0);
-    vec_init(&output, 0);
+    vec_t line;
+    vec_init(&line, 0);
 
-    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
-        token_t *token = vec_iter_get(ts);
-        if (token->type == NEWLINE) {
-            break;
-        }
-
-        vec_push_back(&input, token);
-    }
-    vec_iter_t input_iter = { &input, 0 };
-
-    if (CCC_OK != (status = cpp_expand(cs, &input_iter, &output))) {
+    if (CCC_OK != (status = cpp_expand_line(cs, ts, &line, false))) {
         goto fail;
     }
 
-    for (size_t i = 0; i < vec_size(&output); ++i) {
-        token_t *token = vec_get(&output, i);
+    for (size_t i = 0; i < vec_size(&line); ++i) {
+        token_t *token = vec_get(&line, i);
         switch (i) {
         case 0:
             if (token->type != INTLIT) {
@@ -551,7 +545,6 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *out) {
 
 fail:
     cpp_skip_line(ts, false);
-    vec_destroy(&input);
-    vec_destroy(&output);
+    vec_destroy(&line);
     return status;
 }

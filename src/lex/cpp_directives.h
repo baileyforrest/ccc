@@ -60,6 +60,9 @@ DIR_DECL(warning);
 DIR_DECL(pragma);
 DIR_DECL(line);
 
+status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
+                         bool pp_if);
+
 status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
                             bool bracket, vec_t *output);
 
@@ -69,7 +72,6 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
                        bool if_taken);
 
 status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val);
-
 
 status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq);
 
