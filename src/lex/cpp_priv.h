@@ -73,7 +73,7 @@ typedef struct cpp_macro_t {
 } cpp_macro_t;
 
 typedef struct cpp_macro_param_t {
-    sl_link_t *link;
+    sl_link_t link;
     char *name;
     vec_t stream;
 } cpp_macro_param_t;
@@ -105,6 +105,8 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
                         lexer_t *lexer);
 
 void cpp_macro_destroy(cpp_macro_t *macro);
+
+void cpp_macro_inst_destroy(cpp_macro_inst_t *macro_inst);
 
 void cpp_state_destroy(cpp_state_t *cs);
 

@@ -154,6 +154,15 @@ void cpp_macro_destroy(cpp_macro_t *macro) {
     free(macro);
 }
 
+void cpp_macro_inst_destroy(cpp_macro_inst_t *macro_inst) {
+    SL_FOREACH(cur, &macro_inst->args) {
+        cpp_macro_param_t *param = GET_ELEM(&macro_inst->args, cur);
+        vec_destroy(&param->stream);
+    }
+
+    SL_DESTROY_FUNC(&macro_inst->args, free);
+}
+
 void cpp_state_destroy(cpp_state_t *cs) {
     HT_DESTROY_FUNC(&cs->macros, cpp_macro_destroy);
     vec_destroy(&cs->search_path);
@@ -170,11 +179,11 @@ token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead) {
     vec_iter_t temp;
     memcpy(&temp, iter, sizeof(temp));
 
-    while (lookahead--) {
+    while (vec_iter_has_next(iter) && lookahead--) {
         cpp_iter_advance(&temp);
     }
 
-    return vec_iter_get(&temp);
+    return vec_iter_has_next(&temp) ? vec_iter_get(&temp) : NULL;
 }
 
 size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
@@ -392,11 +401,13 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 goto fail;
             }
         } else {
+            cpp_iter_advance(ts); // Skip lparen
             if (CCC_OK !=
                 (status = cpp_fetch_macro_params(cs, ts, &macro_inst))) {
                 goto fail;
             }
             token_t *rparen = vec_iter_get(ts);
+
             assert(rparen->type == RPAREN);
             hideset = str_set_intersect(token->hideset, rparen->hideset);
             hideset = str_set_add(hideset, token->id_name);
@@ -406,10 +417,12 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             }
         }
 
+        cpp_macro_inst_destroy(&macro_inst);
         str_set_destroy(hideset);
         continue;
 
     fail:
+        cpp_macro_inst_destroy(&macro_inst);
         str_set_destroy(hideset);
         goto done;
     }
@@ -609,6 +622,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                 --parens;
             } else if (parens == 0) {
                 if (token->type == COMMA && !vararg) {
+                    cpp_iter_advance(ts);
                     break;
                 }
                 if (token->type == RPAREN) {
@@ -623,6 +637,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
         }
 
         if (cur < macro->num_params) {
+            sl_append(&macro_inst->args, &param->link);
             ++cur;
         }
     }

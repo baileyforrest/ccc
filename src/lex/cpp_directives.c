@@ -259,14 +259,19 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
                 break;
             }
             if (token->type == RPAREN) {
+                cpp_iter_advance(ts);
                 done = true;
                 break;
             }
-            if (!first && token->type != COMMA) {
-                logger_log(&token->mark, LOG_ERR,
-                           "macro parameters must be comma-separated");
-                status = CCC_ESYNTAX;
-                goto fail;
+            if (!first) {
+                if (token->type != COMMA) {
+                    logger_log(&token->mark, LOG_ERR,
+                               "macro parameters must be comma-separated");
+                    status = CCC_ESYNTAX;
+                    goto fail;
+                }
+                cpp_iter_advance(ts);
+                token = vec_iter_get(ts);
             }
             if (token->type != ID) {
                 logger_log(&token->mark, LOG_ERR,
