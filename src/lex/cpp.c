@@ -20,21 +20,20 @@
  * C preprocessor implementation
  */
 
-// TODO0: Need to copy in some places for expand/substitute
-
-#include <assert.h>
-
 #include "cpp.h"
 #include "cpp_priv.h"
 #include "cpp_directives.h"
 
-#include "optman.h"
+#include <assert.h>
+#include <time.h>
 
+#include "optman.h"
 #include "util/logger.h"
 #include "util/string_store.h"
 #include "util/file_directory.h"
 
 #define VARARG_NAME "__VA_ARGS__"
+#define TIME_DATE_BUF_SZ 128
 
 static char *s_search_path[] = {
     "", // Denotes current directory
@@ -89,6 +88,16 @@ static char *s_predef_macros[] = {
     "char32_t int"
 };
 
+static struct {
+    char *name;
+    cpp_macro_type_t type;
+} s_special_macros[] = {
+    { "__FILE__", CPP_MACRO_FILE },
+    { "__LINE__", CPP_MACRO_LINE },
+    { "__DATE__", CPP_MACRO_DATE },
+    { "__TIME__", CPP_MACRO_TIME }
+};
+
 extern void cpp_iter_skip_space(vec_iter_t *iter);
 
 status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
@@ -127,17 +136,28 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
         vec_push_back(&cs->search_path, s_search_path[i]);
     }
 
+    // Add special macros
+    for (size_t i = 0; i < STATIC_ARRAY_LEN(s_special_macros); ++i) {
+        if (CCC_OK !=
+            (status = cpp_macro_define(cs, s_special_macros[i].name,
+                                       s_special_macros[i].type, false))) {
+            return status;
+        }
+    }
+
     // Add default macros
     for (size_t i = 0; i < STATIC_ARRAY_LEN(s_predef_macros); ++i) {
         if (CCC_OK !=
-            (status = cpp_macro_define(cs, s_predef_macros[i], false))) {
+            (status = cpp_macro_define(cs, s_predef_macros[i], CPP_MACRO_BASIC,
+                                       false))) {
             return status;
         }
     }
 
     VEC_FOREACH(cur, &optman.macros) {
         char *macro = vec_get(&optman.macros, cur);
-        if (CCC_OK != (status = cpp_macro_define(cs, macro, false))) {
+        if (CCC_OK != (status = cpp_macro_define(cs, macro, CPP_MACRO_BASIC,
+                                                 false))) {
             return status;
         }
     }
@@ -260,7 +280,8 @@ vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name) {
     return NULL;
 }
 
-status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq) {
+status_t cpp_macro_define(cpp_state_t *cs, char *string,
+                          cpp_macro_type_t type, bool has_eq) {
     status_t status = CCC_OK;
     tstream_t stream;
     ts_init(&stream, string, string + strlen(string), COMMAND_LINE_FILENAME,
@@ -273,7 +294,7 @@ status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq) {
     }
 
     vec_iter_t tstream = { &tokens, 0 };
-    if (CCC_OK != (status = cpp_define_helper(cs, &tstream, has_eq))) {
+    if (CCC_OK != (status = cpp_define_helper(cs, &tstream, type, has_eq))) {
         goto fail;
     }
 
@@ -290,7 +311,7 @@ status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
     if (CCC_OK != (status = cpp_state_init(&cs, token_man, lexer))) {
         goto fail;
     }
-    cs.cur_filename = ccc_basename(filepath);
+    cs.cur_filename = filepath;
 
     if (CCC_OK != (status = cpp_process_file(&cs, filepath, output))) {
         goto fail;
@@ -392,6 +413,9 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             // without a paren next
             vec_push_back(output, token);
             continue;
+        }
+        if (macro->type != CPP_MACRO_BASIC) {
+            cpp_handle_special_macro(cs, &token->mark, macro->type, output);
         }
 
         cpp_macro_inst_t macro_inst =
@@ -754,4 +778,54 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
     }
 
     return CCC_OK;
+}
+
+void cpp_handle_special_macro(cpp_state_t *cs, fmark_t *mark,
+                              cpp_macro_type_t type, vec_t *output) {
+    token_t *token = token_create(cs->token_man);
+    memcpy(&token->mark, mark, sizeof(fmark_t));
+
+    char buf[TIME_DATE_BUF_SZ];
+
+    time_t t;
+    struct tm *tm;
+
+    switch (type) {
+    case CPP_MACRO_FILE:
+        token->type = STRING;
+        token->str_val = cs->cur_filename;
+        break;
+    case CPP_MACRO_LINE:
+        token->type = INTLIT;
+        token->int_params = emalloc(sizeof(token_int_params_t));
+        token->int_params->hasU = false;
+        token->int_params->hasL = false;
+        token->int_params->hasLL = false;
+        token->int_params->int_val = mark->line - cs->line_orig + cs->line_mod;
+        break;
+    case CPP_MACRO_DATE:
+        token->type = STRING;
+        if (-1 == (t = time(NULL)) || NULL == (tm = localtime(&t))) {
+            logger_log(mark, LOG_WARN, "Failed to get Date!");
+            snprintf(buf, sizeof(buf), "??? ?? ????");
+        } else {
+            strftime(buf, sizeof(buf), "%b %d %Y", tm);
+        }
+        token->str_val = sstore_lookup(buf);
+        break;
+    case CPP_MACRO_TIME:
+        token->type = STRING;
+        if (-1 == (t = time(NULL)) || NULL == (tm = localtime(&t))) {
+            logger_log(mark, LOG_WARN, "Failed to get Time!");
+            snprintf(buf, sizeof(buf), "??:??:??");
+        } else {
+            strftime(buf, sizeof(buf), "%T", tm);
+        }
+        token->str_val = sstore_lookup(buf);
+        break;
+    default:
+        assert(false);
+    }
+
+    vec_push_back(output, token);
 }

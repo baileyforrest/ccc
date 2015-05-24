@@ -225,10 +225,11 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
 
 status_t cpp_dir_define(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
-    return cpp_define_helper(cs, ts, false);
+    return cpp_define_helper(cs, ts, CPP_MACRO_BASIC, false);
 }
 
-status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
+status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
+                           cpp_macro_type_t type, bool has_eq) {
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
 
@@ -240,6 +241,7 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
     vec_init(&macro->stream, 0);
     vec_init(&macro->params, 0);
     macro->num_params = -1;
+    macro->type = type;
 
     if (has_eq) {
         cpp_iter_advance(ts);
@@ -311,7 +313,8 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq) {
 
     cpp_macro_t *old_macro = ht_remove(&cs->macros, &macro->name);
     if (old_macro != NULL) {
-        if (!cpp_macro_equal(macro, old_macro)) {
+        if (old_macro->type != CPP_MACRO_BASIC ||
+            !cpp_macro_equal(macro, old_macro)) {
             logger_log(macro->mark, LOG_WARN, "\"%s\" redefined", macro->name);
             logger_log(old_macro->mark, LOG_NOTE,
                        "this is the location of the previous definition");
@@ -533,7 +536,8 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 status = CCC_ESYNTAX;
                 goto fail;
             }
-            cs->line_mod = token->int_params->int_val;
+            // -1 because this line value applies to next line
+            cs->line_mod = token->int_params->int_val - 1;
             cs->line_orig = token->mark.line;
             break;
         case 1:

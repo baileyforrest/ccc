@@ -58,6 +58,8 @@ typedef struct fmark_t {
 #define FMARK_LIT(last, file, line_start, line, col) \
     { last, file, line_start, line, col }
 
+// TODO0: Use this, replace token and ast node's mark to pointer to this
+// structure's entries
 typedef struct fmark_man_t {
     fmark_t *marks;
     size_t size;

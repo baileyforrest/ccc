@@ -73,6 +73,7 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
 
 status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val);
 
-status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts, bool has_eq);
+status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
+                           cpp_macro_type_t type, bool has_eq);
 
 #endif /* _CPP_DIRECTIVES_H_ */

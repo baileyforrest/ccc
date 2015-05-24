@@ -63,6 +63,14 @@ typedef struct cpp_state_t {
     bool ignore;
 } cpp_state_t;
 
+typedef enum cpp_macro_type_t {
+    CPP_MACRO_BASIC, /**< Regular macro */
+    CPP_MACRO_FILE,  /**< __FILE__ */
+    CPP_MACRO_LINE,  /**< __LINE__ */
+    CPP_MACRO_DATE,  /**< __DATE__ */
+    CPP_MACRO_TIME,  /**< __TIME__ */
+} cpp_macro_type_t;
+
 typedef struct cpp_macro_t {
     sl_link_t link;
     char *name;
@@ -70,6 +78,7 @@ typedef struct cpp_macro_t {
     vec_t stream; /**< (token_t) */
     vec_t params; /**< (char *) name NULL if varargs */
     int num_params; /**< -1 if object like macro */
+    cpp_macro_type_t type;
 } cpp_macro_t;
 
 typedef struct cpp_macro_param_t {
@@ -122,7 +131,8 @@ bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2);
 
 vec_t *cpp_macro_inst_lookup(cpp_macro_inst_t *inst, char *arg_name);
 
-status_t cpp_macro_define(cpp_state_t *cs, char *string, bool has_eq);
+status_t cpp_macro_define(cpp_state_t *cs, char *string,
+                          cpp_macro_type_t type, bool has_eq);
 
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output);
 
@@ -138,5 +148,9 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts);
 
 status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
                   size_t nelems);
+
+void cpp_handle_special_macro(cpp_state_t *cs, fmark_t *mark,
+                              cpp_macro_type_t type, vec_t *output);
+
 
 #endif /* _CPP_PRIV_ */
