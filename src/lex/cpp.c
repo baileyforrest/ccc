@@ -128,6 +128,7 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
     cs->if_taken = false;
     cs->ignore = false;
     cs->last_dir = CPP_DIR_NONE;
+    cs->in_param = false;
 
     // Add search path from command line options
     VEC_FOREACH(cur, &optman.include_paths) {
@@ -422,19 +423,6 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
 
         switch (token->type) {
-        case HASH:
-            if (last != NULL && last->type != NEWLINE) {
-                logger_log(&token->mark, LOG_ERR, "stray '#' in program");
-                break;
-            }
-            cpp_iter_advance(ts);
-            if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
-                return status;
-            }
-
-            // Set last as NULL to allow another directive following this one
-            token = NULL;
-            continue;
         case ID:
             break;
 
@@ -444,6 +432,26 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             // ignore these
             continue;
 
+        case HASH:
+            if (!cs->in_param) {
+                if (last != NULL && last->type != NEWLINE) {
+                    if (!cs->ignore) {
+                        logger_log(&token->mark, LOG_ERR,
+                                   "stray '#' in program");
+                        return CCC_ESYNTAX;
+                    }
+                    continue;
+                }
+                cpp_iter_advance(ts);
+                if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
+                    return status;
+                }
+
+                // Set last as NULL to pass above check for stray #
+                token = NULL;
+                continue;
+            }
+            // FALL THROUGH
         default:
             // If the token isn't one of the above, just transfer it
             cpp_stream_append(cs, output, token);
@@ -595,7 +603,10 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             } else {
                 // Macro param not followed by ##, expand it onto the output
                 vec_iter_t iter = { param_vec, 0 };
+                bool param_save = cs->in_param;
+                cs->in_param = true;
                 cpp_expand(cs, &iter, &temp);
+                cs->in_param = param_save;
             }
         } else {
             // Regular token, just put it on the output
@@ -622,12 +633,13 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
     token_t *token = vec_iter_get(ts);
     fmark_t *mark = &token->mark;
-    char *tok_str = token_str(token);
 
     // Single # on a line allowed
     if (token->type == NEWLINE || !vec_iter_has_next(ts)) {
         return CCC_OK;
     }
+
+    char *tok_str = token_str(token);
 
     cpp_directive_t *dir = NULL;
 

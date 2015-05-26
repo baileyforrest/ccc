@@ -62,6 +62,7 @@ typedef struct cpp_state_t {
     int if_level;
     bool if_taken;
     bool ignore;
+    bool in_param;
 } cpp_state_t;
 
 typedef enum cpp_macro_type_t {
