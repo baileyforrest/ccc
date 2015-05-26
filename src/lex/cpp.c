@@ -129,6 +129,8 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
     cs->ignore = false;
     cs->last_dir = CPP_DIR_NONE;
     cs->in_param = false;
+    cs->last_top_token = NULL;
+    cs->expand_level = 0;
 
     // Add search path from command line options
     VEC_FOREACH(cur, &optman.include_paths) {
@@ -412,10 +414,14 @@ fail:
 
 status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
+    ++cs->expand_level;
 
     token_t *token = NULL, *last = NULL;
     for (; vec_iter_has_next(ts); last = token, cpp_iter_advance(ts)) {
         token = vec_iter_get(ts);
+        if (cs->expand_level == 1) {
+            cs->last_top_token = token;
+        }
 
         // If we're ignoring and, we only want to check # directives
         if (cs->ignore && token->type != HASH) {
@@ -438,13 +444,14 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                     if (!cs->ignore) {
                         logger_log(&token->mark, LOG_ERR,
                                    "stray '#' in program");
-                        return CCC_ESYNTAX;
+                        status = CCC_ESYNTAX;
+                        goto done;
                     }
                     continue;
                 }
                 cpp_iter_advance(ts);
                 if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
-                    return status;
+                    goto done;
                 }
 
                 // Set last as NULL to pass above check for stray #
@@ -530,6 +537,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     }
 
 done:
+    --cs->expand_level;
     return status;
 }
 
@@ -640,6 +648,14 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     }
 
     char *tok_str = token_str(token);
+    char *dir_name;
+    bool implicit_line = false;
+    if (token->type == INTLIT) {
+        implicit_line = true;
+        dir_name = "line";
+    } else {
+        dir_name = tok_str;
+    }
 
     cpp_directive_t *dir = NULL;
 
@@ -649,7 +665,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             break;
         }
 
-        if (strcmp(dir->name, tok_str) == 0) {
+        if (strcmp(dir->name, dir_name) == 0) {
             break;
         }
     }
@@ -661,7 +677,9 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             status = CCC_ESYNTAX;
         }
     } else {
-        cpp_iter_advance(ts); // Skip the directive name
+        if (!implicit_line) {
+            cpp_iter_advance(ts); // Skip the directive name
+        }
         if (!cs->ignore || !dir->if_ignore) {
             status = dir->func(cs, ts, output);
             cs->last_dir = dir->type;
@@ -882,7 +900,8 @@ void cpp_handle_special_macro(cpp_state_t *cs, fmark_t *mark,
         token->int_params->hasU = false;
         token->int_params->hasL = false;
         token->int_params->hasLL = false;
-        token->int_params->int_val = mark->line - cs->line_orig + cs->line_mod;
+        token->int_params->int_val = cs->last_top_token->mark.line -
+            cs->line_orig + cs->line_mod;
         break;
     case CPP_MACRO_DATE:
         token->type = STRING;

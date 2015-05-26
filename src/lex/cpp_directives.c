@@ -585,6 +585,7 @@ status_t cpp_dir_pragma(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
     status_t status = CCC_OK;
+    token_t *head = vec_iter_get(ts);
 
     vec_t line;
     vec_init(&line, 0);
@@ -606,7 +607,7 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             }
             // -1 because this line value applies to next line
             cs->line_mod = token->int_params->int_val - 1;
-            cs->line_orig = token->mark.line;
+            cs->line_orig = head->mark.line;
             break;
         case 1:
             if (token->type != STRING) {

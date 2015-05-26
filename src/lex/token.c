@@ -78,6 +78,7 @@ token_t *token_create(token_man_t *tm) {
     token_node_t *result = emalloc(sizeof(token_node_t));
     sl_append(&tm->tokens, &result->link);
     result->token.hideset = str_set_empty();
+    result->token.type = TOKEN_EOF; // Set to EOF for safe destruction
 
     return &result->token;
 }

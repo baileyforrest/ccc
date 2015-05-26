@@ -61,7 +61,6 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     token_t *last = NULL;
     while (ts_peek(stream) != EOF) {
         token_t *token = token_create(lexer->token_man);
-        token->type = TOKEN_EOF;
         token->start = ts_pos(stream);
 
         if (CCC_OK != (status = lex_next_token(lexer, stream, token))) {
