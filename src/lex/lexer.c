@@ -766,13 +766,7 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
         result->float_params = emalloc(sizeof(token_float_params_t));
         result->float_params->hasF = has_f;
         result->float_params->hasL = has_l;
-        if (has_f) {
-            result->float_params->float_val = strtof(buf, &end);
-        } else if (has_l) {
-            result->float_params->float_val = strtold(buf, &end);
-        } else {
-            result->float_params->float_val = strtod(buf, &end);
-        }
+        result->float_params->float_val = strtold(buf, &end);
     } else {
         result->type = INTLIT;
         result->int_params = emalloc(sizeof(token_int_params_t));
@@ -782,8 +776,7 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
         result->int_params->int_val = strtoull(buf, &end, 0);
     }
     if (errno == ERANGE) {
-        logger_log(&result->mark, LOG_ERR, "Overflow in numeric literal", cur);
-        status = CCC_ESYNTAX;
+        logger_log(&result->mark, LOG_WARN, "Overflow in numeric literal", cur);
     }
 
     // End is allowed to be NULL or an integral literal suffix

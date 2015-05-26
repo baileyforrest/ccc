@@ -450,7 +450,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         cpp_macro_inst_t macro_inst =
             { macro, SLIST_LIT(offsetof(cpp_macro_param_t, link)) };
 
-        str_set_t *hideset; // Macro's hideset
+        str_set_t *hideset = str_set_empty(); // Macro's hideset
         vec_t subbed;
         vec_init(&subbed, 0);
 
@@ -675,7 +675,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             }
         }
         token_t *token = vec_iter_get(ts);
-        if (token->type != RPAREN) {
+        if (num_params == 0 && token->type != RPAREN) {
             ++num_params;
         }
 
@@ -688,6 +688,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
                 --parens;
             } else if (parens == 0) {
                 if (token->type == COMMA && !vararg) {
+                    ++num_params;
                     cpp_iter_advance(ts);
                     break;
                 }
