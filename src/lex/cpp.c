@@ -717,8 +717,9 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             ++num_params;
         }
 
+        // Use vec iter advance to preserve whitespace
         int parens = 0;
-        for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
+        for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
             token_t *token = vec_iter_get(ts);
             if (token->type == LPAREN) {
                 ++parens;
@@ -742,6 +743,19 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
         }
 
         if (cur < macro->num_params) {
+            // Remove trailing whitespace
+            bool done = false;
+            while (!done && vec_size(&param->stream) > 0) {
+                token_t *tail = vec_back(&param->stream);
+                switch (tail->type) {
+                case SPACE:
+                case NEWLINE:
+                    vec_pop_back(&param->stream);
+                    break;
+                default:
+                    done = true;
+                }
+            }
             sl_append(&macro_inst->args, &param->link);
             ++cur;
         }
