@@ -205,11 +205,37 @@ token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead) {
     vec_iter_t temp;
     memcpy(&temp, iter, sizeof(temp));
 
-    while (vec_iter_has_next(iter) && lookahead--) {
+    while (vec_iter_has_next(&temp) && lookahead--) {
         cpp_iter_advance(&temp);
     }
 
     return vec_iter_has_next(&temp) ? vec_iter_get(&temp) : NULL;
+}
+
+token_t *cpp_next_nonspace(vec_iter_t *iter, bool inplace) {
+    vec_iter_t temp;
+    vec_iter_t *ts;
+    if (inplace) {
+        ts = iter;
+    } else {
+        memcpy(&temp, iter, sizeof(temp));
+        ts = &temp;
+    }
+
+    cpp_iter_advance(ts); // Go to next token
+
+    for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+        token_t *token = vec_iter_get(ts);
+        switch (token->type) {
+        case SPACE:
+        case NEWLINE:
+            break;
+        default:
+            return token;
+        }
+    }
+
+    return NULL;
 }
 
 void cpp_stream_append(cpp_state_t *cs, vec_t *output, token_t *token) {
@@ -431,7 +457,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             continue;
         }
 
-        token_t *next = cpp_iter_lookahead(ts, 1);
+        token_t *next = cpp_next_nonspace(ts, false);
 
         cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
         if (macro == NULL ||
@@ -462,7 +488,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                 goto fail;
             }
         } else {
-            cpp_iter_advance(ts); // Skip lparen
+            cpp_next_nonspace(ts, true); // Skip to lparen
             if (CCC_OK !=
                 (status = cpp_fetch_macro_params(cs, ts, &macro_inst))) {
                 goto fail;

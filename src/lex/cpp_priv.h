@@ -124,6 +124,8 @@ token_t *cpp_iter_advance(vec_iter_t *iter);
 
 token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead);
 
+token_t *cpp_next_nonspace(vec_iter_t *iter, bool inplace);
+
 void cpp_stream_append(cpp_state_t *cs, vec_t *output, token_t *token);
 
 status_t cpp_process_file(cpp_state_t *cs, char *filename, vec_t *output);
