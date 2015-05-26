@@ -77,8 +77,12 @@ void token_man_destroy(token_man_t *tm) {
 token_t *token_create(token_man_t *tm) {
     token_node_t *result = emalloc(sizeof(token_node_t));
     sl_append(&tm->tokens, &result->link);
+
+    // Set to safe values for printing and destruction
+    result->token.type = TOKEN_EOF;
+    result->token.start = NULL;
+    result->token.len = 0;
     result->token.hideset = str_set_empty();
-    result->token.type = TOKEN_EOF; // Set to EOF for safe destruction
 
     return &result->token;
 }

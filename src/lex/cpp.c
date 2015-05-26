@@ -795,8 +795,6 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
 
     token_t *token = token_create(cs->token_man);
     token->type = STRING;
-    token->start = NULL;
-    token->len = 0;
     token_t *first = vec_get(ts, 0);
     memcpy(&token->mark, &first->mark, sizeof(fmark_t));
 
