@@ -221,8 +221,7 @@ void cpp_stream_append(cpp_state_t *cs, vec_t *output, token_t *token) {
             string_builder_t sb;
             sb_init(&sb, 0);
 
-            token_t *concat = token_create(cs->token_man);
-            memcpy(concat, tail, sizeof(token_t));
+            token_t *concat = token_copy(cs->token_man, tail);
 
             sb_append_printf(&sb, "%s", tail->str_val);
             sb_append_printf(&sb, "%s", token->str_val);
