@@ -786,7 +786,6 @@ const char *ast_type_mod_str(type_mod_t type_mod) {
     case TMOD_VOLATILE: return "volatile";
     case TMOD_INLINE:   return "inline";
     case TMOD_ALIGNAS:  return "_Alignas";
-    case TMOD_NORETURN: return "_Noreturn";
     default:
         assert(false);
     }
@@ -830,11 +829,6 @@ void ast_type_mod_print(type_t *type, char **dest, size_t *remain) {
     if (type_mod & TMOD_VOLATILE) {
         ast_directed_print(dest, remain, "%s ",
                     ast_type_mod_str(TMOD_VOLATILE));
-    }
-
-    if (type_mod & TMOD_NORETURN) {
-        ast_directed_print(dest, remain, "%s ",
-                    ast_type_mod_str(TMOD_NORETURN));
     }
 
     if (type_mod & TMOD_ALIGNAS) {

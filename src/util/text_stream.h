@@ -51,6 +51,8 @@ void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last);
 
 int ts_peek(tstream_t *ts);
 
+char *ts_pos(tstream_t *ts);
+
 /**
  * Retrieves a character from the text stream
  *

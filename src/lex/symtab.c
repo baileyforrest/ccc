@@ -75,7 +75,6 @@ static symtab_entry_t s_reserved[] = {
     { SL_LINK_LIT, "_Complex"      , COMPLEX       },
     { SL_LINK_LIT, "_Generic"      , GENERIC       },
     { SL_LINK_LIT, "_Imaginary"    , IMAGINARY     },
-    { SL_LINK_LIT, "_Noreturn"     , NORETURN      },
     { SL_LINK_LIT, "_Static_assert", STATIC_ASSERT },
     { SL_LINK_LIT, "_Thread_local" , THREAD_LOCAL  },
 

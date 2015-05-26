@@ -36,6 +36,14 @@ int ts_peek(tstream_t *ts) {
     return *ts->cur;
 }
 
+char *ts_pos(tstream_t *ts) {
+    if (ts->last != EOF) {
+        return ts->cur - 1;
+    }
+
+    return ts->cur;
+}
+
 void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last) {
     assert(ts != NULL);
     ts->cur = start;

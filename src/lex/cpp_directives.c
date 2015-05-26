@@ -344,6 +344,7 @@ status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 status_t cpp_dir_ifdef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
+    cpp_iter_advance(ts);
 
     cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
     return cpp_if_helper(cs, ts, output, macro != NULL);
@@ -352,6 +353,7 @@ status_t cpp_dir_ifdef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 status_t cpp_dir_ifndef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
+    cpp_iter_advance(ts);
 
     cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
     return cpp_if_helper(cs, ts, output, macro == NULL);

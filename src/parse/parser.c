@@ -385,7 +385,6 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
     bool allowed = false;
     switch (LEX_CUR(lex)->type) {
     case ALIGNAS:
-    case NORETURN:
         allowed = true;
     default:
         break;
@@ -505,13 +504,11 @@ status_t par_type_specifier(lex_wrap_t *lex, type_t **type) {
         // Don't give a base type for signed/unsigned. No base type defaults to
         // int
     case ALIGNAS:
-    case NORETURN:
     case SIGNED:
     case UNSIGNED: {
         type_mod_t mod;
         switch (LEX_CUR(lex)->type) {
         case ALIGNAS:  mod = TMOD_ALIGNAS;  break;
-        case NORETURN: mod = TMOD_NORETURN; break;
         case SIGNED:   mod = TMOD_SIGNED;   break;
         case UNSIGNED: mod = TMOD_UNSIGNED; break;
         default:

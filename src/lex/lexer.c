@@ -61,10 +61,13 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     token_t *last = NULL;
     while (ts_peek(stream) != EOF) {
         token_t *token = token_create(lexer->token_man);
+        token->start = ts_pos(stream);
 
         if (CCC_OK != (status = lex_next_token(lexer, stream, token))) {
+            token->type = TOKEN_EOF;
             return status;
         }
+        token->len = ts_pos(stream) - token->start;
 
         // If we encounter two # in a row, combine them. This is necessary
         // to lex the %:%: digraph with only getc and ungetc operations
@@ -172,7 +175,9 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
         }
 
         case '=': result->type = DIVEQ; break;
-        default: result->type = DIV; break;
+        default:
+            ts_ungetc(next, stream);
+            result->type = DIV;
         }
         break;
     }
@@ -660,17 +665,6 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
             if (!is_hex) {
                 err = true;
             }
-            break;
-
-            // _ and all letters other than X, U, L, E, F, P, and hex letters
-        case 'g': case 'h': case 'i': case 'j': case 'k': case 'm': case 'n':
-        case 'o': case 'q': case 'r': case 's': case 't': case 'v': case 'w':
-        case 'y': case 'z':
-        case 'G': case 'H': case 'I': case 'J': case 'K': case 'M': case 'N':
-        case 'O': case 'Q': case 'R': case 'S': case 'T': case 'V': case 'W':
-        case 'Y': case 'Z':
-        case '_':
-            err = true;
             break;
         default:
             done = true;

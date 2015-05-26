@@ -32,7 +32,7 @@
 #define INT_PARAM_LIT(val) { false, false, false, val }
 
 #define INT_TOK_LIT(param) {                                            \
-        INTLIT,                                                         \
+        INTLIT, NULL, 0,                                                \
         FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),    \
         STR_SET_LIT,                                                    \
         .int_params = &param                                            \
@@ -45,8 +45,8 @@ static token_int_params_t one_params = INT_PARAM_LIT(1);
 token_t token_int_one = INT_TOK_LIT(one_params);
 
 token_t token_eof = {
-    TOKEN_EOF, FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),
-    STR_SET_LIT, {}
+    TOKEN_EOF, NULL, 0,
+    FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1), STR_SET_LIT, {}
 };
 
 
@@ -141,9 +141,17 @@ void token_print_helper(token_t *token, string_builder_t *sb, FILE *file) {
         directed_print(sb, file, "%s", token->id_name);
         break;
     case STRING:
+        if (token->start != NULL) {
+            directed_print(sb, file, "%.*s", (int)token->len, token->start);
+            break;
+        }
         directed_print(sb, file, "\"%s\"", token->str_val);
         break;
     case INTLIT:
+        if (token->start != NULL) {
+            directed_print(sb, file, "%.*s", (int)token->len, token->start);
+            break;
+        }
         directed_print(sb, file, "%lld", token->int_params->int_val);
         if (token->int_params->hasU) {
             directed_print(sb, file, "U");
@@ -155,6 +163,10 @@ void token_print_helper(token_t *token, string_builder_t *sb, FILE *file) {
         }
         break;
     case FLOATLIT:
+        if (token->start != NULL) {
+            directed_print(sb, file, "%.*s", (int)token->len, token->start);
+            break;
+        }
         directed_print(sb, file, "%Lf", token->float_params->float_val);
         if (token->float_params->hasL) {
             directed_print(sb, file, "L");
@@ -285,7 +297,6 @@ const char *token_type_str(token_type_t token) {
     case COMPLEX:       return "_Complex";
     case GENERIC:       return "_Generic";
     case IMAGINARY:     return "_Imaginary";
-    case NORETURN:      return "_Noreturn";
     case STATIC_ASSERT: return "_Static_assert";
     case THREAD_LOCAL:  return "_Thread_local";
 

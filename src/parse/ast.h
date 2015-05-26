@@ -96,7 +96,6 @@ typedef enum type_mod_t {
     TMOD_VOLATILE = 1 << 8,
     TMOD_INLINE   = 1 << 9,
     TMOD_ALIGNAS  = 1 << 10,
-    TMOD_NORETURN = 1 << 11,
 } type_mod_t;
 
 /**

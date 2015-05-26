@@ -131,7 +131,6 @@ typedef enum token_type_t {
     COMPLEX,       // _Complex
     GENERIC,       // _Generic
     IMAGINARY,     // _Imaginary
-    NORETURN,      // _Noreturn
     STATIC_ASSERT, // _Static_assert
     THREAD_LOCAL,  // _Thread_local
 
@@ -183,6 +182,8 @@ typedef struct token_float_params_t {
  */
 typedef struct token_t {
     token_type_t type;             /**< Type of token */
+    char *start;
+    size_t len;
     fmark_t mark;                  /**< Location of token */
     str_set_t *hideset;
 
