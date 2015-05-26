@@ -24,7 +24,17 @@
 
 #include <assert.h>
 
-extern int ts_peek(tstream_t *ts);
+int ts_peek(tstream_t *ts) {
+    if (ts->last != EOF) {
+        return ts->last;
+    }
+
+    if (ts->cur == ts->end) {
+        return EOF;
+    }
+
+    return *ts->cur;
+}
 
 void ts_init(tstream_t *ts, char *start, char *end, char *file, fmark_t *last) {
     assert(ts != NULL);
