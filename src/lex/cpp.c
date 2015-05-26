@@ -40,7 +40,7 @@ static char *s_search_path[] = {
     "/usr/local/include",
 
     // TODO1: conditionally compile these
-    "/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include",
+    "/usr/lib/gcc/x86_64-unknown-linux-gnu/5.1.0/include",
 
     "/usr/include",
 
@@ -64,6 +64,8 @@ static char *s_predef_macros[] = {
     // Required for compatability
     "__alignof__ _Alignof",
     "__FUNCTION__ __func__",
+
+    "__attribute__(xyz)", // Attributes aren't supported
 
 #ifdef __x86_64__
     "__amd64 1",
@@ -122,6 +124,7 @@ status_t cpp_state_init(cpp_state_t *cs, token_man_t *token_man,
     cs->line_mod = 0;
     cs->line_orig = 0;
     cs->if_count = 0;
+    cs->if_level = 0;
     cs->if_taken = false;
     cs->ignore = false;
     cs->last_dir = CPP_DIR_NONE;

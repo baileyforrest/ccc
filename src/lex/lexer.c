@@ -444,7 +444,7 @@ char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
             case '8': case '9':
             case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
             case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
-                if (!is_oct) {
+                if (is_oct) {
                     done = true;
                     break;
                 }
@@ -530,6 +530,9 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
         cur = lex_getc_splice(stream);
     }
 
+    if (status != CCC_OK) {
+        free(result->int_params);
+    }
     return status;
 }
 

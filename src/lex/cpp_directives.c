@@ -71,10 +71,12 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
             // Handle defined operator
             if (strcmp(token->id_name, "defined") == 0) {
                 cpp_iter_advance(ts);
+                token = vec_iter_get(ts);
                 bool has_paren = false;
                 if (token->type == LPAREN) {
                     has_paren = true;
                     cpp_iter_advance(ts);
+                    token = vec_iter_get(ts);
                 }
 
                 if (token->type != ID) {
@@ -89,13 +91,19 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
 
                 if (has_paren) {
                     cpp_iter_advance(ts); // Get paren
-                    if (token->type != RPAREN) {
+                    token_t *next_token = vec_iter_get(ts);
+                    if (next_token->type != RPAREN) {
                         logger_log(&token->mark, LOG_ERR,
                                    "missing ')' after \"defined\"");
                         status = CCC_ESYNTAX;
                         goto fail;
                     }
                 }
+            } else {
+                // Non 'defined' idenitifer if undefined macro, just output zero
+                cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+                token = macro == NULL ? &token_int_zero : token;
+
             }
         }
 
@@ -342,31 +350,52 @@ status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 }
 
 status_t cpp_dir_ifdef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    token_t *token = vec_iter_get(ts);
-    VERIFY_TOK_ID(token);
-    cpp_iter_advance(ts);
+    bool taken;
+    if (cs->ignore) {
+        cpp_skip_line(ts, true);
+        taken = false;
+    } else {
+        token_t *token = vec_iter_get(ts);
+        VERIFY_TOK_ID(token);
+        cpp_iter_advance(ts);
 
-    cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
-    return cpp_if_helper(cs, ts, output, macro != NULL);
+        cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+        taken = macro != NULL;
+    }
+    return cpp_if_helper(cs, ts, output, taken);
 }
 
 status_t cpp_dir_ifndef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
-    token_t *token = vec_iter_get(ts);
-    VERIFY_TOK_ID(token);
-    cpp_iter_advance(ts);
+    bool taken;
+    if (cs->ignore) {
+        cpp_skip_line(ts, true);
+        taken = false;
+    } else {
+        token_t *token = vec_iter_get(ts);
+        VERIFY_TOK_ID(token);
+        cpp_iter_advance(ts);
 
-    cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
-    return cpp_if_helper(cs, ts, output, macro == NULL);
+        cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
+        taken = macro == NULL;
+    }
+    return cpp_if_helper(cs, ts, output, taken);
 }
 
 status_t cpp_dir_if(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
-    long long val;
-    if (CCC_OK != (status = cpp_evaluate_line(cs, ts, &val))) {
-        return status;
+    bool taken;
+    if (cs->ignore) {
+        cpp_skip_line(ts, true);
+        taken = false;
+    } else {
+        long long val;
+        if (CCC_OK != (status = cpp_evaluate_line(cs, ts, &val))) {
+            return status;
+        }
+        taken = val != 0;
     }
 
-    return cpp_if_helper(cs, ts, output, val != 0);
+    return cpp_if_helper(cs, ts, output, taken);
 }
 
 status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val) {
@@ -415,6 +444,11 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
     cs->ignore = ignore_save || !if_taken;
     ++cs->if_count;
 
+    // Mark the level of the current unignored if
+    if (!ignore_save) {
+        cs->if_level = cs->if_count;
+    }
+
     do {
         if (CCC_BACKTRACK != (status = cpp_expand(cs, ts, output)) &&
             cs->last_dir != CPP_DIR_endif) {
@@ -452,13 +486,15 @@ status_t cpp_dir_elif(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         return CCC_ESYNTAX;
     }
 
-    long long val;
-    if (CCC_OK != (status = cpp_evaluate_line(cs, ts, &val))) {
-        return status;
-    }
+    if (cs->if_level == cs->if_count) {
+        long long val;
+        if (CCC_OK != (status = cpp_evaluate_line(cs, ts, &val))) {
+            return status;
+        }
 
-    // This if is taken if it's value evaluated to non zero
-    cs->if_taken = val != 0;
+        // This if is taken if it's value evaluated to non zero
+        cs->if_taken = val != 0;
+    }
 
     return CCC_BACKTRACK; // Return to calling if
 }

@@ -59,6 +59,7 @@ typedef struct cpp_state_t {
     cpp_dir_type_t last_dir;
 
     int if_count;
+    int if_level;
     bool if_taken;
     bool ignore;
 } cpp_state_t;
