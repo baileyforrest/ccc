@@ -165,17 +165,18 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
 
             // Multi line comment
         case '*': {
-            while (true) {
-                if ((next = lex_getc_splice(stream)) == '*' &&
-                    lex_getc_splice(stream) == '/') {
+            int last = 0;
+            while ((next = lex_getc_splice(stream)) != EOF) {
+                if (last == '*' && next == '/') {
                     break;
                 }
-                if (next == EOF) {
-                    logger_log(&stream->mark, LOG_ERR, "unterminated comment");
-                    status = CCC_ESYNTAX;
-                    break;
-                }
+                last = next;
             }
+            if (next == EOF) {
+                logger_log(&stream->mark, LOG_ERR, "unterminated comment");
+                status = CCC_ESYNTAX;
+            }
+
             result->type = SPACE;
             break;
         }
