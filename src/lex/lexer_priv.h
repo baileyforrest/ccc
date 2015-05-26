@@ -42,7 +42,7 @@ int lex_getc_splice(tstream_t *stream);
 
 status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result);
 
-status_t lex_id(lexer_t *lexer, tstream_t *stream, token_t *result);
+status_t lex_id(lexer_t *lexer, tstream_t *stream, int cur, token_t *result);
 
 char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
                          lex_str_type_t type);

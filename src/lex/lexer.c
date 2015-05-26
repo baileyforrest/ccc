@@ -315,7 +315,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
             break;
         default:
             ts_ungetc(next, stream);
-            status = lex_id(lexer, stream, result);
+            status = lex_id(lexer, stream, cur, result);
         }
         break;
     case 'U':
@@ -361,8 +361,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
 
     case '$':
     case '_':
-        ts_ungetc(cur, stream);
-        status = lex_id(lexer, stream, result);
+        status = lex_id(lexer, stream, cur, result);
         break;
 
     case '"': // String Literals
@@ -382,17 +381,16 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
     return status;
 }
 
-status_t lex_id(lexer_t *lexer, tstream_t *stream, token_t *result) {
+status_t lex_id(lexer_t *lexer, tstream_t *stream, int cur, token_t *result) {
     status_t status = CCC_OK;
     sb_clear(&lexer->lexbuf);
 
     bool done = false;
     while (!done) {
-        int cur = lex_getc_splice(stream);
-
         switch (cur) {
         case ID_CHARS:
             sb_append_char(&lexer->lexbuf, cur);
+            cur = lex_getc_splice(stream);
             break;
         default:
             ts_ungetc(cur, stream);
