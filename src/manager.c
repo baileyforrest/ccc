@@ -40,8 +40,11 @@ void man_init(manager_t *manager) {
 
     st_init(&manager->symtab, true);
 
+    fmark_man_init(&manager->mark_man);
     token_man_init(&manager->token_man);
-    lexer_init(&manager->lexer, &manager->token_man, &manager->symtab);
+
+    lexer_init(&manager->lexer, &manager->token_man, &manager->mark_man,
+               &manager->symtab);
 
     manager->ast = NULL;
     manager->ir = NULL;
@@ -68,6 +71,7 @@ void man_destroy_parse(manager_t *manager) {
     st_destroy(&manager->symtab);
     lexer_destroy(&manager->lexer);
     token_man_destroy(&manager->token_man);
+    fmark_man_destroy(&manager->mark_man);
     ast_destroy(manager->ast);
 }
 

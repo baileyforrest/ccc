@@ -182,9 +182,9 @@ typedef struct token_float_params_t {
  */
 typedef struct token_t {
     token_type_t type;             /**< Type of token */
+    unsigned len;
     char *start;
-    size_t len;
-    fmark_t mark;                  /**< Location of token */
+    fmark_t *mark;                 /**< Location of token */
     str_set_t *hideset;
 
     union {

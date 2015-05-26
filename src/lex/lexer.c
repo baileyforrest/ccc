@@ -38,12 +38,14 @@
 
 #define INIT_LEXBUF_SIZE 128
 
-void lexer_init(lexer_t *lexer, token_man_t *token_man, symtab_t *symtab) {
+void lexer_init(lexer_t *lexer, token_man_t *token_man, fmark_man_t *mark_man,
+                symtab_t *symtab) {
     assert(lexer != NULL);
     assert(symtab != NULL);
 
     lexer->symtab = symtab;
     lexer->token_man = token_man;
+    lexer->mark_man = mark_man;
     sb_init(&lexer->lexbuf, INIT_LEXBUF_SIZE);
 }
 
@@ -114,7 +116,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
 
     status_t status = CCC_OK;
 
-    memcpy(&result->mark, &stream->mark, sizeof(fmark_t));
+    result->mark = fmark_man_insert(lexer->mark_man, &stream->mark);
     int cur = lex_getc_splice(stream);
 
     // Combine spaces
@@ -213,7 +215,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
             result->type = ELIPSE;
             break;
         }
-        logger_log(&result->mark, LOG_ERR, "Invalid token: ..");
+        logger_log(result->mark, LOG_ERR, "Invalid token: ..");
         status = CCC_ESYNTAX;
         break;
     }
@@ -374,7 +376,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
         status = lex_number(lexer, stream, cur, result);
         break;
     default:
-        logger_log(&result->mark, LOG_ERR, "Unexpected character: %c", cur);
+        logger_log(result->mark, LOG_ERR, "Unexpected character: %c", cur);
         status = CCC_ESYNTAX;
     }
 
@@ -524,7 +526,7 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
 
     int cur = lex_getc_splice(stream);
     if (cur != '\'') {
-        logger_log(&result->mark, LOG_ERR,
+        logger_log(result->mark, LOG_ERR,
                    "Unexpected junk in character literal");
         status = CCC_ESYNTAX;
     }
@@ -699,7 +701,7 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
 
     if (err || !done) {
         err = true;
-        logger_log(&result->mark, LOG_ERR, "Invalid numeric literal");
+        logger_log(result->mark, LOG_ERR, "Invalid numeric literal");
         status = CCC_ESYNTAX;
 
         // Skip over junk at end (identifier characters)
@@ -784,7 +786,7 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
         result->int_params->int_val = strtoull(buf, &end, 0);
     }
     if (errno == ERANGE) {
-        logger_log(&result->mark, LOG_WARN, "Overflow in numeric literal", cur);
+        logger_log(result->mark, LOG_WARN, "Overflow in numeric literal", cur);
     }
 
     // End is allowed to be NULL or an integral literal suffix
@@ -798,7 +800,7 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
     case 'F':
         break;
     default:
-        logger_log(&result->mark, LOG_ERR, "Invalid integral constant", cur);
+        logger_log(result->mark, LOG_ERR, "Invalid integral constant", cur);
         status = CCC_ESYNTAX;
     }
 

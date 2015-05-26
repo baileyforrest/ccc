@@ -31,12 +31,8 @@
 
 #define INT_PARAM_LIT(val) { false, false, false, val }
 
-#define INT_TOK_LIT(param) {                                            \
-        INTLIT, NULL, 0,                                                \
-        FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),    \
-        STR_SET_LIT,                                                    \
-        .int_params = &param                                            \
-    }
+#define INT_TOK_LIT(param) \
+    { INTLIT, 0, NULL, &fmark_built_in, STR_SET_LIT, .int_params = &param }
 
 static token_int_params_t zero_params = INT_PARAM_LIT(0);
 token_t token_int_zero = INT_TOK_LIT(zero_params);
@@ -44,10 +40,7 @@ token_t token_int_zero = INT_TOK_LIT(zero_params);
 static token_int_params_t one_params = INT_PARAM_LIT(1);
 token_t token_int_one = INT_TOK_LIT(one_params);
 
-token_t token_eof = {
-    TOKEN_EOF, NULL, 0,
-    FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1), STR_SET_LIT, {}
-};
+token_t token_eof = { TOKEN_EOF, 0, NULL, &fmark_built_in, STR_SET_LIT, {} };
 
 
 typedef struct token_node_t {

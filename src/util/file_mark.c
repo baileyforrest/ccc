@@ -24,32 +24,35 @@
 
 #include "util/util.h"
 
-#define MIN_CAPACITY 16
+fmark_t fmark_built_in =
+    FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1);
 
-// 1.5 growth factor
-#define NEW_SIZE(size) ((size) + ((size) >> 1))
+#define FMARK_NUM_NODES 256
 
+typedef struct fmark_node_t {
+    sl_link_t link;
+    fmark_t marks[FMARK_NUM_NODES];
+} fmark_node_t;
 
 void fmark_man_init(fmark_man_t *man) {
-    man->capacity = MIN_CAPACITY;
-    man->size = 0;
-    man->marks = emalloc(sizeof(fmark_t) * man->capacity);
+    sl_init(&man->list, offsetof(fmark_node_t, link));
+    man->offset = FMARK_NUM_NODES;
 }
 
 void fmark_man_destroy(fmark_man_t *man) {
-    free(man->marks);
-    man->capacity = 0;
-    man->size = 0;
-    man->marks = NULL;
+    SL_DESTROY_FUNC(&man->list, free);
+    man->offset = 0;
 }
 
 fmark_t *fmark_man_insert(fmark_man_t *man, fmark_t *copy_from) {
-    if (man->size == man->capacity) {
-        man->capacity = NEW_SIZE(man->capacity);
-        man->marks = realloc(man->marks, man->capacity * sizeof(fmark_t));
+    if (man->offset == FMARK_NUM_NODES) {
+        fmark_node_t *node = emalloc(sizeof(fmark_node_t));
+        man->offset = 0;
+        sl_append(&man->list, &node->link);
     }
 
-    memcpy(&man->marks[man->size], copy_from, sizeof(fmark_t));
+    fmark_node_t *tail = sl_tail(&man->list);
+    memcpy(&tail->marks[man->offset], copy_from, sizeof(fmark_t));
 
-    return &man->marks[man->size++];
+    return &tail->marks[man->offset++];
 }

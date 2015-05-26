@@ -100,7 +100,7 @@ typedef struct cpp_macro_inst_t {
 #define VERIFY_TOK_ID(token)                                \
     do {                                                    \
         if (token->type != ID) {                            \
-            logger_log(&token->mark, LOG_ERR,               \
+            logger_log(token->mark, LOG_ERR,                \
                        "macro names must be identifiers");  \
             return CCC_ESYNTAX;                             \
         }                                                   \

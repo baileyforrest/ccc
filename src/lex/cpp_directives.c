@@ -81,7 +81,7 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
                 }
 
                 if (token->type != ID) {
-                    logger_log(&token->mark, LOG_ERR,
+                    logger_log(token->mark, LOG_ERR,
                                "operator \"defined\" requires an identifier");
                     status = CCC_ESYNTAX;
                     goto fail;
@@ -94,7 +94,7 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
                     cpp_iter_advance(ts); // Get paren
                     token_t *next_token = vec_iter_get(ts);
                     if (next_token->type != RPAREN) {
-                        logger_log(&token->mark, LOG_ERR,
+                        logger_log(token->mark, LOG_ERR,
                                    "missing ')' after \"defined\"");
                         status = CCC_ESYNTAX;
                         goto fail;
@@ -125,7 +125,7 @@ fail:
 status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
     token_t *token = vec_iter_get(ts);
-    fmark_t *mark = &token->mark;
+    fmark_t *mark = token->mark;
     char *filename = NULL;
 
     vec_t line;
@@ -168,7 +168,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         if (done) {
             status = cpp_include_helper(cs, mark, sb_buf(&sb), true, output);
         } else {
-            logger_log(&token->mark, LOG_ERR,
+            logger_log(token->mark, LOG_ERR,
                        "missing terminating > character");
             status = CCC_ESYNTAX;
         }
@@ -176,7 +176,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         break;
     }
     default:
-        logger_log(&token->mark, LOG_ERR,
+        logger_log(token->mark, LOG_ERR,
                    "#include expects \"FILENAME\" or <FILENAME>");
         status = CCC_ESYNTAX;
     }
@@ -261,7 +261,7 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
 
     cpp_macro_t *macro = emalloc(sizeof(*macro));
     macro->name = token->id_name;
-    macro->mark = &token->mark;
+    macro->mark = token->mark;
     vec_init(&macro->stream, 0);
     vec_init(&macro->params, 0);
     macro->num_params = -1;
@@ -300,7 +300,7 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
             }
             if (!first) {
                 if (token->type != COMMA) {
-                    logger_log(&token->mark, LOG_ERR,
+                    logger_log(token->mark, LOG_ERR,
                                "macro parameters must be comma-separated");
                     status = CCC_ESYNTAX;
                     goto fail;
@@ -314,7 +314,7 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
             } else if (token->type == ID) {
                 vec_push_back(&macro->params, token->id_name);
             } else {
-                logger_log(&token->mark, LOG_ERR,
+                logger_log(token->mark, LOG_ERR,
                            "\"%s\" may not appear in macro parameter list",
                            token_type_str(token->type));
                 status = CCC_ESYNTAX;
@@ -479,7 +479,7 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
         if (CCC_BACKTRACK != (status = cpp_expand(cs, ts, output)) &&
             cs->last_dir != CPP_DIR_endif) {
             if (status == CCC_OK) {
-                logger_log(&start_token->mark, LOG_ERR, "Unterminted #if");
+                logger_log(start_token->mark, LOG_ERR, "Unterminted #if");
             }
             goto fail;
         }
@@ -508,7 +508,7 @@ status_t cpp_dir_elif(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
     token_t *token = vec_iter_get(ts);
     if (cs->if_count == 0) {
-        logger_log(&token->mark, LOG_ERR, "#else without #if");
+        logger_log(token->mark, LOG_ERR, "#else without #if");
         return CCC_ESYNTAX;
     }
 
@@ -529,7 +529,7 @@ status_t cpp_dir_else(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
     token_t *token = vec_iter_get(ts);
     if (cs->if_count == 0) {
-        logger_log(&token->mark, LOG_ERR, "#else without #if");
+        logger_log(token->mark, LOG_ERR, "#else without #if");
         return CCC_ESYNTAX;
     }
 
@@ -542,7 +542,7 @@ status_t cpp_dir_endif(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
     token_t *token = vec_iter_get(ts);
     if (cs->if_count == 0) {
-        logger_log(&token->mark, LOG_ERR, "#else without #if");
+        logger_log(token->mark, LOG_ERR, "#else without #if");
         return CCC_ESYNTAX;
     }
 
@@ -559,11 +559,11 @@ status_t cpp_dir_error_helper(vec_iter_t *ts, bool is_err) {
     string_builder_t sb;
     sb_init(&sb, 0);
     token_t *token = vec_iter_get(ts);
-    const char *line_start = token->mark.line_start;
+    const char *line_start = token->mark->line_start;
     while (*line_start && *line_start != '\n') {
         sb_append_char(&sb, *(line_start++));
     }
-    logger_log(&token->mark, is_err ? LOG_ERR : LOG_WARN, "%s", sb_buf(&sb));
+    logger_log(token->mark, is_err ? LOG_ERR : LOG_WARN, "%s", sb_buf(&sb));
     sb_destroy(&sb);
 
     return is_err ? CCC_ESYNTAX : CCC_OK;
@@ -599,7 +599,7 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         switch (i) {
         case 0:
             if (token->type != INTLIT) {
-                logger_log(&token->mark, LOG_ERR,
+                logger_log(token->mark, LOG_ERR,
                            "\"%s\" after #line is not a positive integer",
                            token_type_str(token->type));
                 status = CCC_ESYNTAX;
@@ -607,11 +607,11 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             }
             // -1 because this line value applies to next line
             cs->line_mod = token->int_params->int_val - 1;
-            cs->line_orig = head->mark.line;
+            cs->line_orig = head->mark->line;
             break;
         case 1:
             if (token->type != STRING) {
-                logger_log(&token->mark, LOG_ERR,
+                logger_log(token->mark, LOG_ERR,
                            "\"%s\" is not a valid filename",
                            token_type_str(token->type));
                 status = CCC_ESYNTAX;
@@ -620,7 +620,7 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             cs->cur_filename = token->str_val;
             break;
         default:
-            logger_log(&token->mark, LOG_WARN,
+            logger_log(token->mark, LOG_WARN,
                        "extra tokens at end of #line directive");
             goto fail;
         }

@@ -40,6 +40,7 @@ typedef struct manager_t {
     symtab_t symtab;
     lexer_t lexer;
     token_man_t token_man;
+    fmark_man_t mark_man;
     trans_unit_t *ast;
     ir_trans_unit_t *ir;
     bool parse_destroyed;

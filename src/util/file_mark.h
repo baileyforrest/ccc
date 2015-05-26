@@ -25,6 +25,8 @@
 
 #include <stddef.h>
 
+#include "util/slist.h"
+
 /**
  * Structure for representing a location in a file
  */
@@ -58,12 +60,13 @@ typedef struct fmark_t {
 #define FMARK_LIT(last, file, line_start, line, col) \
     { last, file, line_start, line, col }
 
+extern fmark_t fmark_built_in;
+
 // TODO0: Use this, replace token and ast node's mark to pointer to this
 // structure's entries
 typedef struct fmark_man_t {
-    fmark_t *marks;
-    size_t size;
-    size_t capacity;
+    slist_t list;
+    size_t offset;
 } fmark_man_t;
 
 void fmark_man_init(fmark_man_t *man);

@@ -433,7 +433,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             break;
 
         case HASHHASH:
-            logger_log(&token->mark, LOG_ERR, "stray '##' in program");
+            logger_log(token->mark, LOG_ERR, "stray '##' in program");
         case NEWLINE:
             // ignore these
             continue;
@@ -442,7 +442,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             if (!cs->in_param) {
                 if (last != NULL && last->type != NEWLINE) {
                     if (!cs->ignore) {
-                        logger_log(&token->mark, LOG_ERR,
+                        logger_log(token->mark, LOG_ERR,
                                    "stray '#' in program");
                         status = CCC_ESYNTAX;
                         goto done;
@@ -484,7 +484,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             continue;
         }
         if (macro->type != CPP_MACRO_BASIC) {
-            cpp_handle_special_macro(cs, &token->mark, macro->type, output);
+            cpp_handle_special_macro(cs, token->mark, macro->type, output);
             continue;
         }
 
@@ -558,7 +558,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             if (param->type != ID ||
                 NULL == (param_vec =
                          cpp_macro_inst_lookup(macro_inst, param->id_name))) {
-                logger_log(&param->mark, LOG_ERR,
+                logger_log(param->mark, LOG_ERR,
                            "'#' is not followed by a macro parameter");
                 goto fail;
             }
@@ -640,7 +640,7 @@ fail:
 status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
     token_t *token = vec_iter_get(ts);
-    fmark_t *mark = &token->mark;
+    fmark_t *mark = token->mark;
 
     // Single # on a line allowed
     if (token->type == NEWLINE || !vec_iter_has_next(ts)) {
@@ -672,7 +672,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
     if (dir == NULL) {
         if (!cs->ignore) {
-            logger_log(&token->mark, LOG_ERR,
+            logger_log(token->mark, LOG_ERR,
                        "invalid preprocessing directive #%s", tok_str);
             status = CCC_ESYNTAX;
         }
@@ -780,7 +780,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
     }
 
     if (num_params != macro->num_params) {
-        logger_log(&lparen->mark, LOG_ERR,
+        logger_log(lparen->mark, LOG_ERR,
                    "macro \"%s\" passed %d arguments, but takes %d",
                    macro->name, num_params, macro->num_params);
         return CCC_ESYNTAX;
@@ -793,10 +793,10 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
     string_builder_t sb;
     sb_init(&sb, 0);
 
+    token_t *first = vec_get(ts, 0);
     token_t *token = token_create(cs->token_man);
     token->type = STRING;
-    token_t *first = vec_get(ts, 0);
-    memcpy(&token->mark, &first->mark, sizeof(fmark_t));
+    token->mark = first->mark;
 
     token_t *last = NULL;
     VEC_FOREACH(cur, ts) {
@@ -843,7 +843,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
 
         tstream_t stream;
         char *buf = sstore_lookup(sb_buf(&sb));
-        ts_init(&stream, buf, buf + sb_len(&sb), ltail->mark.filename, NULL);
+        ts_init(&stream, buf, buf + sb_len(&sb), ltail->mark->filename, NULL);
 
         size_t init_size = vec_size(left);
 
@@ -853,7 +853,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
 
         size_t post_size = vec_size(left);
         if (post_size > init_size + 1) {
-            logger_log(&ltail->mark, LOG_ERR,
+            logger_log(ltail->mark, LOG_ERR,
                        "pasting \"%s\" and \"%s\" does not give a valid "
                        "preprocessing token", token_type_str(ltail->type),
                        token_type_str(rhead->type));
@@ -880,7 +880,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
 void cpp_handle_special_macro(cpp_state_t *cs, fmark_t *mark,
                               cpp_macro_type_t type, vec_t *output) {
     token_t *token = token_create(cs->token_man);
-    memcpy(&token->mark, mark, sizeof(fmark_t));
+    token->mark = mark;
 
     char buf[TIME_DATE_BUF_SZ];
 
@@ -898,7 +898,7 @@ void cpp_handle_special_macro(cpp_state_t *cs, fmark_t *mark,
         token->int_params->hasU = false;
         token->int_params->hasL = false;
         token->int_params->hasLL = false;
-        token->int_params->int_val = cs->last_top_token->mark.line -
+        token->int_params->int_val = cs->last_top_token->mark->line -
             cs->line_orig + cs->line_mod;
         break;
     case CPP_MACRO_DATE:
