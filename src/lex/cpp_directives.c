@@ -87,15 +87,14 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
                 cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
                 token = macro == NULL ? &token_int_zero : &token_int_one;
 
-                cpp_iter_advance(ts);
                 if (has_paren) {
+                    cpp_iter_advance(ts); // Get paren
                     if (token->type != RPAREN) {
                         logger_log(&token->mark, LOG_ERR,
                                    "missing ')' after \"defined\"");
                         status = CCC_ESYNTAX;
                         goto fail;
                     }
-                    cpp_iter_advance(ts);
                 }
             }
         }
@@ -369,8 +368,11 @@ status_t cpp_dir_if(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 }
 
 status_t cpp_evaluate_line(cpp_state_t *cs, vec_iter_t *ts, long long *val) {
+    bool ignore_save = cs->ignore;
+    cs->ignore = false;
+
     status_t status = CCC_OK;
-    trans_unit_t *ast = NULL;
+    trans_unit_t *ast = ast_trans_unit_create(true);
     *val = 0;
 
     vec_t line;
@@ -394,6 +396,8 @@ fail:
     ast_destroy(ast);
     cpp_skip_line(ts, false);
     vec_destroy(&line);
+
+    cs->ignore = ignore_save;
     return status;
 }
 
@@ -410,10 +414,6 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
     ++cs->if_count;
 
     do {
-        // If last directive was a taken branch, then mark if_taken as true
-        if (cs->if_taken) {
-            if_taken = true;
-        }
         if (CCC_BACKTRACK != (status = cpp_expand(cs, ts, output)) &&
             cs->last_dir != CPP_DIR_endif) {
             if (status == CCC_OK) {
@@ -421,12 +421,16 @@ status_t cpp_if_helper(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
             }
             goto fail;
         }
-        // If we were ignoring before, or already took an if branch then ignore
-        if (ignore_save || if_taken) {
+        // If last directive was a taken branch, then mark if_taken as true
+        if (cs->if_taken && !ignore_save && !if_taken) {
+            if_taken = true;
+            cs->ignore = false; // Stop ignoring if last branch taken
+        } else {
             cs->ignore = true;
         }
         cs->if_taken = false;
     } while (cs->last_dir != CPP_DIR_endif);
+    status = CCC_OK;
 
     // Restore state
     --cs->if_count;

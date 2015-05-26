@@ -1,21 +1,21 @@
 /*
-  Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
-
-  This file is part of CCC.
-
-  CCC is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  CCC is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with CCC.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * Copyright (C) 2015 Bailey Forrest <baileycforrest@gmail.com>
+ *
+ * This file is part of CCC.
+ *
+ * CCC is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * CCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
+ */
 /**
  * Token function implmenetation
  */
@@ -43,6 +43,11 @@ token_t token_int_zero = INT_TOK_LIT(zero_params);
 
 static token_int_params_t one_params = INT_PARAM_LIT(1);
 token_t token_int_one = INT_TOK_LIT(one_params);
+
+token_t token_eof = {
+    TOKEN_EOF, FMARK_LIT(NULL, BUILT_IN_FILENAME, BUILT_IN_FILENAME, 1, 1),
+    STR_SET_LIT, {}
+};
 
 
 typedef struct token_node_t {
@@ -186,6 +191,7 @@ void token_str_append_sb(string_builder_t *sb, token_t *token) {
 
 const char *token_type_str(token_type_t token) {
     switch (token) {
+    case TOKEN_EOF:     return "";
     case HASH:          return "#";
     case HASHHASH:      return "##";
     case SPACE:         return " ";

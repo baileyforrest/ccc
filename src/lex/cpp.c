@@ -40,7 +40,7 @@ static char *s_search_path[] = {
     "/usr/local/include",
 
     // TODO1: conditionally compile these
-    "/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include"
+    "/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include",
 
     "/usr/include",
 
@@ -565,36 +565,31 @@ fail:
 
 status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
-
     token_t *token = vec_iter_get(ts);
+    fmark_t *mark = &token->mark;
+    char *tok_str = token_str(token);
 
     // Single # on a line allowed
     if (token->type == NEWLINE || !vec_iter_has_next(ts)) {
         return CCC_OK;
     }
 
-    token_t *name_token = token;
-
     cpp_directive_t *dir = NULL;
 
-    if (token->type == ID) {
-        for (dir = directives; ; ++dir) {
-            if (dir->name == NULL) {
-                dir = NULL;
-                break;
-            }
+    for (dir = directives; ; ++dir) {
+        if (dir->name == NULL) {
+            dir = NULL;
+            break;
+        }
 
-            if (strcmp(dir->name, token->id_name) == 0) {
-                break;
-            }
+        if (strcmp(dir->name, tok_str) == 0) {
+            break;
         }
     }
 
     if (dir == NULL) {
-        char *tok_str = token_str(token);
         logger_log(&token->mark, LOG_ERR, "invalid preprocessing directive #%s",
                    tok_str);
-        free(tok_str);
         status = CCC_ESYNTAX;
     } else {
         cpp_iter_advance(ts); // Skip the directive name
@@ -605,13 +600,13 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     }
 
     if (cpp_skip_line(ts, false) > 1) {
-        if (dir != NULL && status == CCC_OK) {
-            logger_log(&name_token->mark, LOG_WARN,
-                       "extra tokens at end of #%s directive",
+        if (!cs->ignore && dir != NULL && status == CCC_OK) {
+            logger_log(mark, LOG_WARN, "extra tokens at end of #%s directive",
                        dir->name);
         }
     }
 
+    free(tok_str);
     return status;
 }
 

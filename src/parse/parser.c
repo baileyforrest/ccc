@@ -51,6 +51,9 @@ status_t parser_parse(vec_t *tokens, trans_unit_t **result) {
     assert(vec_size(tokens) > 0);
     assert(result != NULL);
 
+    // Place an eof at end to satisfy parser lookahead
+    vec_push_back(tokens, &token_eof);
+
     lex_wrap_t lex;
     vec_iter_init(&lex.tokens, tokens);
 
@@ -63,7 +66,11 @@ status_t parser_parse_expr(vec_t *tokens, trans_unit_t *tunit,
     assert(vec_size(tokens) > 0);
     assert(result != NULL);
 
+    // Place an eof at end to satisfy parser lookahead
+    vec_push_back(tokens, &token_eof);
+
     lex_wrap_t lex;
+    lex.typetab = &tunit->typetab;
     lex.tunit = tunit;
     vec_iter_init(&lex.tokens, tokens);
 
@@ -111,7 +118,7 @@ status_t par_translation_unit(lex_wrap_t *lex, trans_unit_t **result) {
     lex->typetab = &tunit->typetab; // Set top type table to translation units
     lex->tunit = tunit;
 
-    while (vec_iter_has_next(&lex->tokens)) {
+    while (LEX_CUR(lex)->type != TOKEN_EOF) {
         gdecl_t *gdecl;
         if (CCC_OK != (status = par_external_declaration(lex, &gdecl))) {
             goto fail;

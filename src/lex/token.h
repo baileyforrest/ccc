@@ -30,6 +30,7 @@
 #include "util/string_builder.h"
 
 typedef enum token_type_t {
+    TOKEN_EOF,     // EOF
     HASH,          // #
     HASHHASH,      // ##
 
@@ -199,6 +200,7 @@ typedef struct token_man_t {
 
 extern token_t token_int_zero;
 extern token_t token_int_one;
+extern token_t token_eof;
 
 void token_man_init(token_man_t *tm);
 void token_man_destroy(token_man_t *tm);

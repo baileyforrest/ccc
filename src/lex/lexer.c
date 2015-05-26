@@ -763,6 +763,7 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
         }
     } else if (is_float) {
         result->type = FLOATLIT;
+        result->float_params = emalloc(sizeof(token_float_params_t));
         result->float_params->hasF = has_f;
         result->float_params->hasL = has_l;
         if (has_f) {
