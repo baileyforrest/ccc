@@ -266,6 +266,8 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
 
         bool done = false;
         bool first = true;
+        bool vararg = false;
+
         for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
             token = vec_iter_get(ts);
             if (token->type == NEWLINE) {
@@ -274,6 +276,9 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
             if (token->type == RPAREN) {
                 cpp_iter_advance(ts);
                 done = true;
+                break;
+            }
+            if (vararg) {
                 break;
             }
             if (!first) {
@@ -286,14 +291,18 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
                 cpp_iter_advance(ts);
                 token = vec_iter_get(ts);
             }
-            if (token->type != ID) {
+            if (token->type == ELIPSE) {
+                vec_push_back(&macro->params, NULL);
+                vararg = true;
+            } else if (token->type == ID) {
+                vec_push_back(&macro->params, token->id_name);
+            } else {
                 logger_log(&token->mark, LOG_ERR,
                            "\"%s\" may not appear in macro parameter list",
                            token_type_str(token->type));
                 status = CCC_ESYNTAX;
                 goto fail;
             }
-            vec_push_back(&macro->params, token->id_name);
             ++macro->num_params;
             first = false;
         }
