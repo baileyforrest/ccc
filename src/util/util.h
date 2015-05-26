@@ -100,6 +100,8 @@ void *erealloc(void *ptr, size_t size);
 
 void directed_print(string_builder_t *sb, FILE *file, char *fmt, ...);
 
+void directed_putc(string_builder_t *sb, FILE *file, int c);
+
 /**
  * djb2 String hash function
  * Must be void * for hashtable interface
@@ -133,6 +135,8 @@ inline bool ind_str_eq(const void *vstr1, const void *vstr2) {
 
     return strcmp(str1, str2) == 0;
 }
+
+char *escape_str(char *str);
 
 char *unescape_str(char *str);
 

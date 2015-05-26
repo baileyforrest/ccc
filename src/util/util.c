@@ -98,6 +98,51 @@ void directed_print(string_builder_t *sb, FILE *file, char *fmt, ...) {
     va_end(ap);
 }
 
+void directed_putc(string_builder_t *sb, FILE *file, int c) {
+    if (sb == NULL) {
+        assert(file != NULL);
+        putc(c, file);
+    } else {
+        sb_append_char(sb, c);
+    }
+}
+
+char *escape_str(char *str) {
+    string_builder_t sb;
+    sb_init(&sb, 0);
+
+    int cur = -1;
+    while ((cur = *(str++)) != '\0') {
+        int escape_val = '\0';
+        switch (cur) {
+        case '\a': escape_val = 'a';  break;
+        case '\b': escape_val = 'b';  break;
+        case '\f': escape_val = 'f';  break;
+        case '\n': escape_val = 'n';  break;
+        case '\r': escape_val = 'r';  break;
+        case '\t': escape_val = 't';  break;
+        case '\v': escape_val = 'v';  break;
+        case '\\': escape_val = '\\'; break;
+        case '"':  escape_val = '"';  break;
+        default:
+            if (!isprint(cur)) {
+                sb_append_printf(&sb, "\\x%x", cur);
+            } else {
+                sb_append_char(&sb, cur);
+            }
+        }
+        if (escape_val != '\0') {
+            sb_append_char(&sb, '\\');
+            sb_append_char(&sb, escape_val);
+        }
+    }
+
+    char *retval = sstore_lookup(sb_buf(&sb));
+    sb_destroy(&sb);
+
+    return retval;
+}
+
 char *unescape_str(char *str) {
     // No forward slashes, just return input string
     if (strchr(str, '\\') == NULL) {

@@ -742,7 +742,7 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
         last = token;
     }
 
-    token->str_val = sstore_lookup(sb_buf(&sb));
+    token->str_val = escape_str(sb_buf(&sb));
     sb_destroy(&sb);
 
     return token;
