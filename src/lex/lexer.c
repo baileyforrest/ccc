@@ -61,10 +61,10 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     token_t *last = NULL;
     while (ts_peek(stream) != EOF) {
         token_t *token = token_create(lexer->token_man);
+        token->type = TOKEN_EOF;
         token->start = ts_pos(stream);
 
         if (CCC_OK != (status = lex_next_token(lexer, stream, token))) {
-            token->type = TOKEN_EOF;
             return status;
         }
         token->len = ts_pos(stream) - token->start;
@@ -530,9 +530,6 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
         cur = lex_getc_splice(stream);
     }
 
-    if (status != CCC_OK) {
-        free(result->int_params);
-    }
     return status;
 }
 
@@ -669,6 +666,12 @@ status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
                 err = true;
             }
             break;
+        case '+':
+        case '-':
+            if (last == 'e' || last == 'E') {
+                break;
+            }
+            // FALL THROUGH
         default:
             done = true;
         }

@@ -212,7 +212,7 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
 
         size_t cur_path_len = strlen(cur_path);
         bool relative;
-        if (*cur_path != '/') {
+        if (*cur_path != '/' && *cur_path != '.') {
             relative = true;
             cur_path_len = optman.ccc_path_len + strlen(cur_path) + 1;
         } else {
