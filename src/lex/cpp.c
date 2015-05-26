@@ -65,6 +65,7 @@ static char *s_predef_macros[] = {
     "__FUNCTION__ __func__",
 
     "__attribute__(xyz)", // Attributes aren't supported
+    "_Noreturn", // Just do nothing for noreturn
 
 #ifdef __x86_64__
     "__amd64 1",
