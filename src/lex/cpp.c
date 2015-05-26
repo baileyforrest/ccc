@@ -213,6 +213,32 @@ token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead) {
     return vec_iter_has_next(&temp) ? vec_iter_get(&temp) : NULL;
 }
 
+void cpp_stream_append(cpp_state_t *cs, vec_t *output, token_t *token) {
+    if (token->type == STRING) {
+        token_t *tail = vec_size(output) == 0 ? NULL : vec_back(output);
+        if (tail != NULL && tail->type == STRING) {
+            // If two strings are next to each other, then join them
+            vec_pop_back(output);
+            string_builder_t sb;
+            sb_init(&sb, 0);
+
+            token_t *concat = token_create(cs->token_man);
+            memcpy(concat, tail, sizeof(token_t));
+
+            sb_append_printf(&sb, "%s", tail->str_val);
+            sb_append_printf(&sb, "%s", token->str_val);
+
+            concat->str_val = sstore_lookup(sb_buf(&sb));
+
+            sb_destroy(&sb);
+
+            token = concat;
+        }
+    }
+
+    vec_push_back(output, token);
+}
+
 size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
     size_t skipped = 0;
 
@@ -395,7 +421,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
         default:
             // If the token isn't one of the above, just transfer it
-            vec_push_back(output, token);
+            cpp_stream_append(cs, output, token);
             continue;
         }
 
@@ -403,7 +429,7 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
         // If the current token is a member of its hideset, just pass it
         if (str_set_mem(token->hideset, token->id_name)) {
-            vec_push_back(output, token);
+            cpp_stream_append(cs, output, token);
             continue;
         }
 
@@ -414,11 +440,12 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             (macro->num_params != -1 && next->type != LPAREN)) {
             // Just continue if this isn't a macro, or a function like macro
             // without a paren next
-            vec_push_back(output, token);
+            cpp_stream_append(cs, output, token);
             continue;
         }
         if (macro->type != CPP_MACRO_BASIC) {
             cpp_handle_special_macro(cs, &token->mark, macro->type, output);
+            continue;
         }
 
         cpp_macro_inst_t macro_inst =
@@ -496,7 +523,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             }
 
             token_t *stringified = cpp_stringify(cs, param_vec);
-            vec_push_back(&temp, stringified);
+            cpp_stream_append(cs, &temp, stringified);
         } else if (token->type == HASHHASH) { // Concatenation
             cpp_iter_advance(&iter);
             token_t *next = vec_iter_get(&iter);
@@ -547,7 +574,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             }
         } else {
             // Regular token, just put it on the output
-            vec_push_back(&temp, token);
+            cpp_stream_append(cs, &temp, token);
         }
     }
 
@@ -558,7 +585,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
         // Make a copy and add it to output
         token_t *copy = token_copy(cs->token_man, token);
         copy->hideset = str_set_union_inplace(copy->hideset, hideset);
-        vec_push_back(output, copy);
+        cpp_stream_append(cs, output, copy);
     }
 
 fail:
@@ -670,7 +697,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             }
 
             if (cur < macro->num_params) {
-                vec_push_back(&param->stream, token);
+                cpp_stream_append(cs, &param->stream, token);
             }
         }
 
@@ -731,7 +758,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
     token_t *rhead = vec_iter_get(right);
 
     if (vec_size(left) == 0) {
-        vec_push_back(left, rhead);
+        cpp_stream_append(cs, left, rhead);
     } else {
         // Remove the last token of the left
         token_t *ltail = vec_pop_back(left);
@@ -774,7 +801,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
         if (!vec_iter_has_next(right)) {
             break;
         }
-        vec_push_back(left, vec_iter_get(right));
+        cpp_stream_append(cs, left, vec_iter_get(right));
     }
 
     return CCC_OK;
@@ -827,5 +854,5 @@ void cpp_handle_special_macro(cpp_state_t *cs, fmark_t *mark,
         assert(false);
     }
 
-    vec_push_back(output, token);
+    cpp_stream_append(cs, output, token);
 }
