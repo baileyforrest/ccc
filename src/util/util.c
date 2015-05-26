@@ -53,9 +53,8 @@ char *ccc_basename(char *path) {
 
 char *ccc_dirname(char *path) {
     size_t path_len = strlen(path);
-    while (path_len > 0 && path[path_len - 1] != '/') {
-        --path_len;
-    }
+    while (path_len > 0 && path[path_len-- - 1] != '/')
+        continue;
     path[path_len] = '\0';
 
     return path;

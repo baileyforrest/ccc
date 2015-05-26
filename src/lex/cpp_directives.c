@@ -25,6 +25,7 @@
 #include <limits.h>
 #include <unistd.h>
 
+#include "optman.h"
 #include "parse/ast.h"
 #include "parse/parser.h"
 #include "typecheck/typechecker.h"
@@ -210,11 +211,27 @@ status_t cpp_include_helper(cpp_state_t *cs, fmark_t *mark, char *filename,
         }
 
         size_t cur_path_len = strlen(cur_path);
+        bool relative;
+        if (*cur_path != '/') {
+            relative = true;
+            cur_path_len = optman.ccc_path_len + strlen(cur_path) + 1;
+        } else {
+            relative = false;
+            cur_path_len = strlen(cur_path);
+        }
+
         if (cur_path_len + strlen(filename) + 1 > PATH_MAX) {
             logger_log(mark, LOG_ERR, "Include path name too long");
             return CCC_ESYNTAX;
         }
-        strcpy(include_path, cur_path);
+
+        if (relative) {
+            strcpy(include_path, optman.ccc_path);
+            include_path[optman.ccc_path_len] = '/';
+            strcpy(include_path + optman.ccc_path_len + 1, cur_path);
+        } else {
+            strcpy(include_path, cur_path);
+        }
         include_path[cur_path_len] = '/';
         strcpy(include_path + cur_path_len + 1, filename);
 

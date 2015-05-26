@@ -39,8 +39,7 @@ static char *s_search_path[] = {
     "", // Denotes current directory
     "/usr/local/include",
 
-    // TODO1: conditionally compile these
-    "/usr/lib/gcc/x86_64-unknown-linux-gnu/5.1.0/include",
+    "lib/ccc/include",
 
     "/usr/include",
 
@@ -618,9 +617,11 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     }
 
     if (dir == NULL) {
-        logger_log(&token->mark, LOG_ERR, "invalid preprocessing directive #%s",
-                   tok_str);
-        status = CCC_ESYNTAX;
+        if (!cs->ignore) {
+            logger_log(&token->mark, LOG_ERR,
+                       "invalid preprocessing directive #%s", tok_str);
+            status = CCC_ESYNTAX;
+        }
     } else {
         cpp_iter_advance(ts); // Skip the directive name
         if (!cs->ignore || !dir->if_ignore) {

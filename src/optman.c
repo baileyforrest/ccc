@@ -22,11 +22,13 @@
 
 #include "optman.h"
 
+#include <assert.h>
+#include <errno.h>
+#include <getopt.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include <assert.h>
-#include <getopt.h>
+#include <unistd.h>
 
 #include "util/logger.h"
 #include "util/text_stream.h"
@@ -47,6 +49,17 @@ optman_t optman;
 static status_t optman_parse(int argc, char **argv);
 
 status_t optman_init(int argc, char **argv) {
+    static char ccc_path[PATH_MAX];
+    if (-1 == readlink("/proc/self/exe", ccc_path, sizeof(ccc_path))) {
+        exit_err(strerror(errno));
+    }
+
+    ccc_dirname(ccc_path); // Remove excutable name
+    assert(strcmp(ccc_basename(ccc_path), "bin") == 0);
+    ccc_dirname(ccc_path); // Remove bin path
+
+    optman.ccc_path = ccc_path;
+    optman.ccc_path_len = strlen(ccc_path);
     optman.exec_name = NULL;
     optman.output = NULL;
     vec_init(&optman.include_paths, 0);

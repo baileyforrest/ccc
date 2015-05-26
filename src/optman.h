@@ -93,6 +93,8 @@ typedef enum output_opts_t {
  * The Option manager. Contains flags/lists from the command line parameters.
  */
 typedef struct optman_t {
+    char *ccc_path;            /**< Path to ccc executable */
+    size_t ccc_path_len;       /**< Length of path to ccc executable */
     char *exec_name;           /**< Name of the executable */
     char *output;              /**< Name of the output file */
     vec_t include_paths;       /**< Search path additions with -I flag */
