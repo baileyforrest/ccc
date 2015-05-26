@@ -543,6 +543,7 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
     sb_clear(&lexer->lexbuf);
 
     bool done = false;
+    bool next_escape = false;
     while (!done) {
         int cur = lex_getc_splice(stream);
         if (cur == EOF) {
@@ -550,10 +551,7 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
         }
 
         // Reached the end, an unescaped quote
-        if (cur == '"' &&
-            (sb_len(&lexer->lexbuf) == 0 ||
-             sb_buf(&lexer->lexbuf)[sb_len(&lexer->lexbuf) - 1] != '\\')) {
-
+        if (cur == '"' && !next_escape) {
             // Concatenate strings. Skip until non whitespace character,
             // then if we find another quote, skip that quote
             do {
@@ -568,6 +566,12 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
                 ts_ungetc(cur, stream);
             }
         } else {
+            if (cur == '\\') {
+                next_escape = !next_escape;
+            } else {
+                next_escape = false;
+            }
+
             sb_append_char(&lexer->lexbuf, cur);
         }
     }
