@@ -30,6 +30,8 @@
 #include "util/string_builder.h"
 
 typedef enum token_type_t {
+    TOK_WARN,
+    TOK_ERR,
     TOKEN_EOF,     // EOF
     HASH,          // #
     HASHHASH,      // ##

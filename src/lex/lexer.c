@@ -217,8 +217,8 @@ status_t lex_next_token(lex_state_t *ls, tstream_t *stream, token_t *result) {
             result->type = ELIPSE;
             break;
         }
-        logger_log(result->mark, LOG_ERR, "Invalid token: ..");
-        status = CCC_ESYNTAX;
+        result->type = TOK_ERR;
+        result->str_val = "Invalid token: ..";
         break;
     }
     case '%':
@@ -411,7 +411,7 @@ status_t lex_id(lex_state_t *ls, tstream_t *stream, int cur, token_t *result) {
     return status;
 }
 
-char32_t lex_single_char(lex_state_t *ls, tstream_t *stream,
+char32_t lex_single_char(lex_state_t *ls, tstream_t *stream, token_t *result,
                          lex_str_type_t type) {
     lexer_t *lexer = ls->lexer;
     int cur = lex_getc_splice(stream);
@@ -492,15 +492,11 @@ char32_t lex_single_char(lex_state_t *ls, tstream_t *stream,
         }
 
         if (overflow) {
-            if (is_oct) {
-                logger_log(&stream->mark, LOG_WARN,
-                           "Overflow in character constant '\\%s'",
-                           sb_buf(&lexer->lexbuf));
-            } else {
-                logger_log(&stream->mark, LOG_WARN,
-                           "Overflow in character constant '\\x%s'",
-                           sb_buf(&lexer->lexbuf));
-            }
+            token_t *warn = token_create(lexer->token_man);
+            warn->type = TOK_WARN;
+            warn->mark = result->mark;
+            warn->str_val = "character constant out of range";
+            vec_push_back(ls->ostream, warn);
         }
         return hexnum;
     }
@@ -510,10 +506,20 @@ char32_t lex_single_char(lex_state_t *ls, tstream_t *stream,
     case 'U':
         // TODO2: Handle utf16
 
-    default:
-        logger_log(&stream->mark, LOG_WARN,
-                   "Unknown escape sequence: '\\%c'", cur);
+    default: {
+        string_builder_t sb;
+        sb_init(&sb, 0);
+        sb_append_printf(&sb, "Unknown escape sequence: '\\%c'", cur);
+
+        token_t *warn = token_create(lexer->token_man);
+        warn->type = TOK_WARN;
+        warn->mark = result->mark;
+        warn->str_val = sstore_lookup(sb_buf(&sb));
+        vec_push_back(ls->ostream, warn);
+
+        sb_destroy(&sb);
         return cur;
+    }
     }
 }
 
@@ -527,17 +533,20 @@ status_t lex_char_lit(lex_state_t *ls, tstream_t *stream, token_t *result,
     result->int_params->hasL = false;
     result->int_params->hasLL = false;
 
-    result->int_params->int_val = lex_single_char(ls, stream, type);
+    result->int_params->int_val = lex_single_char(ls, stream, result, type);
 
     bool first = true;
     int cur = lex_getc_splice(stream);
     while (cur != '\'' && cur != '\n' && cur != EOF) {
         if (first) {
-            logger_log(result->mark, LOG_WARN,
-                       "multi-character character constant");
+            token_t *warn = token_create(ls->lexer->token_man);
+            warn->type = TOK_WARN;
+            warn->mark = result->mark;
+            warn->str_val = "multi-character character constant";
+            vec_push_back(ls->ostream, warn);
         }
         ts_ungetc(cur, stream);
-        result->int_params->int_val = lex_single_char(ls, stream, type);
+        result->int_params->int_val = lex_single_char(ls, stream, result, type);
         cur = lex_getc_splice(stream);
         first = false;
     }
@@ -709,8 +718,8 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
 
     if (err || !done) {
         err = true;
-        logger_log(result->mark, LOG_ERR, "Invalid numeric literal");
-        status = CCC_ESYNTAX;
+        result->type = TOK_ERR;
+        result->str_val = "Invalid numeric literal";
 
         // Skip over junk at end (identifier characters)
         done = false;
@@ -793,8 +802,13 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
         result->int_params->hasLL = has_ll;
         result->int_params->int_val = strtoull(buf, &end, 0);
     }
+
+    err = false;
+    char *err_msg;
+
     if (errno == ERANGE) {
-        logger_log(result->mark, LOG_WARN, "Overflow in numeric literal", cur);
+        err = true;
+        err_msg = "Overflow in numeric literal";
     }
 
     // End is allowed to be NULL or an integral literal suffix
@@ -808,8 +822,18 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
     case 'F':
         break;
     default:
-        logger_log(result->mark, LOG_ERR, "Invalid integral constant", cur);
-        status = CCC_ESYNTAX;
+        err = true;
+        err_msg = "Invalid integral constant";
+    }
+
+    if (err) {
+        switch (result->type) {
+        case FLOATLIT: free(result->float_params); break;
+        case INTLIT: free(result->int_params); break;
+        default: break;
+        }
+        result->type = TOK_WARN;
+        result->str_val = err_msg;
     }
 
     return status;

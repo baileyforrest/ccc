@@ -49,7 +49,7 @@ status_t lex_next_token(lex_state_t *ls, tstream_t *stream, token_t *result);
 
 status_t lex_id(lex_state_t *ls, tstream_t *stream, int cur, token_t *result);
 
-char32_t lex_single_char(lex_state_t *ls, tstream_t *stream,
+char32_t lex_single_char(lex_state_t *ls, tstream_t *stream, token_t *result,
                          lex_str_type_t type);
 
 status_t lex_char_lit(lex_state_t *ls, tstream_t *stream, token_t *result,

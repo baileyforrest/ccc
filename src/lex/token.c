@@ -28,6 +28,7 @@
 #include "lex/symtab.h"
 
 #include "util/string_builder.h"
+#include "util/logger.h"
 
 #define INT_PARAM_LIT(val) { false, false, false, val }
 
@@ -134,7 +135,9 @@ void token_print_helper(token_t *token, string_builder_t *sb, FILE *file) {
     assert(token != NULL);
 
     switch (token->type) {
-        // Other
+    case TOK_WARN: logger_log(token->mark, LOG_WARN, token->str_val); break;
+    case TOK_ERR:  logger_log(token->mark, LOG_ERR, token->str_val); break;
+
     case ID:
         directed_print(sb, file, "%s", token->id_name);
         break;
@@ -201,6 +204,8 @@ void token_str_append_sb(string_builder_t *sb, token_t *token) {
 
 const char *token_type_str(token_type_t token) {
     switch (token) {
+    case TOK_WARN:
+    case TOK_ERR:       return "";
     case TOKEN_EOF:     return "";
     case HASH:          return "#";
     case HASHHASH:      return "##";

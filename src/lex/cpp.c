@@ -392,10 +392,19 @@ status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
         goto fail;
     }
 
-    // Remove spaces and newlines
+    // Do post processing
     VEC_FOREACH(cur, &temp) {
         token_t *token = vec_get(&temp, cur);
-        if (token->type != SPACE && token->type != NEWLINE) {
+        switch (token->type) {
+            // Filter out spaces
+        case SPACE:
+        case NEWLINE: break;
+
+            // Report lexer errors
+        case TOK_WARN: logger_log(token->mark, LOG_WARN, token->str_val); break;
+        case TOK_ERR: logger_log(token->mark, LOG_ERR, token->str_val); break;
+
+        default:
             vec_push_back(output, token);
         }
     }
