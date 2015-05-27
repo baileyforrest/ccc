@@ -29,6 +29,7 @@ typedef struct trans_state_t {
     typetab_t *typetab;
     trans_unit_t *ast_tunit;
     ir_trans_unit_t *tunit;
+    ir_type_t *va_type;
     ir_gdecl_t *func;
     ir_label_t *break_target;
     ir_label_t *continue_target;
@@ -39,8 +40,8 @@ typedef struct trans_state_t {
     bool cur_case_jumps;
 } trans_state_t;
 
-#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL, NULL, 0, false, false, \
-            false, false }
+#define TRANS_STATE_LIT { NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, false, \
+            false, false, false }
 
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt);

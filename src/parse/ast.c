@@ -815,6 +815,12 @@ size_t ast_type_size(type_t *type) {
     }
     case TYPE_PTR:
         return sizeof(void *);
+    case TYPE_VA_LIST:
+#ifdef __x86_64__
+        return sizeof(int) * 2 + sizeof(char *) * 2;
+#else
+#error "Unsupported platform"
+#endif
     default:
         assert(false);
     }
@@ -877,6 +883,12 @@ size_t ast_type_align(type_t *type) {
         return ast_type_align(type->arr.base);
     case TYPE_PTR:
         return alignof(void *);
+    case TYPE_VA_LIST:
+#ifdef __x86_64__
+        return alignof(char *);
+#else
+#error "Unsupported platform"
+#endif
     default:
         assert(false);
     }

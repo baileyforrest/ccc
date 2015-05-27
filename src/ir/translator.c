@@ -38,6 +38,7 @@
 #define UNION_PREFIX "union."
 
 #define LLVM_MEMCPY "llvm.memcpy.p0i8.p0i8.i64"
+#define VA_LIST_NAME "struct.__va_list_tag"
 
 void trans_add_stmt(trans_state_t *ts, ir_inst_stream_t *stream,
                     ir_stmt_t *stmt) {
@@ -2489,6 +2490,32 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             ir_type->ptr.base = trans_type(ts, type->ptr.base);
         }
         return ir_type;
+    case TYPE_VA_LIST: {
+        if (ts->va_type != NULL) {
+            return ts->va_type;
+        }
+#ifdef __x86_64__
+        ir_type = ir_type_create(ts->tunit, IR_TYPE_STRUCT);
+        vec_push_back(&ir_type->struct_params.types, &ir_type_i32);
+        vec_push_back(&ir_type->struct_params.types, &ir_type_i32);
+        vec_push_back(&ir_type->struct_params.types, &ir_type_i8_ptr);
+        vec_push_back(&ir_type->struct_params.types, &ir_type_i8_ptr);
+#else
+#error "Unsupported platform"
+#endif
+
+        ir_type_t *id_type = ir_type_create(ts->tunit, IR_TYPE_ID_STRUCT);
+        id_type->id_struct.name = VA_LIST_NAME;
+        id_type->id_struct.type = ir_type;
+
+        ir_gdecl_t *id_gdecl = ir_gdecl_create(IR_GDECL_ID_STRUCT);
+        id_gdecl->id_struct.name = VA_LIST_NAME;
+        id_gdecl->id_struct.id_type = id_type;
+        id_gdecl->id_struct.type = ir_type;
+        sl_append(&ts->tunit->id_structs, &id_gdecl->link);
+
+        return ts->va_type = id_type;
+    }
     default:
         assert(false);
     }
