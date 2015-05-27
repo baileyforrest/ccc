@@ -1417,7 +1417,7 @@ ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
         }
 
         // Just treat p + x as &p[x]
-        expr_t *arr_idx = ast_expr_create(ts->ast_tunit, &ptr_expr->mark,
+        expr_t *arr_idx = ast_expr_create(ts->ast_tunit, ptr_expr->mark,
                                           EXPR_ARR_IDX);
         arr_idx->arr_idx.array = ptr_expr;
         arr_idx->arr_idx.index = int_expr;

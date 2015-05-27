@@ -666,7 +666,7 @@ status_t par_struct_or_union_or_enum_specifier(lex_wrap_t *lex, type_t **type) {
         if (entry->struct_defined) {
             logger_log(LEX_CUR(lex)->mark, LOG_ERR, "redefinition of '%s'",
                        entry->key);
-            logger_log(&entry->type->mark, LOG_NOTE, "originally defined here");
+            logger_log(entry->type->mark, LOG_NOTE, "originally defined here");
             status = CCC_ESYNTAX;
             goto fail;
         }
@@ -850,7 +850,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
         } else if ((decl_node->type->mod.type_mod & ~TMOD_TYPEDEF) == 0) {
             typedef_base = decl_node->type->mod.base;
         } else {
-            typedef_base = ast_type_create(lex->tunit, &decl_node->type->mark,
+            typedef_base = ast_type_create(lex->tunit, decl_node->type->mark,
                                            TYPE_MOD);
             typedef_base->mod.base = decl_node->type->mod.base;
             typedef_base->mod.type_mod =
@@ -866,7 +866,7 @@ status_t par_declarator_base(lex_wrap_t *lex, decl_t *decl) {
                 if (typecheck_type_equal(entry->type, decl_node->type)) {
                     status = CCC_OK;
                 } else {
-                    logger_log(&decl_node->mark, LOG_ERR,
+                    logger_log(decl_node->mark, LOG_ERR,
                                "conflicting types for '%s'", decl_node->id);
                 }
             }

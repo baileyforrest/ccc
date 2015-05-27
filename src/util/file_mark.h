@@ -62,8 +62,6 @@ typedef struct fmark_t {
 
 extern fmark_t fmark_built_in;
 
-// TODO0: Use this, replace token and ast node's mark to pointer to this
-// structure's entries
 typedef struct fmark_man_t {
     slist_t list;
     size_t offset;

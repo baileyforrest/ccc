@@ -36,11 +36,11 @@
  * @param mark The location of the node
  * @param loc location to store the result
  */
-#define ALLOC_NODE(list, mark, loc) \
-    do { \
-        (loc) = ecalloc(1, sizeof(*(loc))); \
-        sl_append(list, &(loc)->heap_link); \
-        memcpy(&(loc)->mark, mark, sizeof(fmark_t)); \
+#define ALLOC_NODE(list, mark, loc)             \
+    do {                                        \
+        (loc) = ecalloc(1, sizeof(*(loc)));     \
+        sl_append(list, &(loc)->heap_link);     \
+        (loc)->mark = mark;                     \
     } while(0)
 
 type_t *ast_type_create(trans_unit_t *tunit, fmark_t *mark, type_type_t type) {
@@ -443,7 +443,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
             // If its a union, just set init list to first entry
             expr_t *head = sl_head(&expr->init_list.exprs);
             if (head != sl_tail(&expr->init_list.exprs)) {
-                logger_log(&expr->mark, LOG_WARN,
+                logger_log(expr->mark, LOG_WARN,
                            "excess elements in union initializer");
             }
             elem = head;
@@ -564,7 +564,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                     }
                 } else {
                     // Create void expressions to fill in the gaps
-                    val = ast_expr_create(tunit, &expr->mark, EXPR_VOID);
+                    val = ast_expr_create(tunit, expr->mark, EXPR_VOID);
                 }
                 sl_append(&exprs, &val->link);
             } else if (sl_head(&unmapped) != NULL && iter.node == NULL &&
@@ -573,7 +573,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                 // If this is an anonymous struct/union see if any of the
                 // unmapped designated initalizers are used
                 // Create a init list for this anonymous member
-                expr_t *init_list = ast_expr_create(tunit, &expr->mark,
+                expr_t *init_list = ast_expr_create(tunit, expr->mark,
                                                      EXPR_DESIG_INIT);
                 sl_append(&anon_desig_init, &init_list->link);
 
@@ -608,7 +608,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
 
         SL_FOREACH(cur, &unmapped) {
             expr_t *cur_expr = GET_ELEM(&unmapped, cur);
-            logger_log(&cur_expr->mark, LOG_ERR,
+            logger_log(cur_expr->mark, LOG_ERR,
                        "unknown field '%s' specified in initializer",
                        cur_expr->desig_init.name);
             status = CCC_ESYNTAX;
@@ -670,7 +670,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                     init_list = cur_expr;
                 } else {
                     if (desig_inits == NULL) {
-                        desig_inits = ast_expr_create(tunit, &cur_expr->mark,
+                        desig_inits = ast_expr_create(tunit, cur_expr->mark,
                                                       EXPR_INIT_LIST);
                     }
                     // Add desig_inits to the list

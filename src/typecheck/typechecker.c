@@ -316,7 +316,7 @@ bool typecheck_expr_lvalue(tc_state_t *tcs, expr_t *expr) {
     default:
         break;
     }
-    logger_log(&expr->mark, LOG_ERR,
+    logger_log(expr->mark, LOG_ERR,
                "lvalue required as left operand of assignment");
     return false;
 }
@@ -727,7 +727,7 @@ bool typecheck_type_max(trans_unit_t *tunit, fmark_t *mark, type_t *t1,
                 } else if (umod2->type == TYPE_PTR) {
                     *result = t2;
                 } else {
-                    type_t *ptr_type = ast_type_create(tunit, &umod_base1->mark,
+                    type_t *ptr_type = ast_type_create(tunit, umod_base1->mark,
                                                        TYPE_PTR);
                     ptr_type->ptr.base = umod_base1;
                     *result = ptr_type;
@@ -862,7 +862,7 @@ bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
         case EXPR_MEM_ACC:
             if (type->type != TYPE_STRUCT &&
                 type->type != TYPE_UNION) {
-                logger_log(&cur_expr->mark, LOG_ERR,
+                logger_log(cur_expr->mark, LOG_ERR,
                            "request for member '%s' in something not a "
                            "structure or union", cur_expr->mem_acc.name);
                 return false;
@@ -870,7 +870,7 @@ bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
             type = ast_type_find_member(type, cur_expr->mem_acc.name, NULL,
                                         NULL);
             if (type == NULL) {
-                logger_log(&cur_expr->mark, LOG_ERR,
+                logger_log(cur_expr->mark, LOG_ERR,
                            "type type has no member '%s'",
                            cur_expr->mem_acc.name);
                 return false;
@@ -878,12 +878,12 @@ bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
             break;
         case EXPR_ARR_IDX:
             if (type->type != TYPE_ARR) {
-                logger_log(&cur_expr->mark, LOG_ERR,
+                logger_log(cur_expr->mark, LOG_ERR,
                            "subscripted value is not an array");
                 return false;
             }
             if (!typecheck_expr(tcs, cur_expr->arr_idx.index, TC_CONST)) {
-                logger_log(&cur_expr->arr_idx.index->mark, LOG_ERR,
+                logger_log(cur_expr->arr_idx.index->mark, LOG_ERR,
                            "cannot apply 'offsetof' to a non constant "
                            "address");
                 return false;
@@ -906,14 +906,14 @@ bool typecheck_expr_integral(tc_state_t *tcs, expr_t *expr) {
     if (!typecheck_expr(tcs, expr, TC_NOCONST)) {
         return false;
     }
-    return typecheck_type_integral(&expr->mark, expr->etype);
+    return typecheck_type_integral(expr->mark, expr->etype);
 }
 
 bool typecheck_expr_conditional(tc_state_t *tcs, expr_t *expr) {
     if (!typecheck_expr(tcs, expr, TC_NOCONST)) {
         return false;
     }
-    return typecheck_type_conditional(&expr->mark, expr->etype);
+    return typecheck_type_conditional(expr->mark, expr->etype);
 }
 
 bool typecheck_expr_va_list(tc_state_t *tcs, expr_t *expr) {
@@ -922,7 +922,7 @@ bool typecheck_expr_va_list(tc_state_t *tcs, expr_t *expr) {
     }
     type_t *type = ast_type_unmod(expr->etype);
     if (type->type != TYPE_VA_LIST) {
-        logger_log(&expr->mark, LOG_ERR, "Expected __builtin_va_list");
+        logger_log(expr->mark, LOG_ERR, "Expected __builtin_va_list");
         return false;
     }
     return true;
@@ -963,7 +963,7 @@ bool typecheck_gdecl(tc_state_t *tcs, gdecl_t *gdecl) {
             stmt_t *label = ht_lookup(&tcs->func->fdefn.labels,
                                       &goto_stmt->goto_params.label);
             if (label == NULL) {
-                logger_log(&goto_stmt->mark, LOG_ERR,
+                logger_log(goto_stmt->mark, LOG_ERR,
                            "label %s used but not defined",
                            goto_stmt->goto_params.label);
                 retval = false;
@@ -1007,7 +1007,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_CASE:
         if (tcs->last_switch == NULL) {
-            logger_log(&stmt->mark, LOG_ERR,
+            logger_log(stmt->mark, LOG_ERR,
                        "'case' label not within a switch statement");
             retval = false;
         } else {
@@ -1019,7 +1019,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_DEFAULT:
         if (tcs->last_switch == NULL) {
-            logger_log(&stmt->mark, LOG_ERR,
+            logger_log(stmt->mark, LOG_ERR,
                        "'default' label not within a switch statement");
             retval = false;
         } else {
@@ -1116,7 +1116,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_CONTINUE:
         if (tcs->last_loop == NULL) {
-            logger_log(&stmt->mark, LOG_ERR,
+            logger_log(stmt->mark, LOG_ERR,
                        "continue statement not within a loop");
             retval = false;
         } else {
@@ -1125,7 +1125,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
         return retval;
     case STMT_BREAK:
         if (tcs->last_break == NULL) {
-            logger_log(&stmt->mark, LOG_ERR,
+            logger_log(stmt->mark, LOG_ERR,
                        "break statement not within loop or switch");
             retval = false;
         } else {
@@ -1138,7 +1138,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
 
         if (stmt->return_params.expr == NULL) {
             if (ast_type_unmod(func_sig->type->func.type)->type != TYPE_VOID) {
-                logger_log(&stmt->mark, LOG_WARN,
+                logger_log(stmt->mark, LOG_WARN,
                            "'return' with no value, in function returning"
                            " non-void");
             }
@@ -1147,7 +1147,7 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt) {
                 return false;
             }
             retval &=
-                typecheck_type_assignable(&stmt->mark,
+                typecheck_type_assignable(stmt->mark,
                                           func_sig->type->func.type,
                                           stmt->return_params.expr->etype);
             stmt->return_params.type = func_sig->type->func.type;
@@ -1222,7 +1222,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 return false;
             }
 
-            retval &= typecheck_type_assignable(&head->mark, dest_type,
+            retval &= typecheck_type_assignable(head->mark, dest_type,
                                                 head->etype);
         }
         return retval;
@@ -1253,7 +1253,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                     if (!retval) {
                         return false;
                     }
-                    retval &= typecheck_type_assignable(&iter.node->mark,
+                    retval &= typecheck_type_assignable(iter.node->mark,
                                                         iter.node->type,
                                                         cur_expr->etype);
                 }
@@ -1289,7 +1289,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
                 retval &= typecheck_init_list(tcs, type->arr.base,
                                               cur_expr);
             } else {
-                retval &= typecheck_type_assignable(&cur_expr->mark,
+                retval &= typecheck_type_assignable(cur_expr->mark,
                                                     type->arr.base,
                                                     cur_expr->etype);
             }
@@ -1301,25 +1301,25 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
         }
 
         if (decl_len >= 0 && decl_len < len) {
-            logger_log(&expr->mark, LOG_WARN,
+            logger_log(expr->mark, LOG_WARN,
                        "excess elements in array initializer");
         }
         return retval;
     }
     default: {
         if (sl_head(&expr->init_list.exprs) == NULL) {
-            logger_log(&expr->arr_idx.index->mark, LOG_ERR,
+            logger_log(expr->arr_idx.index->mark, LOG_ERR,
                        "empty scalar initializer");
             return false;
         }
         if (sl_head(&expr->init_list.exprs) !=
             sl_tail(&expr->init_list.exprs)) {
-            logger_log(&expr->arr_idx.index->mark, LOG_WARN,
+            logger_log(expr->arr_idx.index->mark, LOG_WARN,
                        "excess elements in scalar initializer");
         }
         expr_t *first = sl_head(&expr->init_list.exprs);
         retval &= typecheck_expr(tcs, first, TC_NOCONST);
-        retval &= typecheck_type_assignable(&first->mark, type, first->etype);
+        retval &= typecheck_type_assignable(first->mark, type, first->etype);
     }
     }
     return retval;
@@ -1337,20 +1337,20 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
         unmod->struct_params.esize == (size_t)-1 &&
         !(node_type->type == TYPE_MOD &&
           node_type->mod.type_mod & TMOD_EXTERN)) {
-        logger_log(&decl_node->mark, LOG_ERR,
+        logger_log(decl_node->mark, LOG_ERR,
                    "storage size of '%s' isn't known", decl_node->id);
         return false;
     }
 
     if (unmod->type == TYPE_VOID) {
-        logger_log(&decl_node->mark, LOG_ERR,
+        logger_log(decl_node->mark, LOG_ERR,
                    "variable or field '%s' declared void", decl_node->id);
         return false;
     }
     if ((type == TYPE_STRUCT || type == TYPE_UNION) &&
         (unmod->type == TYPE_STRUCT || unmod->type == TYPE_UNION) &&
         unmod->struct_params.esize == (size_t)-1) {
-        logger_log(&decl_node->mark, LOG_ERR, "field '%s' has incomplete type",
+        logger_log(decl_node->mark, LOG_ERR, "field '%s' has incomplete type",
                    decl_node->id);
         return false;
     }
@@ -1376,7 +1376,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
              tt_insert(tcs->typetab, node_type, TT_VAR, decl_node->id,
                        &entry))) {
             if (status != CCC_DUPLICATE) {
-                logger_log(&decl_node->mark, LOG_ERR,
+                logger_log(decl_node->mark, LOG_ERR,
                            "Failure inserting to type table");
                 return false;
             } else {
@@ -1397,7 +1397,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 if (entry->entry_type != TT_VAR ||
                     (entry->var.var_defined && !is_decl) ||
                     !typecheck_type_equal(cmp_type, node_type)) {
-                    logger_log(&decl_node->mark, LOG_ERR,
+                    logger_log(decl_node->mark, LOG_ERR,
                                "Redefined symbol %s", decl_node->id);
                     return false;
                 }
@@ -1440,7 +1440,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 }
                 // FALL THROUGH
             default:
-                retval &= typecheck_type_assignable(&decl_node->mark, node_type,
+                retval &= typecheck_type_assignable(decl_node->mark, node_type,
                                                     decl_node->expr->etype);
             }
             break;
@@ -1455,7 +1455,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
             type_t *type = decl_node->expr->etype;
             type = ast_type_unmod(type);
             if (!TYPE_IS_INTEGRAL(type)) {
-                logger_log(&decl_node->mark, LOG_ERR,
+                logger_log(decl_node->mark, LOG_ERR,
                            "bit-field '%s' width not an integer constant",
                            decl_node->id);
                 return false;
@@ -1493,18 +1493,18 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         typetab_entry_t *entry = tt_lookup(tcs->typetab, expr->var_id);
         if (entry == NULL ||
             (entry->entry_type != TT_VAR && entry->entry_type != TT_ENUM_ID)) {
-            logger_log(&expr->mark, LOG_ERR, "'%s' undeclared.", expr->var_id);
+            logger_log(expr->mark, LOG_ERR, "'%s' undeclared.", expr->var_id);
             return false;
         }
         if (constant == TC_CONST && entry->entry_type == TT_VAR) {
-            logger_log(&expr->mark, LOG_ERR, "Expected constant value");
+            logger_log(expr->mark, LOG_ERR, "Expected constant value");
             return false;
         }
 
         if (entry->type->type == TYPE_FUNC) {
             // If we're using a function as a variable, etype is function
             // pointer
-            type_t *ptr_type = ast_type_create(tcs->tunit, &expr->mark,
+            type_t *ptr_type = ast_type_create(tcs->tunit, expr->mark,
                                                TYPE_PTR);
             ptr_type->ptr.base = entry->type;
             expr->etype = ptr_type;
@@ -1521,11 +1521,11 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             return false;
         }
         retval &= typecheck_expr_lvalue(tcs, expr->assign.dest);
-        retval &= typecheck_type_assignable(&expr->assign.dest->mark,
+        retval &= typecheck_type_assignable(expr->assign.dest->mark,
                                             expr->assign.dest->etype,
                                             expr->assign.expr->etype);
         if (expr->assign.op != OP_NOP) {
-            retval &= typecheck_types_binop(&expr->mark, expr->assign.op,
+            retval &= typecheck_types_binop(expr->mark, expr->assign.op,
                                             expr->assign.dest->etype,
                                             expr->assign.expr->etype);
         }
@@ -1544,7 +1544,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!retval) {
             return false;
         }
-        retval &= typecheck_types_binop(&expr->mark, expr->bin.op,
+        retval &= typecheck_types_binop(expr->mark, expr->bin.op,
                                         expr->bin.expr1->etype,
                                         expr->bin.expr2->etype);
         type_t *umod1 = ast_type_unmod(expr->bin.expr1->etype);
@@ -1580,7 +1580,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                     expr->etype = ptr_type;
                 } else {
                     type_t *new_ptr = ast_type_create(tcs->tunit,
-                                                      &ptr_type->mark,
+                                                      ptr_type->mark,
                                                       TYPE_PTR);
                     new_ptr->ptr.base = ast_type_ptr_base(ptr_type);
                     expr->etype = new_ptr;
@@ -1593,7 +1593,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         if (expr->etype == NULL) {
             type_t *etype;
-            retval &= typecheck_type_max(tcs->tunit, &expr->mark,
+            retval &= typecheck_type_max(tcs->tunit, expr->mark,
                                          expr->bin.expr1->etype,
                                          expr->bin.expr2->etype,
                                          &etype);
@@ -1609,7 +1609,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         if (!typecheck_expr(tcs, expr->unary.expr, TC_NOCONST)) {
             return false;
         }
-        if (!typecheck_type_unaryop(&expr->mark, expr->unary.op,
+        if (!typecheck_type_unaryop(expr->mark, expr->unary.op,
                                     expr->unary.expr->etype)) {
             return false;
         }
@@ -1638,7 +1638,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             } else {
                 sl_append(&tcs->etypes, &expr->etype->heap_link);
             }
-            memcpy(&expr->etype->mark, &expr->mark, sizeof(fmark_t));
+            expr->etype->mark = expr->mark;
 
             expr->etype->type = TYPE_PTR;
             expr->etype->ptr.type_mod = TMOD_NONE;
@@ -1647,18 +1647,18 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case OP_DEREF: {
             type_t *ptr_type = ast_type_unmod(expr->unary.expr->etype);
             if (!TYPE_IS_PTR(ptr_type)) {
-                logger_log(&expr->unary.expr->mark, LOG_ERR,
+                logger_log(expr->unary.expr->mark, LOG_ERR,
                            "invalid type argument of unary '*'");
                 return false;
             }
             type_t *unmod = ast_type_unmod(ast_type_ptr_base(ptr_type));
             if (unmod->type == TYPE_VOID) {
-                logger_log(&expr->mark, LOG_WARN,
+                logger_log(expr->mark, LOG_WARN,
                            "dereferencing a 'void *' pointer");
             }
             if ((unmod->type == TYPE_STRUCT || unmod->type == TYPE_VOID) &&
                 unmod->struct_params.esize == (size_t)-1) {
-                logger_log(&expr->mark, LOG_ERR,
+                logger_log(expr->mark, LOG_ERR,
                            "dereferencing pointer to incomplete type");
                 retval = false;
             }
@@ -1693,7 +1693,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             ast_type_unmod(expr->cond.expr3->etype)->type == TYPE_VOID) {
             expr->etype = tt_void;
         } else {
-            retval &= typecheck_type_max(tcs->tunit, &expr->mark,
+            retval &= typecheck_type_max(tcs->tunit, expr->mark,
                                          expr->cond.expr2->etype,
                                          expr->cond.expr3->etype,
                                          &expr->etype);
@@ -1726,7 +1726,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             func_sig = ast_type_unmod(func_sig->ptr.base);
         }
         if (func_sig->type != TYPE_FUNC) {
-            logger_log(&expr->mark, LOG_ERR,
+            logger_log(expr->mark, LOG_ERR,
                        "called object is not a function or function pointer");
             return false;
         }
@@ -1743,7 +1743,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             if (arg->etype != NULL &&
                 !typecheck_type_assignable(NULL, param_type,
                                            arg->etype)) {
-                logger_log(&arg->mark, LOG_ERR,
+                logger_log(arg->mark, LOG_ERR,
                            "incompatible type for argument %d of function",
                            arg_num);
                 return false;
@@ -1760,7 +1760,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             // Only report error if parameter isn't (void)
             if (!(arg_num == 1 && param == NULL &&
                   decl->type->type == TYPE_VOID)) {
-                logger_log(&expr->mark, LOG_ERR,
+                logger_log(expr->mark, LOG_ERR,
                            "too few arguments to function");
                 retval = false;
             }
@@ -1773,7 +1773,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                     cur_arg = cur_arg->next;
                 }
             } else {
-                logger_log(&expr->mark, LOG_ERR,
+                logger_log(expr->mark, LOG_ERR,
                            "too many arguments to function");
                 retval = false;
             }
@@ -1803,7 +1803,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             typetab_entry_t *entry =
                 tt_lookup(tcs->typetab, type->typedef_params.name);
             if (entry->entry_type != TT_TYPEDEF) {
-                expr_t *var_expr = ast_expr_create(tcs->tunit, &expr->mark,
+                expr_t *var_expr = ast_expr_create(tcs->tunit, expr->mark,
                                                    EXPR_VAR);
                 var_expr->var_id = type->typedef_params.name;
                 expr->sizeof_params.type = NULL;
@@ -1824,7 +1824,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             if (type->type == TYPE_STRUCT || type->type == TYPE_UNION) {
                 // If the type hasn't been defined yet, then return an error
                 if (type->struct_params.esize == (size_t)-1) {
-                    logger_log(&expr->mark, LOG_ERR,
+                    logger_log(expr->mark, LOG_ERR,
                                "invalid application to incomplete type");
                     return false;
                 }
@@ -1857,7 +1857,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         case TYPE_STRUCT:
         case TYPE_UNION:
             if (expr->mem_acc.op != OP_DOT) {
-                logger_log(&expr->mark, LOG_ERR,
+                logger_log(expr->mark, LOG_ERR,
                            "invalid type argument of '->'");
                 return false;
             }
@@ -1872,13 +1872,13 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             }
             // FALL THROUGH
         default:
-            logger_log(&expr->mark, LOG_ERR,
+            logger_log(expr->mark, LOG_ERR,
                        "request for member '%s' in something not a structure "
                        "or union", expr->mem_acc.name);
             return false;
         }
         if (compound->struct_params.esize == (size_t)-1) {
-            logger_log(&expr->mark, LOG_ERR,
+            logger_log(expr->mark, LOG_ERR,
                        "dereferencing pointer to incomplete type");
             return false;
         }
@@ -1888,7 +1888,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             expr->etype = mem_type;
             return true;
         }
-        logger_log(&expr->mark, LOG_ERR, "compound type has no member '%s'",
+        logger_log(expr->mark, LOG_ERR, "compound type has no member '%s'",
                    expr->mem_acc.name);
         return false;
     }
@@ -1903,13 +1903,13 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         type_t *umod_index = ast_type_unmod(expr->arr_idx.index->etype);
 
         if (umod_arr->type != TYPE_PTR && umod_arr->type != TYPE_ARR) {
-            logger_log(&expr->arr_idx.array->mark, LOG_ERR,
+            logger_log(expr->arr_idx.array->mark, LOG_ERR,
                        "subscripted value is neither array nor pointer nor"
                        " vector");
             retval = false;
         }
         if (!TYPE_IS_INTEGRAL(umod_index)) {
-            logger_log(&expr->arr_idx.index->mark, LOG_ERR,
+            logger_log(expr->arr_idx.index->mark, LOG_ERR,
                        "array subscript is not an integer");
             retval = false;
         }
@@ -1956,7 +1956,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             }
         }
         if (failed) {
-            logger_log(&expr->vastart.last->mark, LOG_ERR,
+            logger_log(expr->vastart.last->mark, LOG_ERR,
                        "Expected function parameter name");
             retval = false;
         }
@@ -2045,7 +2045,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                 if (check.node != NULL) {
                     if (check.node->id != NULL &&
                         strcmp(cur.node->id, check.node->id) == 0) {
-                        logger_log(&check.node->mark, LOG_ERR,
+                        logger_log(check.node->mark, LOG_ERR,
                                    "duplicate member '%s'", check.node->id);
                         retval = false;
                     }
@@ -2054,7 +2054,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                     assert(check.decl != NULL);
                     if (ast_type_find_member(check.decl->type, cur.node->id,
                                              NULL, NULL)) {
-                        logger_log(&cur.node->mark, LOG_ERR,
+                        logger_log(cur.node->mark, LOG_ERR,
                                    "duplicate member '%s'", cur.node->id);
                         retval = false;
                     }
@@ -2078,7 +2078,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                  tt_insert(tcs->typetab, type->enum_params.type, TT_ENUM_ID,
                            node->id, &entry))) {
                 if (status == CCC_DUPLICATE) {
-                    logger_log(&node->mark, LOG_ERR, "Redefined symbol %s",
+                    logger_log(node->mark, LOG_ERR, "Redefined symbol %s",
                                node->id);
                 }
                 return false;
@@ -2101,7 +2101,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             typetab_entry_t *entry =
                 tt_lookup(tcs->typetab, type->typedef_params.name);
             if (entry == NULL || entry->entry_type != TT_TYPEDEF) {
-                logger_log(&type->mark, LOG_ERR, "unexpected identifier '%s'",
+                logger_log(type->mark, LOG_ERR, "unexpected identifier '%s'",
                            type->typedef_params.name);
                 return false;
             }
@@ -2120,7 +2120,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         retval &= typecheck_type(tcs, type->mod.base);
         if (type->mod.type_mod & TMOD_SIGNED &&
             type->mod.type_mod & TMOD_UNSIGNED) {
-            logger_log(&type->mark, LOG_ERR,
+            logger_log(type->mark, LOG_ERR,
                        "both 'signed' and 'unsigned' in declaration"
                        " specifiers");
             retval = false;
@@ -2134,7 +2134,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
         case TMOD_EXTERN:
             break;
         default:
-            logger_log(&type->mark, LOG_ERR,
+            logger_log(type->mark, LOG_ERR,
                        "multiple storage classes in declaration specifiers");
             retval = false;
         }
@@ -2146,7 +2146,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                 type->mod.alignas_align = ast_type_align(align_type);
             } else {
                 if (!typecheck_expr(tcs, type->mod.alignas_expr, TC_CONST)) {
-                    logger_log(&type->mod.alignas_expr->mark, LOG_ERR,
+                    logger_log(type->mod.alignas_expr->mark, LOG_ERR,
                                "requested alignment is not an integer"
                                " constant");
                     return false;
@@ -2155,7 +2155,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                 typecheck_const_expr_eval(tcs->typetab, type->mod.alignas_expr,
                                           &val);
                 if (val < 0 || (val & (val - 1))) {
-                    logger_log(&type->mod.alignas_expr->mark, LOG_ERR,
+                    logger_log(type->mod.alignas_expr->mark, LOG_ERR,
                                "requested alignment is not a positive power of"
                                " 2");
                     return false;
@@ -2211,9 +2211,9 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                         continue;
                     }
                     if (strcmp(node->id, cur_node->id) == 0) {
-                        logger_log(&node->mark, LOG_ERR,
+                        logger_log(node->mark, LOG_ERR,
                                    "redefinition of parameter '%s'", node->id);
-                        logger_log(&cur_node->mark, LOG_NOTE,
+                        logger_log(cur_node->mark, LOG_NOTE,
                                    "previous definition of '%s' was here",
                                    node->id);
                         retval = false;
@@ -2224,7 +2224,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             // If a paramater is a function, convert it to a function pointer
             if (node != NULL && node->type->type == TYPE_FUNC) {
                 type_t *ptr_type = ast_type_create(tcs->tunit,
-                                                   &node->type->mark, TYPE_PTR);
+                                                   node->type->mark, TYPE_PTR);
                 ptr_type->ptr.base = node->type;
                 node->type = ptr_type;
             }
@@ -2234,7 +2234,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
 
         if (void_typed) {
             if (sl_head(&type->func.params) != sl_tail(&type->func.params)) {
-                logger_log(&type->mark, LOG_ERR,
+                logger_log(type->mark, LOG_ERR,
                            "'void' must be the only parameter");
                 retval = false;
             } else {
@@ -2255,7 +2255,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
             typecheck_const_expr_eval(tcs->typetab, type->arr.len,
                                       &nelems);
             if (nelems < 0) {
-                logger_log(&type->arr.len->mark, LOG_ERR,
+                logger_log(type->arr.len->mark, LOG_ERR,
                            "size of array is negative");
                 retval = false;
             }
@@ -2267,14 +2267,14 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
 
     case TYPE_STATIC_ASSERT: {
         if (!typecheck_expr(tcs, type->sa_params.expr, TC_CONST)) {
-            logger_log(&type->sa_params.expr->mark, LOG_ERR,
+            logger_log(type->sa_params.expr->mark, LOG_ERR,
                        "expression in static assertion is not constant");
             return false;
         }
         long long value;
         typecheck_const_expr_eval(tcs->typetab, type->sa_params.expr, &value);
         if (value == 0) {
-            logger_log(&type->mark, LOG_ERR,
+            logger_log(type->mark, LOG_ERR,
                        "static assertion failed: \"%s\"", type->sa_params.msg);
             return false;
         }

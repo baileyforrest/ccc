@@ -32,9 +32,11 @@
 
 #define PRIM_TYPE_FILE "<primitive_type>"
 
+static fmark_t s_prim_type_mark =
+    FMARK_LIT(NULL, PRIM_TYPE_FILE, PRIM_TYPE_FILE, 0, 0);
+
 #define TYPE_LITERAL(typename, type) \
-    { SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, \
-      typename, true, { } }
+    { SL_LINK_LIT, &s_prim_type_mark, typename, true, { } }
 
 static type_t stt_void        = TYPE_LITERAL(TYPE_VOID       , void       );
 static type_t stt_bool        = TYPE_LITERAL(TYPE_BOOL       , _Bool      );
@@ -50,7 +52,7 @@ static type_t stt_long_double = TYPE_LITERAL(TYPE_LONG_DOUBLE, long double);
 // TODO1: This isn't portable
 // size_t is unsigned long.
 static type_t stt_size_t = {
-    SL_LINK_LIT, { NULL, PRIM_TYPE_FILE, "\n", 0, 0 }, TYPE_MOD, true,
+    SL_LINK_LIT, &s_prim_type_mark, TYPE_MOD, true,
     { .mod = { TMOD_UNSIGNED, NULL, NULL, 0, &stt_long } }
 };
 

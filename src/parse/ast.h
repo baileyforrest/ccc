@@ -77,7 +77,7 @@ typedef struct ir_label_t ir_label_t;
 
 #define DECL_MARK(decl) \
     (sl_head(&decl->decls) == NULL ? \
-     &decl->mark : &((decl_node_t *)sl_head(&decl->decls))->mark)
+     decl->mark : ((decl_node_t *)sl_head(&decl->decls))->mark)
 
 
 /**
@@ -140,8 +140,7 @@ typedef enum type_type_t {
  */
 struct type_t {
     sl_link_t heap_link;         /**< Allocation Link */
-    // No storage link because there are static types
-    fmark_t mark;                /**< File mark */
+    fmark_t *mark;               /**< File mark */
     type_type_t type;            /**< Type of type type */
     bool typechecked;
 
@@ -278,7 +277,7 @@ typedef struct mem_acc_list_t {
 struct expr_t {
     sl_link_t heap_link;            /**< Allocation Link */
     sl_link_t link;                 /**< Storage link */
-    fmark_t mark;                   /**< File mark */
+    fmark_t *mark;                  /**< File mark */
     expr_type_t type;               /**< Expression type */
     type_t *etype;                  /**< Type of the expression */
 
@@ -394,7 +393,7 @@ struct expr_t {
 typedef struct decl_node_t {
     sl_link_t heap_link; /**< Allocation Link */
     sl_link_t link;      /**< Storage link */
-    fmark_t mark;        /**< File mark */
+    fmark_t *mark;       /**< File mark */
     type_t *type;        /**< Type of variable */
     char *id;            /**< Name of variable */
     expr_t *expr;        /**< Expression to assign, bitfield bits for struct/union */
@@ -406,7 +405,7 @@ typedef struct decl_node_t {
 struct decl_t {
     sl_link_t heap_link; /**< Allocation Link */
     sl_link_t link;      /**< Storage link */
-    fmark_t mark;        /**< File mark */
+    fmark_t *mark;       /**< File mark */
     type_t *type;        /**< Type of variable */
     slist_t decls;       /**< List of declarations (decl_node_t) */
 };
@@ -451,7 +450,7 @@ typedef enum stmt_type_t {
 struct stmt_t {
     sl_link_t heap_link;          /**< Allocation Link */
     sl_link_t link;               /**< Storage link */
-    fmark_t mark;                 /**< File mark */
+    fmark_t *mark;                /**< File mark */
     stmt_type_t type;             /**< Type of statement */
 
     union {
@@ -551,7 +550,7 @@ typedef enum gdecl_type_t {
 struct gdecl_t {
     sl_link_t heap_link;     /**< Allocation Link */
     sl_link_t link;          /**< Storage Link */
-    fmark_t mark;            /**< File mark */
+    fmark_t *mark;           /**< File mark */
     gdecl_type_t type;       /**< Type of gdecl */
     struct decl_t *decl;     /**< Declaration */
     union {
