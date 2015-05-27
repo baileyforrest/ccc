@@ -433,7 +433,13 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             break;
 
         case HASHHASH:
+            if (cs->expand_level != 1) {
+                // ## allowed in expanded macros
+                cpp_stream_append(cs, output, token);
+                continue;
+            }
             logger_log(token->mark, LOG_ERR, "stray '##' in program");
+            // FALL THROUGH
         case NEWLINE:
             // ignore these
             continue;
@@ -477,7 +483,8 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
         cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
         if (macro == NULL ||
-            (macro->num_params != -1 && next->type != LPAREN)) {
+            (macro->num_params != -1 &&
+             (next == NULL || next->type != LPAREN))) {
             // Just continue if this isn't a macro, or a function like macro
             // without a paren next
             cpp_stream_append(cs, output, token);
@@ -552,7 +559,8 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
         token_t *token = vec_iter_get(&iter);
         vec_t *param_vec;
 
-        if (token->type == HASH) { // Handle stringification
+        if (token->type == HASH && macro_inst->macro->num_params != -1) {
+            // Handle stringification
             cpp_iter_advance(&iter);
             token_t *param = vec_iter_get(&iter);
             if (param->type != ID ||
@@ -779,7 +787,8 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
         }
     }
 
-    if (num_params != macro->num_params) {
+    if (num_params != macro->num_params &&
+        !(num_params == 0 && macro->num_params == 1)) { // () counts as 0 or 1
         logger_log(lparen->mark, LOG_ERR,
                    "macro \"%s\" passed %d arguments, but takes %d",
                    macro->name, num_params, macro->num_params);
@@ -798,17 +807,27 @@ token_t *cpp_stringify(cpp_state_t *cs, vec_t *ts) {
     token->type = STRING;
     token->mark = first->mark;
 
-    token_t *last = NULL;
+    bool last_space = false;
     VEC_FOREACH(cur, ts) {
         token_t *token = vec_get(ts, cur);
 
         // Combine multiple spaces into one
-        if (token->type == SPACE && last != NULL && last->type == SPACE) {
-            continue;
+        if (token->type == SPACE || token->type == NEWLINE) {
+            if (last_space) {
+                continue;
+            }
+
+            // If the token isn't a space, make a space
+            if (token->type != SPACE) {
+                token = token_copy(cs->token_man, token);
+                token->type = SPACE;
+            }
+            last_space = true;
+        } else {
+            last_space = false;
         }
 
         token_str_append_sb(&sb, token);
-        last = token;
     }
 
     token->str_val = escape_str(sb_buf(&sb));
