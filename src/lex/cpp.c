@@ -195,12 +195,14 @@ void cpp_state_destroy(cpp_state_t *cs) {
     vec_destroy(&cs->search_path);
 }
 
-token_t *cpp_iter_advance(vec_iter_t *iter) {
+token_t *cpp_iter_advance(vec_iter_t *iter, bool skip_space) {
     if (!vec_iter_has_next(iter)) {
         return NULL;
     }
     token_t *cur = vec_iter_advance(iter);
-    cpp_iter_skip_space(iter);
+    if (skip_space) {
+        cpp_iter_skip_space(iter);
+    }
 
     return cur;
 }
@@ -210,7 +212,7 @@ token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead) {
     memcpy(&temp, iter, sizeof(temp));
 
     while (vec_iter_has_next(&temp) && lookahead--) {
-        cpp_iter_advance(&temp);
+        cpp_iter_advance(&temp, true);
     }
 
     return vec_iter_has_next(&temp) ? vec_iter_get(&temp) : NULL;
@@ -226,9 +228,9 @@ token_t *cpp_next_nonspace(vec_iter_t *iter, bool inplace) {
         ts = &temp;
     }
 
-    cpp_iter_advance(ts); // Go to next token
+    cpp_iter_advance(ts, true); // Go to next token
 
-    for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts, false)) {
         token_t *token = vec_iter_get(ts);
         switch (token->type) {
         case SPACE:
@@ -243,11 +245,25 @@ token_t *cpp_next_nonspace(vec_iter_t *iter, bool inplace) {
 }
 
 void cpp_stream_append(cpp_state_t *cs, vec_t *output, token_t *token) {
-    if (token->type == STRING) {
-        token_t *tail = vec_size(output) == 0 ? NULL : vec_back(output);
-        if (tail != NULL && tail->type == STRING) {
-            // If two strings are next to each other, then join them
-            vec_pop_back(output);
+
+    // Look for strings to concatenate
+    size_t len;
+    if (token->type == STRING && (len = vec_size(output)) > 0) {
+        // Find last non space token
+        token_t *tail = NULL;
+        for (; len > 0; --len) {
+            tail = vec_get(output, len - 1);
+            if (tail->type != SPACE && tail->type != NEWLINE) {
+                break;
+            }
+        }
+
+        // Combine them if last one was a string
+        if (len != 0 && tail->type == STRING) {
+            do {
+                tail = vec_pop_back(output);
+            } while (tail->type == SPACE || tail->type == NEWLINE);
+
             string_builder_t sb;
             sb_init(&sb, 0);
 
@@ -270,11 +286,11 @@ void cpp_stream_append(cpp_state_t *cs, vec_t *output, token_t *token) {
 size_t cpp_skip_line(vec_iter_t *ts, bool skip_newline) {
     size_t skipped = 0;
 
-    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts, false)) {
         token_t *token = vec_iter_get(ts);
         if (token->type == NEWLINE) {
             if (skip_newline) {
-                cpp_iter_advance(ts);
+                cpp_iter_advance(ts, false);
             }
             break;
         }
@@ -315,8 +331,8 @@ bool cpp_macro_equal(cpp_macro_t *m1, cpp_macro_t *m2) {
             return false;
         }
 
-        cpp_iter_advance(&stream1);
-        cpp_iter_advance(&stream2);
+        cpp_iter_advance(&stream1, true);
+        cpp_iter_advance(&stream2, true);
     }
 
     if (vec_iter_has_next(&stream1) || vec_iter_has_next(&stream2)) {
@@ -363,6 +379,8 @@ fail:
 status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
                      vec_t *output) {
     status_t status = CCC_OK;
+    vec_t temp;
+    vec_init(&temp, vec_size(output));
 
     cpp_state_t cs;
     if (CCC_OK != (status = cpp_state_init(&cs, token_man, lexer))) {
@@ -370,11 +388,20 @@ status_t cpp_process(token_man_t *token_man, lexer_t *lexer, char *filepath,
     }
     cs.cur_filename = filepath;
 
-    if (CCC_OK != (status = cpp_process_file(&cs, filepath, output))) {
+    if (CCC_OK != (status = cpp_process_file(&cs, filepath, &temp))) {
         goto fail;
     }
 
+    // Remove spaces and newlines
+    VEC_FOREACH(cur, &temp) {
+        token_t *token = vec_get(&temp, cur);
+        if (token->type != SPACE && token->type != NEWLINE) {
+            vec_push_back(output, token);
+        }
+    }
+
 fail:
+    vec_destroy(&temp);
     cpp_state_destroy(&cs);
     return status;
 }
@@ -416,11 +443,17 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     status_t status = CCC_OK;
     ++cs->expand_level;
 
-    token_t *token = NULL, *last = NULL;
-    for (; vec_iter_has_next(ts); last = token, cpp_iter_advance(ts)) {
+    token_t *token = NULL, *next_last = NULL, *last = NULL;
+    for (; vec_iter_has_next(ts);
+         last = next_last, cpp_iter_advance(ts, false)) {
+
         token = vec_iter_get(ts);
         if (cs->expand_level == 1) {
             cs->last_top_token = token;
+        }
+
+        if (token->type != SPACE) {
+            next_last = token;
         }
 
         // If we're ignoring and, we only want to check # directives
@@ -433,15 +466,12 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             break;
 
         case HASHHASH:
-            if (cs->expand_level != 1) {
+            if (cs->expand_level == 1) {
+                logger_log(token->mark, LOG_ERR, "stray '##' in program");
+            } else {
                 // ## allowed in expanded macros
                 cpp_stream_append(cs, output, token);
-                continue;
             }
-            logger_log(token->mark, LOG_ERR, "stray '##' in program");
-            // FALL THROUGH
-        case NEWLINE:
-            // ignore these
             continue;
 
         case HASH:
@@ -455,13 +485,13 @@ status_t cpp_expand(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
                     }
                     continue;
                 }
-                cpp_iter_advance(ts);
+                cpp_iter_advance(ts, true);
                 if (CCC_OK != (status = cpp_handle_directive(cs, ts, output))) {
                     goto done;
                 }
 
                 // Set last as NULL to pass above check for stray #
-                token = NULL;
+                next_last = NULL;
                 continue;
             }
             // FALL THROUGH
@@ -555,13 +585,13 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
     vec_t temp;
     vec_init(&temp, 0);
 
-    for (; vec_iter_has_next(&iter); cpp_iter_advance(&iter)) {
+    for (; vec_iter_has_next(&iter); cpp_iter_advance(&iter, false)) {
         token_t *token = vec_iter_get(&iter);
         vec_t *param_vec;
 
         if (token->type == HASH && macro_inst->macro->num_params != -1) {
             // Handle stringification
-            cpp_iter_advance(&iter);
+            cpp_iter_advance(&iter, true);
             token_t *param = vec_iter_get(&iter);
             if (param->type != ID ||
                 NULL == (param_vec =
@@ -574,7 +604,7 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
             token_t *stringified = cpp_stringify(cs, param_vec);
             cpp_stream_append(cs, &temp, stringified);
         } else if (token->type == HASHHASH) { // Concatenation
-            cpp_iter_advance(&iter);
+            cpp_iter_advance(&iter, true);
             token_t *next = vec_iter_get(&iter);
 
             if (next->type == ID &&
@@ -608,8 +638,8 @@ status_t cpp_substitute(cpp_state_t *cs, cpp_macro_inst_t *macro_inst,
                         NULL != (param_vec =
                                  cpp_macro_inst_lookup(macro_inst,
                                                        after_paste->id_name))) {
-                        cpp_iter_advance(&iter); // skip empty param
-                        cpp_iter_advance(&iter); // skip ##
+                        cpp_iter_advance(&iter, true); // skip empty param
+                        cpp_iter_advance(&iter, true); // skip ##
                         vec_append_vec(&temp, param_vec);
                     }
                 } else {
@@ -686,7 +716,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
     } else {
         if (!implicit_line) {
-            cpp_iter_advance(ts); // Skip the directive name
+            cpp_iter_advance(ts, true); // Skip the directive name
         }
         if (!cs->ignore || !dir->if_ignore) {
             status = dir->func(cs, ts, output);
@@ -694,6 +724,7 @@ status_t cpp_handle_directive(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         }
     }
 
+    cpp_iter_skip_space(ts);
     if (cpp_skip_line(ts, false) > 1) {
         if (!cs->ignore && dir != NULL && status == CCC_OK) {
             logger_log(mark, LOG_WARN, "extra tokens at end of #%s directive",
@@ -710,7 +741,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
     (void)cs;
     token_t *lparen = vec_iter_get(ts);
     assert(lparen->type == LPAREN);
-    cpp_iter_advance(ts);
+    cpp_iter_advance(ts, true);
 
     cpp_macro_t *macro = macro_inst->macro;
     assert(macro->num_params >= 0);
@@ -743,9 +774,8 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             ++num_params;
         }
 
-        // Use vec iter advance to preserve whitespace
         int parens = 0;
-        for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+        for (; vec_iter_has_next(ts); cpp_iter_advance(ts, false)) {
             token_t *token = vec_iter_get(ts);
             if (token->type == LPAREN) {
                 ++parens;
@@ -754,7 +784,7 @@ status_t cpp_fetch_macro_params(cpp_state_t *cs, vec_iter_t *ts,
             } else if (parens == 0) {
                 if (token->type == COMMA && !vararg) {
                     ++num_params;
-                    cpp_iter_advance(ts);
+                    cpp_iter_advance(ts, true);
                     break;
                 }
                 if (token->type == RPAREN) {
@@ -845,13 +875,16 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
     }
 
     token_t *rhead = vec_iter_get(right);
+    token_t *ltail = NULL;
+    while (vec_size(left) > 0) {
+        if ((ltail = vec_pop_back(left))->type != SPACE) {
+            break;
+        }
+    }
 
-    if (vec_size(left) == 0) {
+    if (ltail == NULL) {
         cpp_stream_append(cs, left, rhead);
     } else {
-        // Remove the last token of the left
-        token_t *ltail = vec_pop_back(left);
-
         // Combine right most left token and left most right token
         // Just print them and lex it into new tokens
         string_builder_t sb;
@@ -886,7 +919,7 @@ status_t cpp_glue(cpp_state_t *cs, vec_t *left, vec_iter_t *right,
     --nelems;
 
     while (nelems-- > 0) {
-        cpp_iter_advance(right);
+        cpp_iter_advance(right, false);
         if (!vec_iter_has_next(right)) {
             break;
         }

@@ -62,7 +62,7 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
     vec_t input;
     vec_init(&input, 0);
 
-    for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts, true)) {
         token_t *token = vec_iter_get(ts);
         if (token->type == NEWLINE) {
             break;
@@ -71,12 +71,12 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
         if (pp_if && token->type == ID) {
             // Handle defined operator
             if (strcmp(token->id_name, "defined") == 0) {
-                cpp_iter_advance(ts);
+                cpp_iter_advance(ts, true);
                 token = vec_iter_get(ts);
                 bool has_paren = false;
                 if (token->type == LPAREN) {
                     has_paren = true;
-                    cpp_iter_advance(ts);
+                    cpp_iter_advance(ts, true);
                     token = vec_iter_get(ts);
                 }
 
@@ -91,7 +91,7 @@ status_t cpp_expand_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output,
                 token = macro == NULL ? &token_int_zero : &token_int_one;
 
                 if (has_paren) {
-                    cpp_iter_advance(ts); // Get paren
+                    cpp_iter_advance(ts, true); // Get paren
                     token_t *next_token = vec_iter_get(ts);
                     if (next_token->type != RPAREN) {
                         logger_log(token->mark, LOG_ERR,
@@ -140,7 +140,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
 
     switch (token->type) {
     case STRING: // "filename"
-        cpp_iter_advance(&line_iter);
+        cpp_iter_advance(&line_iter, true);
         filename = token->str_val;
         status = cpp_include_helper(cs, mark, filename, false, output);
         break;
@@ -148,10 +148,10 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         string_builder_t sb;
         sb_init(&sb, 0);
 
-        // Don't use cpp_iter_advance, we want to preserve whitespace
         bool done = false;
-        vec_iter_advance(&line_iter);
-        for (; vec_iter_has_next(&line_iter); vec_iter_advance(&line_iter)) {
+        cpp_iter_advance(&line_iter, false);
+        for (; vec_iter_has_next(&line_iter);
+             cpp_iter_advance(&line_iter, false)) {
             token_t *token = vec_iter_get(&line_iter);
 
             if (token->type == NEWLINE) {
@@ -159,7 +159,7 @@ status_t cpp_dir_include(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
             }
             if (token->type == GT) {
                 done = true;
-                vec_iter_advance(&line_iter);
+                cpp_iter_advance(&line_iter, false);
                 break;
             }
 
@@ -268,30 +268,30 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
     macro->type = type;
 
     if (has_eq) {
-        cpp_iter_advance(ts);
+        cpp_iter_advance(ts, true);
         if ((token = vec_iter_get(ts))->type == EQ) {
-            vec_iter_advance(ts);
+            cpp_iter_advance(ts, false);
         }
     }
 
     // Don't want to skip spaces, because lparen must be right after macro name
-    vec_iter_advance(ts);
+    cpp_iter_advance(ts, false);
 
     if (vec_iter_has_next(ts) && (token = vec_iter_get(ts))->type == LPAREN) {
-        cpp_iter_advance(ts);
+        cpp_iter_advance(ts, true);
         macro->num_params = 0;
 
         bool done = false;
         bool first = true;
         bool vararg = false;
 
-        for (; vec_iter_has_next(ts); cpp_iter_advance(ts)) {
+        for (; vec_iter_has_next(ts); cpp_iter_advance(ts, true)) {
             token = vec_iter_get(ts);
             if (token->type == NEWLINE) {
                 break;
             }
             if (token->type == RPAREN) {
-                cpp_iter_advance(ts);
+                cpp_iter_advance(ts, true);
                 done = true;
                 break;
             }
@@ -305,7 +305,7 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
                     status = CCC_ESYNTAX;
                     goto fail;
                 }
-                cpp_iter_advance(ts);
+                cpp_iter_advance(ts, true);
                 token = vec_iter_get(ts);
             }
             if (token->type == ELIPSE) {
@@ -334,8 +334,7 @@ status_t cpp_define_helper(cpp_state_t *cs, vec_iter_t *ts,
 
     cpp_iter_skip_space(ts); // Skip space between header and body
 
-    // Don't use cpp_iter_advance, we want to preserve whitespace
-    for (; vec_iter_has_next(ts); vec_iter_advance(ts)) {
+    for (; vec_iter_has_next(ts); cpp_iter_advance(ts, false)) {
         token = vec_iter_get(ts);
         if (token->type == NEWLINE) {
             break;
@@ -368,6 +367,7 @@ status_t cpp_dir_undef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     (void)output;
     token_t *token = vec_iter_get(ts);
     VERIFY_TOK_ID(token);
+    cpp_iter_advance(ts, true);
 
     cpp_macro_t *macro = ht_remove(&cs->macros, &token->id_name);
     cpp_macro_destroy(macro);
@@ -383,7 +383,7 @@ status_t cpp_dir_ifdef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     } else {
         token_t *token = vec_iter_get(ts);
         VERIFY_TOK_ID(token);
-        cpp_iter_advance(ts);
+        cpp_iter_advance(ts, true);
 
         cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
         taken = macro != NULL;
@@ -399,7 +399,7 @@ status_t cpp_dir_ifndef(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
     } else {
         token_t *token = vec_iter_get(ts);
         VERIFY_TOK_ID(token);
-        cpp_iter_advance(ts);
+        cpp_iter_advance(ts, true);
 
         cpp_macro_t *macro = ht_lookup(&cs->macros, &token->id_name);
         taken = macro == NULL;

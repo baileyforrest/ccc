@@ -124,7 +124,7 @@ void cpp_macro_inst_destroy(cpp_macro_inst_t *macro_inst);
 
 void cpp_state_destroy(cpp_state_t *cs);
 
-token_t *cpp_iter_advance(vec_iter_t *iter);
+token_t *cpp_iter_advance(vec_iter_t *iter, bool skip_space);
 
 token_t *cpp_iter_lookahead(vec_iter_t *iter, size_t lookahead);
 
