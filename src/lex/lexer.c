@@ -524,16 +524,17 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
 
     result->int_params->int_val = lex_single_char(lexer, stream, type);
 
+    bool first = true;
     int cur = lex_getc_splice(stream);
-    if (cur != '\'') {
-        logger_log(result->mark, LOG_ERR,
-                   "Unexpected junk in character literal");
-        status = CCC_ESYNTAX;
-    }
-
-    // skip over junk in character literal
-    while (cur != '\'' && cur != EOF) {
+    while (cur != '\'' && cur != '\n' && cur != EOF) {
+        if (first) {
+            logger_log(result->mark, LOG_WARN,
+                       "multi-character character constant");
+        }
+        ts_ungetc(cur, stream);
+        result->int_params->int_val = lex_single_char(lexer, stream, type);
         cur = lex_getc_splice(stream);
+        first = false;
     }
 
     return status;
