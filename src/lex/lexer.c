@@ -60,12 +60,14 @@ status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result) {
     assert(result != NULL);
     status_t status = CCC_OK;
 
+    lex_state_t ls = { lexer, result };
+
     token_t *last = NULL;
     while (ts_peek(stream) != EOF) {
         token_t *token = token_create(lexer->token_man);
         token->start = ts_pos(stream);
 
-        if (CCC_OK != (status = lex_next_token(lexer, stream, token))) {
+        if (CCC_OK != (status = lex_next_token(&ls, stream, token))) {
             return status;
         }
         token->len = ts_pos(stream) - token->start;
@@ -109,14 +111,14 @@ int lex_getc_splice(tstream_t *stream) {
     }
 }
 
-status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
-    assert(lexer != NULL);
+status_t lex_next_token(lex_state_t *ls, tstream_t *stream, token_t *result) {
+    assert(ls != NULL);
     assert(stream != NULL);
     assert(result != NULL);
 
     status_t status = CCC_OK;
 
-    result->mark = fmark_man_insert(lexer->mark_man, &stream->mark);
+    result->mark = fmark_man_insert(ls->lexer->mark_man, &stream->mark);
     int cur = lex_getc_splice(stream);
 
     // Combine spaces
@@ -195,7 +197,7 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
         switch (next) {
         case ASCII_DIGIT:
             ts_ungetc(next, stream);
-            status = lex_number(lexer, stream, cur, result);
+            status = lex_number(ls, stream, cur, result);
             done = true;
             break;
         case '.':
@@ -309,15 +311,15 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
         switch (next) {
         case '"':
             cur = next;
-            status = lex_string(lexer, stream, result, LEX_STR_LCHAR);
+            status = lex_string(ls, stream, result, LEX_STR_LCHAR);
             break;
         case '\'':
             cur = next;
-            status = lex_char_lit(lexer, stream, result, LEX_STR_LCHAR);
+            status = lex_char_lit(ls, stream, result, LEX_STR_LCHAR);
             break;
         default:
             ts_ungetc(next, stream);
-            status = lex_id(lexer, stream, cur, result);
+            status = lex_id(ls, stream, cur, result);
         }
         break;
     case 'U':
@@ -363,17 +365,17 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
 
     case '$':
     case '_':
-        status = lex_id(lexer, stream, cur, result);
+        status = lex_id(ls, stream, cur, result);
         break;
 
     case '"': // String Literals
-        status = lex_string(lexer, stream, result, LEX_STR_CHAR);
+        status = lex_string(ls, stream, result, LEX_STR_CHAR);
         break;
     case '\'': // Character literals
-        status = lex_char_lit(lexer, stream, result, LEX_STR_CHAR);
+        status = lex_char_lit(ls, stream, result, LEX_STR_CHAR);
         break;
     case ASCII_DIGIT:
-        status = lex_number(lexer, stream, cur, result);
+        status = lex_number(ls, stream, cur, result);
         break;
     default:
         logger_log(result->mark, LOG_ERR, "Unexpected character: %c", cur);
@@ -383,8 +385,9 @@ status_t lex_next_token(lexer_t *lexer, tstream_t *stream, token_t *result) {
     return status;
 }
 
-status_t lex_id(lexer_t *lexer, tstream_t *stream, int cur, token_t *result) {
+status_t lex_id(lex_state_t *ls, tstream_t *stream, int cur, token_t *result) {
     status_t status = CCC_OK;
+    lexer_t *lexer = ls->lexer;
     sb_clear(&lexer->lexbuf);
 
     bool done = false;
@@ -408,8 +411,9 @@ status_t lex_id(lexer_t *lexer, tstream_t *stream, int cur, token_t *result) {
     return status;
 }
 
-char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
+char32_t lex_single_char(lex_state_t *ls, tstream_t *stream,
                          lex_str_type_t type) {
+    lexer_t *lexer = ls->lexer;
     int cur = lex_getc_splice(stream);
     if (cur != '\\') {
         return cur;
@@ -513,16 +517,17 @@ char32_t lex_single_char(lexer_t *lexer, tstream_t *stream,
     }
 }
 
-status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
+status_t lex_char_lit(lex_state_t *ls, tstream_t *stream, token_t *result,
                       lex_str_type_t type) {
     status_t status = CCC_OK;
+
     result->type = INTLIT;
     result->int_params = emalloc(sizeof(token_int_params_t));
     result->int_params->hasU = false;
     result->int_params->hasL = false;
     result->int_params->hasLL = false;
 
-    result->int_params->int_val = lex_single_char(lexer, stream, type);
+    result->int_params->int_val = lex_single_char(ls, stream, type);
 
     bool first = true;
     int cur = lex_getc_splice(stream);
@@ -532,7 +537,7 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
                        "multi-character character constant");
         }
         ts_ungetc(cur, stream);
-        result->int_params->int_val = lex_single_char(lexer, stream, type);
+        result->int_params->int_val = lex_single_char(ls, stream, type);
         cur = lex_getc_splice(stream);
         first = false;
     }
@@ -540,8 +545,9 @@ status_t lex_char_lit(lexer_t *lexer, tstream_t *stream, token_t *result,
     return status;
 }
 
-status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
+status_t lex_string(lex_state_t *ls, tstream_t *stream, token_t *result,
                     lex_str_type_t type) {
+    lexer_t *lexer = ls->lexer;
     // TODO2: Make sure wide character literals take up more space
     (void)type;
     status_t status = CCC_OK;
@@ -588,9 +594,10 @@ status_t lex_string(lexer_t *lexer, tstream_t *stream, token_t *result,
     return status;
 }
 
-status_t lex_number(lexer_t *lexer, tstream_t *stream, int cur,
+status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
                     token_t *result) {
     status_t status = CCC_OK;
+    lexer_t *lexer = ls->lexer;
 
     bool has_e = false;
     bool has_f = false;
