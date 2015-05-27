@@ -594,9 +594,11 @@ status_t cpp_dir_line(cpp_state_t *cs, vec_iter_t *ts, vec_t *output) {
         goto fail;
     }
 
-    for (size_t i = 0; i < vec_size(&line); ++i) {
-        token_t *token = vec_get(&line, i);
-        switch (i) {
+    vec_iter_t line_iter = { &line, 0 };
+    int num = 0;
+    for (; vec_iter_has_next(&line_iter); cpp_iter_advance(&line_iter, true)) {
+        token_t *token = vec_iter_get(&line_iter);
+        switch (num++) {
         case 0:
             if (token->type != INTLIT) {
                 logger_log(token->mark, LOG_ERR,
