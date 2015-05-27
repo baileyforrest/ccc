@@ -25,10 +25,10 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include "optman.h"
-#include "parse/ast.h"
-#include "parse/parser.h"
-#include "typecheck/typechecker.h"
+#include "ast/ast.h"
+#include "parse/parse.h"
+#include "top/optman.h"
+#include "typecheck/typecheck.h"
 #include "util/logger.h"
 
 #define DIR_ENTRY(directive, if_ignored) \

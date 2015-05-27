@@ -20,8 +20,8 @@
  * Type checker implementation
  */
 
-#include "typechecker.h"
-#include "typechecker_priv.h"
+#include "typecheck.h"
+#include "typecheck_priv.h"
 
 #include <assert.h>
 #include <stdio.h>

@@ -25,7 +25,7 @@
 
 #include <stdbool.h>
 
-#include "parse/ast.h"
+#include "ast/ast.h"
 
 /**
  * Typecheck an ast. Error and warnings will be sent to the logger.

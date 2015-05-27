@@ -23,13 +23,10 @@
 #ifndef _MANAGER_H_
 #define _MANAGER_H_
 
+#include "ast/ast.h"
 #include "ir/ir.h"
-
-#include "lex/lexer.h"
+#include "lex/lex.h"
 #include "lex/symtab.h"
-
-#include "parse/ast.h"
-
 #include "util/status.h"
 
 /**

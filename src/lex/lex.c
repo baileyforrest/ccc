@@ -20,8 +20,8 @@
  * Lexer implementation
  */
 // TODO2: Support unicode literals
-#include "lexer.h"
-#include "lexer_priv.h"
+#include "lex.h"
+#include "lex_priv.h"
 
 #include <stdio.h>
 

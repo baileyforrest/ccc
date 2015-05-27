@@ -24,7 +24,7 @@
 #ifndef _AST_H_
 #define _AST_H_
 
-#include "parse/type_table.h"
+#include "ast/type_table.h"
 
 #include <stdarg.h>
 
@@ -70,7 +70,7 @@ typedef struct ir_label_t ir_label_t;
      (test)->type == STMT_DEFAULT ? (test)->default_params.stmt :   \
      (test)->type == STMT_LABEL ? (test)->label.stmt : NULL)
 
-// TODO: Replace this idiom in the code with this
+// TODO1: Replace this idiom in the code with this
 #define DECL_TYPE(decl) \
     (sl_head(&decl->decls) == NULL ? \
      decl->type : ((decl_node_t *)sl_head(&decl->decls))->type)

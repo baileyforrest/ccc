@@ -17,35 +17,16 @@
  * along with CCC.  If not, see <http://www.gnu.org/licenses/>.
  */
 /**
- * Parser Interface
+ * AST to IR translator interface
  */
 
-#ifndef _PARSER_H_
-#define _PARSER_H_
+#ifndef _TRANSLATOR_H_
+#define _TRANSLATOR_H_
 
-#include "parse/ast.h"
-#include "parse/type_table.h"
+#include "ast/ast.h"
+#include "ir/ir.h"
+#include "util/status.h"
 
-#include "util/vector.h"
+ir_trans_unit_t *trans_translate(trans_unit_t *ast);
 
-/**
- * Parses input from a lexer into an AST
- *
- * @param tokens Token stream
- * @param result The parsed AST
- * @return CCC_OK on success, error code on error
- */
-status_t parser_parse(vec_t *tokens, trans_unit_t **result);
-
-/**
- * Parses input from a lexer into an expression
- *
- * @param tokens Token stream
- * @param tunit Dummy tranlation unit
- * @param result The parsed expression
- * @return CCC_OK on success, error code on error
- */
-status_t parser_parse_expr(vec_t *tokens, trans_unit_t *tunit,
-                           expr_t **result);
-
-#endif /* _PARSER_H_ */
+#endif /* _TRANSLATOR_H_ */

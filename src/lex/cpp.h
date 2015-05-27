@@ -23,9 +23,8 @@
 #ifndef _CPP_H_
 #define _CPP_H_
 
-#include "lex/lexer.h"
+#include "lex/lex.h"
 #include "lex/token.h"
-
 #include "util/vector.h"
 
 typedef struct cpp_macro_t cpp_macro_t;

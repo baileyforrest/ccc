@@ -20,15 +20,15 @@
  * AST to IR translator implementation
  */
 
-#include "translator.h"
-#include "translator_priv.h"
+#include "trans.h"
+#include "trans_priv.h"
 
 #include <assert.h>
 
 #include "util/util.h"
 #include "util/string_store.h"
 
-#include "typecheck/typechecker.h"
+#include "typecheck/typecheck.h"
 
 #define MAX_NUM_LEN 21
 
@@ -1276,6 +1276,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
         break;
     }
+    case EXPR_VA_START:
+    case EXPR_VA_ARG:
+    case EXPR_VA_END:
+    case EXPR_VA_COPY:
     case EXPR_DESIG_INIT:
     default:
         assert(false);

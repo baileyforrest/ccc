@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "optman.h"
+#include "top/optman.h"
 
 void logger_log_line(fmark_t *mark);
 

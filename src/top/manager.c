@@ -24,14 +24,12 @@
 
 #include <assert.h>
 
-#include "ir/translator.h"
-
+#include "ast/ast.h"
 #include "lex/cpp.h"
-#include "lex/lexer.h"
+#include "lex/lex.h"
 #include "lex/symtab.h"
-
-#include "parse/ast.h"
-#include "parse/parser.h"
+#include "trans/trans.h"
+#include "parse/parse.h"
 
 void man_init(manager_t *manager) {
     assert(manager != NULL);

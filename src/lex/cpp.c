@@ -18,6 +18,9 @@
  */
 /**
  * C preprocessor implementation
+ *
+ * The algorithm used is from here:
+ * http://www.spinellis.gr/blog/20060626/cpp.algo.pdf
  */
 
 #include "cpp.h"
@@ -27,10 +30,10 @@
 #include <assert.h>
 #include <time.h>
 
-#include "optman.h"
 #include "util/logger.h"
 #include "util/string_store.h"
 #include "util/file_directory.h"
+#include "top/optman.h"
 
 #define VARARG_NAME "__VA_ARGS__"
 #define TIME_DATE_BUF_SZ 128

@@ -23,7 +23,7 @@
 #ifndef _LEXER_PRIV_H_
 #define _LEXER_PRIV_H_
 
-#include "lexer.h"
+#include "lex.h"
 
 #include <uchar.h>
 

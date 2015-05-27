@@ -30,21 +30,18 @@
  */
 // TODO1: Use TYPE_TYPEDEF only if print ast mode is on
 
-#include "parser.h"
-#include "parser_priv.h"
+#include "parse.h"
+#include "parse_priv.h"
 
 #include <assert.h>
 #include <stdlib.h>
 #include <limits.h>
 
-#include "optman.h"
-
 #include "lex/symtab.h"
-
+#include "top/optman.h"
+#include "typecheck/typecheck.h"
 #include "util/htable.h"
 #include "util/logger.h"
-
-#include "typecheck/typechecker.h"
 
 status_t parser_parse(vec_t *tokens, trans_unit_t **result) {
     assert(tokens != NULL);

@@ -29,19 +29,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "ast/ast.h"
+#include "ir/ir.h"
 #include "manager.h"
 #include "optman.h"
-
-#include "ir/ir.h"
-
-#include "parse/ast.h"
-
 #include "util/file_directory.h"
 #include "util/logger.h"
 #include "util/tempfile.h"
 #include "util/string_store.h"
-
-#include "typecheck/typechecker.h"
+#include "typecheck/typecheck.h"
 
 #define LLVM_EXT "ll"
 #define ASM_EXT "s"

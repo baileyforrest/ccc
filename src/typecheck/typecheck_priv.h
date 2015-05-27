@@ -23,7 +23,7 @@
 #ifndef _TYPECHECKER_PRIV_H_
 #define _TYPECHECKER_PRIV_H_
 
-#include "typechecker.h"
+#include "typecheck.h"
 
 #define TC_CONST true
 #define TC_NOCONST false
