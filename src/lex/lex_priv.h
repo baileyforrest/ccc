@@ -20,8 +20,8 @@
  * Lexer private interface
  */
 
-#ifndef _LEXER_PRIV_H_
-#define _LEXER_PRIV_H_
+#ifndef _LEX_PRIV_H_
+#define _LEX_PRIV_H_
 
 #include "lex.h"
 
@@ -69,4 +69,4 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
                     token_t *result);
 
 
-#endif /* _LEXER_PRIV_H_ */
+#endif /* _LEX_PRIV_H_ */

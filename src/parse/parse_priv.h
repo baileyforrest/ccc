@@ -20,8 +20,8 @@
  * Parser private interface
  */
 
-#ifndef _PARSER_PRIV_H_
-#define _PARSER_PRIV_H_
+#ifndef _PARSE_PRIV_H_
+#define _PARSE_PRIV_H_
 
 #include "util/status.h"
 #include "ast/type_table.h"
@@ -578,4 +578,4 @@ status_t par_compound_statement(lex_wrap_t *lex, stmt_t **result);
 status_t par_expression_statement(lex_wrap_t *lex, stmt_t **result);
 
 
-#endif /* _PARSER_PRIV_H_ */
+#endif /* _PARSE_PRIV_H_ */

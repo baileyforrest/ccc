@@ -20,8 +20,8 @@
  * Lexer interface
  */
 
-#ifndef _LEXER_H_
-#define _LEXER_H_
+#ifndef _LEX_H_
+#define _LEX_H_
 
 #include "lex/symtab.h"
 #include "util/string_builder.h"
@@ -63,4 +63,4 @@ void lexer_destroy(lexer_t *lexer);
  */
 status_t lexer_lex_stream(lexer_t *lexer, tstream_t *stream, vec_t *result);
 
-#endif /* _LEXER_H_ */
+#endif /* _LEX_H_ */

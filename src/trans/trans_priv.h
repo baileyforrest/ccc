@@ -20,8 +20,8 @@
  * AST to IR translator private interface
  */
 
-#ifndef _TRANSLATOR_PRIV_H
-#define _TRANSLATOR_PRIV_H
+#ifndef _TRANS_PRIV_H
+#define _TRANS_PRIV_H
 
 #include "ir/ir.h"
 
@@ -146,4 +146,4 @@ ir_expr_t *trans_compound_literal(trans_state_t *ts, bool addrof,
                                   expr_t *expr);
 
 
-#endif /* _TRANSLATOR_PRIV_H */
+#endif /* _TRANS_PRIV_H */

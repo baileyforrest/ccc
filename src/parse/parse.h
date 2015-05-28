@@ -20,8 +20,8 @@
  * Parser Interface
  */
 
-#ifndef _PARSER_H_
-#define _PARSER_H_
+#ifndef _PARSE_H_
+#define _PARSE_H_
 
 #include "ast/ast.h"
 #include "ast/type_table.h"
@@ -48,4 +48,4 @@ status_t parser_parse(vec_t *tokens, trans_unit_t **result);
 status_t parser_parse_expr(vec_t *tokens, trans_unit_t *tunit,
                            expr_t **result);
 
-#endif /* _PARSER_H_ */
+#endif /* _PARSE_H_ */

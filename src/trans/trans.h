@@ -20,8 +20,8 @@
  * AST to IR translator interface
  */
 
-#ifndef _TRANSLATOR_H_
-#define _TRANSLATOR_H_
+#ifndef _TRANS_H_
+#define _TRANS_H_
 
 #include "ast/ast.h"
 #include "ir/ir.h"
@@ -29,4 +29,4 @@
 
 ir_trans_unit_t *trans_translate(trans_unit_t *ast);
 
-#endif /* _TRANSLATOR_H_ */
+#endif /* _TRANS_H_ */
