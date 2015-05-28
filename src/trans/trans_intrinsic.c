@@ -21,6 +21,7 @@
  */
 
 #include "trans_intrinsic.h"
+#include "trans_type.h"
 
 #define LLVM_MEMCPY "llvm.memcpy.p0i8.p0i8.i64"
 

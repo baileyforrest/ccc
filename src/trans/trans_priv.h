@@ -27,6 +27,8 @@
 
 #include "ir/ir.h"
 
+#define MAX_GLOBAL_NAME 128
+
 typedef struct trans_state_t {
     typetab_t *typetab;
     trans_unit_t *ast_tunit;
@@ -60,88 +62,21 @@ ir_expr_t *trans_assign_temp(trans_state_t *ts, ir_inst_stream_t *stream,
 ir_expr_t *trans_load_temp(trans_state_t *ts, ir_inst_stream_t *stream,
                            ir_expr_t *expr);
 
-ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
-
-void trans_gdecl_node(trans_state_t *ts, decl_node_t *node);
-
-void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
-
-// Returns true if the statement always jumps, false otherwise
-bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts);
-
-ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
-                      ir_inst_stream_t *ir_stmts);
-
-ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
-                           ir_inst_stream_t *ir_stmts);
-
-ir_expr_t *trans_binop(trans_state_t *ts, expr_t *left, ir_expr_t *left_addr,
-                       expr_t *right, oper_t op, type_t *type,
-                       ir_inst_stream_t *ir_stmts, ir_expr_t **left_loc);
-
-ir_expr_t *trans_unaryop(trans_state_t *ts, bool addrof, expr_t *expr,
-                         ir_inst_stream_t *ir_stmts);
-
-
-ir_expr_t *trans_type_conversion(trans_state_t *ts, type_t *dest, type_t *src,
-                                 ir_expr_t *src_expr,
-                                 ir_inst_stream_t *ir_stmts);
-
-ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
-                                    bool dest_signed, ir_type_t *src_type,
-                                    bool src_signed, ir_expr_t *src_expr,
-                                    ir_inst_stream_t *ir_stmts);
-
-
-ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
-                        type_t *dest_type, ir_expr_t *src, type_t *src_type,
-                        ir_inst_stream_t *ir_stmts);
-
-char *trans_decl_node_name(ir_symtab_t *symtab, char *name);
-
-typedef enum ir_decl_node_type_t {
-    IR_DECL_NODE_GLOBAL,
-    IR_DECL_NODE_LOCAL,
-    IR_DECL_NODE_FDEFN,
-    IR_DECL_NODE_FUNC_PARAM,
-} ir_decl_node_type_t;
-
-ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
-                           ir_decl_node_type_t type, void *context);
-
-// If val is NULL, then a "zero" value will be substituted instead
-void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                       type_t *ast_type, ir_type_t *ir_type, ir_expr_t *addr,
-                       expr_t *val);
-
-ir_type_t *trans_type(trans_state_t *ts, type_t *type);
-
-ir_oper_t trans_op(oper_t op);
-
 ir_expr_t *trans_create_anon_global(trans_state_t *ts, ir_type_t *type,
                                     ir_expr_t *init, size_t align,
                                     ir_linkage_t linkage,
                                     ir_gdata_flags_t flags);
 
-ir_expr_t *trans_string(trans_state_t *ts, char *str);
-
-ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);
-
-ir_expr_t *trans_union_init(trans_state_t *ts, type_t *type, expr_t *expr);
-
-ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr);
-
-void trans_struct_init_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                              type_t *ast_type, ir_type_t *ir_type,
-                              ir_expr_t *addr, expr_t *val, ir_type_t *ptr_type,
-                              sl_link_t **cur_expr, size_t offset);
-
 bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
                              slist_t *indexs);
 
-ir_expr_t *trans_compound_literal(trans_state_t *ts, bool addrof,
-                                  ir_inst_stream_t *ir_stmts,
-                                  expr_t *expr);
 
+
+ir_trans_unit_t *trans_trans_unit(trans_state_t *ts, trans_unit_t *ast);
+
+void trans_gdecl(trans_state_t *ts, gdecl_t *gdecl, slist_t *ir_gdecls);
+
+// Returns true if the statement always jumps, false otherwise
+bool trans_stmt(trans_state_t *ts, stmt_t *stmt, ir_inst_stream_t *ir_stmts);
 
 #endif /* _TRANS_PRIV_H */
