@@ -23,6 +23,8 @@
 #ifndef _TRANS_PRIV_H
 #define _TRANS_PRIV_H
 
+#include "trans.h"
+
 #include "ir/ir.h"
 
 typedef struct trans_state_t {
@@ -133,10 +135,6 @@ void trans_struct_init_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                               type_t *ast_type, ir_type_t *ir_type,
                               ir_expr_t *addr, expr_t *val, ir_type_t *ptr_type,
                               sl_link_t **cur_expr, size_t offset);
-
-void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                  ir_expr_t *dest, ir_expr_t *src, size_t len,
-                  size_t align, bool isvolatile);
 
 bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
                              slist_t *indexs);
