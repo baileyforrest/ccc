@@ -25,8 +25,18 @@
 
 #include "trans/trans_priv.h"
 
+ir_symtab_entry_t *trans_intrinsic_register(trans_state_t *ts,
+                                            ir_type_t *func_type,
+                                            char *func_name);
+
+ir_expr_t *trans_intrinsic_call(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                                ir_symtab_entry_t *func);
+
 void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                   ir_expr_t *dest, ir_expr_t *src, size_t len,
                   size_t align, bool isvolatile);
+
+void trans_va_start(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                    expr_t *va_list);
 
 #endif /* _TRANS_INTRINSIC_H_ */
