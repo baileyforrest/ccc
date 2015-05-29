@@ -26,6 +26,8 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include "util/iee754.h"
+
 #define INDENT "    "
 #define DATALAYOUT "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 #define TRIPLE "x86_64-unknown-linux-gnu"
@@ -245,35 +247,26 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
             // values that can be represented
             switch (expr->const_params.type->float_params.type) {
             case IR_FLOAT_FLOAT: {
-                // TODO1: This isn't portable
+                iee754_parts_t parts;
+                iee754_f32_decompose((float)expr->const_params.float_val,
+                                     &parts);
                 union {
-                    float f;
-                    uint32_t i;
-                } converter = { (float)expr->const_params.float_val };
-                uint32_t fval = converter.i;
+                    double d;
+                    uint64_t i;
+                } converter = { iee754_f64_construct(&parts) };
 
-                uint64_t dval = 0UL;
-
-                if (fval & (1UL << 31)) { // Sign bit
-                    dval |= (1UL << 63);
-                }
-
-                // Exponent
-                int fexp = ((fval >> 23) & 0xff) - 127; // remove 32 bit bias
-                uint64_t dexp = fexp + 1023; // Add 64 bit bias
-
-                dval |= dexp << 52;
-
-                // Mantissa
-                uint64_t fman = fval & 0x7fffff;
-                dval |= (fman << (52 - 23));
-
-                fprintf(stream, "0x%lx", dval);
+                fprintf(stream, "0x%lX", converter.i);
                 break;
             }
-            case IR_FLOAT_DOUBLE:
-                fprintf(stream, "%f", (double)expr->const_params.float_val);
+            case IR_FLOAT_DOUBLE: {
+                union {
+                    double d;
+                    uint64_t i;
+                } converter = { (double)expr->const_params.float_val };
+
+                fprintf(stream, "0x%lX", converter.i);
                 break;
+            }
             case IR_FLOAT_X86_FP80:
                 fprintf(stream, "%Lf",
                         (long double)expr->const_params.float_val);
