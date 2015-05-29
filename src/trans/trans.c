@@ -25,8 +25,6 @@
 
 #include "trans_decl.h"
 #include "trans_expr.h"
-#include "trans_init.h"
-#include "trans_intrinsic.h"
 #include "trans_type.h"
 
 #include <assert.h>

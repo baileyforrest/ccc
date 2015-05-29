@@ -21,12 +21,10 @@
  */
 
 #include "trans_intrinsic.h"
+#include "trans_intrinsic_priv.h"
 
 #include "trans_expr.h"
 #include "trans_type.h"
-
-#define LLVM_MEMCPY "llvm.memcpy.p0i8.p0i8.i64"
-#define LLVM_VA_START "llvm.va_start"
 
 ir_symtab_entry_t *trans_intrinsic_register(trans_state_t *ts,
                                             ir_type_t *func_type,
@@ -112,12 +110,20 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 }
 
 void trans_va_start(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                    expr_t *va_list) {
-    ir_expr_t *ir_expr = trans_expr(ts, true, va_list, ir_stmts);
-    ir_expr = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
-                                       ir_expr_type(ir_expr), false,
-                                       ir_expr, ir_stmts);
-    char *func_name = LLVM_VA_START;
+                    ir_expr_t *va_list) {
+    return trans_va_start_end_helper(ts, ir_stmts, va_list, LLVM_VA_START);
+}
+
+void trans_va_end(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                  ir_expr_t *va_list) {
+    return trans_va_start_end_helper(ts, ir_stmts, va_list, LLVM_VA_END);
+}
+
+void trans_va_start_end_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                               ir_expr_t *va_list, char *func_name) {
+    ir_expr_t *ir_expr = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                                  ir_expr_type(va_list), false,
+                                                  va_list, ir_stmts);
 
     // Lazily create the function declaration and object
     ir_symtab_entry_t *func = ir_symtab_lookup(&ts->tunit->globals, func_name);
@@ -134,4 +140,35 @@ void trans_va_start(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
     ir_expr_t *call = trans_intrinsic_call(ts, ir_stmts, func);
 
     sl_append(&call->call.arglist, &ir_expr->link);
+}
+
+void trans_va_copy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                   ir_expr_t *dest, ir_expr_t *src) {
+    dest = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                    ir_expr_type(dest), false,
+                                    dest, ir_stmts);
+
+    src = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                   ir_expr_type(src), false,
+                                   src, ir_stmts);
+
+    char *func_name = LLVM_VA_COPY;
+
+    // Lazily create the function declaration and object
+    ir_symtab_entry_t *func = ir_symtab_lookup(&ts->tunit->globals, func_name);
+    if (func == NULL) {
+        ir_type_t *func_type = ir_type_create(ts->tunit, IR_TYPE_FUNC);
+        func_type->func.type = &ir_type_void;
+        func_type->func.varargs = false;
+        vec_push_back(&func_type->func.params, &ir_type_i8_ptr);
+        vec_push_back(&func_type->func.params, &ir_type_i8_ptr);
+
+        func = trans_intrinsic_register(ts, func_type, func_name);
+    }
+    assert(func->type == IR_SYMTAB_ENTRY_VAR);
+
+    ir_expr_t *call = trans_intrinsic_call(ts, ir_stmts, func);
+
+    sl_append(&call->call.arglist, &dest->link);
+    sl_append(&call->call.arglist, &src->link);
 }

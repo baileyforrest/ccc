@@ -23,6 +23,7 @@
 #include "trans_expr.h"
 
 #include "trans_decl.h"
+#include "trans_intrinsic.h"
 #include "trans_init.h"
 #include "trans_type.h"
 
@@ -493,10 +494,23 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
         break;
     }
-    case EXPR_VA_START:
+    case EXPR_VA_START: {
+        ir_expr_t *ir_expr = trans_expr(ts, true, expr->vastart.ap, ir_stmts);
+        trans_va_start(ts, ir_stmts, ir_expr);
+        return NULL;
+    }
+    case EXPR_VA_END: {
+        ir_expr_t *ir_expr = trans_expr(ts, true, expr->vaend.ap, ir_stmts);
+        trans_va_end(ts, ir_stmts, ir_expr);
+        return NULL;
+    }
+    case EXPR_VA_COPY: {
+        ir_expr_t *dest = trans_expr(ts, true, expr->vacopy.dest, ir_stmts);
+        ir_expr_t *src = trans_expr(ts, true, expr->vacopy.src, ir_stmts);
+        trans_va_copy(ts, ir_stmts, dest, src);
+        return NULL;
+    }
     case EXPR_VA_ARG:
-    case EXPR_VA_END:
-    case EXPR_VA_COPY:
     case EXPR_DESIG_INIT:
     default:
         assert(false);

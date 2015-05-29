@@ -20,22 +20,24 @@
  * LLVM intrinsic translator implementations
  */
 
-#ifndef _TRANS_INTRINSIC_H_
-#define _TRANS_INTRINSIC_H_
+#ifndef _TRANS_INTRINSIC_PRIV_H_
+#define _TRANS_INTRINSIC_PRIV_H_
 
-#include "trans/trans_priv.h"
+#include "trans_intrinsic.h"
 
-void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                  ir_expr_t *dest, ir_expr_t *src, size_t len,
-                  size_t align, bool isvolatile);
+#define LLVM_MEMCPY "llvm.memcpy.p0i8.p0i8.i64"
+#define LLVM_VA_START "llvm.va_start"
+#define LLVM_VA_END "llvm.va_end"
+#define LLVM_VA_COPY "llvm.va_copy"
 
-void trans_va_start(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                    ir_expr_t *va_list);
+ir_symtab_entry_t *trans_intrinsic_register(trans_state_t *ts,
+                                            ir_type_t *func_type,
+                                            char *func_name);
 
-void trans_va_end(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                  ir_expr_t *va_list);
+ir_expr_t *trans_intrinsic_call(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                                ir_symtab_entry_t *func);
 
-void trans_va_copy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                   ir_expr_t *dest, ir_expr_t *src);
+void trans_va_start_end_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                               ir_expr_t *va_list, char *func_name);
 
-#endif /* _TRANS_INTRINSIC_H_ */
+#endif /* _TRANS_INTRINSIC_PRIV_H_ */
