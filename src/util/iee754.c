@@ -55,11 +55,39 @@ void iee754_f32_decompose(float f, iee754_parts_t *parts) {
         (64 - IEE754_F32_MANT_BITS);
 }
 
-void iee754_f64_decompose(double f, iee754_parts_t *parts);
+void iee754_f64_decompose(double f, iee754_parts_t *parts) {
+    union {
+        double f;
+        uint64_t i;
+    } converter = { f };
+
+    parts->sign = converter.i >> (IEE754_F64_BITS - 1);
+
+    parts->exp = (int64_t)((converter.i >> IEE754_F64_MANT_BITS) &
+                  ((1 << IEE754_F64_EXP_BITS) - 1)) - IEE754_F64_EXP_BIAS;
+
+    parts->mantissa =
+        (uint64_t)(converter.i & ((1ULL << IEE754_F64_MANT_BITS) - 1)) <<
+        (64 - IEE754_F64_MANT_BITS);
+}
 
 void iee754_f80_decompose(long double f, iee754_parts_t *parts);
 
-float iee754_f32_construct(iee754_parts_t *parts);
+float iee754_f32_construct(iee754_parts_t *parts) {
+    union {
+        uint32_t i;
+        float f;
+    } converter = { 0 };
+
+    if (parts->sign) {
+        converter.i |= 1ULL << (IEE754_F32_BITS - 1);
+    }
+
+    converter.i |= (parts->exp + IEE754_F32_EXP_BIAS) << IEE754_F32_MANT_BITS;
+    converter.i |= parts->mantissa >> (32 - IEE754_F32_MANT_BITS);
+
+    return converter.f;
+}
 
 double iee754_f64_construct(iee754_parts_t *parts) {
     union {

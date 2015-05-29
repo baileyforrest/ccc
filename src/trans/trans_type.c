@@ -189,7 +189,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     case TYPE_LONG_LONG:   return &ir_type_i64;
     case TYPE_FLOAT:       return &ir_type_float;
     case TYPE_DOUBLE:      return &ir_type_double;
-    case TYPE_LONG_DOUBLE: return &ir_type_double;
+    case TYPE_LONG_DOUBLE: return &ir_type_x86_fp80;
     case TYPE_ENUM:        return &ir_type_i32;
 
     case TYPE_TYPEDEF:     return trans_type(ts, type->typedef_params.base);

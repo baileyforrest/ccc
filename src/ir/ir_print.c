@@ -267,10 +267,17 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
                 fprintf(stream, "0x%lX", converter.i);
                 break;
             }
-            case IR_FLOAT_X86_FP80:
-                fprintf(stream, "%Lf",
-                        (long double)expr->const_params.float_val);
+            case IR_FLOAT_X86_FP80: {
+                union {
+                    uint64_t i[2];
+                    long double f;
+                } converter = { { 0, 0 } };
+                converter.f = expr->const_params.float_val;
+
+                fprintf(stream, "0xK%lX", converter.i[1]);
+                fprintf(stream, "%lX", converter.i[0]);
                 break;
+            }
             default:
                 assert(false);
             }
