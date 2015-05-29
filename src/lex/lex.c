@@ -695,7 +695,7 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
             break;
         case '+':
         case '-':
-            if (last == 'e' || last == 'E') {
+            if (last == 'e' || last == 'E' || last =='p' || last == 'P') {
                 break;
             }
             // FALL THROUGH
@@ -709,7 +709,8 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
         }
     }
 
-    bool is_float = has_e || (dot_off != (size_t)-1) || has_f;
+    bool is_float = has_e || (dot_off != (size_t)-1) || has_f ||
+        p_off != (size_t)-1;
 
     if ((is_float && (has_u || has_ll || (is_hex && p_off == (size_t)-1))) ||
         (!is_float && p_off != (size_t)-1)) {
@@ -743,10 +744,10 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
     char *end;
     errno = 0;
     if (is_float && is_hex) {
-        assert(p_off != (size_t)-1 && dot_off != (size_t)-1);
+        assert(p_off != (size_t)-1);
 
-        char *dot_loc = buf + dot_off;
         char *p_loc = buf + p_off;
+        char *dot_loc = dot_off == (size_t)-1 ? p_loc : buf + dot_off;
         result->type = FLOATLIT;
         result->float_params = emalloc(sizeof(token_float_params_t));
         result->float_params->hasF = has_f;
@@ -763,8 +764,8 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
         }
         if (errno == 0 && end == dot_loc) {
             long long frac;
-            if (dot_loc + 1 == p_loc) {
-                // account for 0xNN.pN
+            if (dot_loc + 1 == p_loc || dot_loc == p_loc) {
+                // account for 0xNN.pN and 0xNNpN
                 frac = 0;
                 end = p_loc;
             } else {
