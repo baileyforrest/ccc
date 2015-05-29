@@ -291,9 +291,9 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
 
         SL_FOREACH(cur, &type->func.params) {
             decl_t *decl = GET_ELEM(&type->func.params, cur);
-            decl_node_t *node = sl_head(&decl->decls);
-            type_t *ptype = node == NULL ? decl->type : node->type;
+            type_t *ptype = DECL_TYPE(decl);
             ir_type_t *param_type = trans_type(ts, ptype);
+
             vec_push_back(&ir_type->func.params, param_type);
         }
 
@@ -343,7 +343,10 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         id_gdecl->id_struct.type = ir_type;
         sl_append(&ts->tunit->id_structs, &id_gdecl->link);
 
-        return ts->va_type = id_type;
+        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ptr_type->ptr.base = id_type;
+
+        return ts->va_type = ptr_type;
     }
     default:
         assert(false);

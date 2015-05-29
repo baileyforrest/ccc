@@ -495,30 +495,30 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         break;
     }
     case EXPR_VA_START: {
-        ir_expr_t *ir_expr = trans_expr(ts, true, expr->vastart.ap, ir_stmts);
+        ir_expr_t *ir_expr = trans_expr(ts, false, expr->vastart.ap, ir_stmts);
         trans_va_start(ts, ir_stmts, ir_expr);
         return NULL;
     }
     case EXPR_VA_END: {
-        ir_expr_t *ir_expr = trans_expr(ts, true, expr->vaend.ap, ir_stmts);
+        ir_expr_t *ir_expr = trans_expr(ts, false, expr->vaend.ap, ir_stmts);
         trans_va_end(ts, ir_stmts, ir_expr);
         return NULL;
     }
     case EXPR_VA_COPY: {
-        ir_expr_t *dest = trans_expr(ts, true, expr->vacopy.dest, ir_stmts);
-        ir_expr_t *src = trans_expr(ts, true, expr->vacopy.src, ir_stmts);
+        ir_expr_t *dest = trans_expr(ts, false, expr->vacopy.dest, ir_stmts);
+        ir_expr_t *src = trans_expr(ts, false, expr->vacopy.src, ir_stmts);
         trans_va_copy(ts, ir_stmts, dest, src);
         return NULL;
     }
     case EXPR_VA_ARG: {
-        ir_expr_t *va_list = trans_expr(ts, true, expr->vaarg.ap, ir_stmts);
-        va_list = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
-                                           ir_expr_type(va_list), false,
-                                           va_list, ir_stmts);
+        ir_expr_t *ap = trans_expr(ts, false, expr->vaarg.ap, ir_stmts);
+        ap = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                      ir_expr_type(ap), false,
+                                      ap, ir_stmts);
         type_t *ast_type = DECL_TYPE(expr->vaarg.type);
         ir_type_t *type = trans_type(ts, ast_type);
         ir_expr_t *result = ir_expr_create(ts->tunit, IR_EXPR_VAARG);
-        result->vaarg.va_list = va_list;
+        result->vaarg.va_list = ap;
         result->vaarg.arg_type = type;
         return trans_assign_temp(ts, ir_stmts, result);
     }

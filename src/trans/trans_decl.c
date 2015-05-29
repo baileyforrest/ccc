@@ -229,12 +229,53 @@ ir_type_t *trans_decl_node(trans_state_t *ts, decl_node_t *node,
         var_expr->var.name = trans_decl_node_name(symtab, node->id);
         var_expr->var.local = true;
 
-        // Have to allocate variable on the stack
-        ir_expr_t *src = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
-        src->alloca.type = ptr_type;
-        src->alloca.elem_type = var_expr->var.type->ptr.base;
-        src->alloca.nelem_type = NULL;
-        src->alloca.align = ast_type_align(node_type);
+        ir_expr_t *src;
+        if (node_type->type == TYPE_VA_LIST) {
+            // TODO1: Something similar to this is needed for the global
+            // case, possibly move this to a function
+            // va lists need to be handled separately
+            var_expr->var.type = expr_type;
+
+            assert(expr_type->type == IR_TYPE_PTR);
+
+            // Allocate the actual va_list, then set the variable's value to
+            // the allocated object
+            ir_type_t *va_tag_type = expr_type->ptr.base;
+            ir_type_t *arr_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+            arr_type->arr.elem_type = va_tag_type;
+            arr_type->arr.nelems = 1;
+            ir_type_t *p_arr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            p_arr_type->ptr.base = arr_type;
+
+            ir_expr_t *alloc = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
+            alloc->alloca.type = p_arr_type;
+            alloc->alloca.elem_type = arr_type;
+            alloc->alloca.nelem_type = NULL;
+            alloc->alloca.align = ast_type_align(node_type);
+
+            ir_expr_t *temp = trans_temp_create(ts, expr_type);
+            ir_stmt_t *assign = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
+            assign->assign.dest = temp;
+            assign->assign.src = alloc;
+            trans_add_stmt(ts, &ts->func->func.prefix, assign);
+
+            src = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+            src->getelemptr.type = expr_type;
+            src->getelemptr.ptr_type = p_arr_type;
+            src->getelemptr.ptr_val = temp;
+
+            ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+            sl_append(&src->getelemptr.idxs, &zero->link);
+            zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+            sl_append(&src->getelemptr.idxs, &zero->link);
+        } else {
+            // Have to allocate variable on the stack
+            src = ir_expr_create(ts->tunit, IR_EXPR_ALLOCA);
+            src->alloca.type = ptr_type;
+            src->alloca.elem_type = var_expr->var.type->ptr.base;
+            src->alloca.nelem_type = NULL;
+            src->alloca.align = ast_type_align(node_type);
+        }
 
         // Assign the named variable to the allocation
         ir_stmt_t *stmt = ir_stmt_create(ts->tunit, IR_STMT_ASSIGN);
