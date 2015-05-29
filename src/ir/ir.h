@@ -299,8 +299,7 @@ struct ir_expr_t {
         } call;
 
         struct {
-            ir_type_t *va_list_type;
-            slist_t arglist; /**< (ir_expr_t) */
+            ir_expr_t *va_list;
             ir_type_t *arg_type;
         } vaarg;
     };

@@ -111,12 +111,12 @@ void trans_memcpy(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
 void trans_va_start(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                     ir_expr_t *va_list) {
-    return trans_va_start_end_helper(ts, ir_stmts, va_list, LLVM_VA_START);
+    trans_va_start_end_helper(ts, ir_stmts, va_list, LLVM_VA_START);
 }
 
 void trans_va_end(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                   ir_expr_t *va_list) {
-    return trans_va_start_end_helper(ts, ir_stmts, va_list, LLVM_VA_END);
+    trans_va_start_end_helper(ts, ir_stmts, va_list, LLVM_VA_END);
 }
 
 void trans_va_start_end_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,

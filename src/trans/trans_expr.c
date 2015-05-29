@@ -510,7 +510,18 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         trans_va_copy(ts, ir_stmts, dest, src);
         return NULL;
     }
-    case EXPR_VA_ARG:
+    case EXPR_VA_ARG: {
+        ir_expr_t *va_list = trans_expr(ts, true, expr->vaarg.ap, ir_stmts);
+        va_list = trans_ir_type_conversion(ts, &ir_type_i8_ptr, false,
+                                           ir_expr_type(va_list), false,
+                                           va_list, ir_stmts);
+        type_t *ast_type = DECL_TYPE(expr->vaarg.type);
+        ir_type_t *type = trans_type(ts, ast_type);
+        ir_expr_t *result = ir_expr_create(ts->tunit, IR_EXPR_VAARG);
+        result->vaarg.va_list = va_list;
+        result->vaarg.arg_type = type;
+        return trans_assign_temp(ts, ir_stmts, result);
+    }
     case EXPR_DESIG_INIT:
     default:
         assert(false);

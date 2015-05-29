@@ -465,7 +465,12 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
         break;
     }
     case IR_EXPR_VAARG:
-        // TODO0: This
+        fprintf(stream, "va_arg ");
+        ir_type_print(stream, ir_expr_type(expr->vaarg.va_list), NULL);
+        fprintf(stream, " ");
+        ir_expr_print(stream, expr->vaarg.va_list, true);
+        fprintf(stream, ", ");
+        ir_type_print(stream, expr->vaarg.arg_type, NULL);
         break;
     default:
         assert(false);

@@ -80,6 +80,7 @@ ir_type_t *ir_expr_type(ir_expr_t *expr) {
     case IR_EXPR_CALL:
         return expr->call.func_sig->func.type;
     case IR_EXPR_VAARG:
+        return expr->vaarg.arg_type;
     default:
         assert(false);
     }
@@ -308,6 +309,7 @@ ir_expr_t *ir_expr_create(ir_trans_unit_t *tunit, ir_expr_type_t type) {
     case IR_EXPR_ICMP:
     case IR_EXPR_FCMP:
     case IR_EXPR_SELECT:
+    case IR_EXPR_VAARG:
         break;
 
     case IR_EXPR_GETELEMPTR:
@@ -318,9 +320,6 @@ ir_expr_t *ir_expr_create(ir_trans_unit_t *tunit, ir_expr_type_t type) {
         break;
     case IR_EXPR_CALL:
         sl_init(&expr->call.arglist, offsetof(ir_expr_t, link));
-        break;
-    case IR_EXPR_VAARG:
-        sl_init(&expr->vaarg.arglist, offsetof(ir_expr_t, link));
         break;
     default:
         assert(false);
@@ -391,7 +390,9 @@ void ir_expr_destroy(ir_expr_t *expr) {
     case IR_EXPR_ICMP:
     case IR_EXPR_FCMP:
     case IR_EXPR_SELECT:
+    case IR_EXPR_VAARG:
         break;
+
     case IR_EXPR_CONST:
         switch (expr->const_params.ctype) {
         case IR_CONST_INT:
@@ -419,9 +420,6 @@ void ir_expr_destroy(ir_expr_t *expr) {
         break;
     case IR_EXPR_CALL:
         sl_destroy(&expr->call.arglist);
-        break;
-    case IR_EXPR_VAARG:
-        sl_destroy(&expr->vaarg.arglist);
         break;
     default:
         assert(false);
