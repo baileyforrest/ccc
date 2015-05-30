@@ -614,9 +614,8 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
     bool has_l = false;
     bool has_ll = false;
     bool is_hex = false;
-
-    size_t dot_off = (size_t)-1;
-    size_t p_off = (size_t)-1;
+    bool has_dot = false;
+    bool has_p = false;
 
     int last = -1;
     bool done = false;
@@ -635,10 +634,10 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
             }
             break;
         case '.':
-            if (dot_off != (size_t)-1) {
+            if (has_dot) {
                 err = true;
             }
-            dot_off = sb_len(&lexer->lexbuf);
+            has_dot = true;
             break;
         case 'f':
         case 'F':
@@ -676,11 +675,11 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
             break;
         case 'p':
         case 'P':
-            if (p_off != (size_t)-1) {
+            if (has_p) {
                 err = true;
             }
 
-            p_off = sb_len(&lexer->lexbuf);
+            has_p = true;
             break;
         case ASCII_DIGIT:
             if (has_f || has_u || has_l || has_ll) {
@@ -709,11 +708,10 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
         }
     }
 
-    bool is_float = has_e || (dot_off != (size_t)-1) || has_f ||
-        p_off != (size_t)-1;
+    bool is_float = has_e || has_dot || has_f || has_p;
 
-    if ((is_float && (has_u || has_ll || (is_hex && p_off == (size_t)-1))) ||
-        (!is_float && p_off != (size_t)-1)) {
+    if ((is_float && (has_u || has_ll || (is_hex && !has_p))) ||
+         (!is_float && has_p)) {
         err = true;
     }
 
@@ -742,54 +740,9 @@ status_t lex_number(lex_state_t *ls, tstream_t *stream, int cur,
 
     char *buf = sb_buf(&lexer->lexbuf);
     char *end;
+
     errno = 0;
-    if (is_float && is_hex) {
-        assert(p_off != (size_t)-1);
-
-        char *p_loc = buf + p_off;
-        char *dot_loc = dot_off == (size_t)-1 ? p_loc : buf + dot_off;
-        result->type = FLOATLIT;
-        result->float_params = emalloc(sizeof(token_float_params_t));
-        result->float_params->hasF = has_f;
-        result->float_params->hasL = has_l;
-        result->float_params->float_val = 0;
-
-        long long head;
-        if (dot_off == 2) {
-            // Account for the case 0x.NNNpN
-            head = 0;
-            end = dot_loc;
-        } else {
-            head = strtoll(buf, &end, 16);
-        }
-        if (errno == 0 && end == dot_loc) {
-            long long frac;
-            if (dot_loc + 1 == p_loc || dot_loc == p_loc) {
-                // account for 0xNN.pN and 0xNNpN
-                frac = 0;
-                end = p_loc;
-            } else {
-                frac = strtoll(dot_loc + 1, &end, 16);
-            }
-            if (errno == 0 && end == p_loc) {
-                ptrdiff_t digits = end - (dot_loc + 1);
-
-                long long exp = strtoll(p_loc + 1, &end, 10);
-                if (errno == 0) {
-
-                    long double dfrac = frac;
-
-                    // Each hex digit is 4 bits of precision
-                    dfrac /= pow(2.0, digits * 4);
-
-                    long double val = (long double)head + dfrac;
-
-                    val *= powl(2.0, exp);
-                    result->float_params->float_val = val;
-                }
-            }
-        }
-    } else if (is_float) {
+    if (is_float) {
         result->type = FLOATLIT;
         result->float_params = emalloc(sizeof(token_float_params_t));
         result->float_params->hasF = has_f;

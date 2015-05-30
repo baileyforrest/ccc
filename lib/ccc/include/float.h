@@ -34,7 +34,7 @@
 
 #define FLT_DIG 6
 #define DBL_DIG 15
-#define LDBL_DIG 8
+#define LDBL_DIG 18
 
 #define FLT_MIN_EXP -125
 #define DBL_MIN_EXP -1021
@@ -54,20 +54,20 @@
 
 #define FLT_MAX 0x1.fffffep+127
 #define DBL_MAX 0x1.fffffffffffffp+1023
-#define LDBL_MAX 0xf.fffffffffffffffp+16380
+#define LDBL_MAX 0xf.fffffffffffffffp+16380L
 
 #define FLT_EPSILON 0x1p-23
 #define DBL_EPSILON 0x1p-52
-#define LDBL_EPSILON 0x8p-66
+#define LDBL_EPSILON 0x8p-66L
 
 #define FLT_MIN 0x1p-126
 #define DBL_MIN 0x1p-1022
-#define LDBL_MIN 0x8p-16385
+#define LDBL_MIN 0x8p-16385L
 
 #if __STDC_VERSION__ >= 201112L || !defined(__STRICT_ANSI__)
 #  define FLT_TRUE_MIN 0x1p-149
 #  define DBL_TRUE_MIN 0x0.0000000000001p-1022
-#  define LDBL_TRUE_MIN 0x0.000000000000001p-16385
+#  define LDBL_TRUE_MIN 0x0.000000000000001p-16385L
 #endif
 
 #endif /* _FLOAT_H___ */

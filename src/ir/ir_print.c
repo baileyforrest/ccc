@@ -274,8 +274,8 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
                 } converter = { { 0, 0 } };
                 converter.f = expr->const_params.float_val;
 
-                fprintf(stream, "0xK%lX", converter.i[1]);
-                fprintf(stream, "%lX", converter.i[0]);
+                fprintf(stream, "0xK%.4lX", converter.i[1]);
+                fprintf(stream, "%.16lX", converter.i[0]);
                 break;
             }
             default:
