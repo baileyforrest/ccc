@@ -1718,10 +1718,18 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     }
 
     case EXPR_CALL: {
-        if (!(retval &= typecheck_expr(tcs, expr->call.func, TC_NOCONST))) {
+        expr_t *func_expr = expr->call.func;
+        if (func_expr->type == EXPR_VAR &&
+            tt_lookup(tcs->typetab, func_expr->var_id) == NULL) {
+            logger_log(expr->mark, LOG_WARN,
+                       "implicit declaration of function '%s'",
+                       func_expr->var_id);
+            func_expr->etype = tt_implicit_func;
+        } else if (!(retval &= typecheck_expr(tcs, func_expr, TC_NOCONST))) {
             return false;
         }
-        type_t *func_sig = ast_type_unmod(expr->call.func->etype);
+
+        type_t *func_sig = ast_type_unmod(func_expr->etype);
         if (func_sig->type == TYPE_PTR) {
             func_sig = ast_type_unmod(func_sig->ptr.base);
         }
@@ -1772,7 +1780,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                     retval &= typecheck_expr(tcs, arg, TC_NOCONST);
                     cur_arg = cur_arg->next;
                 }
-            } else {
+            } else if (sl_head(&func_sig->func.params) != NULL) {
+                // Don't report error for () K & R style decls
                 logger_log(expr->mark, LOG_ERR,
                            "too many arguments to function");
                 retval = false;

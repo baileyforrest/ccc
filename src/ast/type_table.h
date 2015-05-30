@@ -75,6 +75,8 @@ extern struct type_t * const tt_size_t;
 
 extern struct type_t * const tt_va_list;
 
+extern struct type_t * const tt_implicit_func;
+
 /**
  * Initalizes a type table
  *

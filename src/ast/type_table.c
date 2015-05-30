@@ -58,6 +58,10 @@ static type_t stt_size_t = {
 
 static type_t stt_va_list = TYPE_LITERAL(TYPE_VA_LIST, va_list);
 
+static type_t stt_implicit_func = {
+    SL_LINK_LIT, &s_prim_type_mark, TYPE_FUNC, true,
+    { .func = { &stt_int, SLIST_LIT(offsetof(decl_t, link)), false } }
+};
 
 type_t * const tt_void = &stt_void;
 type_t * const tt_bool = &stt_bool;
@@ -73,6 +77,8 @@ type_t * const tt_long_double = &stt_long_double;
 type_t * const tt_size_t = &stt_size_t;
 
 type_t * const tt_va_list = &stt_va_list;
+
+type_t * const tt_implicit_func = &stt_implicit_func;
 
 #define TYPE_TAB_LITERAL_ENTRY(type, type_str)                  \
     { SL_LINK_LIT, type_str, NULL, TT_PRIM , &stt_ ## type, { } }
