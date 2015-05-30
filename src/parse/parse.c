@@ -206,18 +206,56 @@ status_t par_function_definition(lex_wrap_t *lex, gdecl_t *gdecl) {
 
     ht_init(&gdecl->fdefn.labels, &s_gdecl_ht_params);
 
-    /* TODO2: Handle K & R style function signature
-    while (LEX_CUR(lex)->type != RPAREN) {
-        stmt_t *param = NULL;
-        if (CCC_OK != (status = par_declaration(lex, &param))) {
-            goto fail;
-        }
-        sl_append(&gdecl->fdefn.params, param->link);
-    }
-    */
-
     decl_node_t *node = sl_head(&gdecl->decl->decls);
-    assert(node != NULL && node->id != NULL);
+    assert(node != NULL && node->id != NULL && node->type->type == TYPE_FUNC);
+
+    decl_t *head_param = sl_head(&node->type->func.params);
+    if (head_param != NULL && head_param->type == NULL) {
+        // Handle oldstyle param decls
+
+        while (LEX_CUR(lex)->type != LBRACE) {
+            decl_t *decl = NULL;
+            if (CCC_OK != (status = par_declaration(lex, &decl, false))) {
+                if (status == CCC_BACKTRACK) {
+                    logger_log(LEX_CUR(lex)->mark, LOG_ERR,
+                               "Expected parameter declaration");
+                    status = CCC_ESYNTAX;
+                }
+                goto fail;
+            }
+            decl_node_t *new_node = sl_head(&decl->decls);
+
+            bool found = false;
+            SL_FOREACH(cur, &node->type->func.params) {
+                decl_t *cur_decl = GET_ELEM(&node->type->func.params, cur);
+                decl_node_t *node = sl_head(&cur_decl->decls);
+                if (node != NULL && strcmp(node->id, new_node->id)) {
+                    found = true;
+                    node->type = new_node->type;
+                    cur_decl->type = ast_type_decl_base(new_node->type);
+                    break;
+                }
+            }
+            if (!found) {
+                logger_log(new_node->mark, LOG_ERR,
+                           "declaration for parameter '%s' but no such "
+                           "parameter", new_node->id);
+                status = CCC_ESYNTAX;
+                goto fail;
+            }
+            LEX_MATCH(lex, SEMI);
+        }
+
+        // Set rest of undeclared params to have a type of int
+        SL_FOREACH(cur, &node->type->func.params) {
+            decl_t *cur_decl = GET_ELEM(&node->type->func.params, cur);
+            decl_node_t *node = sl_head(&cur_decl->decls);
+            if (node->type == NULL) {
+                node->type = tt_int;
+                cur_decl->type = tt_int;
+            }
+        }
+    }
 
     // Set the current function we're in
     log_function = node->id;
@@ -1026,18 +1064,47 @@ status_t par_direct_declarator(lex_wrap_t *lex, decl_node_t *node,
             *last_node = func_type;
             last_node = &func_type->func.type;
 
-            /* TODO2: Support K & R decl syntax
-            if (LEX_CUR(lex)->type == ID) {
-                while (LEX_CUR(lex)->type == ID) {
+            if (LEX_CUR(lex)->type == ID &&
+                NULL == tt_lookup(lex->typetab, LEX_CUR(lex)->id_name)) {
+                // Handle old style function declaration
+                bool first = true;
+
+                while (LEX_CUR(lex)->type != RPAREN) {
+                    if (!first) {
+                        LEX_MATCH(lex, COMMA);
+                    } else {
+                        first = false;
+                    }
+
+                    LEX_CHECK(lex, ID);
+                    if (tt_lookup(lex->typetab,
+                                  LEX_CUR(lex)->id_name) != NULL) {
+                        logger_log(LEX_CUR(lex)->mark, LOG_ERR,
+                                   "expected ')' before '%s'",
+                                   LEX_CUR(lex)->id_name);
+                        status = CCC_ESYNTAX;
+                        goto fail;
+                    }
+
+                    decl_t *decl = ast_decl_create(lex->tunit,
+                                                   LEX_CUR(lex)->mark);
+
+                    decl_node_t *dnode =
+                        ast_decl_node_create(lex->tunit, LEX_CUR(lex)->mark);
+                    dnode->id = LEX_CUR(lex)->id_name;
+
+                    sl_append(&decl->decls, &dnode->link);
+                    sl_append(&func_type->func.params, &decl->link);
+
                     LEX_ADVANCE(lex);
                 }
-                LEX_MATCH(lex, RPAREN);
             } else {
-            */
-            if (CCC_OK != (status = par_parameter_type_list(lex, func_type))) {
-                goto fail;
+                if (CCC_OK != (status = par_parameter_type_list(lex,
+                                                                func_type))) {
+                    goto fail;
+                }
             }
-            //}
+
             LEX_MATCH(lex, RPAREN);
             break;
         default:

@@ -704,6 +704,8 @@ type_t *ast_type_unmod(type_t *type);
  */
 type_t *ast_type_ptr_base(type_t *t1);
 
+type_t *ast_type_decl_base(type_t *t1);
+
 /**
  * Get a string of a type modifier
  *

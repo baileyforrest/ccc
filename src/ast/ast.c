@@ -1037,3 +1037,18 @@ type_t *ast_type_ptr_base(type_t *t1) {
     }
     return NULL;
 }
+
+type_t *ast_type_decl_base(type_t *type) {
+    while (true) {
+        switch (type->type) {
+        case TYPE_FUNC: type = type->func.type;
+        case TYPE_PTR:  type = type->ptr.base;
+        case TYPE_ARR:  type = type->arr.base;
+        default:
+            return type;
+        }
+    }
+
+    assert(false);
+    return NULL;
+}
