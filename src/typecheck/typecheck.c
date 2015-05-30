@@ -1719,12 +1719,13 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
 
     case EXPR_CALL: {
         expr_t *func_expr = expr->call.func;
+
         if (func_expr->type == EXPR_VAR &&
             tt_lookup(tcs->typetab, func_expr->var_id) == NULL) {
             logger_log(expr->mark, LOG_WARN,
                        "implicit declaration of function '%s'",
                        func_expr->var_id);
-            func_expr->etype = tt_implicit_func;
+            func_expr->etype = tt_implicit_func_ptr;
         } else if (!(retval &= typecheck_expr(tcs, func_expr, TC_NOCONST))) {
             return false;
         }

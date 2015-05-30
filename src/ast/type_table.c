@@ -63,6 +63,11 @@ static type_t stt_implicit_func = {
     { .func = { &stt_int, SLIST_LIT(offsetof(decl_t, link)), false } }
 };
 
+static type_t stt_implicit_func_ptr = {
+    SL_LINK_LIT, &s_prim_type_mark, TYPE_PTR, true,
+    { .ptr = { &stt_implicit_func, TMOD_NONE } }
+};
+
 type_t * const tt_void = &stt_void;
 type_t * const tt_bool = &stt_bool;
 type_t * const tt_char = &stt_char;
@@ -79,6 +84,7 @@ type_t * const tt_size_t = &stt_size_t;
 type_t * const tt_va_list = &stt_va_list;
 
 type_t * const tt_implicit_func = &stt_implicit_func;
+type_t * const tt_implicit_func_ptr = &stt_implicit_func_ptr;
 
 #define TYPE_TAB_LITERAL_ENTRY(type, type_str)                  \
     { SL_LINK_LIT, type_str, NULL, TT_PRIM , &stt_ ## type, { } }

@@ -127,7 +127,10 @@ void ir_gdecl_print(FILE *stream, ir_gdecl_t *gdecl) {
             }
         }
         if (gdecl->func.type->func.varargs) {
-            fprintf(stream, ", ...");
+            if (sl_head(&gdecl->func.params) != NULL) {
+                fprintf(stream, ", ");
+            }
+            fprintf(stream, "...");
         }
         fprintf(stream, ")");
 
@@ -449,7 +452,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
             ir_type_print(stream, func_sig->func.type, NULL);
         }
         fprintf(stream, " ");
-        ir_expr_print(stream, expr->call.func_ptr, false);
+        ir_expr_print(stream, expr->call.func_ptr, true);
         fprintf(stream, "(");
 
         SL_FOREACH(cur, &expr->call.arglist) {
@@ -496,7 +499,10 @@ void ir_type_print(FILE *stream, ir_type_t *type, char *func_name) {
             }
         }
         if (type->func.varargs) {
-            fprintf(stream, ", ...");
+            if (vec_size(&type->func.params) > 0) {
+                fprintf(stream, ", ");
+            }
+            fprintf(stream, "...");
         }
         fprintf(stream, ")");
         break;

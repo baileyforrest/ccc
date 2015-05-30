@@ -54,7 +54,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 // Function expressions evaluate to function pointers
                 if (expr->type == EXPR_VAR && tt_ent->type->type == TYPE_FUNC) {
                     assert(expr->etype->type == TYPE_PTR);
-                    if (expr->etype->ptr.base == tt_ent->type) {
+                    if (expr->etype->ptr.base == tt_ent->type ||
+                        expr->etype == tt_implicit_func_ptr) {
                         break;
                     }
                 }
@@ -239,9 +240,45 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         if (func_sig->type == TYPE_PTR) {
             func_sig = func_sig->ptr.base;
         }
+        assert(func_sig->type == TYPE_FUNC);
+
         call->call.func_sig = trans_type(ts, func_sig);
         call->call.func_ptr = trans_expr(ts, false, expr->call.func, ir_stmts);
-        assert(func_sig->type == TYPE_FUNC);
+
+        bool oldstyle = false;
+        if (sl_head(&func_sig->func.params) == NULL) {
+            // Handle K & R style func sig
+            oldstyle = true;
+
+            // If this is a K & R style call for a function that was specified
+            // later in this tunit, we need to set up the cast correctly
+            if (expr->call.func->type == EXPR_VAR) {
+                typetab_entry_t *entry = tt_lookup(ts->typetab,
+                                                   expr->call.func->var_id);
+                if (entry->type->type == TYPE_FUNC) {
+                    call->call.func_sig = trans_type(ts, entry->type);
+                }
+            }
+
+            ir_type_t *new_func_sig = ir_type_create(ts->tunit, IR_TYPE_FUNC);
+            new_func_sig->func.type = call->call.func_sig->func.type;
+            new_func_sig->func.varargs = true;
+
+            ir_type_t *ptr_dest = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            ptr_dest->ptr.base = new_func_sig;
+
+            ir_type_t *ptr_src = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            ptr_src->ptr.base = call->call.func_sig;
+
+            ir_expr_t *convert = ir_expr_create(ts->tunit, IR_EXPR_CONVERT);
+            convert->convert.type = IR_CONVERT_BITCAST;
+            convert->convert.src_type = ptr_src;
+            convert->convert.dest_type = ptr_dest;
+            convert->convert.val = call->call.func_ptr;
+
+            call->call.func_sig = new_func_sig;
+            call->call.func_ptr = trans_assign_temp(ts, ir_stmts, convert);
+        }
 
         sl_link_t *cur_sig = func_sig->func.params.head;
         sl_link_t *cur_expr = expr->call.params.head;
@@ -274,11 +311,16 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             cur_sig = cur_sig->next;
             cur_expr = cur_expr->next;
         }
-        if (func_sig->func.varargs) {
+        if (func_sig->func.varargs || oldstyle) {
             while (cur_expr != NULL) {
                 expr_t *param = GET_ELEM(&expr->call.params, cur_expr);
                 ir_expr_t *ir_expr = trans_expr(ts, false, param, ir_stmts);
                 sl_append(&call->call.arglist, &ir_expr->link);
+
+                if (oldstyle) {
+                    vec_push_back(&call->call.func_sig->func.params,
+                                  ir_expr_type(ir_expr));
+                }
 
                 cur_expr = cur_expr->next;
             }
@@ -286,10 +328,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             assert(cur_expr == NULL);
         }
 
-        type_t *return_type = ast_type_unmod(func_sig->func.type);
+        ir_type_t *return_type = call->call.func_sig->func.type;
         ir_expr_t *result;
         // Void returning function, don't create a temp
-        if (return_type->type == TYPE_VOID) {
+        if (return_type->type == IR_TYPE_VOID) {
             ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_EXPR);
             ir_stmt->expr = call;
             trans_add_stmt(ts, ir_stmts, ir_stmt);
@@ -297,7 +339,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         } else {
             result = trans_assign_temp(ts, ir_stmts, call);
         }
-
 
         return result;
     }
