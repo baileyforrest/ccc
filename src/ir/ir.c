@@ -510,8 +510,13 @@ ir_expr_t *ir_expr_zero(ir_trans_unit_t *tunit, ir_type_t *type) {
         return expr;
     }
 
-    case IR_TYPE_ID_STRUCT:
-        return ir_expr_zero(tunit, type->id_struct.type);
+    case IR_TYPE_ID_STRUCT: {
+        ir_expr_t *retval = ir_expr_zero(tunit, type->id_struct.type);
+        assert(retval->type == IR_EXPR_CONST &&
+               retval->const_params.ctype == IR_CONST_STRUCT);
+        retval->const_params.type = type;
+        return retval;
+    }
 
     case IR_TYPE_ARR: {
         ir_expr_t *expr = ir_expr_create(tunit, IR_EXPR_CONST);

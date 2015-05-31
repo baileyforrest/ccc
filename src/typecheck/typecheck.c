@@ -76,6 +76,19 @@ void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
     case EXPR_PAREN:
         typecheck_const_expr_eval(typetab, expr->paren_base, result);
         return;
+    case EXPR_VAR: {
+        typetab_entry_t *entry = tt_lookup(typetab, expr->var_id);
+        // If entry isn't defined, return 0
+        if (entry == NULL) {
+            *result = 0;
+        } else if (entry->entry_type == TT_ENUM_ID) {
+            *result = entry->enum_val;
+            return;
+        } else {
+            assert(false);
+        }
+        return;
+    }
     case EXPR_CONST_INT:
         *result = expr->const_val.int_val;
         return;
@@ -159,18 +172,10 @@ void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
             }
         }
         return;
-    case EXPR_VAR: {
-        typetab_entry_t *entry = tt_lookup(typetab, expr->var_id);
-        // If entry isn't defined, return 0
-        if (entry == NULL) {
-            *result = 0;
-        } else if (entry->entry_type == TT_ENUM_ID) {
-            *result = entry->enum_val;
-            return;
-        } else {
-            assert(false);
-        }
-        break;
+    case EXPR_OFFSETOF: {
+        type_t *type = DECL_TYPE(expr->offsetof_params.type);
+        *result = ast_type_offset(type, &expr->offsetof_params.path);
+        return;
     }
     case EXPR_VOID:
     case EXPR_ASSIGN:
