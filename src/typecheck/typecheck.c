@@ -1391,15 +1391,27 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 } else {
                     cmp_type = entry->type;
                 }
-                // Redefined if old entry is not a variable, last variable was
-                // already defined, and this is a definiton, or if the
-                // types are not equal
-                if (entry->entry_type != TT_VAR ||
-                    (entry->var.var_defined && !is_decl) ||
-                    !typecheck_type_equal(cmp_type, node_type)) {
-                    logger_log(decl_node->mark, LOG_ERR,
-                               "Redefined symbol %s", decl_node->id);
-                    return false;
+
+                if (cmp_type == tt_implicit_func) {
+                    if (node_type->type != TYPE_FUNC ||
+                        node_type->func.type->type != TYPE_INT) {
+                        logger_log(decl_node->mark, LOG_ERR,
+                                   "conflicting types for '%s'", decl_node->id);
+                        return false;
+                    }
+                    entry->type = node_type;
+                } else {
+
+                    // Redefined if old entry is not a variable, last variable
+                    // was already defined, and this is a definiton, or if the
+                    // types are not equal
+                    if (entry->entry_type != TT_VAR ||
+                        (entry->var.var_defined && !is_decl) ||
+                        !typecheck_type_equal(cmp_type, node_type)) {
+                        logger_log(decl_node->mark, LOG_ERR,
+                                   "Redefined symbol %s", decl_node->id);
+                        return false;
+                    }
                 }
             }
         } else {
@@ -1725,6 +1737,13 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
             logger_log(expr->mark, LOG_WARN,
                        "implicit declaration of function '%s'",
                        func_expr->var_id);
+
+            typetab_t *tt_save = tcs->typetab;
+            tcs->typetab = &tcs->tunit->typetab;
+            status_t status = tt_insert(tcs->typetab, tt_implicit_func, TT_VAR,
+                                        func_expr->var_id, NULL);
+            assert(status == CCC_OK);
+            tcs->typetab = tt_save;
             func_expr->etype = tt_implicit_func_ptr;
         } else if (!(retval &= typecheck_expr(tcs, func_expr, TC_NOCONST))) {
             return false;
