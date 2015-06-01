@@ -1518,6 +1518,9 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
 
 bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     bool retval = true;
+    if (expr->etype != NULL) {
+        return retval;
+    }
     expr->etype = NULL;
 
     switch(expr->type) {
