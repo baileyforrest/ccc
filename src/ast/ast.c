@@ -706,13 +706,12 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
     return status;
 }
 
-bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type) {
+bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type,
+                              expr_t **tail) {
     if (expr->type != EXPR_MEM_ACC || expr->mem_acc.op != OP_DOT) {
         return false;
     }
     type = ast_type_unmod(type);
-
-    expr_t *old_base = expr->mem_acc.base;
 
     struct_iter_t iter;
     struct_iter_init(type, &iter);
@@ -720,29 +719,32 @@ bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type) {
         // No anonymous union, return
         if (iter.node != NULL && iter.node->id != NULL &&
             strcmp(iter.node->id, expr->mem_acc.name) == 0) {
+            if (tail != NULL) {
+                *tail = expr;
+            }
             return true;
         }
         if (iter.node == NULL && iter.decl != NULL &&
             (iter.decl->type->type == TYPE_STRUCT ||
              iter.decl->type->type == TYPE_UNION)) {
-            if (ast_canonicalize_mem_acc(tunit, expr, iter.decl->type)) {
-                // If recursive call added a member access, add on to after
-                // that one
-                if (expr->mem_acc.base != old_base) {
-                    expr = expr->mem_acc.base;
-                    assert(expr->type == EXPR_MEM_ACC &&
-                           expr->mem_acc.op == OP_DOT);
-                }
+            expr_t *new_tail;
+            if (ast_canonicalize_mem_acc(tunit, expr, iter.decl->type,
+                                         &new_tail)) {
+                assert(new_tail != NULL && new_tail->type == EXPR_MEM_ACC &&
+                       new_tail->mem_acc.op == OP_DOT);
 
                 // Member is in anonymous union
                 // Make a new member access to get the union
-                expr_t *new_expr = ast_expr_create(tunit, expr->mark,
+                expr_t *new_expr = ast_expr_create(tunit, new_tail->mark,
                                                    EXPR_MEM_ACC);
                 new_expr->etype = iter.decl->type;
-                new_expr->mem_acc.base = expr->mem_acc.base;
-                new_expr->mem_acc.name = expr->mem_acc.name;
+                new_expr->mem_acc.base = new_tail->mem_acc.base;
+                new_expr->mem_acc.name = new_tail->mem_acc.name;
                 new_expr->mem_acc.op = OP_DOT;
-                expr->mem_acc.base = new_expr;
+                new_tail->mem_acc.base = new_expr;
+                if (tail != NULL) {
+                    *tail = new_expr;
+                }
                 return true;
             }
         }

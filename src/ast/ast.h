@@ -630,7 +630,8 @@ bool struct_iter_advance(struct_iter_t *iter);
 status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                                     expr_t *expr);
 
-bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type);
+bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type,
+                              expr_t **tail);
 
 
 type_t *ast_get_union_type(type_t *type, expr_t *expr, expr_t **head_loc);

@@ -1921,7 +1921,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
 
         if (mem_type != NULL) {
             ast_canonicalize_mem_acc(tcs->tunit, expr,
-                                     expr->mem_acc.base->etype);
+                                     expr->mem_acc.base->etype, NULL);
             expr->etype = mem_type;
             return true;
         }
