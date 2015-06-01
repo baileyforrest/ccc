@@ -848,7 +848,7 @@ size_t ast_type_size(type_t *type) {
 
                     if (decl_bf_bits != -1) {
                         if (bitfield_bits == 0) {
-                            size += decl_bf_bits + (CHAR_BIT - 1) / CHAR_BIT;
+                            size += (decl_bf_bits + (CHAR_BIT - 1)) / CHAR_BIT;
                             bitfield_bits = decl_bf_bits % CHAR_BIT;
                         } else {
                             bitfield_bits += decl_bf_bits;
@@ -864,7 +864,7 @@ size_t ast_type_size(type_t *type) {
                     size_t cur_size;
                     if (decl_bf_bits != -1) {
                         // Size of bitfield rounded up to one byte
-                        cur_size = decl_bf_bits + (CHAR_BIT - 1) / CHAR_BIT;
+                        cur_size = (decl_bf_bits + (CHAR_BIT - 1)) / CHAR_BIT;
                     } else {
                         cur_size = ast_type_size(decl_node->type);
                     }
