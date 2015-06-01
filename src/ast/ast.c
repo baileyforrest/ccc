@@ -716,7 +716,7 @@ bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type,
     struct_iter_t iter;
     struct_iter_init(type, &iter);
     do {
-        // No anonymous union, return
+        // No anonymous members, return
         if (iter.node != NULL && iter.node->id != NULL &&
             strcmp(iter.node->id, expr->mem_acc.name) == 0) {
             if (tail != NULL) {
@@ -733,8 +733,8 @@ bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type,
                 assert(new_tail != NULL && new_tail->type == EXPR_MEM_ACC &&
                        new_tail->mem_acc.op == OP_DOT);
 
-                // Member is in anonymous union
-                // Make a new member access to get the union
+                // Member is in anonymous
+                // Make a new member access to get it
                 expr_t *new_expr = ast_expr_create(tunit, new_tail->mark,
                                                    EXPR_MEM_ACC);
                 new_expr->etype = iter.decl->type;

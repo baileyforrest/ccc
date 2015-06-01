@@ -573,6 +573,13 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
 ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
                         type_t *dest_type, ir_expr_t *src, type_t *src_type,
                         ir_inst_stream_t *ir_stmts) {
+    src_type = ast_type_untypedef(src_type);
+    if (src_type->type == TYPE_STRUCT || src_type->type == TYPE_UNION) {
+        trans_memcpy(ts, ir_stmts, dest_ptr, src, ast_type_size(src_type),
+                     ast_type_align(src_type), false);
+        return src;
+    }
+
     ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_STORE);
     ir_stmt->store.type = trans_type(ts, dest_type);
     ir_stmt->store.val = trans_type_conversion(ts, dest_type, src_type, src,
