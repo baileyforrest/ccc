@@ -24,6 +24,7 @@
 #include "ast_priv.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stdlib.h>
 
 #include "util/logger.h"
@@ -805,7 +806,6 @@ size_t ast_type_size(type_t *type) {
     case TYPE_DOUBLE:      return sizeof(double);
     case TYPE_LONG_DOUBLE: return sizeof(long double);
 
-        // TODO1: Handle bit fields
     case TYPE_STRUCT:
     case TYPE_UNION: {
         if (type->struct_params.esize != (size_t)-1) {
@@ -813,12 +813,32 @@ size_t ast_type_size(type_t *type) {
         }
         size_t max_align = 1;
         size_t size = 0;
+        size_t bitfield_bits = 0;
         SL_FOREACH(cur, &type->struct_params.decls) {
             decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
 
             SL_FOREACH(icur, &decl->decls) {
                 decl_node_t *decl_node = GET_ELEM(&decl->decls, icur);
-                size_t align = ast_type_align(decl_node->type);
+                long long decl_bf_bits = -1;
+                if (decl_node->expr != NULL) {
+                    assert(decl_node->expr->type == EXPR_CONST_INT);
+                    decl_bf_bits = decl_node->expr->const_val.int_val;
+
+                    // 0 bitfield bits causes next field to be aligned at
+                    // byte boundary
+                    if (decl_bf_bits == 0) {
+                        bitfield_bits = 0;
+                        continue;
+                    }
+                } else {
+                    // Reset bitfield remaining
+                    bitfield_bits = 0;
+                }
+
+                // Bitfields have alignment requirement of 1
+                size_t align = decl_bf_bits == -1 ?
+                    ast_type_align(decl_node->type) : 1;
+
                 if (type->type == TYPE_STRUCT) {
                     // Add padding between members
                     size_t remain = size % align;
@@ -826,9 +846,28 @@ size_t ast_type_size(type_t *type) {
                         size += align - remain;
                     }
 
-                    size += ast_type_size(decl_node->type);
+                    if (decl_bf_bits != -1) {
+                        if (bitfield_bits == 0) {
+                            size += decl_bf_bits + (CHAR_BIT - 1) / CHAR_BIT;
+                            bitfield_bits = decl_bf_bits % CHAR_BIT;
+                        } else {
+                            bitfield_bits += decl_bf_bits;
+                            if (bitfield_bits > CHAR_BIT) {
+                                size += bitfield_bits / CHAR_BIT;
+                                bitfield_bits = bitfield_bits % CHAR_BIT;
+                            }
+                        }
+                    } else {
+                        size += ast_type_size(decl_node->type);
+                    }
                 } else { // type->type == TYPE_UNION
-                    size_t cur_size = ast_type_size(decl_node->type);
+                    size_t cur_size;
+                    if (decl_bf_bits != -1) {
+                        // Size of bitfield rounded up to one byte
+                        cur_size = decl_bf_bits + (CHAR_BIT - 1) / CHAR_BIT;
+                    } else {
+                        cur_size = ast_type_size(decl_node->type);
+                    }
                     size = MAX(size, cur_size);
                 }
                 max_align = MAX(max_align, align);

@@ -1462,8 +1462,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
             }
             break;
         case TYPE_STRUCT:
-        case TYPE_UNION:
-        case TYPE_ENUM: {
+        case TYPE_UNION: {
             retval &= typecheck_expr(tcs, decl_node->expr, TC_CONST);
             if (!retval) {
                 return false;
@@ -1475,6 +1474,36 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 logger_log(decl_node->mark, LOG_ERR,
                            "bit-field '%s' width not an integer constant",
                            decl_node->id);
+                return false;
+            }
+
+            // Evaluate the size
+            if (decl_node->expr->type != EXPR_CONST_INT) {
+                long long size;
+                typecheck_const_expr_eval(tcs->typetab, decl_node->expr, &size);
+                expr_t *new_size = ast_expr_create(tcs->tunit,
+                                                   decl_node->expr->mark,
+                                                   EXPR_CONST_INT);
+                new_size->etype = tt_int;
+                new_size->const_val.type = tt_int;
+                new_size->const_val.int_val = size;
+                decl_node->expr = new_size;
+            }
+
+            break;
+        }
+        case TYPE_ENUM: {
+            retval &= typecheck_expr(tcs, decl_node->expr, TC_CONST);
+            if (!retval) {
+                return false;
+            }
+
+            type_t *type = decl_node->expr->etype;
+            type = ast_type_unmod(type);
+            if (!TYPE_IS_INTEGRAL(type)) {
+                logger_log(decl_node->mark, LOG_ERR,
+                           "enumerator value for '%s' is not an integer "
+                           "constant", decl_node->id);
                 return false;
             }
             break;
