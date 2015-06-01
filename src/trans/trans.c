@@ -137,7 +137,7 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
                              slist_t *indexs) {
     type = ast_type_unmod(type);
     if (type->type == TYPE_UNION) {
-        return 0;
+        return true;
     }
 
     assert(type->type == TYPE_STRUCT);
@@ -147,6 +147,9 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
         decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
         SL_FOREACH(cur_node, &decl->decls) {
             decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
+            if (node->id == NULL) {
+                continue;
+            }
             if (strcmp(node->id, mem_name) == 0) {
                 ir_expr_t *index =
                     ir_int_const(ts->tunit, &ir_type_i32, offset);
@@ -159,7 +162,8 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
         if (sl_head(&decl->decls) == NULL &&
             (decl->type->type == TYPE_STRUCT ||
              decl->type->type == TYPE_UNION)) {
-            if (trans_struct_mem_offset(ts, decl->type, mem_name, indexs)) {
+            if (ast_type_find_member(decl->type, mem_name, NULL, NULL)
+                != NULL) {
                 ir_expr_t *index =
                     ir_int_const(ts->tunit, &ir_type_i32, offset);
                 sl_prepend(indexs, &index->link);

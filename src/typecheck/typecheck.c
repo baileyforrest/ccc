@@ -1426,7 +1426,6 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
     if (decl_node->expr != NULL) {
         switch (type) {
         case TYPE_VOID:
-            retval &= typecheck_expr(tcs, decl_node->expr, TC_NOCONST);
             if (!retval) {
                 return false;
             }
@@ -1457,6 +1456,7 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                 }
                 // FALL THROUGH
             default:
+                retval &= typecheck_expr(tcs, decl_node->expr, TC_NOCONST);
                 retval &= typecheck_type_assignable(decl_node->mark, node_type,
                                                     decl_node->expr->etype);
             }
@@ -1918,7 +1918,10 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         }
         type_t *mem_type =
             ast_type_find_member(compound, expr->mem_acc.name, NULL, NULL);
+
         if (mem_type != NULL) {
+            ast_canonicalize_mem_acc(tcs->tunit, expr,
+                                     expr->mem_acc.base->etype);
             expr->etype = mem_type;
             return true;
         }
