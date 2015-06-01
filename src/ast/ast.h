@@ -680,8 +680,8 @@ size_t ast_get_member_num(type_t *type, char *name);
  * @param mem_num location to store the member number, NULL if not needed
  * @return Return the type of the member, of NULL if doesn't exist
  */
-type_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
-                             size_t *mem_num);
+decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
+                                  size_t *mem_num);
 
 /**
  * Returns a type with its typedefs removed

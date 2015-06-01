@@ -938,6 +938,11 @@ size_t ast_type_align(type_t *type) {
 
             SL_FOREACH(icur, &decl->decls) {
                 decl_node_t *decl_node = GET_ELEM(&decl->decls, icur);
+
+                // Bitfields have alignment requirement of 1
+                if (decl_node->expr != NULL) {
+                    continue;
+                }
                 size_t cur_align = ast_type_align(decl_node->type);
                 align = MAX(align, cur_align);
             }
@@ -990,10 +995,13 @@ size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
         expr_t *cur_expr = GET_ELEM(&list->list, cur);
 
         switch (cur_expr->type) {
-        case EXPR_MEM_ACC:
-            type = ast_type_find_member(type, cur_expr->mem_acc.name,
-                                        &inner_offset, NULL);
+        case EXPR_MEM_ACC: {
+            decl_node_t *node = ast_type_find_member(type,
+                                                     cur_expr->mem_acc.name,
+                                                     &inner_offset, NULL);
+            type = node->type;
             break;
+        }
         case EXPR_ARR_IDX:
             inner_offset = ast_type_size(type->arr.base) *
                 cur_expr->arr_idx.const_idx;
@@ -1011,20 +1019,21 @@ size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
 size_t ast_get_member_num(type_t *type, char *name) {
     size_t mem_num;
     type = ast_type_unmod(type);
-    type = ast_type_find_member(type, name, NULL, &mem_num);
-    if (type == NULL) {
+
+    decl_node_t *node = ast_type_find_member(type, name, NULL, &mem_num);
+    if (node == NULL) {
         return -1;
     }
 
     return mem_num;
 }
 
-type_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
+decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
                              size_t *mem_num) {
     assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
     size_t cur_offset = 0;
     size_t cur_mem_num = 0;
-    type_t *result = NULL;
+    decl_node_t *result = NULL;
 
     struct_iter_t iter;
     struct_iter_init(type, &iter);
@@ -1034,7 +1043,7 @@ type_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
             cur_type = iter.node->type;
 
             if (strcmp(iter.node->id, name) == 0) {
-                result = cur_type;
+                result = iter.node;
             }
         }
 
@@ -1046,11 +1055,11 @@ type_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
 
             size_t inner_offset;
             size_t inner_mem_num;
-            type_t *inner_type = ast_type_find_member(cur_type, name,
-                                                      &inner_offset,
-                                                      &inner_mem_num);
-            if (inner_type != NULL) {
-                result = inner_type;
+            decl_node_t *inner_node = ast_type_find_member(cur_type, name,
+                                                           &inner_offset,
+                                                           &inner_mem_num);
+            if (inner_node != NULL) {
+                result = inner_node;
                 cur_mem_num += inner_mem_num;
                 cur_offset += inner_offset;
             }

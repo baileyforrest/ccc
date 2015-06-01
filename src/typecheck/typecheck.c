@@ -872,14 +872,16 @@ bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
                            "structure or union", cur_expr->mem_acc.name);
                 return false;
             }
-            type = ast_type_find_member(type, cur_expr->mem_acc.name, NULL,
-                                        NULL);
-            if (type == NULL) {
+            decl_node_t *node = ast_type_find_member(type,
+                                                     cur_expr->mem_acc.name,
+                                                     NULL, NULL);
+            if (node == NULL) {
                 logger_log(cur_expr->mark, LOG_ERR,
                            "type type has no member '%s'",
                            cur_expr->mem_acc.name);
                 return false;
             }
+            type = node->type;
             break;
         case EXPR_ARR_IDX:
             if (type->type != TYPE_ARR) {
@@ -1948,13 +1950,13 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                        "dereferencing pointer to incomplete type");
             return false;
         }
-        type_t *mem_type =
+        decl_node_t *mem_node =
             ast_type_find_member(compound, expr->mem_acc.name, NULL, NULL);
 
-        if (mem_type != NULL) {
+        if (mem_node != NULL) {
             ast_canonicalize_mem_acc(tcs->tunit, expr,
                                      expr->mem_acc.base->etype, NULL);
-            expr->etype = mem_type;
+            expr->etype = mem_node->type;
             return true;
         }
         logger_log(expr->mark, LOG_ERR, "compound type has no member '%s'",
