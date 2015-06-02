@@ -105,7 +105,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     case EXPR_ASSIGN: {
         if (expr->assign.dest->type == EXPR_MEM_ACC) {
             expr_t *mem_acc = expr->assign.dest;
-            type_t *compound = mem_acc->mem_acc.base->etype;
+            type_t *compound = ast_type_unmod(mem_acc->mem_acc.base->etype);
+            if (compound->type == TYPE_PTR) {
+                compound = ast_type_unmod(compound->ptr.base);
+            }
             decl_node_t *node = ast_type_find_member(compound,
                                                      mem_acc->mem_acc.name,
                                                      NULL, NULL);
