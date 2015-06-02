@@ -32,13 +32,9 @@ ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
                         type_t *dest_type, ir_expr_t *src, type_t *src_type,
                         ir_inst_stream_t *ir_stmts);
 
-ir_expr_t *trans_assign_bitfield(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                                 expr_t *expr);
-
-ir_expr_t *trans_assign_bitfield_ir(trans_state_t *ts,
-                                    ir_inst_stream_t *ir_stmts, type_t *type,
-                                    char *field_name, ir_expr_t *addr,
-                                    ir_expr_t *val);
+ir_expr_t *trans_bitfield_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                                 type_t *type, char *field_name,
+                                 ir_expr_t *addr, ir_expr_t *val);
 
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
                            ir_inst_stream_t *ir_stmts);

@@ -103,8 +103,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
     }
     case EXPR_ASSIGN: {
+        bool bitfield = false;
+        expr_t *mem_acc;
         if (expr->assign.dest->type == EXPR_MEM_ACC) {
-            expr_t *mem_acc = expr->assign.dest;
+            mem_acc = expr->assign.dest;
             type_t *compound = ast_type_unmod(mem_acc->mem_acc.base->etype);
             if (compound->type == TYPE_PTR) {
                 compound = ast_type_unmod(compound->ptr.base);
@@ -114,30 +116,43 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                                                      NULL, NULL);
             assert(node != NULL);
             if (node->expr != NULL) {
-                return trans_assign_bitfield(ts, ir_stmts, expr);
+                bitfield = true;
             }
         }
-        ir_expr_t *dest_addr = trans_expr(ts, true, expr->assign.dest,
-                                          ir_stmts);
-        if (expr->assign.op == OP_NOP) {
-            ir_expr_t *src = trans_expr(ts, false, expr->assign.expr, ir_stmts);
-            return trans_assign(ts, dest_addr, expr->assign.dest->etype, src,
-                                expr->assign.expr->etype, ir_stmts);
+        ir_expr_t *dest_addr;
+        if (bitfield) {
+            bool addrof = mem_acc->mem_acc.op == OP_DOT;
+            dest_addr = trans_expr(ts, addrof, mem_acc->mem_acc.base, ir_stmts);
+        } else {
+            dest_addr = trans_expr(ts, true, expr->assign.dest, ir_stmts);
         }
-        type_t *max_type;
-        bool result = typecheck_type_max(ts->ast_tunit, NULL,
-                                         expr->assign.expr->etype,
-                                         expr->etype, &max_type);
-        assert(result && max_type != NULL);
-        ir_expr_t *dest;
-        ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, dest_addr,
-                                         expr->assign.expr, expr->assign.op,
-                                         max_type, ir_stmts, &dest);
 
-        ir_expr_t *temp = trans_assign_temp(ts, ir_stmts, op_expr);
+        type_t *src_type;
+        ir_expr_t *val;
+        if (expr->assign.op == OP_NOP) {
+            val = trans_expr(ts, false, expr->assign.expr, ir_stmts);
+            src_type = expr->assign.expr->etype;
+        } else {
+            bool result = typecheck_type_max(ts->ast_tunit, NULL,
+                                             expr->assign.expr->etype,
+                                             expr->etype, &src_type);
+            assert(result && src_type != NULL);
+            ir_expr_t *dest;
+            ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, dest_addr,
+                                             expr->assign.expr, expr->assign.op,
+                                             src_type, ir_stmts, &dest);
 
-        return trans_assign(ts, dest_addr, expr->assign.dest->etype, temp,
-                            max_type, ir_stmts);
+            val  = trans_assign_temp(ts, ir_stmts, op_expr);
+        }
+
+        if (bitfield) {
+            return trans_bitfield_helper(ts, ir_stmts,
+                                         mem_acc->mem_acc.base->etype,
+                                         mem_acc->mem_acc.name, dest_addr, val);
+        } else {
+            return trans_assign(ts, dest_addr, expr->assign.dest->etype, val,
+                                src_type, ir_stmts);
+        }
     }
     case EXPR_CONST_INT:
         return ir_int_const(ts->tunit, trans_type(ts, expr->const_val.type),
@@ -605,41 +620,10 @@ ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
     return src;
 }
 
-ir_expr_t *trans_assign_bitfield(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                                 expr_t *expr) {
-    assert(expr->type == EXPR_ASSIGN);
-    assert(expr->assign.dest->type == EXPR_MEM_ACC);
-
-    ir_expr_t *val;
-    if (expr->assign.op != OP_NOP) {
-        type_t *max_type;
-        bool result = typecheck_type_max(ts->ast_tunit, NULL,
-                                         expr->assign.expr->etype,
-                                         expr->etype, &max_type);
-        assert(result && max_type != NULL);
-        ir_expr_t *dest;
-        ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, NULL,
-                                         expr->assign.expr, expr->assign.op,
-                                         max_type, ir_stmts, &dest);
-
-        val = trans_assign_temp(ts, ir_stmts, op_expr);
-    } else {
-        val = trans_expr(ts, false, expr->assign.expr, ir_stmts);
-    }
-
-    expr_t *mem_acc = expr->assign.dest;
-    bool addrof = mem_acc->mem_acc.op == OP_DOT;
-    ir_expr_t *addr = trans_expr(ts, addrof, mem_acc->mem_acc.base, ir_stmts);
-
-    return trans_assign_bitfield_ir(ts, ir_stmts, mem_acc->mem_acc.base->etype,
-                                    mem_acc->mem_acc.name, addr, val);
-}
-
 // I hate bitfields!
-ir_expr_t *trans_assign_bitfield_ir(trans_state_t *ts,
-                                    ir_inst_stream_t *ir_stmts, type_t *type,
-                                    char *field_name, ir_expr_t *addr,
-                                    ir_expr_t *val) {
+ir_expr_t *trans_bitfield_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                                 type_t *type, char *field_name,
+                                 ir_expr_t *addr, ir_expr_t *val) {
     ir_type_t *ir_type = trans_type(ts, type);
     if (ir_type->type == IR_TYPE_ID_STRUCT) {
         ir_type = ir_type->id_struct.type;
