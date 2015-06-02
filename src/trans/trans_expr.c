@@ -762,6 +762,15 @@ ir_expr_t *trans_assign_bitfield_ir(trans_state_t *ts,
                                                    ~mask);
             val_masked = trans_assign_temp(ts, ir_stmts, val_masked);
         }
+
+        // Make a copy if its a constant, because trans_ir_type_conversion
+        // mutates constant val, and we need val to be the same for future
+        // iterations
+        if (val_masked->type == IR_EXPR_CONST) {
+            assert(val_masked->const_params.ctype == IR_CONST_INT);
+            val_masked = ir_int_const(ts->tunit, ir_expr_type(val_masked),
+                                      val_masked->const_params.int_val);
+        }
         val_masked = trans_ir_type_conversion(ts, &ir_type_i8, false,
                                               ir_expr_type(val_masked), false,
                                               val_masked, ir_stmts);
