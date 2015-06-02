@@ -134,7 +134,7 @@ ir_expr_t *trans_create_anon_global(trans_state_t *ts, ir_type_t *type,
 }
 
 bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
-                             slist_t *indexs) {
+                             slist_t *indexs, bool *is_bitfield) {
     type = ast_type_unmod(type);
     if (type->type == TYPE_UNION) {
         return true;
@@ -151,6 +151,18 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
             if (node->id == NULL) {
                 continue;
             }
+
+            if (strcmp(node->id, mem_name) == 0) {
+                if (node->expr != NULL) {
+                    *is_bitfield = true;
+                } else {
+                    ir_expr_t *index =
+                        ir_int_const(ts->tunit, &ir_type_i32, offset);
+                    sl_prepend(indexs, &index->link);
+                }
+                return true;
+            }
+
             if (node->expr == NULL) {
                 bitfield_last = false;
             } else {
@@ -158,12 +170,6 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
                     continue;
                 }
                 bitfield_last = true;
-            }
-            if (strcmp(node->id, mem_name) == 0) {
-                ir_expr_t *index =
-                    ir_int_const(ts->tunit, &ir_type_i32, offset);
-                sl_prepend(indexs, &index->link);
-                return true;
             }
             ++offset;
         }
