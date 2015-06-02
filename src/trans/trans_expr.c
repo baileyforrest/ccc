@@ -22,6 +22,8 @@
 
 #include "trans_expr.h"
 
+#include <limits.h>
+
 #include "trans_decl.h"
 #include "trans_intrinsic.h"
 #include "trans_init.h"
@@ -101,6 +103,17 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
     }
     case EXPR_ASSIGN: {
+        if (expr->assign.dest->type == EXPR_MEM_ACC) {
+            expr_t *mem_acc = expr->assign.dest;
+            type_t *compound = mem_acc->mem_acc.base->etype;
+            decl_node_t *node = ast_type_find_member(compound,
+                                                     mem_acc->mem_acc.name,
+                                                     NULL, NULL);
+            assert(node != NULL);
+            if (node->expr != NULL) {
+                return trans_assign_bitfield(ts, ir_stmts, expr);
+            }
+        }
         ir_expr_t *dest_addr = trans_expr(ts, true, expr->assign.dest,
                                           ir_stmts);
         if (expr->assign.op == OP_NOP) {
@@ -589,6 +602,214 @@ ir_expr_t *trans_assign(trans_state_t *ts, ir_expr_t *dest_ptr,
     return src;
 }
 
+ir_expr_t *trans_assign_bitfield(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                                 expr_t *expr) {
+    assert(expr->type == EXPR_ASSIGN);
+    assert(expr->assign.dest->type == EXPR_MEM_ACC);
+
+    ir_expr_t *val;
+    if (expr->assign.op != OP_NOP) {
+        type_t *max_type;
+        bool result = typecheck_type_max(ts->ast_tunit, NULL,
+                                         expr->assign.expr->etype,
+                                         expr->etype, &max_type);
+        assert(result && max_type != NULL);
+        ir_expr_t *dest;
+        ir_expr_t *op_expr = trans_binop(ts, expr->assign.dest, NULL,
+                                         expr->assign.expr, expr->assign.op,
+                                         max_type, ir_stmts, &dest);
+
+        val = trans_assign_temp(ts, ir_stmts, op_expr);
+    } else {
+        val = trans_expr(ts, false, expr->assign.expr, ir_stmts);
+    }
+
+    expr_t *mem_acc = expr->assign.dest;
+    bool addrof = mem_acc->mem_acc.op == OP_DOT;
+    ir_expr_t *addr = trans_expr(ts, addrof, mem_acc->mem_acc.base, ir_stmts);
+
+    return trans_assign_bitfield_ir(ts, ir_stmts, mem_acc->mem_acc.base->etype,
+                                    mem_acc->mem_acc.name, addr, val);
+}
+
+// I hate bitfields!
+ir_expr_t *trans_assign_bitfield_ir(trans_state_t *ts,
+                                    ir_inst_stream_t *ir_stmts, type_t *type,
+                                    char *field_name, ir_expr_t *addr,
+                                    ir_expr_t *val) {
+    ir_type_t *ir_type = trans_type(ts, type);
+    if (ir_type->type == IR_TYPE_ID_STRUCT) {
+        ir_type = ir_type->id_struct.type;
+    }
+    assert(ir_type->type == IR_TYPE_STRUCT);
+
+    int mem_num = 0;
+    size_t bitfield_offset = 0;
+    ssize_t bits_total = -1;
+
+    struct_iter_t iter;
+    struct_iter_init(type, &iter);
+    do {
+        if (iter.node != NULL) {
+            if (iter.node->expr != NULL) {
+                assert(iter.node->expr->type == EXPR_CONST_INT);
+                size_t bf_bits = iter.node->expr->const_val.int_val;
+
+                if (iter.node->id != NULL && strcmp(iter.node->id, field_name)
+                    == 0) {
+                    bits_total = bf_bits;
+                    break;
+                }
+
+                if (bf_bits == 0) {
+                    int remain = bitfield_offset % CHAR_BIT;
+                    if (remain != 0) {
+                        bitfield_offset += CHAR_BIT - remain;
+                    }
+                } else {
+                    bitfield_offset += bf_bits;
+                }
+            } else {
+                // Skip members with no id or bitfield specified
+                if (iter.node->id == NULL) {
+                    continue;
+                }
+                bitfield_offset = 0;
+                ++mem_num;
+            }
+        }
+
+        if (iter.node == NULL && iter.decl != NULL &&
+            (iter.decl->type->type == TYPE_STRUCT ||
+             iter.decl->type->type == TYPE_UNION)) {
+            ++mem_num;
+            bitfield_offset = 0;
+        }
+    } while (struct_iter_advance(&iter));
+
+    assert(bits_total != -1); // Must have found the member if typechecked
+
+    ir_type_t *ir_arr_type = vec_get(&ir_type->struct_params.types, mem_num);
+    assert(ir_arr_type->type == IR_TYPE_ARR);
+
+    ir_expr_t *bf_arr_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+    bf_arr_addr->getelemptr.type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+    bf_arr_addr->getelemptr.type->ptr.base = ir_arr_type;
+    bf_arr_addr->getelemptr.ptr_type = ir_expr_type(addr);
+    bf_arr_addr->getelemptr.ptr_val = addr;
+
+    ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+    sl_append(&bf_arr_addr->getelemptr.idxs, &zero->link); // Get structure
+    ir_expr_t *offset = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
+    sl_append(&bf_arr_addr->getelemptr.idxs, &offset->link); // Get bf array
+
+    bf_arr_addr = trans_assign_temp(ts, ir_stmts, bf_arr_addr);
+
+    size_t arr_idx = bitfield_offset / CHAR_BIT;
+    bitfield_offset %= CHAR_BIT;
+    ssize_t bit_offset = 0;
+
+    while (bit_offset < bits_total) {
+        int bits = CHAR_BIT;
+        int mask = 0;
+        int upto = bit_offset + CHAR_BIT;
+
+        if (bitfield_offset != 0) { // Mask away lower bits
+            mask |= (1 << bitfield_offset) - 1;
+            bits -= bitfield_offset;
+            upto = CHAR_BIT - bitfield_offset;
+        }
+        if (upto > bits_total) { // Mask away upper bits
+            mask |= ((1 << (upto - bits_total)) - 1)
+                << (bits_total - bit_offset + bitfield_offset);
+            bits -= upto - bits_total - bitfield_offset;
+        }
+
+        // Get the upto 8 bit value from between [bit_offset, until_bit)
+        ir_expr_t *val_shifted;
+        int shift = 0;
+        if (bitfield_offset > 0) {
+            shift = bitfield_offset;
+            bitfield_offset = 0;
+        } else {
+            shift = -bit_offset;
+        }
+        if (shift == 0) {
+            val_shifted = val;
+        } else {
+            val_shifted = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+            val_shifted->binop.op = shift > 0 ? IR_OP_SHL : IR_OP_LSHR;
+            val_shifted->binop.type = ir_expr_type(val);
+            val_shifted->binop.expr1 = val;
+            val_shifted->binop.expr2 = ir_int_const(ts->tunit,
+                                                    ir_expr_type(val),
+                                                    abs(shift));
+            val_shifted = trans_assign_temp(ts, ir_stmts, val_shifted);
+        }
+
+        ir_expr_t *val_masked;
+        if (mask == 0) {
+            val_masked = val_shifted;
+        } else {
+            val_masked = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+            val_masked->binop.op = IR_OP_AND;
+            val_masked->binop.type = ir_expr_type(val);
+            val_masked->binop.expr1 = val_shifted;
+            val_masked->binop.expr2 = ir_int_const(ts->tunit, ir_expr_type(val),
+                                                   ~mask);
+            val_masked = trans_assign_temp(ts, ir_stmts, val_masked);
+        }
+        val_masked = trans_ir_type_conversion(ts, &ir_type_i8, false,
+                                              ir_expr_type(val_masked), false,
+                                              val_masked, ir_stmts);
+
+        ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+        cur_addr->getelemptr.type = &ir_type_i8_ptr;
+        cur_addr->getelemptr.ptr_type = ir_expr_type(bf_arr_addr);
+        cur_addr->getelemptr.ptr_val = bf_arr_addr;
+
+        ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+        sl_append(&cur_addr->getelemptr.idxs, &zero->link); // Get array
+
+        ir_expr_t *idx = ir_int_const(ts->tunit, &ir_type_i32, arr_idx);
+        sl_append(&cur_addr->getelemptr.idxs, &idx->link); // Get index
+
+        cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
+
+        ir_expr_t *store_val;
+        if (bits == CHAR_BIT) { // Storing whole byte, just store masked value
+            store_val = val_masked;
+        } else {
+            ir_expr_t *load_val = trans_load_temp(ts, ir_stmts, cur_addr);
+
+            ir_expr_t *load_masked = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+            load_masked->binop.op = IR_OP_AND;
+            load_masked->binop.type = ir_expr_type(load_val);
+            load_masked->binop.expr1 = load_val;
+            load_masked->binop.expr2 = ir_int_const(ts->tunit,
+                                                    &ir_type_i8, mask);
+            load_masked = trans_assign_temp(ts, ir_stmts, load_masked);
+
+            store_val = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
+            store_val->binop.op = IR_OP_OR;
+            store_val->binop.type = &ir_type_i8;
+            store_val->binop.expr1 = load_masked;
+            store_val->binop.expr2 = val_masked;
+            store_val = trans_assign_temp(ts, ir_stmts, store_val);
+        }
+
+        ir_stmt_t *ir_stmt = ir_stmt_create(ts->tunit, IR_STMT_STORE);
+        ir_stmt->store.type = &ir_type_i8;
+        ir_stmt->store.val = store_val;
+        ir_stmt->store.ptr = cur_addr;
+        trans_add_stmt(ts, ir_stmts, ir_stmt);
+
+        bit_offset += bits;
+        ++arr_idx;
+    }
+
+    return val;
+}
 
 ir_expr_t *trans_expr_bool(trans_state_t *ts, ir_expr_t *expr,
                            ir_inst_stream_t *ir_stmts) {

@@ -142,6 +142,7 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
 
     assert(type->type == TYPE_STRUCT);
 
+    bool bitfield_last = false;
     size_t offset = 0;
     SL_FOREACH(cur_decl, &type->struct_params.decls) {
         decl_t *decl = GET_ELEM(&type->struct_params.decls, cur_decl);
@@ -149,6 +150,14 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
             decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
             if (node->id == NULL) {
                 continue;
+            }
+            if (node->expr == NULL) {
+                bitfield_last = false;
+            } else {
+                if (bitfield_last) {
+                    continue;
+                }
+                bitfield_last = true;
             }
             if (strcmp(node->id, mem_name) == 0) {
                 ir_expr_t *index =
@@ -170,6 +179,7 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
                 return true;
             }
             ++offset;
+            bitfield_last = false;
         }
     }
 
