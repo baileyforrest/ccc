@@ -307,11 +307,8 @@ void trans_struct_init_finalize_bf_array(trans_state_t *ts,
     size_t bitfield_offset = *pbitfield_offset;
     uint8_t cur_byte = *pcur_byte;
 
-    ir_type_t *arr_type = ir_expr_type(arr_lit);
-    assert(arr_type->type == IR_TYPE_ARR);
-
-    // Add upto the end of the bitfield array, zeroing unused bytes
-    if (bitfield_offset / CHAR_BIT < arr_type->arr.nelems) {
+    // Add any remaining bits
+    if (bitfield_offset % CHAR_BIT != 0) {
         ir_expr_t *ir_elem = ir_int_const(ts->tunit, &ir_type_i8, cur_byte);
         sl_append(&arr_lit->const_params.arr_val, &ir_elem->link);
     }

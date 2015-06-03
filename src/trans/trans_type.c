@@ -178,6 +178,18 @@ ir_expr_t *trans_ir_type_conversion(trans_state_t *ts, ir_type_t *dest_type,
     return trans_assign_temp(ts, ir_stmts, convert);
 }
 
+void trans_type_bitfield_finalizer(trans_state_t *ts, int *bitfield_bits,
+                                   ir_type_t *ir_type) {
+    if (*bitfield_bits == 0) {
+        return;
+    }
+
+    ir_type_t *bf_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+    bf_type->arr.nelems = (*bitfield_bits + (CHAR_BIT - 1)) / CHAR_BIT;
+    bf_type->arr.elem_type = &ir_type_i8;
+    vec_push_back(&ir_type->struct_params.types, bf_type);
+    *bitfield_bits = 0;
+}
 
 ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
     ir_type_t *ir_type = NULL;
@@ -266,16 +278,8 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
                         }
                         bitfield_bits += decl_bf_bits;
                     } else {
-                        if (bitfield_bits != 0) {
-                            ir_type_t *bf_type = ir_type_create(ts->tunit,
-                                                                IR_TYPE_ARR);
-                            bf_type->arr.nelems =
-                                (bitfield_bits + (CHAR_BIT - 1)) / CHAR_BIT;
-                            bf_type->arr.elem_type = &ir_type_i8;
-                            vec_push_back(&ir_type->struct_params.types,
-                                          bf_type);
-                            bitfield_bits = 0;
-                        }
+                        trans_type_bitfield_finalizer(ts, &bitfield_bits,
+                                                      ir_type);
                         ir_type_t *node_type = trans_type(ts, node->type);
                         vec_push_back(&ir_type->struct_params.types, node_type);
                     }
@@ -286,6 +290,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
             if (sl_head(&decl->decls) == NULL &&
                 (decl->type->type == TYPE_STRUCT ||
                  decl->type->type == TYPE_UNION)) {
+                trans_type_bitfield_finalizer(ts, &bitfield_bits, ir_type);
                 if (is_union) {
                     size_t size = ast_type_size(decl->type);
                     if (size > max_size) {
@@ -300,15 +305,7 @@ ir_type_t *trans_type(trans_state_t *ts, type_t *type) {
         }
 
         // Handle trailing bitfield bits
-        if (bitfield_bits != 0) {
-            ir_type_t *bf_type = ir_type_create(ts->tunit,
-                                                IR_TYPE_ARR);
-            bf_type->arr.nelems =
-                bitfield_bits + (CHAR_BIT - 1) / CHAR_BIT;
-            bf_type->arr.elem_type = &ir_type_i8;
-            vec_push_back(&ir_type->struct_params.types,
-                          bf_type);
-        }
+        trans_type_bitfield_finalizer(ts, &bitfield_bits, ir_type);
 
         if (is_union && max_type != NULL) {
             ir_type_t *ir_max_type = trans_type(ts, max_type);
