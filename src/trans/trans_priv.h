@@ -68,7 +68,7 @@ ir_expr_t *trans_create_anon_global(trans_state_t *ts, ir_type_t *type,
                                     ir_gdata_flags_t flags);
 
 bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
-                             slist_t *indexs, bool *is_bitfield);
+                             slist_t *indexs);
 
 
 

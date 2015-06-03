@@ -683,6 +683,8 @@ size_t ast_get_member_num(type_t *type, char *name);
 decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
                                   size_t *mem_num);
 
+bool ast_is_mem_acc_bitfield(expr_t *expr);
+
 /**
  * Returns a type with its typedefs removed
  *

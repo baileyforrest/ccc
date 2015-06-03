@@ -443,7 +443,15 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         }
 
         ir_expr_t *pointer;
-        // Unions are handled differently
+        // Handle bitfields
+        if (ast_is_mem_acc_bitfield(expr)) {
+            pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
+            return trans_bitfield_helper(ts, ir_stmts,
+                                         expr->mem_acc.base->etype,
+                                         expr->mem_acc.name, pointer, NULL);
+        }
+
+        // Handle unions
         if (expr->type == EXPR_MEM_ACC &&
             ((expr->mem_acc.op == OP_DOT && base_type->type == TYPE_UNION) ||
              (expr->mem_acc.op == OP_ARROW &&
@@ -463,7 +471,6 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         elem_ptr->getelemptr.type = ptr_type;
 
         bool is_union = false;
-        bool is_bitfield = false;
         bool last_array = false;
         while ((expr->type == EXPR_MEM_ACC && expr->mem_acc.op == OP_DOT)
             || expr->type == EXPR_ARR_IDX) {
@@ -474,11 +481,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
                 }
                 trans_struct_mem_offset(ts, expr->mem_acc.base->etype,
                                         expr->mem_acc.name,
-                                        &elem_ptr->getelemptr.idxs,
-                                        &is_bitfield);
-                if (is_bitfield) {
-                    break;
-                }
+                                        &elem_ptr->getelemptr.idxs);
                 expr = expr->mem_acc.base;
             } else { // expr->type == EXPR_ARR_IDX
                 type_t *arr_type = ast_type_unmod(expr->arr_idx.array->etype);
@@ -514,7 +517,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
         if (!last_array && !is_union && expr->type == EXPR_MEM_ACC) {
             assert(expr->mem_acc.op == OP_ARROW);
             trans_struct_mem_offset(ts, etype->ptr.base, expr->mem_acc.name,
-                                    &elem_ptr->getelemptr.idxs, &is_bitfield);
+                                    &elem_ptr->getelemptr.idxs);
 
             pointer = trans_expr(ts, false, expr->mem_acc.base, ir_stmts);
             prepend_zero = true;
@@ -542,19 +545,10 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
             sl_prepend(&elem_ptr->getelemptr.idxs, &zero->link);
         }
-
         elem_ptr->getelemptr.ptr_type = ir_expr_type(pointer);
         elem_ptr->getelemptr.ptr_val = pointer;
 
         ir_expr_t *ptr = trans_assign_temp(ts, ir_stmts, elem_ptr);
-
-        if (is_bitfield) {
-            assert(!addrof); // Can't take address of bitfield
-            assert(expr->type == EXPR_MEM_ACC);
-            return trans_bitfield_helper(ts, ir_stmts,
-                                         expr->mem_acc.base->etype,
-                                         expr->mem_acc.name, ptr, NULL);
-        }
 
         if (addrof) {
             return ptr;
@@ -837,6 +831,10 @@ ir_expr_t *trans_bitfield_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                 load_masked = trans_assign_temp(ts, ir_stmts, load_masked);
             }
 
+            load_masked = trans_ir_type_conversion(ts, node_type, false,
+                                                   &ir_type_i8, false,
+                                                   load_masked, ir_stmts);
+
             int shift = 0;
             if (bitfield_offset > 0) {
                 shift = -bitfield_offset;
@@ -851,25 +849,22 @@ ir_expr_t *trans_bitfield_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
             } else {
                 load_shifted = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
                 load_shifted->binop.op = shift > 0 ? IR_OP_SHL : IR_OP_LSHR;
-                load_shifted->binop.type = ir_expr_type(val);
-                load_shifted->binop.expr1 = val;
+                load_shifted->binop.type = node_type;
+                load_shifted->binop.expr1 = load_masked;
                 load_shifted->binop.expr2 = ir_int_const(ts->tunit,
-                                                         ir_expr_type(val),
+                                                         node_type,
                                                          abs(shift));
                 load_shifted = trans_assign_temp(ts, ir_stmts, load_shifted);
             }
-            load_shifted = trans_ir_type_conversion(ts, node_type, false,
-                                                    &ir_type_i8, false,
-                                                    load_shifted, ir_stmts);
 
             if (val == NULL) {
                 val = load_shifted;
             } else {
                 ir_expr_t *new_val = ir_expr_create(ts->tunit, IR_EXPR_BINOP);
-                load_shifted->binop.op = IR_OP_OR;
-                load_shifted->binop.type = ir_expr_type(val);
-                load_shifted->binop.expr1 = val;
-                load_shifted->binop.expr2 = load_shifted;
+                new_val->binop.op = IR_OP_OR;
+                new_val->binop.type = ir_expr_type(val);
+                new_val->binop.expr1 = val;
+                new_val->binop.expr2 = load_shifted;
 
                 val = trans_assign_temp(ts, ir_stmts, new_val);
             }

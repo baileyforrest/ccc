@@ -1029,7 +1029,7 @@ size_t ast_get_member_num(type_t *type, char *name) {
 }
 
 decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
-                             size_t *mem_num) {
+                                  size_t *mem_num) {
     assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
     size_t cur_offset = 0;
     size_t cur_mem_num = 0;
@@ -1092,6 +1092,29 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
         *mem_num = cur_mem_num;
     }
     return result;
+}
+
+bool ast_is_mem_acc_bitfield(expr_t *expr) {
+    if (expr->type != EXPR_MEM_ACC) {
+        return false;
+    }
+    type_t *type = ast_type_unmod(expr->mem_acc.base->etype);
+    if (type->type == TYPE_PTR) {
+        type = ast_type_unmod(type->ptr.base);
+    }
+    assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
+
+    struct_iter_t iter;
+    struct_iter_init(type, &iter);
+    do {
+        if (iter.node != NULL && iter.node->id != NULL) {
+            if (strcmp(iter.node->id, expr->mem_acc.name) == 0) {
+                return iter.node->expr != NULL;
+            }
+        }
+    } while (struct_iter_advance(&iter));
+
+    return false;
 }
 
 type_t *ast_type_untypedef(type_t *type) {
