@@ -739,7 +739,7 @@ ir_expr_t *trans_bitfield_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
         if (upto > bits_total) { // Mask away upper bits
             mask |= ((1 << (upto - bits_total)) - 1)
                 << (bits_total - bit_offset + bitfield_offset);
-            bits -= upto - bits_total - bitfield_offset;
+            bits -= upto - bits_total;
         }
 
         ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);

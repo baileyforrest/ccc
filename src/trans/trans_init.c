@@ -22,6 +22,8 @@
 
 #include "trans_init.h"
 
+#include <limits.h>
+
 #include "trans_expr.h"
 #include "trans_intrinsic.h"
 #include "trans_type.h"
@@ -239,16 +241,64 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     return arr_lit;
 }
 
+void trans_struct_init_finalize_bf_array(trans_state_t *ts,
+                                         ir_expr_t **parr_lit,
+                                         size_t *pbitfield_offset,
+                                         uint8_t *pcur_byte,
+                                         size_t *ir_type_off,
+                                         ir_expr_t *struct_lit) {
+    ir_expr_t *arr_lit = *parr_lit;
+    if (arr_lit == NULL) {
+        return;
+    }
+    size_t bitfield_offset = *pbitfield_offset;
+    uint8_t cur_byte = *pcur_byte;
+
+    ir_type_t *arr_type = ir_expr_type(arr_lit);
+    assert(arr_type->type == IR_TYPE_ARR);
+
+    // Add upto the end of the bitfield array, zeroing unused bytes
+    if (bitfield_offset / CHAR_BIT < arr_type->arr.nelems) {
+        ir_expr_t *ir_elem = ir_int_const(ts->tunit, &ir_type_i8, cur_byte);
+        sl_append(&arr_lit->const_params.arr_val, &ir_elem->link);
+    }
+
+    ++(*ir_type_off);
+    sl_append(&struct_lit->const_params.struct_val, &arr_lit->link);
+
+    // Reset state
+    *parr_lit = NULL;
+    *pbitfield_offset = 0;
+    *pcur_byte = 0;
+}
+
+void trans_struct_init_append_val(trans_state_t *ts, ir_type_t *cur_type,
+                                  expr_t *expr, sl_link_t **cur_elem,
+                                  size_t *ir_type_off, ir_expr_t *struct_lit) {
+    ir_expr_t *ir_elem;
+    if (*cur_elem == NULL) {
+        ir_elem = ir_expr_zero(ts->tunit, cur_type);
+    } else {
+        expr_t *elem = GET_ELEM(&expr->init_list.exprs, *cur_elem);
+        ir_elem = trans_expr(ts, false, elem, NULL);
+        ir_elem = trans_ir_type_conversion(ts, cur_type, false,
+                                           ir_expr_type(ir_elem), false,
+                                           ir_elem, NULL);
+        *cur_elem = (*cur_elem)->next;
+    }
+    ++(*ir_type_off);
+    sl_append(&struct_lit->const_params.struct_val, &ir_elem->link);
+}
+
 ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
     assert(expr->type == EXPR_INIT_LIST);
     assert(expr->etype->type == TYPE_STRUCT);
 
     ir_type_t *type = trans_type(ts, expr->etype);
-    assert(type->type == IR_TYPE_STRUCT || type->type == IR_TYPE_ID_STRUCT);
     if (type->type == IR_TYPE_ID_STRUCT) {
         type = type->id_struct.type;
-        assert(type->type == IR_TYPE_STRUCT);
     }
+    assert(type->type == IR_TYPE_STRUCT);
 
     ir_expr_t *struct_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
     sl_init(&struct_lit->const_params.struct_val, offsetof(ir_expr_t, link));
@@ -256,23 +306,118 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
     struct_lit->const_params.type = type;
 
     sl_link_t *cur_elem = expr->init_list.exprs.head;
-    VEC_FOREACH(cur, &type->struct_params.types) {
-        ir_type_t *cur_type = vec_get(&type->struct_params.types, cur);
+    size_t ir_type_off = 0;
+    ir_expr_t *arr_lit = NULL;
+    size_t bitfield_offset = 0;
+    uint8_t cur_byte;
 
-        ir_expr_t *ir_elem;
-        if (cur_elem == NULL) {
-            ir_elem = ir_expr_zero(ts->tunit, cur_type);
-        } else {
-            expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
-            ir_elem = trans_expr(ts, false, elem, NULL);
-            ir_elem = trans_ir_type_conversion(ts, cur_type, false,
-                                               ir_expr_type(ir_elem), false,
-                                               ir_elem, NULL);
-            cur_elem = cur_elem->next;
+    struct_iter_t iter;
+    struct_iter_init(expr->etype, &iter);
+    do {
+        // If we were filling in bitfield elems, and this element is not a
+        // bitfield, finalize the bitfield array
+        if (arr_lit != NULL &&
+            !(iter.node != NULL && iter.node->expr != NULL)) {
+            trans_struct_init_finalize_bf_array(ts, &arr_lit, &bitfield_offset,
+                                                &cur_byte, &ir_type_off,
+                                                struct_lit);
         }
-        sl_append(&struct_lit->const_params.struct_val, &ir_elem->link);
-    }
 
+        ir_type_t *cur_type = vec_get(&type->struct_params.types, ir_type_off);
+
+        if (iter.node != NULL) {
+            if (iter.node->expr != NULL) { // Bitfield
+                assert(iter.node->expr->type == EXPR_CONST_INT);
+                int bf_bits = iter.node->expr->const_val.int_val;
+                if (cur_type->type != IR_TYPE_ARR) {
+                    continue;
+                }
+                if (arr_lit == NULL) {
+                    arr_lit = ir_expr_create(ts->tunit, IR_EXPR_CONST);
+                    sl_init(&arr_lit->const_params.struct_val,
+                            offsetof(ir_expr_t, link));
+                    arr_lit->const_params.ctype = IR_CONST_ARR;
+                    arr_lit->const_params.type = cur_type;
+                    bitfield_offset = 0;
+                    cur_byte = 0;
+                }
+                if (bf_bits == 0) { // Align to next bit
+                    if (bitfield_offset != 0) {
+                        ir_expr_t *ir_elem = ir_int_const(ts->tunit,
+                                                          &ir_type_i8,
+                                                          cur_byte);
+                        sl_append(&arr_lit->const_params.arr_val,
+                                  &ir_elem->link);
+                        cur_byte = 0;
+                    }
+                    continue;
+                }
+
+                long long val = 0;
+                if (cur_elem != NULL) {
+                    expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
+                    // TODO0: This assertion isn't correct
+                    assert(elem->type == EXPR_CONST_INT);
+                    val = elem->const_val.int_val;
+                    cur_elem = cur_elem->next;
+                }
+                int offset = 0;
+                while (offset < bf_bits) {
+                    int bits = CHAR_BIT;
+                    int mask = 0;
+                    int upto = offset + CHAR_BIT;
+
+                    if (bitfield_offset != 0) { // Mask away lower bits
+                        mask |= (1 << bitfield_offset) - 1;
+                        bits -= bitfield_offset;
+                        upto = CHAR_BIT - bitfield_offset;
+                    }
+                    if (upto > bf_bits) { // Mask away upper bits
+                        mask |= ((1 << (upto - bf_bits)) - 1)
+                            << (bf_bits - offset + bitfield_offset);
+                        bits -= upto - bf_bits;
+                    }
+                    long long temp = val;
+                    if (bitfield_offset > 0) {
+                        temp <<= bitfield_offset;
+                    } else {
+                        temp >>= offset;
+                    }
+                    temp &= ~mask;
+
+                    cur_byte |= temp;
+
+                    bitfield_offset += bits;
+
+                    if (bitfield_offset >= CHAR_BIT) {
+                        ir_expr_t *ir_elem = ir_int_const(ts->tunit,
+                                                          &ir_type_i8,
+                                                          cur_byte);
+                        sl_append(&arr_lit->const_params.arr_val,
+                                  &ir_elem->link);
+                        bitfield_offset %= CHAR_BIT;
+                        cur_byte = 0;
+                    }
+
+                    offset += bits;
+                }
+
+            } else if (iter.node->id != NULL) {
+                trans_struct_init_append_val(ts, cur_type, expr, &cur_elem,
+                                             &ir_type_off, struct_lit);
+            }
+        }
+        // Anonymous struct/union
+        if (iter.node == NULL && iter.decl != NULL &&
+            (iter.decl->type->type == TYPE_STRUCT ||
+             iter.decl->type->type == TYPE_UNION)) {
+            trans_struct_init_append_val(ts, cur_type, expr, &cur_elem,
+                                         &ir_type_off, struct_lit);
+        }
+    } while (struct_iter_advance(&iter));
+
+    trans_struct_init_finalize_bf_array(ts, &arr_lit, &bitfield_offset,
+                                        &cur_byte, &ir_type_off, struct_lit);
     return struct_lit;
 }
 
