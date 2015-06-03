@@ -1035,15 +1035,50 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
     size_t cur_mem_num = 0;
     decl_node_t *result = NULL;
 
+    size_t bitfield_bits = 0;
+
+#define BITFIELD_FINALIZER()                                \
+    (cur_offset += (bitfield_bits + (CHAR_BIT - 1)) / CHAR_BIT, \
+     bitfield_bits = 0)
+
     struct_iter_t iter;
     struct_iter_init(type, &iter);
     do {
+        if (bitfield_bits != 0 &&
+            !(iter.node != NULL && iter.node->expr != NULL)) {
+            BITFIELD_FINALIZER();
+        }
         type_t *cur_type = NULL;
-        if (iter.node != NULL && iter.node->id != NULL) {
-            cur_type = iter.node->type;
-
-            if (strcmp(iter.node->id, name) == 0) {
+        if (iter.node != NULL) {
+            if (iter.node->id != NULL && strcmp(iter.node->id, name) == 0) {
                 result = iter.node;
+            }
+
+            if (iter.node->expr != NULL) {
+                if (bitfield_bits == 0) {
+                    size_t align = ast_type_align(iter.node->type);
+                    size_t remain = cur_offset % align;
+                    if (remain != 0) {
+                        cur_offset += align - remain;
+                    }
+                }
+
+                // Bitfield bits
+                assert(iter.node->expr->type == EXPR_CONST_INT);
+                int decl_bf_bits = iter.node->expr->const_val.int_val;
+
+                // 0 bitfield bits causes next field to be aligned at
+                // byte boundary
+                if (decl_bf_bits == 0) {
+                    size_t remain = bitfield_bits % CHAR_BIT;
+                    if (remain != 0) {
+                        bitfield_bits += CHAR_BIT - remain;
+                    }
+                    continue;
+                }
+                bitfield_bits += decl_bf_bits;
+            } else if (iter.node->id != NULL) {
+                cur_type = iter.node->type;
             }
         }
 
@@ -1083,6 +1118,10 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
             }
         }
     } while (struct_iter_advance(&iter));
+
+    if (bitfield_bits != 0) {
+        BITFIELD_FINALIZER();
+    }
 
     if (offset != NULL) {
         *offset = cur_offset;
