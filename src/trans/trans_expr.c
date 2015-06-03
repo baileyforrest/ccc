@@ -685,25 +685,42 @@ ir_expr_t *trans_bitfield_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
             bitfield_offset = 0;
         }
     } while (struct_iter_advance(&iter));
-
     assert(node != NULL); // Must have found the member if typechecked
     ir_type_t *node_type = trans_type(ts, node->type);
 
-    ir_type_t *ir_arr_type = vec_get(&ir_type->struct_params.types, mem_num);
-    assert(ir_arr_type->type == IR_TYPE_ARR);
+    ir_expr_t *bf_arr_addr;
+    if (type->type == TYPE_UNION) {
+        bitfield_offset = 0;
 
-    ir_expr_t *bf_arr_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
-    bf_arr_addr->getelemptr.type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-    bf_arr_addr->getelemptr.type->ptr.base = ir_arr_type;
-    bf_arr_addr->getelemptr.ptr_type = ir_expr_type(addr);
-    bf_arr_addr->getelemptr.ptr_val = addr;
+        // Union: Cast to i8 arr of largest bitfield size
+        ir_type_t *ir_arr_type = ir_type_create(ts->tunit, IR_TYPE_ARR);
+        ir_arr_type->arr.nelems = sizeof(long long);
+        ir_arr_type->arr.elem_type = &ir_type_i8;
 
-    ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
-    sl_append(&bf_arr_addr->getelemptr.idxs, &zero->link); // Get structure
-    ir_expr_t *offset = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
-    sl_append(&bf_arr_addr->getelemptr.idxs, &offset->link); // Get bf array
+        ir_type_t *ir_arr_ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        ir_arr_ptr_type->ptr.base = ir_arr_type;
 
-    bf_arr_addr = trans_assign_temp(ts, ir_stmts, bf_arr_addr);
+        bf_arr_addr = trans_ir_type_conversion(ts, ir_arr_ptr_type, false,
+                                               ir_expr_type(addr), false,
+                                               addr, ir_stmts);
+    } else {
+        ir_type_t *ir_arr_type = vec_get(&ir_type->struct_params.types,
+                                         mem_num);
+        assert(ir_arr_type->type == IR_TYPE_ARR);
+
+        bf_arr_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+        bf_arr_addr->getelemptr.type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+        bf_arr_addr->getelemptr.type->ptr.base = ir_arr_type;
+        bf_arr_addr->getelemptr.ptr_type = ir_expr_type(addr);
+        bf_arr_addr->getelemptr.ptr_val = addr;
+
+        ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
+        sl_append(&bf_arr_addr->getelemptr.idxs, &zero->link); // Get structure
+        ir_expr_t *offset = ir_int_const(ts->tunit, &ir_type_i32, mem_num);
+        sl_append(&bf_arr_addr->getelemptr.idxs, &offset->link); // Get bf array
+
+        bf_arr_addr = trans_assign_temp(ts, ir_stmts, bf_arr_addr);
+    }
 
     size_t arr_idx = bitfield_offset / CHAR_BIT;
     bitfield_offset %= CHAR_BIT;
