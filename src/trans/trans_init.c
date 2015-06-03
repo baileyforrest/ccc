@@ -32,37 +32,9 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                        type_t *ast_type, ir_type_t *ir_type, ir_expr_t *addr,
                        expr_t *val) {
     switch (ast_type->type) {
-    case TYPE_STRUCT: {
-        assert(val == NULL || val->type == EXPR_INIT_LIST);
-        assert(ir_type->type == IR_TYPE_STRUCT ||
-               ir_type->type == IR_TYPE_ID_STRUCT);
-
-        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ptr_type->ptr.base = ir_type;
-
-        size_t offset = 0;
-        sl_link_t *cur_expr = val->init_list.exprs.head;
-        SL_FOREACH(cur_decl, &ast_type->struct_params.decls) {
-            decl_t *decl = GET_ELEM(&ast_type->struct_params.decls, cur_decl);
-            SL_FOREACH(cur_node, &decl->decls) {
-                decl_node_t *node = GET_ELEM(&decl->decls, cur_node);
-                trans_struct_init_helper(ts, ir_stmts, node->type,
-                                         ir_type, addr, val, ptr_type,
-                                         &cur_expr, offset);
-                ++offset;
-            }
-
-            if (sl_head(&decl->decls) == NULL &&
-                (decl->type->type == TYPE_STRUCT ||
-                 decl->type->type == TYPE_UNION)) {
-                trans_struct_init_helper(ts, ir_stmts, decl->type,
-                                         ir_type, addr, val, ptr_type,
-                                         &cur_expr, offset);
-                ++offset;
-            }
-        }
+    case TYPE_STRUCT:
+        trans_initializer_struct(ts, ir_stmts, ast_type, ir_type, addr, val);
         break;
-    }
     case TYPE_ARR: {
         if (val != NULL && val->type == EXPR_CONST_STR) {
             assert(val->etype->type == TYPE_ARR);
@@ -161,6 +133,87 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
         trans_add_stmt(ts, ir_stmts, store);
     }
     }
+}
+
+void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                              type_t *ast_type, ir_type_t *ir_type,
+                              ir_expr_t *addr, expr_t *val) {
+    assert(val == NULL || val->type == EXPR_INIT_LIST);
+    assert(ir_type->type == IR_TYPE_STRUCT ||
+           ir_type->type == IR_TYPE_ID_STRUCT);
+
+    // Type for pointer to the structure
+    ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+    ptr_type->ptr.base = ir_type;
+
+    ir_type_t *struct_type = ir_type->type == IR_TYPE_ID_STRUCT ?
+        ir_type->id_struct.type : ir_type;
+
+    // Offset into ir struct type's members
+    size_t offset = 0;
+
+    // Current init list expr
+    sl_link_t *cur_expr = val->init_list.exprs.head;
+
+    struct_iter_t iter;
+    struct_iter_init(ast_type, &iter);
+    do {
+        type_t *cur_ast_type = NULL;
+
+        if (iter.node != NULL && iter.node->id != NULL) {
+            if (iter.node->expr != NULL) {
+                // Handle bitfields
+                ir_type_t *cur_type = trans_type(ts, iter.node->type);
+                ir_expr_t *cur_val;
+                if (cur_expr == NULL) {
+                    cur_val = ir_expr_zero(ts->tunit, cur_type);
+                } else {
+                    expr_t *elem = GET_ELEM(&val->init_list.exprs, cur_expr);
+                    cur_expr = cur_expr->next;
+                    cur_val = trans_expr(ts, false, elem, ir_stmts);
+                }
+                trans_bitfield_helper(ts, ir_stmts, ast_type, iter.node->id,
+                                      addr, cur_val);
+            } else {
+                cur_ast_type = iter.node->type;
+            }
+        }
+
+        // Anonymous struct/union
+        if (iter.node == NULL && iter.decl != NULL &&
+            (iter.decl->type->type == TYPE_STRUCT ||
+             iter.decl->type->type == TYPE_UNION)) {
+            cur_ast_type = iter.decl->type;
+        }
+
+        if (cur_ast_type != NULL) {
+            ir_type_t *cur_type = vec_get(&struct_type->struct_params.types,
+                                          offset);
+            ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
+            cur_addr->getelemptr.type = cur_type;
+            cur_addr->getelemptr.ptr_type = ptr_type;
+            cur_addr->getelemptr.ptr_val = addr;
+
+            // Point to the structure
+            ir_expr_t *ptr_offset = ir_expr_zero(ts->tunit, &ir_type_i32);
+            sl_append(&cur_addr->getelemptr.idxs, &ptr_offset->link);
+
+            // Get member offset
+            ptr_offset = ir_int_const(ts->tunit, &ir_type_i32, offset);
+            sl_append(&cur_addr->getelemptr.idxs, &ptr_offset->link);
+
+            cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
+
+            expr_t *elem = NULL;
+            if (cur_expr != NULL) {
+                elem = GET_ELEM(&val->init_list.exprs, cur_expr);
+                cur_expr = cur_expr->next;
+            }
+            trans_initializer(ts, ir_stmts, cur_ast_type, cur_type, cur_addr,
+                              elem);
+            ++offset;
+        }
+    } while (struct_iter_advance(&iter));
 }
 
 ir_expr_t *trans_string(trans_state_t *ts, char *str) {
@@ -420,41 +473,6 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
                                         &cur_byte, &ir_type_off, struct_lit);
     return struct_lit;
 }
-
-void trans_struct_init_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                              type_t *ast_type, ir_type_t *ir_type,
-                              ir_expr_t *addr, expr_t *val, ir_type_t *ptr_type,
-                              sl_link_t **cur_expr, size_t offset) {
-    if (ir_type->type == IR_TYPE_ID_STRUCT) {
-        ir_type = ir_type->id_struct.type;
-    }
-
-    ir_type_t *cur_type = vec_get(&ir_type->struct_params.types, offset);
-    ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
-    cur_addr->getelemptr.type = cur_type;
-    cur_addr->getelemptr.ptr_type = ptr_type;
-    cur_addr->getelemptr.ptr_val = addr;
-
-    // We need to 0's on getelemptr, one to get the struct, another
-    // to get the struct index
-    ir_expr_t *zero = ir_expr_zero(ts->tunit, &ir_type_i32);
-    sl_append(&cur_addr->getelemptr.idxs, &zero->link);
-
-    zero = ir_int_const(ts->tunit, &ir_type_i32, offset);
-    sl_append(&cur_addr->getelemptr.idxs, &zero->link);
-
-    cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
-
-    if (*cur_expr == NULL) {
-        trans_initializer(ts, ir_stmts, ast_type, cur_type, cur_addr, NULL);
-    } else {
-        expr_t *elem = GET_ELEM(&val->init_list.exprs, *cur_expr);
-        trans_initializer(ts, ir_stmts, ast_type, cur_type, cur_addr, elem);
-
-        *cur_expr = (*cur_expr)->next;
-    }
-}
-
 
 ir_expr_t *trans_union_init(trans_state_t *ts, type_t *type, expr_t *expr) {
     assert(expr->type == EXPR_INIT_LIST);

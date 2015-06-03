@@ -30,6 +30,10 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                        type_t *ast_type, ir_type_t *ir_type, ir_expr_t *addr,
                        expr_t *val);
 
+void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
+                              type_t *ast_type, ir_type_t *ir_type,
+                              ir_expr_t *addr, expr_t *val);
+
 ir_expr_t *trans_string(trans_state_t *ts, char *str);
 
 ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);
@@ -37,11 +41,6 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr);
 ir_expr_t *trans_union_init(trans_state_t *ts, type_t *type, expr_t *expr);
 
 ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr);
-
-void trans_struct_init_helper(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
-                              type_t *ast_type, ir_type_t *ir_type,
-                              ir_expr_t *addr, expr_t *val, ir_type_t *ptr_type,
-                              sl_link_t **cur_expr, size_t offset);
 
 ir_expr_t *trans_compound_literal(trans_state_t *ts, bool addrof,
                                   ir_inst_stream_t *ir_stmts,
