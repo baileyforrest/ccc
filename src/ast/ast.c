@@ -933,20 +933,21 @@ size_t ast_type_align(type_t *type) {
             return type->struct_params.ealign;
         }
         size_t align = 1;
-        SL_FOREACH(cur, &type->struct_params.decls) {
-            decl_t *decl = GET_ELEM(&type->struct_params.decls, cur);
-
-            SL_FOREACH(icur, &decl->decls) {
-                decl_node_t *decl_node = GET_ELEM(&decl->decls, icur);
-
-                // Bitfields have alignment requirement of 1
-                if (decl_node->expr != NULL) {
-                    continue;
-                }
-                size_t cur_align = ast_type_align(decl_node->type);
+        struct_iter_t iter;
+        struct_iter_init(type, &iter);
+        do {
+            if (iter.node != NULL && iter.node->id != NULL) {
+                size_t cur_align = ast_type_align(iter.node->type);
+                align = MAX(align, cur_align);
+            } else if (iter.node == NULL && iter.decl != NULL &&
+                       (iter.decl->type->type == TYPE_STRUCT ||
+                        iter.decl->type->type == TYPE_UNION)) {
+                // Anonymous struct/union
+                size_t cur_align = ast_type_align(iter.decl->type);
                 align = MAX(align, cur_align);
             }
-        }
+        } while (struct_iter_advance(&iter));
+
         type->struct_params.ealign = align;
         return align;
     }
