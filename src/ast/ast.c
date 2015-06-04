@@ -950,7 +950,7 @@ size_t ast_type_align(type_t *type) {
     return 0;
 }
 
-size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
+size_t ast_type_offset(type_t *type, designator_list_t *list) {
     size_t offset = 0;
     SL_FOREACH(cur, &list->list) {
         type = ast_type_unmod(type);

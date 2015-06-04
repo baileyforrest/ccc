@@ -267,9 +267,9 @@ typedef enum expr_type_t {
     EXPR_VA_COPY,     /**< __builtin_va_copy */
 } expr_type_t;
 
-typedef struct mem_acc_list_t {
+typedef struct designator_list_t {
     slist_t list; /**< (expr_t) List of EXPR_MEM_ACC and EXPR_ARR_IDX  */
-} mem_acc_list_t;
+} designator_list_t;
 
 /**
  * Tagged union for expressions
@@ -338,7 +338,7 @@ struct expr_t {
 
         struct {                    /**< Offsetof parameters */
             decl_t *type;           /**< Type to get offsetof */
-            mem_acc_list_t path;    /**< Accesses is path */
+            designator_list_t path;    /**< Accesses is path */
         } offsetof_params;
 
         struct {                    /**< Member access of a compound type */
@@ -660,7 +660,7 @@ size_t ast_type_align(type_t *type);
  * @return Returns the offset of the member in the type, or -1 if it isn't a
  *     member
  */
-size_t ast_type_offset(type_t *type, mem_acc_list_t *path);
+size_t ast_type_offset(type_t *type, designator_list_t *path);
 
 /**
  * Finds the type of a member in a struct or union type

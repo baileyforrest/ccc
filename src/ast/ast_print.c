@@ -514,7 +514,7 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         ast_directed_print(dest, remain, "__builtin_offsetof(");
         ast_decl_print(expr->offsetof_params.type, TYPE_VOID, 0, dest, remain);
         ast_directed_print(dest, remain, ", ");
-        ast_mem_acc_list_print(&expr->offsetof_params.path, true, dest, remain);
+        ast_designator_list_print(&expr->offsetof_params.path, true, dest, remain);
         ast_directed_print(dest, remain, ")");
         break;
     }
@@ -585,8 +585,8 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
     }
 }
 
-void ast_mem_acc_list_print(mem_acc_list_t *list, bool nodot, char **dest,
-                            size_t *remain) {
+void ast_designator_list_print(designator_list_t *list, bool nodot, char **dest,
+                               size_t *remain) {
     SL_FOREACH(cur, &list->list) {
         expr_t *cur_expr = GET_ELEM(&list->list, cur);
         switch (cur_expr->type) {

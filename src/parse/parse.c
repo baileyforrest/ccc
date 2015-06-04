@@ -1333,7 +1333,7 @@ fail:
     return status;
 }
 
-status_t par_mem_acc_list(lex_wrap_t *lex, mem_acc_list_t *list, bool nodot) {
+status_t par_designator_list(lex_wrap_t *lex, designator_list_t *list, bool nodot) {
     status_t status = CCC_OK;
     while (nodot || LEX_CUR(lex)->type == DOT ||
            LEX_CUR(lex)->type == LBRACK) {
@@ -1438,7 +1438,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             goto fail;
         }
         LEX_MATCH(lex, COMMA);
-        par_mem_acc_list(lex, &base->offsetof_params.path, true);
+        par_designator_list(lex, &base->offsetof_params.path, true);
         LEX_MATCH(lex, RPAREN);
         break;
 

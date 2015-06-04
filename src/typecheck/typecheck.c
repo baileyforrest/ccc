@@ -858,8 +858,8 @@ bool typecheck_type_conditional(fmark_t *mark, type_t *type) {
     return false;
 }
 
-bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
-                            mem_acc_list_t *list) {
+bool typecheck_designator_list(tc_state_t *tcs, type_t *type,
+                            designator_list_t *list) {
     SL_FOREACH(cur, &list->list) {
         type = ast_type_unmod(type);
         expr_t *cur_expr = GET_ELEM(&list->list, cur);
@@ -1911,8 +1911,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         decl_node_t *decl = sl_head(&expr->offsetof_params.type->decls);
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
-        retval &= typecheck_mem_acc_list(tcs, compound,
-                                         &expr->offsetof_params.path);
+        retval &= typecheck_designator_list(tcs, compound,
+                                            &expr->offsetof_params.path);
         expr->etype = tt_size_t;
         return true;
 
