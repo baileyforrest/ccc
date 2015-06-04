@@ -1061,18 +1061,29 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset) {
     struct_iter_t iter;
     struct_iter_init(type, &iter);
     do {
+        // If we were processing a bitfield, and we found a non bitfield member,
+        // then finalize bitfied offset
         if (bitfield_bits != 0 &&
             !(iter.node != NULL && iter.node->expr != NULL)) {
             BITFIELD_FINALIZER();
         }
-        type_t *cur_type = NULL;
+
+        type_t *cur_type = NULL; // Current member's type
+
         if (iter.node != NULL) {
-            if (iter.node->id != NULL && strcmp(iter.node->id, name) == 0) {
+            if (name != NULL && iter.node->id != NULL &&
+                strcmp(iter.node->id, name) == 0) {
                 result = iter.node;
             }
 
-            if (iter.node->expr != NULL && result == NULL) {
-                // Bitfield bits
+            if (iter.node->expr != NULL) {
+                // We don't need to align the member if its a bitfield,
+                // so exit loop
+                if (result != NULL) {
+                    break;
+                }
+
+                // Handle Bitfield bits
                 assert(iter.node->expr->type == EXPR_CONST_INT);
                 int decl_bf_bits = iter.node->expr->const_val.int_val;
 
@@ -1107,22 +1118,26 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset) {
              iter.decl->type->type == TYPE_UNION)) {
             cur_type = iter.decl->type;
 
-            size_t inner_offset;
-            decl_node_t *inner_node = ast_type_find_member(cur_type, name,
-                                                           &inner_offset);
-            if (inner_node != NULL) {
-                result = inner_node;
-                cur_offset += inner_offset;
+            if (name != NULL) { // Don't recursively search if no name
+                size_t inner_offset;
+                decl_node_t *inner_node = ast_type_find_member(cur_type, name,
+                                                               &inner_offset);
+                if (inner_node != NULL) {
+                    result = inner_node;
+                    cur_offset += inner_offset;
+                }
             }
         }
 
         if (cur_type != NULL) {
+            // Align current offset to the current type
             size_t align = ast_type_align(cur_type);
             size_t remain = cur_offset % align;
             if (remain != 0) {
                 cur_offset += align - remain;
             }
 
+            // Don't add on the current type's size if we found the result
             if (result != NULL) {
                 break;
             }
@@ -1131,8 +1146,18 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset) {
         }
     } while (struct_iter_advance(&iter));
 
+    // Add the size for trailing bitfields
     if (bitfield_bits != 0) {
         BITFIELD_FINALIZER();
+    }
+
+    // If name is NULL, we're finding type size. Add alignment padding
+    if (name == NULL) {
+        size_t align = ast_type_align(type);
+        size_t remain = cur_offset % align;
+        if (remain != 0) {
+            cur_offset += align - remain;
+        }
     }
 
     if (offset != NULL) {
