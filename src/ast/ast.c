@@ -806,8 +806,38 @@ size_t ast_type_size(type_t *type) {
     case TYPE_DOUBLE:      return sizeof(double);
     case TYPE_LONG_DOUBLE: return sizeof(long double);
 
-    case TYPE_STRUCT:
     case TYPE_UNION: {
+        if (type->struct_params.esize != (size_t)-1) {
+            return type->struct_params.esize;
+        }
+        size_t size = 0;
+        struct_iter_t iter;
+        struct_iter_init(type, &iter);
+        do {
+            if (iter.node != NULL && iter.node->id != NULL) {
+                size_t cur_size = ast_type_size(iter.node->type);
+                size = MAX(size, cur_size);
+            } else if (iter.node == NULL && iter.decl != NULL &&
+                       (iter.decl->type->type == TYPE_STRUCT ||
+                        iter.decl->type->type == TYPE_UNION)) {
+                // Anonymous struct/union
+                size_t cur_size = ast_type_size(iter.decl->type);
+                size = MAX(size, cur_size);
+            }
+        } while (struct_iter_advance(&iter));
+
+        // Add pending between unions
+        size_t align = ast_type_align(type);
+        size_t remain = size % align;
+        if (remain != 0) {
+            size += align - remain;
+        }
+
+        type->struct_params.esize = size;
+        return size;
+    }
+
+    case TYPE_STRUCT: {
         if (type->struct_params.esize != (size_t)-1) {
             return type->struct_params.esize;
         }
