@@ -64,6 +64,8 @@ inline size_t vec_size(const vec_t *vec) {
     return vec->size;
 }
 
+void vec_reserve(vec_t *vec, size_t size);
+
 inline void *vec_front(vec_t *vec) {
     return vec->elems[0];
 }
@@ -73,6 +75,8 @@ inline void *vec_back(vec_t *vec) {
 }
 
 void vec_push_back(vec_t *vec, void *elem);
+
+void vec_resize(vec_t *vec, size_t size);
 
 inline void *vec_pop_back(vec_t *vec) {
     return vec->elems[--vec->size];

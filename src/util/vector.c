@@ -52,6 +52,15 @@ void vec_destroy(vec_t *vec) {
     vec->capacity = 0;
 }
 
+void vec_reserve(vec_t *vec, size_t size) {
+    if (vec->capacity > size) {
+        return;
+    }
+
+    vec->capacity = size;
+    vec->elems = erealloc(vec->elems, vec->capacity * sizeof(vec->elems[0]));
+}
+
 void vec_push_back(vec_t *vec, void *elem) {
     if (vec->size == vec->capacity) {
         vec->capacity = NEW_SIZE(vec->capacity);
@@ -59,6 +68,11 @@ void vec_push_back(vec_t *vec, void *elem) {
             erealloc(vec->elems, vec->capacity * sizeof(vec->elems[0]));
     }
     vec->elems[vec->size++] = elem;
+}
+
+void vec_resize(vec_t *vec, size_t size) {
+    vec_reserve(vec, size);
+    vec->size = size;
 }
 
 void vec_append_vec(vec_t *dest, vec_t *vec2) {
