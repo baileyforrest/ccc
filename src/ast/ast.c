@@ -587,7 +587,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                     expr_t *cur_expr = GET_ELEM(&unmapped, cur);
                     if (NULL != ast_type_find_member(iter.decl->type,
                                                      cur_expr->desig_init.name,
-                                                     NULL, NULL)) {
+                                                     NULL)) {
                         if (cur == unmapped.head) {
                             unmapped.head = cur->next;
                         } else {
@@ -1029,7 +1029,7 @@ size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
         case EXPR_MEM_ACC: {
             decl_node_t *node = ast_type_find_member(type,
                                                      cur_expr->mem_acc.name,
-                                                     &inner_offset, NULL);
+                                                     &inner_offset);
             type = node->type;
             break;
         }
@@ -1047,23 +1047,9 @@ size_t ast_type_offset(type_t *type, mem_acc_list_t *list) {
     return offset;
 }
 
-size_t ast_get_member_num(type_t *type, char *name) {
-    size_t mem_num;
-    type = ast_type_unmod(type);
-
-    decl_node_t *node = ast_type_find_member(type, name, NULL, &mem_num);
-    if (node == NULL) {
-        return -1;
-    }
-
-    return mem_num;
-}
-
-decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
-                                  size_t *mem_num) {
+decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset) {
     assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
     size_t cur_offset = 0;
-    size_t cur_mem_num = 0;
     decl_node_t *result = NULL;
 
     size_t bitfield_bits = 0;
@@ -1122,13 +1108,10 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
             cur_type = iter.decl->type;
 
             size_t inner_offset;
-            size_t inner_mem_num;
             decl_node_t *inner_node = ast_type_find_member(cur_type, name,
-                                                           &inner_offset,
-                                                           &inner_mem_num);
+                                                           &inner_offset);
             if (inner_node != NULL) {
                 result = inner_node;
-                cur_mem_num += inner_mem_num;
                 cur_offset += inner_offset;
             }
         }
@@ -1159,9 +1142,6 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
         *offset = cur_offset;
     }
 
-    if (mem_num != NULL) {
-        *mem_num = cur_mem_num;
-    }
     return result;
 }
 

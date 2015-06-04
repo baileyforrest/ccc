@@ -874,7 +874,7 @@ bool typecheck_mem_acc_list(tc_state_t *tcs, type_t *type,
             }
             decl_node_t *node = ast_type_find_member(type,
                                                      cur_expr->mem_acc.name,
-                                                     NULL, NULL);
+                                                     NULL);
             if (node == NULL) {
                 logger_log(cur_expr->mark, LOG_ERR,
                            "type type has no member '%s'",
@@ -1950,8 +1950,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
                        "dereferencing pointer to incomplete type");
             return false;
         }
-        decl_node_t *mem_node =
-            ast_type_find_member(compound, expr->mem_acc.name, NULL, NULL);
+        decl_node_t *mem_node = ast_type_find_member(compound,
+                                                     expr->mem_acc.name, NULL);
 
         if (mem_node != NULL) {
             ast_canonicalize_mem_acc(tcs->tunit, expr,
@@ -2124,7 +2124,7 @@ bool typecheck_type(tc_state_t *tcs, type_t *type) {
                     // Check anonymous struct/unions
                     assert(check.decl != NULL);
                     if (ast_type_find_member(check.decl->type, cur.node->id,
-                                             NULL, NULL)) {
+                                             NULL)) {
                         logger_log(cur.node->mark, LOG_ERR,
                                    "duplicate member '%s'", cur.node->id);
                         retval = false;

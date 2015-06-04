@@ -663,15 +663,6 @@ size_t ast_type_align(type_t *type);
 size_t ast_type_offset(type_t *type, mem_acc_list_t *path);
 
 /**
- * Gets the number of a member in a struct/union
- *
- * @param type Type to use
- * @param name Name of the member
- * @return Returns the member number or -1 if it doesn't exist
- */
-size_t ast_get_member_num(type_t *type, char *name);
-
-/**
  * Finds the type of a member in a struct or union type
  *
  * @param type Type to find member in
@@ -680,8 +671,7 @@ size_t ast_get_member_num(type_t *type, char *name);
  * @param mem_num location to store the member number, NULL if not needed
  * @return Return the type of the member, of NULL if doesn't exist
  */
-decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
-                                  size_t *mem_num);
+decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset);
 
 bool ast_is_mem_acc_bitfield(expr_t *expr);
 

@@ -113,7 +113,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             }
             decl_node_t *node = ast_type_find_member(compound,
                                                      mem_acc->mem_acc.name,
-                                                     NULL, NULL);
+                                                     NULL);
             assert(node != NULL);
             if (node->expr != NULL) {
                 bitfield = true;

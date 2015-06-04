@@ -171,8 +171,7 @@ bool trans_struct_mem_offset(trans_state_t *ts, type_t *type, char *mem_name,
         if (sl_head(&decl->decls) == NULL &&
             (decl->type->type == TYPE_STRUCT ||
              decl->type->type == TYPE_UNION)) {
-            if (ast_type_find_member(decl->type, mem_name, NULL, NULL)
-                != NULL) {
+            if (ast_type_find_member(decl->type, mem_name, NULL) != NULL) {
                 ir_expr_t *index =
                     ir_int_const(ts->tunit, &ir_type_i32, offset);
                 sl_prepend(indexs, &index->link);
