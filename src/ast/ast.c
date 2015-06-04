@@ -1037,7 +1037,7 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
 
     size_t bitfield_bits = 0;
 
-#define BITFIELD_FINALIZER()                                \
+#define BITFIELD_FINALIZER()                                    \
     (cur_offset += (bitfield_bits + (CHAR_BIT - 1)) / CHAR_BIT, \
      bitfield_bits = 0)
 
@@ -1054,15 +1054,7 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
                 result = iter.node;
             }
 
-            if (iter.node->expr != NULL) {
-                if (bitfield_bits == 0) {
-                    size_t align = ast_type_align(iter.node->type);
-                    size_t remain = cur_offset % align;
-                    if (remain != 0) {
-                        cur_offset += align - remain;
-                    }
-                }
-
+            if (iter.node->expr != NULL && result == NULL) {
                 // Bitfield bits
                 assert(iter.node->expr->type == EXPR_CONST_INT);
                 int decl_bf_bits = iter.node->expr->const_val.int_val;
@@ -1076,6 +1068,16 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
                     }
                     continue;
                 }
+
+                // If starting bitfield, align to the bitfield's type
+                if (bitfield_bits == 0) {
+                    size_t align = ast_type_align(iter.node->type);
+                    size_t remain = cur_offset % align;
+                    if (remain != 0) {
+                        cur_offset += align - remain;
+                    }
+                }
+
                 bitfield_bits += decl_bf_bits;
             } else if (iter.node->id != NULL) {
                 cur_type = iter.node->type;
@@ -1101,21 +1103,17 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
         }
 
         if (cur_type != NULL) {
-            if (type->type == TYPE_STRUCT) {
-                size_t align = ast_type_align(cur_type);
-                size_t remain = cur_offset % align;
-                if (remain != 0) {
-                    cur_offset += align - remain;
-                }
+            size_t align = ast_type_align(cur_type);
+            size_t remain = cur_offset % align;
+            if (remain != 0) {
+                cur_offset += align - remain;
             }
 
             if (result != NULL) {
                 break;
             }
 
-            if (type->type == TYPE_STRUCT) {
-                cur_offset += ast_type_size(cur_type);
-            }
+            cur_offset += ast_type_size(cur_type);
         }
     } while (struct_iter_advance(&iter));
 
@@ -1124,6 +1122,9 @@ decl_node_t *ast_type_find_member(type_t *type, char *name, size_t *offset,
     }
 
     if (offset != NULL) {
+        if (type->type == TYPE_UNION) { // Unions always have 0 offset
+            cur_offset = 0;
+        }
         *offset = cur_offset;
     }
 
