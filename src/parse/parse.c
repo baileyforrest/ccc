@@ -1333,7 +1333,8 @@ fail:
     return status;
 }
 
-status_t par_designator_list(lex_wrap_t *lex, designator_list_t *list, bool nodot) {
+status_t par_designator_list(lex_wrap_t *lex, designator_list_t *list,
+                             bool nodot) {
     status_t status = CCC_OK;
     while (nodot || LEX_CUR(lex)->type == DOT ||
            LEX_CUR(lex)->type == LBRACK) {
@@ -1438,7 +1439,7 @@ status_t par_unary_expression(lex_wrap_t *lex, expr_t **result) {
             goto fail;
         }
         LEX_MATCH(lex, COMMA);
-        par_designator_list(lex, &base->offsetof_params.path, true);
+        par_designator_list(lex, &base->offsetof_params.list, true);
         LEX_MATCH(lex, RPAREN);
         break;
 
@@ -2139,21 +2140,25 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
             break;
         }
         expr_t *cur = NULL;
-        if (LEX_CUR(lex)->type == DOT) { // Designated initalizer
-            LEX_ADVANCE(lex);
-            if (LEX_CUR(lex)->type != ID || LEX_NEXT(lex)->type != ASSIGN) {
-                goto fail;
-            }
+        switch (LEX_CUR(lex)->type) {
+        case DOT:
+        case LBRACK: { // Designated initalizer
             cur = ast_expr_create(lex->tunit, LEX_CUR(lex)->mark,
                                   EXPR_DESIG_INIT);
-            cur->desig_init.name = LEX_CUR(lex)->id_name;
-            LEX_ADVANCE(lex); // Skip the ID
-            LEX_ADVANCE(lex); // Skip the =
-            if (CCC_OK != (status = par_initializer(lex,
-                                                    &cur->desig_init.val))) {
+            if (CCC_OK !=
+                (status =
+                 par_designator_list(lex, &cur->desig_init.list, false))) {
                 goto fail;
             }
-        } else {
+
+            LEX_MATCH(lex, ASSIGN);
+            if (CCC_OK !=
+                (status = par_initializer(lex, &cur->desig_init.val))) {
+                goto fail;
+            }
+            break;
+        }
+        default:
             if (CCC_OK != (status = par_initializer(lex, &cur))) {
                 goto fail;
             }

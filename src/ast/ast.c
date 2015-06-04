@@ -105,7 +105,10 @@ expr_t *ast_expr_create(trans_unit_t *tunit, fmark_t *mark, expr_type_t type) {
         sl_init(&node->cmpd.exprs, offsetof(expr_t, link));
         break;
     case EXPR_OFFSETOF:
-        sl_init(&node->offsetof_params.path.list, offsetof(expr_t, link));
+        sl_init(&node->offsetof_params.list.list, offsetof(expr_t, link));
+        break;
+    case EXPR_DESIG_INIT:
+        sl_init(&node->desig_init.list.list, offsetof(expr_t, link));
         break;
     case EXPR_INIT_LIST:
         sl_init(&node->init_list.exprs, offsetof(expr_t, link));
@@ -126,7 +129,6 @@ expr_t *ast_expr_create(trans_unit_t *tunit, fmark_t *mark, expr_type_t type) {
     case EXPR_ALIGNOF:
     case EXPR_MEM_ACC:
     case EXPR_ARR_IDX:
-    case EXPR_DESIG_INIT:
     case EXPR_VA_START:
     case EXPR_VA_ARG:
     case EXPR_VA_END:
@@ -514,6 +516,9 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
 
             expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
             if (cur_expr->type == EXPR_DESIG_INIT) {
+                expr_t *head = sl_head(&cur_expr->desig_init.list.list);
+                assert(head->type == EXPR_MEM_ACC);
+
                 bool mapped = false;
                 struct_iter_reset(&iter);
 
@@ -521,7 +526,7 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                     // Look for a non anonymous member, matching the designated
                     // initializer
                     if (iter.node != NULL && iter.node->id != NULL &&
-                        strcmp(iter.node->id, cur_expr->desig_init.name) == 0) {
+                        strcmp(iter.node->id, head->mem_acc.name) == 0) {
                         ht_ptr_elem_t *elem = ht_lookup(&map, &iter.node->id);
                         if (elem == NULL) {
                             elem = emalloc(sizeof(*elem));
@@ -585,8 +590,10 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                 // in the a desig_init list
                 while (cur != NULL) {
                     expr_t *cur_expr = GET_ELEM(&unmapped, cur);
+                    expr_t *head = sl_head(&cur_expr->desig_init.list.list);
+                    assert(head->type = EXPR_MEM_ACC);
                     if (NULL != ast_type_find_member(iter.decl->type,
-                                                     cur_expr->desig_init.name,
+                                                     head->mem_acc.name,
                                                      NULL)) {
                         if (cur == unmapped.head) {
                             unmapped.head = cur->next;
@@ -609,9 +616,11 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
 
         SL_FOREACH(cur, &unmapped) {
             expr_t *cur_expr = GET_ELEM(&unmapped, cur);
+            expr_t *head = sl_head(&cur_expr->desig_init.list.list);
+            assert(head->type == EXPR_MEM_ACC);
             logger_log(cur_expr->mark, LOG_ERR,
                        "unknown field '%s' specified in initializer",
-                       cur_expr->desig_init.name);
+                       head->mem_acc.name);
             status = CCC_ESYNTAX;
         }
 
@@ -773,8 +782,10 @@ type_t *ast_get_union_type(type_t *type, expr_t *expr, expr_t **head_loc) {
     if (head->type == EXPR_DESIG_INIT) {
         // Find the member
         do {
+            expr_t *desig_head = sl_head(&head->desig_init.list.list);
+            assert(desig_head->type == EXPR_MEM_ACC);
             if (iter.node != NULL && iter.node->id != NULL &&
-                strcmp(iter.node->id, head->desig_init.name) == 0) {
+                strcmp(iter.node->id, desig_head->mem_acc.name) == 0) {
                 break;
             }
         } while (struct_iter_advance(&iter));

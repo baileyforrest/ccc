@@ -338,7 +338,7 @@ struct expr_t {
 
         struct {                    /**< Offsetof parameters */
             decl_t *type;           /**< Type to get offsetof */
-            designator_list_t path;    /**< Accesses is path */
+            designator_list_t list; /**< Accesses is path */
         } offsetof_params;
 
         struct {                    /**< Member access of a compound type */
@@ -360,7 +360,7 @@ struct expr_t {
 
         struct {
             expr_t *val;
-            char *name;
+            designator_list_t list;
         } desig_init;
 
         struct {

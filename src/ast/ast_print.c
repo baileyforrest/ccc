@@ -514,7 +514,8 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         ast_directed_print(dest, remain, "__builtin_offsetof(");
         ast_decl_print(expr->offsetof_params.type, TYPE_VOID, 0, dest, remain);
         ast_directed_print(dest, remain, ", ");
-        ast_designator_list_print(&expr->offsetof_params.path, true, dest, remain);
+        ast_designator_list_print(&expr->offsetof_params.list, true, dest,
+                                  remain);
         ast_directed_print(dest, remain, ")");
         break;
     }
@@ -549,7 +550,8 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         break;
     }
     case EXPR_DESIG_INIT:
-        ast_directed_print(dest, remain, ".%s = ", expr->desig_init.name);
+        ast_designator_list_print(&expr->desig_init.list, false, dest, remain);
+        ast_directed_print(dest, remain, " = ");
         ast_expr_print(expr->desig_init.val, indent, dest, remain);
         break;
 

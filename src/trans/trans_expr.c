@@ -428,7 +428,7 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
     }
     case EXPR_OFFSETOF: {
         size_t offset = ast_type_offset(expr->offsetof_params.type->type,
-                                        &expr->offsetof_params.path);
+                                        &expr->offsetof_params.list);
         return ir_int_const(ts->tunit, trans_type(ts, expr->etype), offset);
     }
     case EXPR_ARR_IDX:

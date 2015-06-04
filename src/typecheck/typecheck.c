@@ -174,7 +174,7 @@ void typecheck_const_expr_eval(typetab_t *typetab, expr_t *expr,
         return;
     case EXPR_OFFSETOF: {
         type_t *type = DECL_TYPE(expr->offsetof_params.type);
-        *result = ast_type_offset(type, &expr->offsetof_params.path);
+        *result = ast_type_offset(type, &expr->offsetof_params.list);
         return;
     }
     case EXPR_VOID:
@@ -1912,7 +1912,7 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
         type_t *compound = decl == NULL ?
             expr->offsetof_params.type->type : decl->type;
         retval &= typecheck_designator_list(tcs, compound,
-                                            &expr->offsetof_params.path);
+                                            &expr->offsetof_params.list);
         expr->etype = tt_size_t;
         return true;
 
