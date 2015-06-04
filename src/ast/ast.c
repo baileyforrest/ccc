@@ -416,11 +416,18 @@ bool struct_iter_advance(struct_iter_t *iter) {
     return iter->cur_decl != NULL || iter->cur_node != NULL;
 }
 
-// Init lists are nasty!
-status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
-                                    expr_t *expr) {
+status_t ast_canonicalize_init_list_check_mem_acc(expr_t *expr) {
+    if (expr->type == EXPR_MEM_ACC) {
+        return CCC_OK;
+    }
+
+    logger_log(expr->mark, LOG_ERR, "array index in non-array initializer");
+    return CCC_ESYNTAX;
+}
+
+status_t ast_canonicalize_init_list_struct(trans_unit_t *tunit, type_t *type,
+                                           expr_t *expr) {
     assert(type->type == TYPE_STRUCT || type->type == TYPE_UNION);
-    assert(expr->type == EXPR_INIT_LIST);
     status_t status = CCC_OK;
 
     if (sl_head(&expr->init_list.exprs) == NULL) {
@@ -517,6 +524,11 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
             expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
             if (cur_expr->type == EXPR_DESIG_INIT) {
                 expr_t *head = sl_head(&cur_expr->desig_init.list.list);
+                if (CCC_OK !=
+                    (status = ast_canonicalize_init_list_check_mem_acc(head))) {
+                    goto fail;
+                }
+
                 assert(head->type == EXPR_MEM_ACC);
 
                 bool mapped = false;
@@ -591,7 +603,11 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                 while (cur != NULL) {
                     expr_t *cur_expr = GET_ELEM(&unmapped, cur);
                     expr_t *head = sl_head(&cur_expr->desig_init.list.list);
-                    assert(head->type = EXPR_MEM_ACC);
+                    if (CCC_OK !=
+                        (status =
+                         ast_canonicalize_init_list_check_mem_acc(head))) {
+                        goto fail;
+                    }
                     if (NULL != ast_type_find_member(iter.decl->type,
                                                      head->mem_acc.name,
                                                      NULL)) {
@@ -617,13 +633,17 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
         SL_FOREACH(cur, &unmapped) {
             expr_t *cur_expr = GET_ELEM(&unmapped, cur);
             expr_t *head = sl_head(&cur_expr->desig_init.list.list);
-            assert(head->type == EXPR_MEM_ACC);
+            if (CCC_OK !=
+                (status = ast_canonicalize_init_list_check_mem_acc(head))) {
+                goto fail;
+            }
             logger_log(cur_expr->mark, LOG_ERR,
                        "unknown field '%s' specified in initializer",
                        head->mem_acc.name);
             status = CCC_ESYNTAX;
         }
 
+    fail:
         HT_DESTROY_FUNC(&map, free);
     } else {
         // No designated initiaizers, just copy the list
@@ -714,6 +734,30 @@ status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
     memcpy(&expr->init_list.exprs, &exprs, sizeof(exprs));
 
     return status;
+}
+
+status_t ast_canonicalize_init_list_arr(trans_unit_t *tunit, type_t *type,
+                                        expr_t *expr) {
+    // TODO0
+    assert(false && tunit && type && expr && "TODO0");
+}
+
+// Init lists are nasty!
+status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
+                                    expr_t *expr) {
+    assert(expr->type == EXPR_INIT_LIST);
+    type = ast_type_unmod(type);
+    switch (type->type) {
+    case TYPE_STRUCT:
+    case TYPE_UNION:
+        return ast_canonicalize_init_list_struct(tunit, type, expr);
+    case TYPE_ARR:
+        return ast_canonicalize_init_list_arr(tunit, type, expr);
+    default:
+        assert(false);
+    }
+
+    return CCC_ESYNTAX;
 }
 
 bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type,
