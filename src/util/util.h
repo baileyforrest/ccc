@@ -67,7 +67,7 @@ typedef struct str_node_t {
     char *str;      /**< Stored string object */
 } str_node_t;
 
-void exit_err(char *msg);
+void exit_err(const char *msg);
 
 char *ccc_basename(char *path);
 char *ccc_dirname(char *path);
@@ -141,5 +141,7 @@ char *escape_str(char *str);
 char *unescape_str(char *str);
 
 char *format_basename_ext(char *path, char *ext);
+
+void get_exe_path(char *path, size_t len);
 
 #endif /* _UTIL_H_ */

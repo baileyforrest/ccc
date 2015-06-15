@@ -14,10 +14,9 @@ BUILD_DIR = $(DEST)/build
 INC = -I$(SRC)/
 
 
-# Find all source files in the source directory, sorted by most
-# recently modified
-SOURCES := $(shell find $(SRC)/ -name '*.c' -printf '%T@\t%p\n' \
-					| sort -k 1nr | cut -f2-)
+# Find all source files in the source directory
+SOURCES := $(shell find $(SRC) -name '*.c')
+
 OBJS := $(SOURCES:$(SRC)/%.c=$(BUILD_DIR)/%.o)
 # Set the dependency files that will be used to add header dependencies
 DEPS := $(OBJS:.o=.d)

@@ -986,8 +986,10 @@ size_t ast_type_align(type_t *type) {
 
     case TYPE_PAREN:
         return ast_type_align(type->paren_base);
+
     case TYPE_FUNC:
-        return alignof(ast_type_align);
+        return 1; // Functions have an "align" of 1
+
     case TYPE_ARR:
         return ast_type_align(type->arr.base);
     case TYPE_PTR:

@@ -28,6 +28,10 @@
 #include <stdlib.h>
 #include <limits.h>
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 #include "util/char_class.h"
 #include "util/logger.h"
 #include "util/string_store.h"
@@ -37,7 +41,7 @@ extern bool ind_str_eq(const void *vstr1, const void *vstr2);
 extern uint32_t len_str_hash(const void *vstr);
 extern bool len_str_eq(const void *vstr1, const void *vstr2);
 
-void exit_err(char *msg) {
+void exit_err(const char *msg) {
     logger_log(NULL, LOG_ERR, msg);
     exit(EXIT_FAILURE);
 }
@@ -296,4 +300,21 @@ char *format_basename_ext(char *path, char *ext) {
     strcpy(namebuf + len, ext);
 
     return namebuf;
+}
+
+void get_exe_path(char *path, size_t len) {
+    static const char *err = "Failed to get executable path";
+
+#ifdef __linux
+    if (-1 == readlink("/proc/self/exe", path, len)) {
+        exit_err(err);
+    }
+#elif __APPLE__
+    uint32_t u32_size = len;
+    if (_NSGetExecutablePath(path, &u32_size) != 0) {
+        exit_err(err);
+    }
+#else
+#error "Unsupported platform"
+#endif
 }

@@ -25,8 +25,6 @@
 
 #include "lex.h"
 
-#include <uchar.h>
-
 typedef enum lex_str_type_t {
     LEX_STR_CHAR,
     LEX_STR_LCHAR,
@@ -49,7 +47,7 @@ status_t lex_next_token(lex_state_t *ls, tstream_t *stream, token_t *result);
 
 status_t lex_id(lex_state_t *ls, tstream_t *stream, int cur, token_t *result);
 
-char32_t lex_single_char(lex_state_t *ls, tstream_t *stream, token_t *result,
+uint32_t lex_single_char(lex_state_t *ls, tstream_t *stream, token_t *result,
                          lex_str_type_t type);
 
 status_t lex_char_lit(lex_state_t *ls, tstream_t *stream, token_t *result,

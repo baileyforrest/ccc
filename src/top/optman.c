@@ -50,9 +50,7 @@ static status_t optman_parse(int argc, char **argv);
 
 status_t optman_init(int argc, char **argv) {
     static char ccc_path[PATH_MAX];
-    if (-1 == readlink("/proc/self/exe", ccc_path, sizeof(ccc_path))) {
-        exit_err(strerror(errno));
-    }
+    get_exe_path(ccc_path, sizeof(ccc_path));
 
     ccc_dirname(ccc_path); // Remove excutable name
     assert(strcmp(ccc_basename(ccc_path), "bin") == 0);
