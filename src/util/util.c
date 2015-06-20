@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <unistd.h>
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>

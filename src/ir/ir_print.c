@@ -258,7 +258,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
                     uint64_t i;
                 } converter = { iee754_f64_construct(&parts) };
 
-                fprintf(stream, "0x%llX", converter.i);
+                fprintf(stream, "0x%llX", (unsigned long long)converter.i);
                 break;
             }
             case IR_FLOAT_DOUBLE: {
@@ -267,7 +267,7 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
                     uint64_t i;
                 } converter = { (double)expr->const_params.float_val };
 
-                fprintf(stream, "0x%llX", converter.i);
+                fprintf(stream, "0x%llX", (unsigned long long)converter.i);
                 break;
             }
             case IR_FLOAT_X86_FP80: {
@@ -277,8 +277,9 @@ void ir_expr_print(FILE *stream, ir_expr_t *expr, bool recurse) {
                 } converter = { { 0, 0 } };
                 converter.f = expr->const_params.float_val;
 
-                fprintf(stream, "0xK%.4llX", converter.i[1]);
-                fprintf(stream, "%.16llX", converter.i[0]);
+                fprintf(stream, "0xK%.4llX",
+                        (unsigned long long)converter.i[1]);
+                fprintf(stream, "%.16llX", (unsigned long long)converter.i[0]);
                 break;
             }
             default:
