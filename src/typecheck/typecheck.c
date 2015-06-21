@@ -26,7 +26,9 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "typecheck_init.h"
 #include "util/logger.h"
+
 
 void tc_state_init(tc_state_t *tcs) {
     sl_init(&tcs->etypes, offsetof(type_t, heap_link));
@@ -1204,134 +1206,6 @@ bool typecheck_decl(tc_state_t *tcs, decl_t *decl, type_type_t type) {
     return retval;
 }
 
-
-bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
-    assert(expr->type == EXPR_INIT_LIST);
-    bool retval = true;
-    type = ast_type_unmod(type);
-    expr->etype = type;
-
-    switch (type->type) {
-    case TYPE_UNION: {
-        ast_canonicalize_init_list(tcs->tunit, type, expr);
-
-        expr_t *head;
-        type_t *dest_type = ast_get_union_type(type, expr, &head);
-        if (head == NULL) {
-            return true;
-        }
-
-        if (head->type == EXPR_INIT_LIST) {
-            retval &= typecheck_init_list(tcs, dest_type, head);
-        } else {
-            retval &= typecheck_expr(tcs, head, TC_NOCONST);
-            if (!retval) {
-                return false;
-            }
-
-            retval &= typecheck_type_assignable(head->mark, dest_type,
-                                                head->etype);
-        }
-        return retval;
-    }
-    case TYPE_STRUCT: {
-        ast_canonicalize_init_list(tcs->tunit, type, expr);
-        struct_iter_t iter;
-        struct_iter_init(type, &iter);
-
-        SL_FOREACH(cur, &expr->init_list.exprs) {
-            expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
-
-            // Skip anonymous members that can't be struct/union
-            while (iter.node != NULL && iter.node->id == NULL) {
-                struct_iter_advance(&iter);
-            }
-
-            if (cur_expr->type == EXPR_VOID) {
-                struct_iter_advance(&iter);
-                continue;
-            }
-            if (iter.node != NULL && iter.node->id != NULL) {
-                if (cur_expr->type == EXPR_INIT_LIST) {
-                    retval &= typecheck_init_list(tcs, iter.node->type,
-                                                  cur_expr);
-                } else {
-                    retval &= typecheck_expr(tcs, cur_expr, TC_NOCONST);
-                    if (!retval) {
-                        return false;
-                    }
-                    retval &= typecheck_type_assignable(iter.node->mark,
-                                                        iter.node->type,
-                                                        cur_expr->etype);
-                }
-            }
-
-            if (iter.node == NULL && iter.decl != NULL &&
-                (iter.decl->type->type == TYPE_STRUCT ||
-                 iter.decl->type->type == TYPE_UNION)) {
-                assert(cur_expr->type == EXPR_INIT_LIST);
-                retval &= typecheck_init_list(tcs, iter.decl->type, cur_expr);
-            }
-
-            struct_iter_advance(&iter);
-        }
-
-        return retval;
-    }
-    case TYPE_ARR: {
-        long long decl_len = -1;
-        if (type->arr.len != NULL) {
-            if (!typecheck_expr(tcs, type->arr.len, TC_CONST)) {
-                return false;
-            }
-            typecheck_const_expr_eval(tcs->typetab, type->arr.len, &decl_len);
-        }
-
-        long len = 0;
-        SL_FOREACH(cur, &expr->init_list.exprs) {
-            ++len;
-            expr_t *cur_expr = GET_ELEM(&expr->init_list.exprs, cur);
-            retval &= typecheck_expr(tcs, cur_expr, TC_NOCONST);
-            if (cur_expr->type == EXPR_INIT_LIST) {
-                retval &= typecheck_init_list(tcs, type->arr.base,
-                                              cur_expr);
-            } else {
-                retval &= typecheck_type_assignable(cur_expr->mark,
-                                                    type->arr.base,
-                                                    cur_expr->etype);
-            }
-        }
-
-        // Set array length to the number of elemes in the init list
-        if (type->arr.len == NULL) {
-            type->arr.nelems = len;
-        }
-
-        if (decl_len >= 0 && decl_len < len) {
-            logger_log(expr->mark, LOG_WARN,
-                       "excess elements in array initializer");
-        }
-        return retval;
-    }
-    default: {
-        if (sl_head(&expr->init_list.exprs) == NULL) {
-            logger_log(expr->arr_idx.index->mark, LOG_ERR,
-                       "empty scalar initializer");
-            return false;
-        }
-        if (sl_head(&expr->init_list.exprs) !=
-            sl_tail(&expr->init_list.exprs)) {
-            logger_log(expr->arr_idx.index->mark, LOG_WARN,
-                       "excess elements in scalar initializer");
-        }
-        expr_t *first = sl_head(&expr->init_list.exprs);
-        retval &= typecheck_expr(tcs, first, TC_NOCONST);
-        retval &= typecheck_type_assignable(first->mark, type, first->etype);
-    }
-    }
-    return retval;
-}
-
 bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
                          type_type_t type) {
     bool retval = true;
@@ -1439,14 +1313,6 @@ bool typecheck_decl_node(tc_state_t *tcs, decl_node_t *decl_node,
             case EXPR_INIT_LIST:
                 retval &= typecheck_init_list(tcs, node_type,
                                               decl_node->expr);
-
-                // If we're assigning to an array without a size, set the
-                // array's size to the init list length
-                if (node_type->type == TYPE_ARR &&
-                    node_type->arr.len == NULL) {
-                    node_type->arr.nelems =
-                        decl_node->expr->init_list.nelems;
-                }
                 break;
             case EXPR_CONST_STR:
                 // If we're assigning to an array without a size, set the
@@ -1994,8 +1860,8 @@ bool typecheck_expr(tc_state_t *tcs, expr_t *expr, bool constant) {
     }
 
     case EXPR_INIT_LIST: {
-        SL_FOREACH(cur, &expr->init_list.exprs) {
-            retval &= typecheck_expr(tcs, GET_ELEM(&expr->init_list.exprs, cur),
+        VEC_FOREACH(cur, &expr->init_list.exprs) {
+            retval &= typecheck_expr(tcs, vec_get(&expr->init_list.exprs, cur),
                                      TC_NOCONST);
         }
         // Don't know what etype is

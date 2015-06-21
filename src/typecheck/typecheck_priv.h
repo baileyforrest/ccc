@@ -205,16 +205,6 @@ bool typecheck_stmt(tc_state_t *tcs, stmt_t *stmt);
 bool typecheck_decl(tc_state_t *tcs, decl_t *decl, type_type_t type);
 
 /**
- * Typechecks a type being assigned to an init list
- *
- * @param tcs The typechecking state
- * @param type The type bein assigned to
- * @param expr The init list expression
- * @return true if the node type checks, false otherwise
- */
-bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr);
-
-/**
  * Typechecks a decl_node_t.
  *
  * @param tcs The typechecking state

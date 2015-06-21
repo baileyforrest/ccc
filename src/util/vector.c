@@ -30,8 +30,10 @@
 #define NEW_SIZE(size) MAX((size) + ((size) >> 1), MIN_SIZE)
 
 extern void *vec_get(vec_t *vec, size_t idx);
+extern void vec_set(vec_t *vec, size_t idx, void *val);
 extern void **vec_elems(vec_t *vec);
 extern size_t vec_size(const vec_t *vec);
+extern size_t vec_capacity(const vec_t *vec);
 extern void *vec_front(vec_t *vec);
 extern void *vec_back(vec_t *vec);
 extern void *vec_pop_back(vec_t *vec);
@@ -44,6 +46,16 @@ void vec_init(vec_t *vec, size_t capacity) {
     vec->elems = emalloc(capacity * sizeof(vec->elems[0]));
     vec->size = 0;
     vec->capacity = capacity;
+}
+
+void vec_move(vec_t *dest, vec_t *src, bool destroy_dest) {
+    if (destroy_dest) {
+        vec_destroy(dest);
+    }
+    memcpy(dest, src, sizeof(vec_t));
+    src->elems = NULL;
+    src->size = 0;
+    src->capacity = 0;
 }
 
 void vec_destroy(vec_t *vec) {

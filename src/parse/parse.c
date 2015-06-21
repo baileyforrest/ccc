@@ -2143,6 +2143,7 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
         switch (LEX_CUR(lex)->type) {
         case DOT:
         case LBRACK: { // Designated initalizer
+            // TODO0: Remove EXPR_DESIG_INIT, and place entries on the init list
             cur = ast_expr_create(lex->tunit, LEX_CUR(lex)->mark,
                                   EXPR_DESIG_INIT);
             if (CCC_OK !=
@@ -2151,11 +2152,17 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
                 goto fail;
             }
 
+            // TODO0: Remove this after above change
+            SL_FOREACH(cur_elem, &cur->desig_init.list.list) {
+                vec_push_back(&expr->init_list.exprs,
+                              GET_ELEM(&cur->desig_init.list.list, cur_elem));
+            }
+
             LEX_MATCH(lex, ASSIGN);
-            if (CCC_OK !=
-                (status = par_initializer(lex, &cur->desig_init.val))) {
+            if (CCC_OK != (status = par_initializer(lex, &cur))) {
                 goto fail;
             }
+
             break;
         }
         default:
@@ -2163,8 +2170,7 @@ status_t par_initializer_list(lex_wrap_t *lex, expr_t **result) {
                 goto fail;
             }
         }
-        sl_append(&expr->init_list.exprs, &cur->link);
-        ++expr->init_list.nelems;
+        vec_push_back(&expr->init_list.exprs, cur);
     }
 
     *result = expr;

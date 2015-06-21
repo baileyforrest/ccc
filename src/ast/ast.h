@@ -31,6 +31,7 @@
 #include "util/file_mark.h"
 #include "util/slist.h"
 #include "util/util.h"
+#include "util/vector.h"
 
 // Forward declarations
 typedef struct type_t type_t;
@@ -354,8 +355,7 @@ struct expr_t {
         } arr_idx;
 
         struct {                    /**< Initalizer list */
-            slist_t exprs;          /**< List of expressions */
-            size_t nelems;
+            vec_t exprs;            /**< List of expressions */
         } init_list;
 
         struct {
@@ -627,14 +627,24 @@ void struct_iter_reset(struct_iter_t *iter);
 
 bool struct_iter_advance(struct_iter_t *iter);
 
+bool struct_iter_end(struct_iter_t *iter);
+
+// TODO1: Replace this common code with these
+inline bool struct_iter_has_node(struct_iter_t *iter) {
+    return iter->node != NULL && iter->node->id != NULL;
+}
+
+inline bool struct_iter_has_anon_struct(struct_iter_t *iter) {
+    return iter->node == NULL && iter->decl != NULL &&
+        (iter->decl->type->type == TYPE_STRUCT ||
+         iter->decl->type->type == TYPE_UNION);
+}
+
 status_t ast_canonicalize_init_list(trans_unit_t *tunit, type_t *type,
                                     expr_t *expr);
 
 bool ast_canonicalize_mem_acc(trans_unit_t *tunit, expr_t *expr, type_t *type,
                               expr_t **tail);
-
-
-type_t *ast_get_union_type(type_t *type, expr_t *expr, expr_t **head_loc);
 
 /**
  * Gets the size of a type
@@ -661,6 +671,8 @@ size_t ast_type_align(type_t *type);
  *     member
  */
 size_t ast_type_offset(type_t *type, designator_list_t *path);
+
+size_t ast_type_num_members(type_t *type);
 
 /**
  * Finds the type of a member in a struct or union type

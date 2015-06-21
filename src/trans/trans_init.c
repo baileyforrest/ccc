@@ -54,7 +54,7 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
 
         size_t nelem = 0;
         if (val != NULL) {
-            SL_FOREACH(cur, &val->init_list.exprs) {
+            VEC_FOREACH(cur, &val->init_list.exprs) {
                 ir_expr_t *cur_addr = ir_expr_create(ts->tunit,
                                                      IR_EXPR_GETELEMPTR);
                 cur_addr->getelemptr.type = ir_type->arr.elem_type;
@@ -70,7 +70,7 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                 sl_append(&cur_addr->getelemptr.idxs, &zero->link);
 
                 cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
-                expr_t *elem = GET_ELEM(&val->init_list.exprs, cur);
+                expr_t *elem = vec_get(&val->init_list.exprs, cur);
                 trans_initializer(ts, ir_stmts, ast_type->arr.base,
                                   elem_type, cur_addr, elem);
                 ++nelem;
@@ -105,17 +105,21 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
     case TYPE_UNION: {
         assert(val == NULL || val->type == EXPR_INIT_LIST);
 
-        type_t *dest_type = ast_get_union_type(ast_type, val, &val);
 
-        ir_type_t *ir_dest_type = trans_type(ts, dest_type);
-        ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
-        ptr_type->ptr.base = ir_dest_type;
+        if (val != NULL && vec_size(&val->init_list.exprs) > 0) {
+            val = vec_front(&val->init_list.exprs);
+            type_t *dest_type = val->etype;
 
-        addr = trans_ir_type_conversion(ts, ptr_type, false,
-                                        ir_expr_type(addr), false,
-                                        addr, ir_stmts);
-        ast_type = dest_type;
-        ir_type = ir_dest_type;
+            ir_type_t *ir_dest_type = trans_type(ts, dest_type);
+            ir_type_t *ptr_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            ptr_type->ptr.base = ir_dest_type;
+
+            addr = trans_ir_type_conversion(ts, ptr_type, false,
+                                            ir_expr_type(addr), false,
+                                            addr, ir_stmts);
+            ast_type = dest_type;
+            ir_type = ir_dest_type;
+        }
         // FALL THROUGH
     }
     default: {
@@ -153,7 +157,7 @@ void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
     size_t offset = 0;
 
     // Current init list expr
-    sl_link_t *cur_expr = val->init_list.exprs.head;
+    vec_iter_t vec_iter = { &val->init_list.exprs, 0 };
 
     struct_iter_t iter;
     struct_iter_init(ast_type, &iter);
@@ -165,11 +169,11 @@ void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                 // Handle bitfields
                 ir_type_t *cur_type = trans_type(ts, iter.node->type);
                 ir_expr_t *cur_val;
-                if (cur_expr == NULL) {
+                if (!vec_iter_has_next(&vec_iter)) {
                     cur_val = ir_expr_zero(ts->tunit, cur_type);
                 } else {
-                    expr_t *elem = GET_ELEM(&val->init_list.exprs, cur_expr);
-                    cur_expr = cur_expr->next;
+                    expr_t *elem = vec_iter_get(&vec_iter);
+                    vec_iter_advance(&vec_iter);
                     cur_val = trans_expr(ts, false, elem, ir_stmts);
                 }
                 trans_bitfield_helper(ts, ir_stmts, ast_type, iter.node->id,
@@ -205,9 +209,9 @@ void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
             cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
 
             expr_t *elem = NULL;
-            if (cur_expr != NULL) {
-                elem = GET_ELEM(&val->init_list.exprs, cur_expr);
-                cur_expr = cur_expr->next;
+            if (vec_iter_has_next(&vec_iter)) {
+                elem = vec_iter_get(&vec_iter);
+                vec_iter_advance(&vec_iter);
             }
             trans_initializer(ts, ir_stmts, cur_ast_type, cur_type, cur_addr,
                               elem);
@@ -277,8 +281,8 @@ ir_expr_t *trans_array_init(trans_state_t *ts, expr_t *expr) {
     arr_lit->const_params.type = type;
 
     size_t nelems = 0;
-    SL_FOREACH(cur, &expr->init_list.exprs) {
-        expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur);
+    VEC_FOREACH(cur, &expr->init_list.exprs) {
+        expr_t *elem = vec_get(&expr->init_list.exprs, cur);
         ir_expr_t *ir_elem = trans_expr(ts, false, elem, NULL);
         ir_elem = trans_type_conversion(ts, ast_elem_type, elem->etype,
                                         ir_elem, NULL);
@@ -323,18 +327,18 @@ void trans_struct_init_finalize_bf_array(trans_state_t *ts,
 }
 
 void trans_struct_init_append_val(trans_state_t *ts, ir_type_t *cur_type,
-                                  expr_t *expr, sl_link_t **cur_elem,
-                                  size_t *ir_type_off, ir_expr_t *struct_lit) {
+                                  vec_iter_t *iter, size_t *ir_type_off,
+                                  ir_expr_t *struct_lit) {
     ir_expr_t *ir_elem;
-    if (*cur_elem == NULL) {
+    if (!vec_iter_has_next(iter)) {
         ir_elem = ir_expr_zero(ts->tunit, cur_type);
     } else {
-        expr_t *elem = GET_ELEM(&expr->init_list.exprs, *cur_elem);
+        expr_t *elem = vec_iter_get(iter);
         ir_elem = trans_expr(ts, false, elem, NULL);
         ir_elem = trans_ir_type_conversion(ts, cur_type, false,
                                            ir_expr_type(ir_elem), false,
                                            ir_elem, NULL);
-        *cur_elem = (*cur_elem)->next;
+        vec_iter_advance(iter);
     }
     ++(*ir_type_off);
     sl_append(&struct_lit->const_params.struct_val, &ir_elem->link);
@@ -355,7 +359,7 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
     struct_lit->const_params.ctype = IR_CONST_STRUCT;
     struct_lit->const_params.type = type;
 
-    sl_link_t *cur_elem = expr->init_list.exprs.head;
+    vec_iter_t vec_iter = { &expr->init_list.exprs, 0 };
     size_t ir_type_off = 0;
     ir_expr_t *arr_lit = NULL;
     size_t bitfield_offset = 0;
@@ -404,12 +408,12 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
                 }
 
                 long long val = 0;
-                if (cur_elem != NULL) {
-                    expr_t *elem = GET_ELEM(&expr->init_list.exprs, cur_elem);
+                if (vec_iter_has_next(&vec_iter)) {
+                    expr_t *elem = vec_iter_get(&vec_iter);
                     // TODO0: This assertion isn't correct
                     assert(elem->type == EXPR_CONST_INT);
                     val = elem->const_val.int_val;
-                    cur_elem = cur_elem->next;
+                    vec_iter_advance(&vec_iter);
                 }
                 int offset = 0;
                 while (offset < bf_bits) {
@@ -453,7 +457,7 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
                 }
 
             } else if (iter.node->id != NULL) {
-                trans_struct_init_append_val(ts, cur_type, expr, &cur_elem,
+                trans_struct_init_append_val(ts, cur_type, &vec_iter,
                                              &ir_type_off, struct_lit);
             }
         }
@@ -461,7 +465,7 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
         if (iter.node == NULL && iter.decl != NULL &&
             (iter.decl->type->type == TYPE_STRUCT ||
              iter.decl->type->type == TYPE_UNION)) {
-            trans_struct_init_append_val(ts, cur_type, expr, &cur_elem,
+            trans_struct_init_append_val(ts, cur_type, &vec_iter,
                                          &ir_type_off, struct_lit);
         }
     } while (struct_iter_advance(&iter));
@@ -472,11 +476,19 @@ ir_expr_t *trans_struct_init(trans_state_t *ts, expr_t *expr) {
 }
 
 ir_expr_t *trans_union_init(trans_state_t *ts, type_t *type, expr_t *expr) {
+    ir_type_t *union_type = trans_type(ts, type);
+    if (expr == NULL) {
+        return ir_expr_zero(ts->tunit, union_type);
+    }
     assert(expr->type == EXPR_INIT_LIST);
     assert(expr->etype->type == TYPE_UNION);
 
-    expr_t *head;
-    type_t *elem_type = ast_get_union_type(type, expr, &head);
+    if (vec_size(&expr->init_list.exprs) == 0) {
+        return ir_expr_zero(ts->tunit, union_type);
+    }
+
+    expr_t *head = vec_front(&expr->init_list.exprs);
+    type_t *elem_type = head->etype;
     size_t total_size = ast_type_size(type);
     size_t elem_size = ast_type_size(elem_type);
 

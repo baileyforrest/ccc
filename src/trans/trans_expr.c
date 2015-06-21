@@ -567,8 +567,8 @@ ir_expr_t *trans_expr(trans_state_t *ts, bool addrof, expr_t *expr,
             return trans_array_init(ts, expr);
         default: {
             // Just take the first element and tranlate it
-            expr_t *head = sl_head(&expr->init_list.exprs);
-            assert(head != NULL);
+            assert(vec_size(&expr->init_list.exprs) > 0);
+            expr_t *head = vec_front(&expr->init_list.exprs);
             return trans_expr(ts, false, head, ir_stmts);
         }
         }

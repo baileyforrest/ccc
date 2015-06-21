@@ -42,6 +42,8 @@ typedef struct vec_iter_t {
 
 void vec_init(vec_t *vec, size_t capacity);
 
+void vec_move(vec_t *dest, vec_t *src, bool destroy_dest);
+
 void vec_destroy(vec_t *vec);
 
 #define VEC_DESTROY_FUNC(vec, func)                     \
@@ -56,12 +58,20 @@ inline void *vec_get(vec_t *vec, size_t idx) {
     return vec->elems[idx];
 }
 
+inline void vec_set(vec_t *vec, size_t idx, void *val) {
+    vec->elems[idx] = val;
+}
+
 inline void **vec_elems(vec_t *vec) {
     return vec->elems;
 }
 
 inline size_t vec_size(const vec_t *vec) {
     return vec->size;
+}
+
+inline size_t vec_capacity(const vec_t *vec) {
+    return vec->capacity;
 }
 
 void vec_reserve(vec_t *vec, size_t size);
