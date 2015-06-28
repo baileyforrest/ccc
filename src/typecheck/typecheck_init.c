@@ -443,7 +443,7 @@ expr_t *typecheck_canon_init_arr(tc_state_t *tcs, type_t *type,
         }
 
         // Reached the end of the array
-        if (nelems > 0 && index > nelems) {
+        if (nelems > 0 && index >= nelems) {
             break;
         }
 
