@@ -40,6 +40,7 @@ bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
 bool typecheck_init_list_helper(tc_state_t *tcs, type_t *type, expr_t *expr) {
     bool retval = true;
     expr->etype = type;
+    type = ast_type_unmod(type);
 
     switch (type->type) {
     case TYPE_UNION: {
@@ -49,6 +50,11 @@ bool typecheck_init_list_helper(tc_state_t *tcs, type_t *type, expr_t *expr) {
         }
 
         expr_t *head = vec_front(&expr->init_list.exprs);
+
+        if (head == NULL) { // 0 initializer
+            return true;
+        }
+
         if (head->type == EXPR_INIT_LIST) {
             retval &= typecheck_init_list_helper(tcs, head->etype, head);
         } else {
@@ -305,16 +311,24 @@ expr_t *typecheck_canon_init_union(tc_state_t *tcs, type_t *type,
         if (vec_iter_has_next(iter)) {
             cur_expr = vec_iter_get(iter);
             vec_iter_advance(iter);
-            cur_expr->etype = dest_type; // Set type to first member's type
+
+            // Set type to first member's type if init list
+            if (cur_expr->type == EXPR_INIT_LIST) {
+                cur_expr->etype = dest_type;
+            }
         }
 
         fmark_t *mark = cur_expr == NULL ? NULL : cur_expr->mark;
         expr = ast_expr_create(tcs->tunit, mark, EXPR_INIT_LIST);
         vec_push_back(&expr->init_list.exprs, cur_expr);
     } else {
-        expr_t *head = vec_iter_get(iter);
+        expr_t *head = NULL;
+        if (vec_iter_has_next(iter)) {
+            head = vec_iter_get(iter);
+            vec_iter_advance(iter);
+        }
 
-        if (head->type == EXPR_MEM_ACC) {
+        if (head != NULL && head->type == EXPR_MEM_ACC) {
             // Find the member
             do {
                 if (mem_iter.node != NULL && mem_iter.node->id != NULL &&
@@ -336,11 +350,14 @@ expr_t *typecheck_canon_init_union(tc_state_t *tcs, type_t *type,
                            "expected expression for designated initializer");
                 return NULL;
             }
-            vec_iter_advance(iter);
             head = vec_iter_get(iter);
+            vec_iter_advance(iter);
         }
-        head->etype = dest_type;
-        vec_iter_advance(iter);
+
+        // Set type to first member's type if init list
+        if (head != NULL && head->type == EXPR_INIT_LIST) {
+            head->etype = dest_type;
+        }
 
         if (vec_iter_has_next(iter)) {
             logger_log(expr->mark, LOG_WARN,

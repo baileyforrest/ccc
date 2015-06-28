@@ -522,8 +522,7 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
     case EXPR_MEM_ACC:
         ast_expr_print(expr->mem_acc.base, 0, dest, remain);
         ast_oper_print(expr->mem_acc.op, dest, remain);
-        ast_directed_print(dest, remain, "%s", expr->mem_acc.name, dest,
-                           remain);
+        ast_directed_print(dest, remain, "%s", expr->mem_acc.name);
         break;
     case EXPR_ARR_IDX:
         ast_expr_print(expr->arr_idx.array, 0, dest, remain);
@@ -533,17 +532,50 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
         break;
     case EXPR_INIT_LIST: {
         ast_directed_print(dest, remain, "{\n");
+
+        vec_iter_t iter = { &expr->init_list.exprs, 0 };
         bool first = true;
-        SL_FOREACH(cur, &expr->cmpd.exprs) {
+
+        for (;vec_iter_has_next(&iter); vec_iter_advance(&iter)) {
+            expr_t *cur = vec_iter_get(&iter);
+
             if (first) {
                 first = false;
             } else {
                 ast_directed_print(dest, remain, ",\n");
             }
             PRINT_INDENT(indent + 1);
-            ast_expr_print(GET_ELEM(&expr->cmpd.exprs, cur), indent + 1,
-                           dest, remain);
+
+            // Handle designated initializers
+            if (cur->type == EXPR_MEM_ACC || cur->type == EXPR_ARR_IDX) {
+                do {
+                    if (cur->type == EXPR_MEM_ACC) {
+                        ast_directed_print(dest, remain, ".");
+                        ast_directed_print(dest, remain, "%s",
+                                           cur->mem_acc.name);
+                    } else { // cur->type == EXPR_ARR_IDX
+                        ast_directed_print(dest, remain, "[");
+                        ast_expr_print(expr->arr_idx.index, 0, dest, remain);
+                        ast_directed_print(dest, remain, "]");
+                    }
+                    vec_iter_advance(&iter);
+                    if (!vec_iter_has_next(&iter)) {
+                        break;
+                    }
+                    cur = vec_iter_get(&iter);
+                } while (cur->type == EXPR_MEM_ACC ||
+                         cur->type == EXPR_ARR_IDX);
+
+                ast_directed_print(dest, remain, " = ");
+            }
+
+            if (!vec_iter_has_next(&iter)) {
+                break;
+            }
+
+            ast_expr_print(cur, indent + 1, dest, remain);
         }
+
         ast_directed_print(dest, remain, "\n");
         PRINT_INDENT(indent);
         ast_directed_print(dest, remain, "}");

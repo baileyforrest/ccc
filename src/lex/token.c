@@ -33,7 +33,7 @@
 #define INT_PARAM_LIT(val) { false, false, false, val }
 
 #define INT_TOK_LIT(param) \
-    { INTLIT, 0, NULL, &fmark_built_in, STR_SET_LIT, .int_params = &param }
+    { INTLIT, 0, NULL, &fmark_built_in, STR_SET_LIT, { .int_params = &param } }
 
 static token_int_params_t zero_params = INT_PARAM_LIT(0);
 token_t token_int_zero = INT_TOK_LIT(zero_params);
