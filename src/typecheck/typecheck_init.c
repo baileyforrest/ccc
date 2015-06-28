@@ -19,6 +19,7 @@
 /**
  * Initializer typechecking functions
  */
+// TODO0: Now NULL is being returned both for errors and zero initializer...
 
 #include "typecheck_priv.h"
 #include "typecheck_init_priv.h"
@@ -26,6 +27,7 @@
 #include "util/logger.h"
 
 bool typecheck_init_list(tc_state_t *tcs, type_t *type, expr_t *expr) {
+    assert(expr != NULL);
     assert(expr->type == EXPR_INIT_LIST);
     type = ast_type_unmod(type);
     if (!typecheck_canon_init(tcs, type, expr)) {
@@ -493,15 +495,13 @@ expr_t *typecheck_canon_init_helper(tc_state_t *tcs, type_t *type,
                        "braces around scalar initializer");
         }
 
-        // Remove nested initializers for scalars
-        while (result->type == EXPR_INIT_LIST) {
+        if (result->type == EXPR_INIT_LIST) {
             vec_t *vec = &result->init_list.exprs;
             switch (vec_size(vec)) {
             case 0:
                 logger_log(result->mark, LOG_ERR, "empty scalar initializer");
                 return NULL;
             case 1:
-                result = vec_front(vec);
                 break;
             default:
                 logger_log(result->mark, LOG_WARN,
@@ -524,6 +524,15 @@ bool typecheck_canon_init(tc_state_t *tcs, type_t *type, expr_t *expr) {
     vec_iter_t iter = { &temp, 0 };
     expr_t *result = typecheck_canon_init_helper(tcs, type, &iter, expr);
     vec_destroy(&temp);
+
+    // Handle compound literals. We want to preserve the outer init list for
+    // scalars
+    if (type->type != TYPE_STRUCT && type->type != TYPE_UNION &&
+        type->type != TYPE_ARR) {
+        assert(result != expr);
+        vec_init(&expr->init_list.exprs, 1);
+        vec_push_back(&expr->init_list.exprs, result);
+    }
 
     return result != NULL;
 }
