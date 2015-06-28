@@ -188,6 +188,7 @@ expr_t *typecheck_canon_init_struct(tc_state_t *tcs, type_t *type,
 
     // Current member number
     size_t cur_off = 0;
+    size_t iters = 0;
 
     // Current member we're working on in the struct
     struct_iter_t mem_iter;
@@ -209,6 +210,13 @@ expr_t *typecheck_canon_init_struct(tc_state_t *tcs, type_t *type,
         }
 
         expr_t *cur = vec_iter_get(iter);
+
+        // If this isn't this type's init list, and we already matched one
+        // element, then ignore the next element if its a designated initializer
+        if (expr == NULL && iters > 0 &&
+            (cur->type == EXPR_ARR_IDX || cur->type == EXPR_MEM_ACC)) {
+            break;
+        }
 
         // Handle designated initalizer to change index
         if (cur->type == EXPR_MEM_ACC) {
@@ -269,12 +277,16 @@ expr_t *typecheck_canon_init_struct(tc_state_t *tcs, type_t *type,
 
         struct_iter_advance(&mem_iter);
         ++cur_off;
+        ++iters;
     }
 
     if (expr == NULL) {
         fmark_t *mark = NULL;
         if (vec_size(&new_vec) > 0) {
-            mark = ((expr_t *)vec_front(&new_vec))->mark;
+            expr_t *front = vec_front(&new_vec);
+            if (front != NULL) {
+                mark = front->mark;
+            }
         }
 
         expr = ast_expr_create(tcs->tunit, mark, EXPR_INIT_LIST);
@@ -393,9 +405,17 @@ expr_t *typecheck_canon_init_arr(tc_state_t *tcs, type_t *type,
     size_t index = 0;
 
     size_t max_idx = 0; // Max index we encountered
+    size_t iters = 0; // Number of elements successfully set
 
     while (vec_iter_has_next(iter)) {
         expr_t *cur = vec_iter_get(iter);
+
+        // If this isn't this type's init list, and we already matched one
+        // element, then ignore the next element if its a designated initializer
+        if (expr == NULL && iters > 0 &&
+            (cur->type == EXPR_ARR_IDX || cur->type == EXPR_MEM_ACC)) {
+            break;
+        }
 
         // Handle designated initalizer to change index
         if (cur->type == EXPR_ARR_IDX) {
@@ -462,6 +482,7 @@ expr_t *typecheck_canon_init_arr(tc_state_t *tcs, type_t *type,
         vec_set(&idx_map, index, val);
 
         ++index;
+        ++iters;
     }
 
     vec_resize(&idx_map, max_idx + 1);
@@ -469,7 +490,10 @@ expr_t *typecheck_canon_init_arr(tc_state_t *tcs, type_t *type,
     if (expr == NULL) {
         fmark_t *mark = NULL;
         if (vec_size(&idx_map) > 0) {
-            mark = ((expr_t *)vec_front(&idx_map))->mark;
+            expr_t *front = vec_front(&idx_map);
+            if (front != NULL) {
+                mark = front->mark;
+            }
         }
 
         expr = ast_expr_create(tcs->tunit, mark, EXPR_INIT_LIST);

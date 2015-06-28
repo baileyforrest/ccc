@@ -555,7 +555,7 @@ void ast_expr_print(expr_t *expr, int indent, char **dest, size_t *remain) {
                                            cur->mem_acc.name);
                     } else { // cur->type == EXPR_ARR_IDX
                         ast_directed_print(dest, remain, "[");
-                        ast_expr_print(expr->arr_idx.index, 0, dest, remain);
+                        ast_expr_print(cur->arr_idx.index, 0, dest, remain);
                         ast_directed_print(dest, remain, "]");
                     }
                     vec_iter_advance(&iter);
