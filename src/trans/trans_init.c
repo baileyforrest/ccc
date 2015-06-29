@@ -193,8 +193,11 @@ void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
         if (cur_ast_type != NULL) {
             ir_type_t *cur_type = vec_get(&struct_type->struct_params.types,
                                           offset);
+            ir_type_t *p_cur_type = ir_type_create(ts->tunit, IR_TYPE_PTR);
+            p_cur_type->ptr.base = cur_type;
+
             ir_expr_t *cur_addr = ir_expr_create(ts->tunit, IR_EXPR_GETELEMPTR);
-            cur_addr->getelemptr.type = cur_type;
+            cur_addr->getelemptr.type = p_cur_type;
             cur_addr->getelemptr.ptr_type = ptr_type;
             cur_addr->getelemptr.ptr_val = addr;
 
