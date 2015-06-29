@@ -222,12 +222,20 @@ expr_t *typecheck_canon_init_struct(tc_state_t *tcs, type_t *type,
         if (cur->type == EXPR_MEM_ACC) {
             struct_iter_init(type, &mem_iter);
             cur_off = 0;
+            bool in_anon = false;
 
             do {
                 if (mem_iter.node != NULL && mem_iter.node->id != NULL &&
                     strcmp(mem_iter.node->id, cur->mem_acc.name) == 0) {
                     elem_type = mem_iter.node->type;
                     // Found the member
+                    break;
+                }
+                if (struct_iter_has_anon_struct(&mem_iter) &&
+                    ast_type_find_member(mem_iter.decl->type,
+                                         cur->mem_acc.name, NULL) != NULL) {
+                    elem_type = mem_iter.decl->type;
+                    in_anon = true;
                     break;
                 }
                 ++cur_off;
@@ -245,8 +253,12 @@ expr_t *typecheck_canon_init_struct(tc_state_t *tcs, type_t *type,
                            "Expected expression for designated initializer");
                 goto fail;
             }
-            vec_iter_advance(iter);
-            cur = vec_iter_get(iter);
+            // If its in an anonymous member, then we don't want to consume
+            // the designated initializer
+            if (!in_anon) {
+                vec_iter_advance(iter);
+                cur = vec_iter_get(iter);
+            }
         }
 
         // We reached the end of the struct
@@ -316,65 +328,59 @@ expr_t *typecheck_canon_init_union(tc_state_t *tcs, type_t *type,
     dest_type = mem_iter.node == NULL ?
         mem_iter.decl->type : mem_iter.node->type;
 
+    expr_t *head = NULL;
+    if (vec_iter_has_next(iter)) {
+        head = vec_iter_get(iter);
+        vec_iter_advance(iter);
+    }
+
+    if (head != NULL && head->type == EXPR_MEM_ACC) {
+        // Find the member
+        do {
+            if (struct_iter_has_node(&mem_iter) &&
+                strcmp(mem_iter.node->id, head->mem_acc.name) == 0) {
+                dest_type = mem_iter.node->type;
+                break;
+            }
+            if (struct_iter_has_anon_struct(&mem_iter) &&
+                ast_type_find_member(mem_iter.decl->type,
+                                     head->mem_acc.name, NULL) != NULL) {
+                dest_type = mem_iter.decl->type;
+                break;
+            }
+        } while (struct_iter_advance(&mem_iter));
+
+        if (struct_iter_end(&mem_iter)) {
+            logger_log(head->mark, LOG_ERR,
+                       "unknown field '%s' specified in initializer",
+                       head->mem_acc.name);
+            return NULL;
+        }
+
+        if (!vec_iter_has_next(iter)) {
+            logger_log(head->mark, LOG_ERR,
+                       "expected expression for designated initializer");
+            return NULL;
+        }
+        head = vec_iter_get(iter);
+        vec_iter_advance(iter);
+    }
+
+    // Set type to first member's type if init list
+    if (head != NULL && head->type == EXPR_INIT_LIST) {
+        head->etype = dest_type;
+    }
+
     if (expr == NULL) {
-        // No init list provided. Create one, and take one element off of
-        // the iterator
-        expr_t *cur_expr = NULL;
-        if (vec_iter_has_next(iter)) {
-            cur_expr = vec_iter_get(iter);
-            vec_iter_advance(iter);
-
-            // Set type to first member's type if init list
-            if (cur_expr->type == EXPR_INIT_LIST) {
-                cur_expr->etype = dest_type;
-            }
-        }
-
-        fmark_t *mark = cur_expr == NULL ? NULL : cur_expr->mark;
+        fmark_t *mark = head == NULL ? NULL : head->mark;
         expr = ast_expr_create(tcs->tunit, mark, EXPR_INIT_LIST);
-        vec_push_back(&expr->init_list.exprs, cur_expr);
+        vec_push_back(&expr->init_list.exprs, head);
     } else {
-        expr_t *head = NULL;
-        if (vec_iter_has_next(iter)) {
-            head = vec_iter_get(iter);
-            vec_iter_advance(iter);
-        }
-
-        if (head != NULL && head->type == EXPR_MEM_ACC) {
-            // Find the member
-            do {
-                if (mem_iter.node != NULL && mem_iter.node->id != NULL &&
-                    strcmp(mem_iter.node->id, head->mem_acc.name) == 0) {
-                    dest_type = mem_iter.node->type;
-                    break;
-                }
-            } while (struct_iter_advance(&mem_iter));
-
-            if (struct_iter_end(&mem_iter)) {
-                logger_log(head->mark, LOG_ERR,
-                           "unknown field '%s' specified in initializer",
-                           head->mem_acc.name);
-                return NULL;
-            }
-
-            if (!vec_iter_has_next(iter)) {
-                logger_log(head->mark, LOG_ERR,
-                           "expected expression for designated initializer");
-                return NULL;
-            }
-            head = vec_iter_get(iter);
-            vec_iter_advance(iter);
-        }
-
-        // Set type to first member's type if init list
-        if (head != NULL && head->type == EXPR_INIT_LIST) {
-            head->etype = dest_type;
-        }
-
         if (vec_iter_has_next(iter)) {
             logger_log(expr->mark, LOG_WARN,
                        "excess elements in union initializer");
         }
+
         vec_resize(iter->vec, 1);
         vec_set(iter->vec, 0, head);
 
