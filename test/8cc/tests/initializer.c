@@ -3,6 +3,8 @@
 
 #include "test.h"
 
+#include <string.h>
+
 static void verify(int *expected, int *got, int len) {
     for (int i = 0; i < len; i++)
         expect(expected[i], got[i]);

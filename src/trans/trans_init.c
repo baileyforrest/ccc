@@ -31,6 +31,13 @@
 void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                        type_t *ast_type, ir_type_t *ir_type, ir_expr_t *addr,
                        expr_t *val) {
+
+    // Handle compound literal
+    if (val != NULL && val->type == EXPR_CAST &&
+        val->cast.base->type == EXPR_INIT_LIST) {
+        val = val->cast.base;
+    }
+
     switch (ast_type->type) {
     case TYPE_STRUCT:
         trans_initializer_struct(ts, ir_stmts, ast_type, ir_type, addr, val);
