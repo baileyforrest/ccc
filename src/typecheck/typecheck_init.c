@@ -144,6 +144,22 @@ bool typecheck_init_list_helper(tc_state_t *tcs, type_t *type, expr_t *expr) {
         // Set array length to the number of elems in the init list
         if (type->arr.len == NULL) {
             type->arr.nelems = len;
+
+            // If this is a string in an init list, set the length to the
+            // length of the string
+            type_t *base_type = ast_type_unmod(type->arr.base);
+            if (base_type->type == TYPE_CHAR) {
+                expr_t *test = expr;
+                while (test != NULL && test->type == EXPR_INIT_LIST) {
+                    if (vec_size(&test->init_list.exprs) == 0) {
+                        break;
+                    }
+                    test = vec_front(&test->init_list.exprs);
+                }
+                if (test->type == EXPR_CONST_STR) {
+                    type->arr.nelems = strlen(test->const_val.str_val) + 1;
+                }
+            }
         }
 
         if (decl_len >= 0 && decl_len < len) {

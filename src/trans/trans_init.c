@@ -43,13 +43,29 @@ void trans_initializer(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
         trans_initializer_struct(ts, ir_stmts, ast_type, ir_type, addr, val);
         break;
     case TYPE_ARR: {
-        if (val != NULL && val->type == EXPR_CONST_STR) {
-            assert(val->etype->type == TYPE_ARR);
-            size_t len = val->etype->arr.nelems;
-            ir_expr_t *string_expr = trans_string(ts, val->const_val.str_val);
-            string_expr = trans_assign_temp(ts, ir_stmts, string_expr);
-            trans_memcpy(ts, ir_stmts, addr, string_expr, len, 1, false);
-            return;
+        type_t *base_type = ast_type_unmod(ast_type->arr.base);
+
+        if (base_type->type == TYPE_CHAR) {
+            // Strings are handled differently. They are in global storage and
+            // then copied into place
+
+            // Look for a string in initializer lists
+            expr_t *test = val;
+            while (test != NULL && test->type == EXPR_INIT_LIST) {
+                if (vec_size(&test->init_list.exprs) == 0) {
+                    break;
+                }
+                test = vec_front(&test->init_list.exprs);
+            }
+            if (test != NULL && test->type == EXPR_CONST_STR) {
+                assert(test->etype->type == TYPE_ARR);
+                size_t len = test->etype->arr.nelems;
+                ir_expr_t *string_expr =
+                    trans_string(ts, test->const_val.str_val);
+                string_expr = trans_assign_temp(ts, ir_stmts, string_expr);
+                trans_memcpy(ts, ir_stmts, addr, string_expr, len, 1, false);
+                return;
+            }
         }
         assert(val == NULL || val->type == EXPR_INIT_LIST);
         assert(ir_type->type == IR_TYPE_ARR);
