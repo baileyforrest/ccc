@@ -169,7 +169,7 @@ void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
                 // Handle bitfields
                 ir_type_t *cur_type = trans_type(ts, iter.node->type);
                 ir_expr_t *cur_val;
-                if (!vec_iter_has_next(&vec_iter)) {
+                if (val == NULL || !vec_iter_has_next(&vec_iter)) {
                     cur_val = ir_expr_zero(ts->tunit, cur_type);
                 } else {
                     expr_t *elem = vec_iter_get(&vec_iter);
@@ -212,7 +212,7 @@ void trans_initializer_struct(trans_state_t *ts, ir_inst_stream_t *ir_stmts,
             cur_addr = trans_assign_temp(ts, ir_stmts, cur_addr);
 
             expr_t *elem = NULL;
-            if (vec_iter_has_next(&vec_iter)) {
+            if (val != NULL && vec_iter_has_next(&vec_iter)) {
                 elem = vec_iter_get(&vec_iter);
                 vec_iter_advance(&vec_iter);
             }
